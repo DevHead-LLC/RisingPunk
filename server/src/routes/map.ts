@@ -40,16 +40,17 @@ function getDisplayLevel(userLevelAssociation: number): number {
   return mapping[userLevelAssociation] || 1;
 }
 
-// Map name used by World Chat; only this name may be auto-created if missing (Bugbot).
+// Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
 const MAP_CHAT_ALLOWED_AUTO_CREATE_NAME = 'main';
 
-// Serialize bootstrap per map name; clear chain on rejection so one failure doesn't leave it stuck (Bugbot).
+// Serialize bootstrap per map name so concurrent first requests don't race in generateMap (Bugbot: non-atomic chat map bootstrap).
 const mapBootstrapChains = new Map<string, Promise<void>>();
 
 async function ensureMapExistsForChat(mapName: string): Promise<void> {
   const run = async (): Promise<void> => {
     const exists = await MapModel.exists({ name: mapName });
     if (!exists) await mapService.generateMap(mapName);
+    // Do not swallow errors: bootstrap failures must surface as 500, not 400 Invalid map name (Bugbot).
   };
   let chain = mapBootstrapChains.get(mapName);
   if (!chain) {
@@ -58,15 +59,12 @@ async function ensureMapExistsForChat(mapName: string): Promise<void> {
   }
   const next = chain.then(() => run());
   mapBootstrapChains.set(mapName, next);
-  await next.catch((err) => {
-    mapBootstrapChains.delete(mapName);
-    throw err;
-  });
+  await next;
 }
 
 // Map chat (world chat) - MUST be before /:name to avoid route conflict
 // Visibility is gated by user.unlockedFeatures.hackRig; only users who have unlocked the hack rig can read/send.
-// Restrict mapName to existing maps (or main: create on first use) to prevent storage abuse (Bugbot).
+// Restrict mapName to existing maps (or main: create on first use) to prevent storage abuse via arbitrary names (Bugbot).
 router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -81,13 +79,6 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
       return;
     }
     const normalizedMapName = mapName.trim();
-
-    const user = await User.findById(userId).select('unlockedFeatures').lean();
-    if (!user?.unlockedFeatures?.hackRig) {
-      res.status(403).json({ error: 'Hack rig must be unlocked to access world chat' });
-      return;
-    }
-
     let mapExists = await MapModel.exists({ name: normalizedMapName });
     if (!mapExists) {
       if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
@@ -98,6 +89,12 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
         res.status(400).json({ error: 'Invalid map name' });
         return;
       }
+    }
+
+    const user = await User.findById(userId).select('unlockedFeatures').lean();
+    if (!user?.unlockedFeatures?.hackRig) {
+      res.status(403).json({ error: 'Hack rig must be unlocked to access world chat' });
+      return;
     }
 
     const messages = await MapChatMessage.find({ mapName: normalizedMapName })
@@ -146,17 +143,6 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       return;
     }
     const normalizedMapName = mapName.trim();
-
-    const user = await User.findById(userId).select('handle unlockedFeatures').lean();
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-    if (!user.unlockedFeatures?.hackRig) {
-      res.status(403).json({ error: 'Hack rig must be unlocked to send world chat messages' });
-      return;
-    }
-
     let mapExists = await MapModel.exists({ name: normalizedMapName });
     if (!mapExists) {
       if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
@@ -167,6 +153,16 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
         res.status(400).json({ error: 'Invalid map name' });
         return;
       }
+    }
+
+    const user = await User.findById(userId).select('handle unlockedFeatures').lean();
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (!user.unlockedFeatures?.hackRig) {
+      res.status(403).json({ error: 'Hack rig must be unlocked to send world chat messages' });
+      return;
     }
 
     const { message } = req.body;
@@ -208,57 +204,62 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       entryToIncrement.count += 1;
     }
 
-    let chatMessage: InstanceType<typeof MapChatMessage>;
     try {
-      const filteredMessage = filterBadWords(trimmedMessage);
+      let chatMessage: InstanceType<typeof MapChatMessage>;
+      try {
+        const filteredMessage = filterBadWords(trimmedMessage);
 
-      chatMessage = new MapChatMessage({
-        mapName: normalizedMapName,
-        userId,
-        username: user.handle || 'Unknown',
-        message: filteredMessage,
-        originalMessage: trimmedMessage,
-      });
-
-      await chatMessage.save();
-    } catch (saveError: any) {
-      // Refund only when save (or pre-save) failed; do not refund if save succeeded and post-save steps fail (Bugbot).
-      const entry = mapChatRateLimit.get(rateLimitKey);
-      if (entry) {
-        entry.count -= 1;
-        if (entry.count <= 0) mapChatRateLimit.delete(rateLimitKey);
-      }
-      throw saveError;
-    }
-
-    const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
-    if (totalMessages > 100) {
-      const cutoff = await MapChatMessage.findOne(
-        { mapName: normalizedMapName },
-        { createdAt: 1, _id: 1 },
-        { sort: { createdAt: -1, _id: -1 }, skip: 99, lean: true }
-      );
-      if (cutoff) {
-        await MapChatMessage.deleteMany({
+        chatMessage = new MapChatMessage({
           mapName: normalizedMapName,
-          $or: [
-            { createdAt: { $lt: cutoff.createdAt } },
-            { createdAt: cutoff.createdAt, _id: { $lt: cutoff._id } },
-          ],
+          userId,
+          username: user.handle || 'Unknown',
+          message: filteredMessage,
+          originalMessage: trimmedMessage,
         });
-      }
-    }
 
-    res.json({
-      success: true,
-      message: {
-        id: (chatMessage._id as mongoose.Types.ObjectId).toString(),
-        userId: (chatMessage.userId as mongoose.Types.ObjectId).toString(),
-        username: chatMessage.username,
-        message: chatMessage.message,
-        timestamp: chatMessage.createdAt,
-      },
-    });
+        await chatMessage.save();
+      } catch (saveError: any) {
+        // Refund only when save (or pre-save) failed; do not refund if save succeeded and post-save steps fail (Bugbot).
+        const entry = mapChatRateLimit.get(rateLimitKey);
+        if (entry) {
+          entry.count -= 1;
+          if (entry.count <= 0) mapChatRateLimit.delete(rateLimitKey);
+        }
+        throw saveError;
+      }
+
+      const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
+      if (totalMessages > 100) {
+        const cutoff = await MapChatMessage.findOne(
+          { mapName: normalizedMapName },
+          { createdAt: 1, _id: 1 },
+          { sort: { createdAt: -1, _id: -1 }, skip: 99, lean: true }
+        );
+        if (cutoff) {
+          await MapChatMessage.deleteMany({
+            mapName: normalizedMapName,
+            $or: [
+              { createdAt: { $lt: cutoff.createdAt } },
+              { createdAt: cutoff.createdAt, _id: { $lt: cutoff._id } },
+            ],
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        message: {
+          id: (chatMessage._id as mongoose.Types.ObjectId).toString(),
+          userId: (chatMessage.userId as mongoose.Types.ObjectId).toString(),
+          username: chatMessage.username,
+          message: chatMessage.message,
+          timestamp: chatMessage.createdAt,
+        },
+      });
+    } catch (saveOrDownstreamError: any) {
+      // Post-save failures (retention, res.json) must not refund; only the inner catch above refunds on save failure (Bugbot).
+      throw saveOrDownstreamError;
+    }
   } catch (error: any) {
     console.error('Error sending map chat message:', error);
     res.status(500).json({ error: 'Internal server error' });
