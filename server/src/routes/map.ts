@@ -43,6 +43,28 @@ function getDisplayLevel(userLevelAssociation: number): number {
 // Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
 const MAP_CHAT_ALLOWED_AUTO_CREATE_NAME = 'main';
 
+// Serialize bootstrap per map name so concurrent first requests don't race in generateMap (Bugbot: non-atomic chat map bootstrap).
+const mapBootstrapChains = new Map<string, Promise<void>>();
+
+async function ensureMapExistsForChat(mapName: string): Promise<void> {
+  const run = async (): Promise<void> => {
+    try {
+      const exists = await MapModel.exists({ name: mapName });
+      if (!exists) await mapService.generateMap(mapName);
+    } catch {
+      // Caller will recheck exists(); duplicate or other error is handled there.
+    }
+  };
+  let chain = mapBootstrapChains.get(mapName);
+  if (!chain) {
+    chain = Promise.resolve();
+    mapBootstrapChains.set(mapName, chain);
+  }
+  const next = chain.then(() => run());
+  mapBootstrapChains.set(mapName, next);
+  await next;
+}
+
 // Map chat (world chat) - MUST be before /:name to avoid route conflict
 // Visibility is gated by user.unlockedFeatures.hackRig; only users who have unlocked the hack rig can read/send.
 // Restrict mapName to existing maps (or main: create on first use) to prevent storage abuse via arbitrary names (Bugbot).
@@ -63,7 +85,7 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
     let mapExists = await MapModel.exists({ name: normalizedMapName });
     if (!mapExists) {
       if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
-        await mapService.generateMap(normalizedMapName);
+        await ensureMapExistsForChat(normalizedMapName);
         mapExists = await MapModel.exists({ name: normalizedMapName });
       }
       if (!mapExists) {
@@ -127,7 +149,7 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
     let mapExists = await MapModel.exists({ name: normalizedMapName });
     if (!mapExists) {
       if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
-        await mapService.generateMap(normalizedMapName);
+        await ensureMapExistsForChat(normalizedMapName);
         mapExists = await MapModel.exists({ name: normalizedMapName });
       }
       if (!mapExists) {
