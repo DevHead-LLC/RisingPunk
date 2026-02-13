@@ -13,10 +13,18 @@ const router: Router = express.Router();
 const mapService = new MapService();
 
 // Rate limit for map chat POST: per user per map, max 10 messages per 60s to prevent spam/abuse (Bugbot).
-// Evict expired-window entries so the Map does not grow unbounded (Bugbot: in-memory leak).
+// Evict expired entries on each POST so the Map stays bounded (Bugbot: keys for users who stop posting are never revisited otherwise).
 const MAP_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const MAP_CHAT_RATE_LIMIT_MAX = 10;
 const mapChatRateLimit = new Map<string, { count: number; windowStartMs: number }>();
+
+function evictExpiredMapChatRateLimitEntries(nowMs: number): void {
+  for (const [key, val] of mapChatRateLimit.entries()) {
+    if (nowMs - val.windowStartMs >= MAP_CHAT_RATE_LIMIT_WINDOW_MS) {
+      mapChatRateLimit.delete(key);
+    }
+  }
+}
 
 function getDisplayLevel(userLevelAssociation: number): number {
   const mapping: { [key: number]: number } = {
@@ -128,6 +136,7 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
     const normalizedMapName = mapName.trim();
     const rateLimitKey = `${userId}:${normalizedMapName}`;
     const nowMs = Date.now();
+    evictExpiredMapChatRateLimitEntries(nowMs);
     const entry = mapChatRateLimit.get(rateLimitKey);
     if (entry) {
       if (nowMs - entry.windowStartMs >= MAP_CHAT_RATE_LIMIT_WINDOW_MS) {
@@ -162,16 +171,18 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
 
     const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
     if (totalMessages > 100) {
-      const messages = await MapChatMessage.find({ mapName: normalizedMapName })
-        .sort({ createdAt: -1 })
-        .limit(100)
-        .select('createdAt')
-        .lean();
-      if (messages.length > 0) {
-        const oldestKeptTimestamp = messages[messages.length - 1].createdAt;
+      const cutoff = await MapChatMessage.findOne(
+        { mapName: normalizedMapName },
+        { createdAt: 1, _id: 1 },
+        { sort: { createdAt: -1, _id: -1 }, skip: 99, lean: true }
+      );
+      if (cutoff) {
         await MapChatMessage.deleteMany({
           mapName: normalizedMapName,
-          createdAt: { $lt: oldestKeptTimestamp },
+          $or: [
+            { createdAt: { $lt: cutoff.createdAt } },
+            { createdAt: cutoff.createdAt, _id: { $lt: cutoff._id } },
+          ],
         });
       }
     }
