@@ -42,6 +42,7 @@ function getDisplayLevel(userLevelAssociation: number): number {
 
 // Map chat (world chat) - MUST be before /:name to avoid route conflict
 // Visibility is gated by user.unlockedFeatures.hackRig; only users who have unlocked the hack rig can read/send.
+// Restrict mapName to maps that exist to prevent storage abuse via arbitrary names (Bugbot).
 router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -55,6 +56,12 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
       res.status(400).json({ error: 'Valid map name is required' });
       return;
     }
+    const normalizedMapName = mapName.trim();
+    const mapExists = await MapModel.exists({ name: normalizedMapName });
+    if (!mapExists) {
+      res.status(400).json({ error: 'Invalid map name' });
+      return;
+    }
 
     const user = await User.findById(userId).select('unlockedFeatures').lean();
     if (!user?.unlockedFeatures?.hackRig) {
@@ -62,7 +69,7 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
       return;
     }
 
-    const messages = await MapChatMessage.find({ mapName: mapName.trim() })
+    const messages = await MapChatMessage.find({ mapName: normalizedMapName })
       .sort({ createdAt: -1 })
       .limit(100)
       .lean();
@@ -93,6 +100,7 @@ interface SendMapChatMessageRequest extends Request {
   };
 }
 
+// Restrict mapName to maps that exist to prevent storage abuse via arbitrary names (Bugbot).
 router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageRequest, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -104,6 +112,12 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
     const { mapName } = req.params;
     if (!mapName || typeof mapName !== 'string' || mapName.trim().length === 0) {
       res.status(400).json({ error: 'Valid map name is required' });
+      return;
+    }
+    const normalizedMapName = mapName.trim();
+    const mapExists = await MapModel.exists({ name: normalizedMapName });
+    if (!mapExists) {
+      res.status(400).json({ error: 'Invalid map name' });
       return;
     }
 
@@ -133,7 +147,6 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       return;
     }
 
-    const normalizedMapName = mapName.trim();
     const rateLimitKey = `${userId}:${normalizedMapName}`;
     const nowMs = Date.now();
     evictExpiredMapChatRateLimitEntries(nowMs);
