@@ -878,8 +878,8 @@ function applyUserProfilePayload(
   state.user.level = typeof payload.level === 'number' ? payload.level : state.user.level;
   state.user.unlockedFeatures = (payload.unlockedFeatures as User['unlockedFeatures']) ?? state.user.unlockedFeatures;
   state.user.profileGender = (payload.profileGender as User['profileGender']) ?? state.user.profileGender;
-  state.user.onboardingCompleted = payload.onboardingCompleted === true;
-  state.user.needsHandleSelection = payload.needsHandleSelection === true;
+  if (typeof payload.onboardingCompleted === 'boolean') state.user.onboardingCompleted = payload.onboardingCompleted;
+  if (typeof payload.needsHandleSelection === 'boolean') state.user.needsHandleSelection = payload.needsHandleSelection;
   state.user.totalGuardiansBuilt = typeof payload.totalGuardiansBuilt === 'number' ? payload.totalGuardiansBuilt : (state.user.totalGuardiansBuilt ?? 0);
   if (typeof payload.isGuest === 'boolean') state.user.isGuest = payload.isGuest;
   if (typeof payload.hasPassword === 'boolean') state.user.hasPassword = payload.hasPassword;
