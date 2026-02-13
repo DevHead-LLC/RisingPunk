@@ -19,7 +19,7 @@ import {BattleGridScreen} from './BattleGridScreen';
 import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
-import {fetchInitialData, setOnboardingCompleted, setShowOnboarding, setShowEmailVerification, setEmailVerificationPrompted} from '../store/slices/authSlice';
+import {fetchInitialData, setOnboardingCompleted, setShowOnboarding, setShowEmailVerification, setEmailVerificationPrompted, refreshUserDataSilent} from '../store/slices/authSlice';
 import {mapApi} from '../store/api/mapApi';
 import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation, authApi} from '../store/api/authApi';
 import {OnboardingSlides} from '../components/onboarding';
@@ -27,6 +27,8 @@ import {TurfIntro} from '../components/turf-intro';
 import {TaskGuide} from '../components/turf/TaskGuide';
 import {TaskGuideHighlightOverlay} from '../components/turf/TaskGuideHighlightOverlay';
 import {useTaskGuideHighlight} from '../contexts/TaskGuideHighlightContext';
+import { WorldChatIconButton } from '../components/hackMap/WorldChatIconButton';
+import { WorldChatModal } from '../components/hackMap/WorldChatModal';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any, useAnimatedReaction: any;
@@ -171,6 +173,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [previousScreen, setPreviousScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
+  const [showWorldChatModal, setShowWorldChatModal] = useState(false);
   const horizontalScrollRef = useRef<ScrollView>(null);
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
   const scrollWrapperRef = useRef<View>(null);
@@ -212,6 +215,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   // Email verification state
   const { user, showEmailVerification, emailVerificationPromptedUserId } = useAppSelector((state) => state.auth);
+  const hackRigUnlocked = user?.unlockedFeatures?.hackRig === true;
 
   // Check for email verification on component mount for existing users
   useEffect(() => {
@@ -638,6 +642,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     const previousScreenBeforeUpdate = currentScreen;
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
+    if (screen !== 'turf') {
+      setShowWorldChatModal(false);
+    }
+    // Refetch user silently when entering turf so World Chat icon (gated by hackRig) updates without app refresh. Map refetch is done in HackMapScreen on mount to avoid duplicate request (Bugbot).
+    if (screen === 'turf') {
+      dispatch(refreshUserDataSilent());
+    }
     
     // If returning to turf, handle different behaviors based on previous screen
     if (screen === 'turf') {
@@ -677,7 +688,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         }, 0);
       }
     }
-  }, [currentScreen, turfViewPosition, centerAndroidView, offsetX, offsetY]);
+  }, [currentScreen, turfViewPosition, centerAndroidView, offsetX, offsetY, dispatch]);
 
   const navigateToFloorPlan = useCallback((propertyId: number) => {
     // Capture current turf view position
@@ -1051,12 +1062,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 }}
               />
             )}
-            <ErrorBoundary>
+<ErrorBoundary>
               <Balance isIntroActive={currentIntroStep === 'wallet'} />
             </ErrorBoundary>
-            <View 
+            <View
               ref={scrollWrapperRef}
               style={styles.scrollWrapper}
+              pointerEvents="box-none"
               onLayout={() => {
                 scrollWrapperRef.current?.measureInWindow((x, y) => {
                   scrollWrapperOffsetY.current = y;
@@ -1410,10 +1422,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </View>
               </>
             )}
+            {hackRigUnlocked && (
+              <WorldChatIconButton onPress={() => setShowWorldChatModal(true)} />
+            )}
+            <WorldChatModal
+              visible={showWorldChatModal}
+              onClose={() => setShowWorldChatModal(false)}
+              mapName="main"
+            />
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal]);
 
   return (
     <>
