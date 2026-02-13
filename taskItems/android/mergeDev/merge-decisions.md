@@ -372,6 +372,52 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-13 (merge dev → android_mergeDev)
+
+**Branch context:** Merging origin/dev into android_mergeDev (from androidStaging). Two conflicts: TitleSection (version display), CrewChatModal (inline modal vs BaseChatModal).
+
+### 1. `mobile/src/components/auth/TitleSection.tsx`
+
+**Conflict:** Version text – hardcoded vs APP_VERSION.
+
+| Side | Content |
+|------|--------|
+| HEAD | `<Text ...>v2.4.1</Text>` (hardcoded) |
+| dev  | `<Text ...>v{APP_VERSION}</Text>` (from appVersion) |
+
+**Resolution:** Accepted **dev**. Final state: `v{APP_VERSION}`.
+
+**Rationale:** Not Android-specific. Single source of truth for version (APP_VERSION) avoids drift; dev’s approach is correct.
+
+**Rejected from HEAD:** Hardcoded v2.4.1.
+
+**Failure-mode hints for later:** None; behavior is improved.
+
+---
+
+### 2. `mobile/src/components/hackMap/CrewChatModal.tsx`
+
+**Conflict:** Inline Modal + ScrollView (HEAD) vs refactored BaseChatModal usage (dev).
+
+| Side | Content |
+|------|--------|
+| HEAD | Full inline implementation: Modal, KeyboardAvoidingView, SafeAreaView, ScrollView with nestedScrollEnabled, FilteredText/FilteredTextInput, report modal, etc. |
+| dev  | `<BaseChatModal ... />` with props (onClose, title, messages, fetchError, isLoadingMessages, onSendMessage, isSending, currentUser, reportContext, getReportContextData). |
+
+**Resolution:** Accepted **dev**. Final state: CrewChatModal uses BaseChatModal with the listed props.
+
+**Rationale:** BaseChatModal already includes Android behavior: `nestedScrollEnabled`, same scroll/at-bottom logic, Modal props, and report flow. Not an Android deployment–specific difference; dev’s refactor is the single shared implementation. Accepting dev keeps one code path for crew and world chat.
+
+**Rejected from HEAD:** Inline duplicate implementation (logic lives in BaseChatModal).
+
+**Failure-mode hints for later:** If crew chat scroll or keyboard behavior regresses on Android, confirm BaseChatModal’s ScrollView still has `nestedScrollEnabled` and KeyboardAvoidingView behavior.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – Android branch verified. Android path uses plain `View style={styles.inputContainer} pointerEvents="box-none"` and TextInput with `onTouchEnd` calling `textInputRef.current?.focus()`. No Pressable or TouchableWithoutFeedback wrapping the handle input on Android. No regression.
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.

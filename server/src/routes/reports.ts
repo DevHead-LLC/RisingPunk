@@ -4,6 +4,7 @@ import { EmailService } from '../services/EmailService';
 import { ReportContext, ReportReason } from '../types/reports';
 import { Crew } from '../models/Crew';
 import { CrewChatMessage } from '../models/CrewChatMessage';
+import { MapChatMessage } from '../models/MapChatMessage';
 import { CrewStatus } from '../models/CrewStatus';
 import mongoose from 'mongoose';
 
@@ -89,6 +90,7 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       'external-message-board',
       'crew-rules',
       'chat-message',
+      'map-chat-message',
     ];
     if (!validContexts.includes(context)) {
       res.status(400).json({ error: 'Invalid context' });
@@ -137,6 +139,7 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       'external-message-board': 'External Message Board',
       'crew-rules': 'Crew Rules',
       'chat-message': 'Chat Message',
+      'map-chat-message': 'Map Chat Message',
     }[context];
 
     // Build context data string, enriching with original content from database when available
@@ -144,10 +147,38 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
     // Note: reportedUserId and reportingUserId are already validated as valid ObjectIds above
     let contextDataString = 'N/A';
     let resolvedCrewId: string | null = null; // Track crewId extracted from database lookups
+    let resolvedMapName: string | null = null; // Track mapName for map-chat-message reports
     if (contextData) {
       const reportedUserIdObj = new mongoose.Types.ObjectId(reportedUserId); // Safe: validated above
       
       switch (context) {
+        case 'map-chat-message': {
+          let messageContent = contextData.message || 'N/A';
+          let hasOriginalContent = false;
+          if (contextData.messageId && mongoose.Types.ObjectId.isValid(contextData.messageId)) {
+            try {
+              const chatMessage = await MapChatMessage.findById(contextData.messageId).lean();
+              if (chatMessage && chatMessage.userId && chatMessage.userId.toString() === reportedUserId) {
+                resolvedMapName = chatMessage.mapName || contextData.mapName || 'N/A';
+                if (chatMessage.originalMessage) {
+                  messageContent = chatMessage.originalMessage;
+                  hasOriginalContent = true;
+                }
+              } else if (contextData.mapName) {
+                resolvedMapName = contextData.mapName;
+              }
+            } catch (error) {
+              console.error('Error looking up original map chat message:', error);
+              if (contextData.mapName) resolvedMapName = contextData.mapName;
+            }
+          } else if (contextData.mapName) {
+            resolvedMapName = contextData.mapName;
+          }
+          const originalLabel = hasOriginalContent ? 'Message (Original)' : 'Message (Content)';
+          const filteredLabel = hasOriginalContent ? 'Message (Filtered)' : 'Message (Filtered - same as content above)';
+          contextDataString = `${originalLabel}: ${messageContent}\n${filteredLabel}: ${contextData.message || 'N/A'}\nMessage ID: ${contextData.messageId || 'N/A'}\nTimestamp: ${contextData.timestamp || 'N/A'}\nMap name: ${resolvedMapName || contextData.mapName || 'N/A'}`;
+          break;
+        }
         case 'chat-message': {
           // Look up original message from database with validation
           let messageContent = contextData.message || 'N/A';
@@ -301,6 +332,7 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
     // Use resolved crewId from database lookup if available, otherwise fall back to contextData
     // This ensures chat-message reports include crewId even if client doesn't send it
     const crewId = resolvedCrewId || contextData?.crewId || 'N/A';
+    const mapName = resolvedMapName || contextData?.mapName || 'N/A';
 
     // Create email content
     const emailSubject = '!!User Report!!';
@@ -321,6 +353,7 @@ REPORTING USER:
 CONTEXT:
   Type: ${contextLabel}
   Crew ID: ${crewId}
+  Map name: ${mapName}
 
 CONTEXT DATA:
 ${contextDataString}
@@ -335,6 +368,7 @@ TIMESTAMP: ${timestamp}
     const escapedReportingUsername = escapeHtml(reportingUsername);
     const escapedReportingUserId = escapeHtml(reportingUserId);
     const escapedCrewId = escapeHtml(String(crewId));
+    const escapedMapName = escapeHtml(String(mapName));
     const escapedContextDataString = escapeHtml(contextDataString);
 
     const emailHtml = `
@@ -362,7 +396,8 @@ TIMESTAMP: ${timestamp}
           <div style="margin-bottom: 20px;">
             <h3>CONTEXT</h3>
             <strong>Type:</strong> ${escapeHtml(contextLabel)}<br/>
-            <strong>Crew ID:</strong> ${escapedCrewId}
+            <strong>Crew ID:</strong> ${escapedCrewId}<br/>
+            <strong>Map name:</strong> ${escapedMapName}
           </div>
           
           <div style="margin-bottom: 20px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffc107;">
