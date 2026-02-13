@@ -40,9 +40,33 @@ function getDisplayLevel(userLevelAssociation: number): number {
   return mapping[userLevelAssociation] || 1;
 }
 
+// Map name used by World Chat; only this name may be auto-created if missing (Bugbot).
+const MAP_CHAT_ALLOWED_AUTO_CREATE_NAME = 'main';
+
+// Serialize bootstrap per map name; clear chain on rejection so one failure doesn't leave it stuck (Bugbot).
+const mapBootstrapChains = new Map<string, Promise<void>>();
+
+async function ensureMapExistsForChat(mapName: string): Promise<void> {
+  const run = async (): Promise<void> => {
+    const exists = await MapModel.exists({ name: mapName });
+    if (!exists) await mapService.generateMap(mapName);
+  };
+  let chain = mapBootstrapChains.get(mapName);
+  if (!chain) {
+    chain = Promise.resolve();
+    mapBootstrapChains.set(mapName, chain);
+  }
+  const next = chain.then(() => run());
+  mapBootstrapChains.set(mapName, next);
+  await next.catch((err) => {
+    mapBootstrapChains.delete(mapName);
+    throw err;
+  });
+}
+
 // Map chat (world chat) - MUST be before /:name to avoid route conflict
 // Visibility is gated by user.unlockedFeatures.hackRig; only users who have unlocked the hack rig can read/send.
-// Restrict mapName to maps that exist to prevent storage abuse via arbitrary names (Bugbot).
+// Restrict mapName to existing maps (or main: create on first use) to prevent storage abuse (Bugbot).
 router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -57,16 +81,23 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
       return;
     }
     const normalizedMapName = mapName.trim();
-    const mapExists = await MapModel.exists({ name: normalizedMapName });
-    if (!mapExists) {
-      res.status(400).json({ error: 'Invalid map name' });
-      return;
-    }
 
     const user = await User.findById(userId).select('unlockedFeatures').lean();
     if (!user?.unlockedFeatures?.hackRig) {
       res.status(403).json({ error: 'Hack rig must be unlocked to access world chat' });
       return;
+    }
+
+    let mapExists = await MapModel.exists({ name: normalizedMapName });
+    if (!mapExists) {
+      if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
+        await ensureMapExistsForChat(normalizedMapName);
+        mapExists = await MapModel.exists({ name: normalizedMapName });
+      }
+      if (!mapExists) {
+        res.status(400).json({ error: 'Invalid map name' });
+        return;
+      }
     }
 
     const messages = await MapChatMessage.find({ mapName: normalizedMapName })
@@ -100,7 +131,7 @@ interface SendMapChatMessageRequest extends Request {
   };
 }
 
-// Restrict mapName to maps that exist to prevent storage abuse via arbitrary names (Bugbot).
+// Same map validation as GET: existing map or auto-create main only (Bugbot).
 router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageRequest, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -115,11 +146,6 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       return;
     }
     const normalizedMapName = mapName.trim();
-    const mapExists = await MapModel.exists({ name: normalizedMapName });
-    if (!mapExists) {
-      res.status(400).json({ error: 'Invalid map name' });
-      return;
-    }
 
     const user = await User.findById(userId).select('handle unlockedFeatures').lean();
     if (!user) {
@@ -129,6 +155,18 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
     if (!user.unlockedFeatures?.hackRig) {
       res.status(403).json({ error: 'Hack rig must be unlocked to send world chat messages' });
       return;
+    }
+
+    let mapExists = await MapModel.exists({ name: normalizedMapName });
+    if (!mapExists) {
+      if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
+        await ensureMapExistsForChat(normalizedMapName);
+        mapExists = await MapModel.exists({ name: normalizedMapName });
+      }
+      if (!mapExists) {
+        res.status(400).json({ error: 'Invalid map name' });
+        return;
+      }
     }
 
     const { message } = req.body;
