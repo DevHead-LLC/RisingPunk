@@ -25,8 +25,10 @@ const filePath = path.join(
 
 const SENTINEL = 'Android 15+ (API 35): getStatusBarColor';
 
+// RN 0.83+ has currentActivity on its own line
 const GET_CONSTANTS_ORIGINAL = `  @Suppress("DEPRECATION")
   override fun getTypedExportedConstants(): Map<String, Any> {
+    val currentActivity = reactApplicationContext.currentActivity
     val statusBarColor =
         currentActivity?.window?.statusBarColor?.let { color ->
           String.format("#%06X", 0xFFFFFF and color)
@@ -35,6 +37,7 @@ const GET_CONSTANTS_ORIGINAL = `  @Suppress("DEPRECATION")
 
 const GET_CONSTANTS_PATCHED = `  @Suppress("DEPRECATION")
   override fun getTypedExportedConstants(): Map<String, Any> {
+    val currentActivity = reactApplicationContext.currentActivity
     // Android 15+ (API 35): getStatusBarColor/setStatusBarColor are deprecated for edge-to-edge.
     // Return default without reading window.statusBarColor to satisfy Play Console.
     val statusBarColor =
