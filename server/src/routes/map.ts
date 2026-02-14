@@ -40,16 +40,17 @@ function getDisplayLevel(userLevelAssociation: number): number {
   return mapping[userLevelAssociation] || 1;
 }
 
-// Map name used by World Chat; only this name may be auto-created if missing (Bugbot).
+// Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
 const MAP_CHAT_ALLOWED_AUTO_CREATE_NAME = 'main';
 
-// Serialize bootstrap per map name; clear chain on rejection so one failure doesn't leave it stuck (Bugbot).
+// Serialize bootstrap per map name so concurrent first requests don't race in generateMap (Bugbot: non-atomic chat map bootstrap).
 const mapBootstrapChains = new Map<string, Promise<void>>();
 
 async function ensureMapExistsForChat(mapName: string): Promise<void> {
   const run = async (): Promise<void> => {
     const exists = await MapModel.exists({ name: mapName });
     if (!exists) await mapService.generateMap(mapName);
+    // Do not swallow errors: bootstrap failures must surface as 500, not 400 Invalid map name (Bugbot).
   };
   let chain = mapBootstrapChains.get(mapName);
   if (!chain) {
@@ -58,6 +59,7 @@ async function ensureMapExistsForChat(mapName: string): Promise<void> {
   }
   const next = chain.then(() => run());
   mapBootstrapChains.set(mapName, next);
+  // On rejection, clear chain so next request can retry; otherwise rejected promise blocks bootstrap until restart (Bugbot).
   await next.catch((err) => {
     mapBootstrapChains.delete(mapName);
     throw err;
@@ -66,7 +68,7 @@ async function ensureMapExistsForChat(mapName: string): Promise<void> {
 
 // Map chat (world chat) - MUST be before /:name to avoid route conflict
 // Visibility is gated by user.unlockedFeatures.hackRig; only users who have unlocked the hack rig can read/send.
-// Restrict mapName to existing maps (or main: create on first use) to prevent storage abuse (Bugbot).
+// Restrict mapName to existing maps (or main: create on first use) to prevent storage abuse via arbitrary names (Bugbot).
 router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -208,17 +210,28 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       entryToIncrement.count += 1;
     }
 
-    const filteredMessage = filterBadWords(trimmedMessage);
+    let chatMessage: InstanceType<typeof MapChatMessage>;
+    try {
+      const filteredMessage = filterBadWords(trimmedMessage);
 
-    const chatMessage = new MapChatMessage({
-      mapName: normalizedMapName,
-      userId,
-      username: user.handle || 'Unknown',
-      message: filteredMessage,
-      originalMessage: trimmedMessage,
-    });
+      chatMessage = new MapChatMessage({
+        mapName: normalizedMapName,
+        userId,
+        username: user.handle || 'Unknown',
+        message: filteredMessage,
+        originalMessage: trimmedMessage,
+      });
 
-    await chatMessage.save();
+      await chatMessage.save();
+    } catch (saveError: any) {
+      // Refund only when save (or pre-save) failed; do not refund if save succeeded and post-save steps fail (Bugbot).
+      const entry = mapChatRateLimit.get(rateLimitKey);
+      if (entry) {
+        entry.count -= 1;
+        if (entry.count <= 0) mapChatRateLimit.delete(rateLimitKey);
+      }
+      throw saveError;
+    }
 
     const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
     if (totalMessages > 100) {
