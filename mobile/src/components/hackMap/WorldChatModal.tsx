@@ -1,28 +1,28 @@
 import React, { useCallback } from 'react';
 import { useAppSelector } from '../../store/hooks';
-import { useGetCrewChatMessagesQuery, useSendCrewChatMessageMutation } from '../../store/api/authApi';
+import { useGetMapChatMessagesQuery, useSendMapChatMessageMutation } from '../../store/api/mapApi';
 import { BaseChatModal, ChatMessageForModal } from './BaseChatModal';
 
-interface CrewChatModalProps {
+interface WorldChatModalProps {
   visible: boolean;
   onClose: () => void;
-  crewId: string;
+  mapName: string;
 }
 
-export const CrewChatModal: React.FC<CrewChatModalProps> = ({
+export const WorldChatModal: React.FC<WorldChatModalProps> = ({
   visible,
   onClose,
-  crewId,
+  mapName,
 }) => {
   const currentUser = useAppSelector((state) => state.auth.user);
 
-  const { data: chatData, error: fetchError, isLoading: isLoadingMessages } = useGetCrewChatMessagesQuery(crewId, {
-    skip: !visible || !crewId,
+  const { data: chatData, error: fetchError, isLoading: isLoadingMessages } = useGetMapChatMessagesQuery(mapName, {
+    skip: !visible || !mapName,
     pollingInterval: visible ? 15000 : 0,
     refetchOnMountOrArgChange: true,
   });
 
-  const [sendMessage, { isLoading: isSending }] = useSendCrewChatMessageMutation();
+  const [sendMessage, { isLoading: isSending }] = useSendMapChatMessageMutation();
 
   const messages: ChatMessageForModal[] = (chatData?.messages?.map((msg) => ({
     id: msg.id,
@@ -34,10 +34,10 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
 
   const onSendMessage = useCallback(
     async (trimmedMessage: string) => {
-      if (!crewId) throw new Error('crewId required');
-      await sendMessage({ crewId, message: trimmedMessage }).unwrap();
+      if (!mapName) throw new Error('mapName required');
+      await sendMessage({ mapName, message: trimmedMessage }).unwrap();
     },
-    [crewId, sendMessage],
+    [mapName, sendMessage],
   );
 
   const getReportContextData = useCallback(
@@ -48,23 +48,23 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
         reportedMessage.timestamp instanceof Date
           ? reportedMessage.timestamp.toISOString()
           : new Date(reportedMessage.timestamp).toISOString(),
-      crewId,
+      mapName,
     }),
-    [crewId],
+    [mapName],
   );
 
   return (
     <BaseChatModal
       visible={visible}
       onClose={onClose}
-      title="Crew Chat"
+      title="World Chat"
       messages={messages}
       fetchError={fetchError}
       isLoadingMessages={isLoadingMessages}
       onSendMessage={onSendMessage}
       isSending={isSending}
       currentUser={currentUser}
-      reportContext="chat-message"
+      reportContext="map-chat-message"
       getReportContextData={getReportContextData}
     />
   );
