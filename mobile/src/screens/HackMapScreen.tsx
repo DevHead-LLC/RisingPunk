@@ -2819,10 +2819,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const lastPress = lastPressTimeRef.current;
     const lastCoords = lastPressCoordsRef.current;
     
-    // Don't handle presses if we're currently panning
-    if (isPanningJS) {
-      return;
-    }
+    // Tap is delivered from gesture layer (Race(Tap, Pan)); Tap only wins for short taps.
+    // Do not gate on isPanningJS: it lags behind the gesture (useAnimatedReaction → setState),
+    // so taps right after pan (or after user-position center) were incorrectly dropped. See tile-tap-reliability.md.
     
     // Debounce: ignore if pressed too soon after last press (but only if same coordinates)
     if (lastCoords && lastCoords.x === x && lastCoords.y === y && now - lastPress < PRESS_DEBOUNCE_MS) {
@@ -2895,29 +2894,35 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     
     setSelectedCell({x, y, info: cellData});
-  }, [currentUserHandle, token, isPanningJS, grid]);
+  }, [currentUserHandle, token, grid]);
 
   // Store handler in ref for stable reference
   handleCellPressRef.current = handleCellPress;
 
   // Tap-at-view coords: use absolute tap position + map view's window position so we get correct cell (e.x/e.y are unreliable when the view has transform). See tile-tap-reliability.md.
+  // Measure map in window at tap time so we don't rely on stale onLayout; Reanimated transform can move the view without firing onLayout.
   const handleTapAtViewCoords = useCallback((absoluteX: number, absoluteY: number, offsetAtTapX: number, offsetAtTapY: number) => {
-    const { x: wx, y: wy } = mapViewWindowRef.current;
-    const viewX = absoluteX - wx;
-    const viewY = absoluteY - wy;
-    const contentX = viewX - MARGIN_SIZE;
-    const contentY = viewY - MARGIN_SIZE;
-    const gridX = contentX - offsetAtTapX;
-    const gridY = contentY - offsetAtTapY;
-    const col = Math.floor(gridX / CELL_SIZE);
-    const row = Math.floor(gridY / CELL_SIZE);
-    if (row < 0 || !grid || row >= grid.length) return;
-    const rowData = grid[row];
-    if (!rowData || col < 0 || col >= rowData.length) return;
-    const cell = rowData[col] as CellData;
-    if (!cell) return;
-    const handler = handleCellPressRef.current;
-    if (handler) handler(col, row, cell);
+    const viewRef = mapViewRef.current;
+    if (!viewRef) return;
+    viewRef.measureInWindow((wx, wy) => {
+      mapViewWindowRef.current = { x: wx, y: wy };
+      // (wx, wy) is the view's rendered top-left (after translate); so view-local tap = (absolute - window).
+      // Grid content starts at (MARGIN_SIZE, MARGIN_SIZE) in view; do NOT subtract pan offset — it's already in (wx, wy).
+      const viewX = absoluteX - wx;
+      const viewY = absoluteY - wy;
+      const contentX = viewX - MARGIN_SIZE;
+      const contentY = viewY - MARGIN_SIZE;
+      const col = Math.floor(contentX / CELL_SIZE);
+      const row = Math.floor(contentY / CELL_SIZE);
+      if (row < 0 || !grid || row >= grid.length) return;
+      const rowData = grid[row];
+      if (!rowData || col < 0 || col >= rowData.length) return;
+      const cell = rowData[col] as CellData;
+      if (!cell) return;
+      const handler = handleCellPressRef.current;
+      if (!handler) return;
+      handler(col, row, cell);
+    });
   }, [grid]);
 
   const tapGesture = useMemo(
