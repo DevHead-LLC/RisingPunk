@@ -327,22 +327,22 @@ type Props = {
  * Shared memo comparison function for Tile and PoolTile components
  * Uses fast path (cell reference equality) with deep comparison fallback
  */
-const tileMemoComparison = <T extends { 
-  x: number; 
-  y: number; 
-  cell: CellData; 
-  selected: boolean; 
-  currentUserHandle?: string | null; 
-  isShieldActive: boolean; 
-  isCrewMember?: boolean; 
-  isWarCrewMember?: boolean; 
-  isAllianceCrewMember?: boolean; 
-  dynamicEntityData: Record<string, any> 
+// Phase 1c: displayName/displayShielded so tile re-renders when minimal→full updates (same cell ref, label changes)
+const tileMemoComparison = <T extends {
+  x: number;
+  y: number;
+  cell: CellData;
+  selected: boolean;
+  currentUserHandle?: string | null;
+  isShieldActive: boolean;
+  isCrewMember?: boolean;
+  isWarCrewMember?: boolean;
+  isAllianceCrewMember?: boolean;
+  dynamicEntityData: Record<string, any>;
+  displayName?: string | undefined;
+  displayShielded?: boolean;
 }>(prevProps: T, nextProps: T): boolean => {
-  // Phase 4: Enhanced memo comparison with fast path and deep fallback
-  // Fast path: Phase 2's stable cell references enable efficient reference equality check
   if (prevProps.cell === nextProps.cell) {
-    // Same cell object reference - check other props that might affect rendering
     return (
       prevProps.x === nextProps.x &&
       prevProps.y === nextProps.y &&
@@ -352,12 +352,12 @@ const tileMemoComparison = <T extends {
       prevProps.isCrewMember === nextProps.isCrewMember &&
       prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
       prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded ===
+      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded &&
+      prevProps.displayName === nextProps.displayName &&
+      prevProps.displayShielded === nextProps.displayShielded
     );
   }
-  
-  // Deep comparison fallback: cell reference changed, check if cell data actually changed
   return (
     prevProps.x === nextProps.x &&
     prevProps.y === nextProps.y &&
@@ -376,8 +376,10 @@ const tileMemoComparison = <T extends {
     prevProps.isCrewMember === nextProps.isCrewMember &&
     prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
     prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-    prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-    nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+    prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded ===
+    nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded &&
+    prevProps.displayName === nextProps.displayName &&
+    prevProps.displayShielded === nextProps.displayShielded
   );
 };
 
@@ -477,16 +479,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded }) => {
     const key = `${x},${y}`;
     const dynamicEntity = dynamicEntityData[key];
-    const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
+    const isShielded = displayShielded ?? dynamicEntity?.isShielded ?? (cell as any).isShielded;
     const pressStartTimeRef = useRef<number>(0);
     const pressStartCoordsRef = useRef<{ x: number; y: number } | null>(null);
-    
+    const nameForStyle = displayName ?? cell.name;
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
-          ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
+          ? (nameForStyle === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
           : styles.enemyHouseBg)
       : null;
     
@@ -540,7 +542,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             <>
               {cell.owner === 'player' ? (
                 <Image 
-                  source={(cell.name === currentUserHandle && isShieldActive) || isShielded
+                  source={(nameForStyle === currentUserHandle && isShieldActive) || isShielded
                     ? require('../assets/images/hackMap/shielded.png')
                     : require('../assets/images/home.png')
                   } 
@@ -563,7 +565,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                   numberOfLines={1}
                   ellipsizeMode="tail"
                 >
-                  {cell.name || (cell.owner === 'player' ? 'YOU' : 'NPC')}
+                  {displayName ?? cell.name ?? '…'}
                 </Text>
               </View>
               {/* NPC Level Indicator */}
@@ -672,10 +674,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     );
   }, panningTileMemoComparison);
 
-  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} displayName={displayName} displayShielded={displayShielded} />
       </View>
     );
   }, tileMemoComparison);
@@ -716,7 +718,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           const cell = row[x];
           if (!cell) return null;
           const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-          return <Tile key={`${x}-${y}`} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} />;
+          return <Tile key={`${x}-${y}`} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} displayName={cell.name} displayShielded={cell.isShielded} />;
         })
       : null;
 
@@ -1841,31 +1843,26 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const cache = cellCacheRef.current;
     
     // Phase 2: Cell cache to maintain stable object references
-    // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
-    // This prevents entities from disappearing when panning stops before full details are loaded
+    // Phase 1c: Cache key excludes name and isShielded so minimal→full transition reuses same ref (reduces image blink).
+    // When full details arrive we update the cached cell's name/isShielded in place so the tile can re-render for label only.
     const getOrCreateCell = (x: number, y: number, terrain: TerrainType, entity: any, entityImage: any): CellData => {
-      // Include entityImage in cache key to ensure proper cache invalidation
-      const cacheKey = `${x},${y}-${terrain}-${entity?.entity || entityImage?.entity || 'empty'}-${entity?.owner || entityImage?.owner || ''}-${entity?.name || ''}-${entity?.userId || entityImage?.userId || ''}-${entity?.npcSlug || entityImage?.npcSlug || ''}-${entity?.npcInstanceId || entityImage?.npcInstanceId || ''}-${entity?.npcLevel || ''}-${entity?.isShielded || false}`;
-      
-      let cell = cache.get(cacheKey);
-      
-      // Check if cached cell matches current data (including entityImage fallback)
       const currentEntity = entity?.entity || entityImage?.entity || 'empty';
       const currentOwner = entity?.owner || entityImage?.owner;
       const currentUserId = entity?.userId || entityImage?.userId;
       const currentNpcSlug = entity?.npcSlug || entityImage?.npcSlug;
       const currentNpcInstanceId = entity?.npcInstanceId || entityImage?.npcInstanceId;
+      const cacheKey = `${x},${y}-${terrain}-${currentEntity}-${currentOwner || ''}-${currentUserId || ''}-${currentNpcSlug || ''}-${currentNpcInstanceId || ''}-${entity?.npcLevel ?? ''}`;
       
-      if (!cell || 
+      let cell = cache.get(cacheKey);
+      
+      if (!cell ||
           cell.terrain !== terrain ||
           cell.entity !== currentEntity ||
           cell.owner !== currentOwner ||
-          cell.name !== entity?.name ||
           cell.userId !== currentUserId ||
           cell.npcSlug !== currentNpcSlug ||
           cell.npcInstanceId !== currentNpcInstanceId ||
-          cell.npcLevel !== entity?.npcLevel ||
-          cell.isShielded !== entity?.isShielded) {
+          cell.npcLevel !== entity?.npcLevel) {
         const newCell: CellData = {
           terrain,
           entity: currentEntity,
@@ -1877,17 +1874,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           npcLevel: entity?.npcLevel,
           isShielded: entity?.isShielded,
         } as any;
-        
         if (cache.size >= MAX_CACHE_SIZE) {
           const firstKey = cache.keys().next().value;
-          if (firstKey !== undefined) {
-            cache.delete(firstKey);
-          }
+          if (firstKey !== undefined) cache.delete(firstKey);
         }
         cache.set(cacheKey, newCell);
         cell = newCell;
+      } else {
+        // Phase 1c: Update name and isShielded in place when full details arrive (same ref → less image blink)
+        const name = entity?.name;
+        const isShielded = entity?.isShielded;
+        if ((cell as any).name !== name || (cell as any).isShielded !== isShielded) {
+          (cell as any).name = name;
+          (cell as any).isShielded = isShielded;
+        }
       }
-      
       return cell;
     };
     
@@ -3284,6 +3285,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                     isCrewMember={isCrewMember}
                     isWarCrewMember={isWarCrewMember}
                     isAllianceCrewMember={isAllianceCrewMember}
+                    displayName={cell.name}
+                    displayShielded={cell.isShielded}
                   />
                 );
               }
@@ -3312,6 +3315,8 @@ type TileProps = {
   isCrewMember?: boolean;
   isWarCrewMember?: boolean;
   isAllianceCrewMember?: boolean;
+  displayName?: string | undefined;
+  displayShielded?: boolean;
 };
 
 type PoolTileProps = {
@@ -3332,6 +3337,8 @@ type PoolTileProps = {
   isCrewMember?: boolean;
   isWarCrewMember?: boolean;
   isAllianceCrewMember?: boolean;
+  displayName?: string | undefined;
+  displayShielded?: boolean;
 };const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
