@@ -2996,7 +2996,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       .unwrap()
       .then((payload) => doPanTo(payload))
       .catch(() => {});
-  }, [currentUserHandle, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, computeWindow, triggerGetMyMapPosition]);
+  }, [currentUserHandle, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport, triggerGetMyMapPosition]);
 
   const handleAntivirusPress = useCallback(() => {
     // Only show modal if antivirus feature is unlocked (including timer-based unlock)
