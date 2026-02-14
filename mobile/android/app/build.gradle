@@ -124,6 +124,23 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
 
+// versionName from mobile/package.json (single source of truth)
+def packageJsonFile = rootProject.file("../package.json")
+if (!packageJsonFile.exists()) {
+    throw new GradleException("package.json not found at ${packageJsonFile.absolutePath}")
+}
+def packageJsonText = packageJsonFile.text
+def versionMatcher = (packageJsonText =~ /"version"\s*:\s*"([^"]+)"/)
+if (!versionMatcher.find()) {
+    throw new GradleException("Could not find \"version\" in package.json")
+}
+def versionNameFromPackage = versionMatcher.group(1)
+def versionCodeMatcher = (packageJsonText =~ /"versionCode"\s*:\s*(\d+)/)
+if (!versionCodeMatcher.find()) {
+    throw new GradleException("Could not find \"versionCode\" in package.json")
+}
+def versionCodeFromPackage = versionCodeMatcher.group(1).toInteger()
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -134,8 +151,8 @@ android {
         applicationId "com.devheadllc.risingpunk"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 77
-        versionName "2.4.1"
+        versionCode versionCodeFromPackage
+        versionName versionNameFromPackage
         
         // Support all ABIs so we don't drop devices (32-bit + 64-bit). 16 KB alignment
         // is handled by enableUncompressedNativeLibs + useLegacyPackaging=false; 64-bit-only
