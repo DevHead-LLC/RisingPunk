@@ -64,20 +64,25 @@ export class MapService {
       console.warn('[MapService.generateMap] deduped cells before save', cells.length, '->', deduped.length);
     }
 
-    // Use native insertOne with plain objects to avoid Mongoose insert path that can trigger E11000
-    const plainCells = deduped.map((c: any) => ({
-      x: c.x,
-      y: c.y,
-      terrain: c.terrain || 'plain',
-      isActive: c.isActive !== false,
-      isOccupied: !!c.isOccupied,
-      canBeOccupied: c.canBeOccupied !== false,
-      occupiedBy: c.occupiedBy || 'none',
-      entityName: c.entityName || '',
-      npcSlug: c.npcSlug || '',
-      npcInstanceId: c.npcInstanceId || '',
-      userId: c.userId || null,
-    }));
+    // Use native insertOne with plain objects to avoid Mongoose insert path that can trigger E11000.
+    // Mirror CellSchema.pre('save') invariant: canBeOccupied = false for mountain, water, road (Bugbot).
+    const plainCells = deduped.map((c: any) => {
+      const terrain = c.terrain || 'plain';
+      const impassable = terrain === 'mountain' || terrain === 'water' || terrain === 'road';
+      return {
+        x: c.x,
+        y: c.y,
+        terrain,
+        isActive: c.isActive !== false,
+        isOccupied: !!c.isOccupied,
+        canBeOccupied: impassable ? false : (c.canBeOccupied !== false),
+        occupiedBy: c.occupiedBy || 'none',
+        entityName: c.entityName || '',
+        npcSlug: c.npcSlug || '',
+        npcInstanceId: c.npcInstanceId || '',
+        userId: c.userId || null,
+      };
+    });
     console.log('[MapService.generateMap] inserting map', name, 'with', plainCells.length, 'cells');
     await Map.collection.insertOne({
       name,

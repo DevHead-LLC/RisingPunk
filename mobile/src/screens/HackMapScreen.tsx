@@ -2901,7 +2901,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Tap-at-view coords: use absolute tap position + map view's window position so we get correct cell (e.x/e.y are unreliable when the view has transform). See tile-tap-reliability.md.
   // Measure map in window at tap time so we don't rely on stale onLayout; Reanimated transform can move the view without firing onLayout.
-  const handleTapAtViewCoords = useCallback((absoluteX: number, absoluteY: number, offsetAtTapX: number, offsetAtTapY: number) => {
+  const handleTapAtViewCoords = useCallback((absoluteX: number, absoluteY: number) => {
     const viewRef = mapViewRef.current;
     if (!viewRef) return;
     viewRef.measureInWindow((wx, wy) => {
@@ -2932,9 +2932,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         .maxDuration(400)
         .onEnd((e) => {
           'worklet';
-          const ox = offsetX.value;
-          const oy = offsetY.value;
-          runOnJS(handleTapAtViewCoords)(e.absoluteX, e.absoluteY, ox, oy);
+          runOnJS(handleTapAtViewCoords)(e.absoluteX, e.absoluteY);
         }),
     [handleTapAtViewCoords]
   );

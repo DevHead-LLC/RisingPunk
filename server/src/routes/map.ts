@@ -330,18 +330,24 @@ router.get('/my-position', auth, async (req: Request, res: Response) => {
       while (tries < 500) {
         const candidateX = Math.floor(Math.random() * gridSize);
         const candidateY = Math.floor(Math.random() * gridSize);
+        // Atomic duplicate-house guard: only place if user has no existing house (same as GET /:name placement).
         const updated = await MapModel.findOneAndUpdate(
           {
             name: 'main',
-            cells: {
-              $elemMatch: {
-                x: candidateX,
-                y: candidateY,
-                isOccupied: false,
-                canBeOccupied: true,
-                terrain: { $nin: ['water', 'mountain', 'road'] },
+            $and: [
+              { cells: { $not: { $elemMatch: { userId: authUserId, occupiedBy: 'player', entityName: { $ne: 'YOU' } } } } },
+              {
+                cells: {
+                  $elemMatch: {
+                    x: candidateX,
+                    y: candidateY,
+                    isOccupied: false,
+                    canBeOccupied: true,
+                    terrain: { $nin: ['water', 'mountain', 'road'] },
+                  },
+                },
               },
-            },
+            ],
           },
           {
             $set: {
