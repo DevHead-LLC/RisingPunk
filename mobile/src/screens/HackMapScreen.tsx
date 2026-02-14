@@ -2693,14 +2693,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
             offsetX.value = cx;
             offsetY.value = cy;
+            // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
+            const gridSizeBounds = getGridSize(grid, 50);
+            const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeBounds, PAN_BUFFER);
+            calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+            const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+            windowRangeRef.current = newRange;
+            setWindowRange(newRange);
             lastComputedPan.value = { x: cx, y: cy };
-            computeWindow(cx, cy, containerSize.width, containerSize.height);
             hasCenteredOnHome.value = true;
           }
         }
       }
     }
-  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, currentUserHandle, restorePan]);
+  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, currentUserHandle, restorePan, calculateVirtualViewport]);
 
   // Center on user's home from my-position API when data arrives (user-position-and-locator.md)
   useEffect(() => {
@@ -2715,10 +2721,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
     offsetX.value = cx;
     offsetY.value = cy;
-    lastComputedPan.value = { x: cx, y: cy };
-    computeWindow(cx, cy, containerSize.width, containerSize.height);
-    hasCenteredOnHome.value = true;
+    // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
     const gridSize = getGridSize(grid, 50);
+    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, PAN_BUFFER);
+    calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+    const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+    windowRangeRef.current = newRange;
+    setWindowRange(newRange);
+    lastComputedPan.value = { x: cx, y: cy };
+    hasCenteredOnHome.value = true;
     const buffer = 15;
     const restoreViewport = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, buffer);
     if (viewportRequestInFlightRef.current) {
@@ -2740,7 +2751,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         minimal: false,
       });
     }
-  }, [myPositionData, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, computeWindow]);
+  }, [myPositionData, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
 
   // Center on current user's home on initial entry (only if not returning from battle with restorePan)
   // Fallback when my-position API not available or user's house is in initial viewport (grid-scan)
@@ -2772,10 +2783,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
     offsetX.value = cx;
     offsetY.value = cy;
+    // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
+    const gridSizeEntry = getGridSize(grid, 50);
+    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeEntry, PAN_BUFFER);
+    calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+    const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+    windowRangeRef.current = newRange;
+    setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
-    computeWindow(cx, cy, containerSize.width, containerSize.height);
     hasCenteredOnHome.value = true;
-  }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
+  }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, offsetX, offsetY, calculateVirtualViewport]);
 
   // When handle changes (e.g. after profile update), reset center flag and cached position so we re-center on home when fresh map data arrives.
   const prevHandleRef = useRef<string | undefined>(undefined);
@@ -2954,11 +2971,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
       offsetX.value = cx;
       offsetY.value = cy;
-      lastComputedPan.value = { x: cx, y: cy };
-      computeWindow(cx, cy, containerSize.width, containerSize.height);
+      // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
       const gridSize = getGridSize(grid, 50);
-      const buffer = 15;
-      const vp = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, buffer);
+      const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, PAN_BUFFER);
+      calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+      const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+      windowRangeRef.current = newRange;
+      setWindowRange(newRange);
+      lastComputedPan.value = { x: cx, y: cy };
+      const vp = { startCol, endCol, startRow, endRow };
       if (viewportRequestInFlightRef.current) {
         pendingViewportParamsRef.current = { x1: vp.startCol, y1: vp.startRow, x2: vp.endCol, y2: vp.endRow, minimal: false };
       } else {
