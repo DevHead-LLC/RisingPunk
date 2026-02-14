@@ -31,14 +31,13 @@ const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
 // Constants for viewport fetching and panning
-const VIEWPORT_FETCH_THRESHOLD = 5; // Cells to move before triggering viewport fetch
+const VIEWPORT_FETCH_THRESHOLD = 2; // Cells to move before triggering viewport fetch (lower = request sooner, fewer black areas)
 const PAN_BUFFER = 8; // Buffer in cells for window range calculation
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
 /** Max press duration (ms) to count as a tap; longer presses are ignored. See tile-tap-reliability.md. */
 const TILE_TAP_MAX_DURATION_MS = 500;
-
 /**
  * NPC level-based images (hackMap/npc/). Use the image for the range that contains the NPC's level.
  * Level ranges and assets:
@@ -293,28 +292,44 @@ const shouldFetchViewport = (
 };
 
 /**
+ * Union two viewports and clamp to grid (so one request can cover multiple queued areas)
+ */
+const unionViewports = (
+  a: { x1: number; y1: number; x2: number; y2: number },
+  b: { x1: number; y1: number; x2: number; y2: number },
+  gridSize: number
+): { x1: number; y1: number; x2: number; y2: number } => {
+  return {
+    x1: Math.max(0, Math.min(a.x1, b.x1)),
+    y1: Math.max(0, Math.min(a.y1, b.y1)),
+    x2: Math.min(gridSize - 1, Math.max(a.x2, b.x2)),
+    y2: Math.min(gridSize - 1, Math.max(a.y2, b.y2)),
+  };
+};
+
+/**
  * Trigger viewport fetch with minimal flag
- * Prevents new requests while one is in flight to avoid cancelling requests
- * @param newViewport - New viewport coordinates { x1, y1, x2, y2, minimal?: boolean }
- * @param panningViewportMinimalRef - Ref to store minimal flag
- * @param setPanningViewportParams - State setter for viewport params
- * @param viewportRequestInFlightRef - Ref to track if request is in flight
- * @param pendingViewportParamsRef - Ref to store pending viewport if request is in flight
+ * Prevents new requests while one is in flight; when queueing, unions with existing pending to cover more area in one request
+ * @param gridSize - Grid size for clamping union
  */
 const triggerViewportFetch = (
   newViewport: { x1: number; y1: number; x2: number; y2: number; minimal?: boolean },
   panningViewportMinimalRef: React.MutableRefObject<boolean>,
   setPanningViewportParams: React.Dispatch<React.SetStateAction<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>>,
   viewportRequestInFlightRef: React.MutableRefObject<boolean>,
-  pendingViewportParamsRef: React.MutableRefObject<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>
+  pendingViewportParamsRef: React.MutableRefObject<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>,
+  gridSize: number
 ): void => {
   if (viewportRequestInFlightRef.current) {
-    // Request already in flight - store this as pending instead of cancelling the current one
-    pendingViewportParamsRef.current = newViewport;
+    // Request in flight: union with existing pending so one request covers more area (reduces black regions)
+    const prev = pendingViewportParamsRef.current;
+    const merged = prev
+      ? { ...unionViewports(prev, newViewport, gridSize), minimal: (newViewport.minimal ?? true) && (prev.minimal ?? true) }
+      : newViewport;
+    pendingViewportParamsRef.current = merged;
     return;
   }
   
-  // No request in flight - start new request
   viewportRequestInFlightRef.current = true;
   panningViewportMinimalRef.current = true;
   setPanningViewportParams(newViewport);
@@ -774,24 +789,22 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [isPanningJS, setIsPanningJS] = useState<boolean>(false);
   const [panningStopped, setPanningStopped] = useState<boolean>(true);
   
-  // Phase 5: Sync ref to state when panning stops
+  // Phase 5: Sync ref to state when panning stops (deferred to next frame to smooth view correction)
   useEffect(() => {
     if (!isPanningJS && panningStopped) {
       const refRange = windowRangeRef.current;
       const stateRange = windowRange;
       
-      // Check if state and ref differ
       const differs = stateRange.rowStart !== refRange.rowStart || stateRange.rowEnd !== refRange.rowEnd ||
                       stateRange.colStart !== refRange.colStart || stateRange.colEnd !== refRange.colEnd;
       
       if (differs) {
-        // State and ref differ - sync state to ref (ref has latest panning data)
-        setWindowRange(refRange);
-        // Don't sync ref to state here - wait for state update to complete
-        // The next render will have state == ref, and we can safely sync if needed
+        // Defer sync to next animation frame so the "correct" view doesn't jump in the same tick as tile load
+        const raf = requestAnimationFrame(() => {
+          setWindowRange(refRange);
+        });
+        return () => cancelAnimationFrame(raf);
       } else {
-        // State and ref are equal - safe to keep ref in sync with state
-        // This handles cases where state is updated externally (not through this effect)
         windowRangeRef.current = stateRange;
       }
     }
@@ -1828,10 +1841,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     if (!terrainDataLoaded) return cells;
     
     
-    // Use ref for panning state, but read data directly from state (not refs)
-    // This ensures we get the latest data even after cache clears
+    // Use ref for panning state and for range when panning just stopped (avoids one frame of stale range/jump)
     const currentIsPanningJS = isPanningJSRef.current;
-    const currentWindowRange = currentIsPanningJS ? windowRangeRef.current : windowRange;
+    const useRefForRange = currentIsPanningJS || panningStopped;
+    const currentWindowRange = useRefForRange ? windowRangeRef.current : windowRange;
     
     const cache = cellCacheRef.current;
     
@@ -1922,13 +1935,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
     }
     
-    // Logging: Track visibleCells count changes (only log if count actually changed)
     if (prevVisibleCellsCountRef.current !== cells.length) {
       prevVisibleCellsCountRef.current = cells.length;
     }
     
     return cells;
-  }, [virtualViewport.visibleTiles, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, entityImageData, terrainDataLoaded]);
+  }, [virtualViewport.visibleTiles, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, entityImageData, terrainDataLoaded, panningStopped]);
 
 
 
@@ -2214,14 +2226,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     
     // Handle pending requests after processing current data
-    // This ensures non-minimal restorePan data is processed even if a panning request is pending
+    // Skip if pending is the same as the viewport we just merged (avoid redundant re-fetch)
     if ((panningViewportData || panningViewportError) && pendingViewportParamsRef.current) {
       const pending = pendingViewportParamsRef.current;
+      const justMerged = panningViewportData?.viewport;
+      const sameViewport = justMerged &&
+        pending.x1 === justMerged.x1 && pending.y1 === justMerged.y1 &&
+        pending.x2 === justMerged.x2 && pending.y2 === justMerged.y2;
       pendingViewportParamsRef.current = null;
-      viewportRequestInFlightRef.current = true;
-      // Respect the minimal flag from the pending request (restorePan uses minimal: false)
-      panningViewportMinimalRef.current = pending.minimal ?? true;
-      setPanningViewportParams(pending);
+      if (!sameViewport) {
+        viewportRequestInFlightRef.current = true;
+        panningViewportMinimalRef.current = pending.minimal ?? true;
+        setPanningViewportParams(pending);
+      }
     }
   }, [panningViewportData, panningViewportError, separateStaticAndDynamicData, dispatch]);
   
@@ -2233,18 +2250,44 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
   
   // Phase 7: Trigger entity details fetch when panning stops
+  // Also fill missing terrain when panning stops (fixes black areas that never loaded during pan)
   const lastStoppedViewportRef = useRef<string | null>(null);
   useEffect(() => {
     if (panningStopped && terrainDataLoaded && !isPanningJS) {
-      // Calculate current viewport from windowRange
+      // Use ref so we have the viewport that was active during pan (sync effect may not have run yet)
+      const range = windowRangeRef.current;
       const currentViewport = {
-        x1: windowRange.colStart,
-        y1: windowRange.rowStart,
-        x2: windowRange.colEnd,
-        y2: windowRange.rowEnd,
+        x1: range.colStart,
+        y1: range.rowStart,
+        x2: range.colEnd,
+        y2: range.rowEnd,
       };
       
       const viewportKey = `${currentViewport.x1},${currentViewport.y1},${currentViewport.x2},${currentViewport.y2}`;
+      
+      // Check if any visible cell is missing terrain (causes black areas)
+      let hasMissingTerrain = false;
+      for (let y = currentViewport.y1; y <= currentViewport.y2; y++) {
+        for (let x = currentViewport.x1; x <= currentViewport.x2; x++) {
+          if (!staticTerrainData[`${x},${y}`]) {
+            hasMissingTerrain = true;
+            break;
+          }
+        }
+        if (hasMissingTerrain) break;
+      }
+      if (hasMissingTerrain) {
+        const params = { ...currentViewport, minimal: false };
+        if (viewportRequestInFlightRef.current) {
+          pendingViewportParamsRef.current = params;
+        } else {
+          viewportRequestInFlightRef.current = true;
+          panningViewportMinimalRef.current = false;
+          setPanningViewportParams(params);
+        }
+        // Full fetch (minimal: false) includes details; skip separate stoppedViewportParams for this viewport
+        return;
+      }
       
       // Check if we've already fetched details for this viewport
       if (lastStoppedViewportRef.current === viewportKey) {
@@ -2274,7 +2317,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         setStoppedViewportParams({ ...currentViewport, minimal: false });
       }
     }
-  }, [panningStopped, terrainDataLoaded, isPanningJS, windowRange, entityImageData, dynamicEntityData]);
+  }, [panningStopped, terrainDataLoaded, isPanningJS, windowRange, staticTerrainData, entityImageData, dynamicEntityData]);
   
   // Phase 7: Process stopped viewport data (full details only)
   // Track processed viewport to prevent infinite loops
@@ -2398,7 +2441,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Phase 4: Conditional throttle - 33ms during panning (30fps), 16ms when not panning (60fps)
     const now = Date.now();
     const throttleMs = isPanningJS ? 33 : 16; // 30fps during panning, 60fps when not panning
-    if (now - lastComputeTs.value < throttleMs) {return;}
+    if (now - lastComputeTs.value < throttleMs) {
+      return;
+    }
     lastComputeTs.value = now;
     
     // Skip tiny pan changes to reduce churn
@@ -2435,8 +2480,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           
           // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
           const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
-          if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
-            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
+          const shouldFetch = shouldFetchViewport(newViewport, lastFetchedViewportRef.current);
+          if (shouldFetch) {
+            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef, gridSize);
           }
         }
       }
@@ -2458,8 +2504,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         
         // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
         const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
-        if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
-          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
+        const shouldFetch = shouldFetchViewport(newViewport, lastFetchedViewportRef.current);
+        if (shouldFetch) {
+          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef, gridSize);
         }
         
         return newWindowRange;
