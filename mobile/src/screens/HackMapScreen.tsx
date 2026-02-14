@@ -15,7 +15,7 @@ import { WorldChatModal } from '../components/hackMap/WorldChatModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
-import { useFetchMapQuery, useFetchMapViewportQuery } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
@@ -886,6 +886,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const lastComputedPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastComputeTsRef = useRef<number>(0);
   const hasCenteredOnHomeRef = useRef<boolean>(false);
+  /** Cached user house position from my-position API for locator and initial center (user-position-and-locator.md) */
+  const userMapPositionRef = useRef<{ x: number; y: number } | null>(null);
   const isPanningRef = useRef<boolean>(false);
   const panStartTimeRef = useRef<number>(0);
   const panEndTimeRef = useRef<number>(0);
@@ -1206,7 +1208,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       refetchInitialViewport();
     }
   }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
-  
+
+  // My-position API: reliable (x,y) for user's house for initial center and locator (user-position-and-locator.md)
+  const shouldFetchMyPosition = !restorePan && !!currentUserHandle;
+  const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(undefined, { skip: !shouldFetchMyPosition });
+  const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
+
   // Phase 6: Viewport fetching during panning with minimal data
   // Track the last viewport we fetched to avoid duplicate requests
   const lastFetchedViewportRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
@@ -2678,6 +2685,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             if (homeX != null) break;
           }
           if (homeX != null && homeY != null) {
+            userMapPositionRef.current = { x: homeX, y: homeY };
             const { x: targetX, y: targetY } = gridToPanCoordinates(homeX, homeY, containerSize.width, containerSize.height);
             const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
             const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
@@ -2692,7 +2700,48 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, currentUserHandle, restorePan]);
 
+  // Center on user's home from my-position API when data arrives (user-position-and-locator.md)
+  useEffect(() => {
+    if (!myPositionData) return;
+    if (restorePan) return;
+    if (hasCenteredOnHome.value) return;
+    if (!boundsReadyJS || containerSize.width <= 0 || containerSize.height <= 0) return;
+    const { x, y } = myPositionData;
+    userMapPositionRef.current = { x, y };
+    const { x: targetX, y: targetY } = gridToPanCoordinates(x, y, containerSize.width, containerSize.height);
+    const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
+    const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
+    offsetX.value = cx;
+    offsetY.value = cy;
+    lastComputedPan.value = { x: cx, y: cy };
+    computeWindow(cx, cy, containerSize.width, containerSize.height);
+    hasCenteredOnHome.value = true;
+    const gridSize = getGridSize(grid, 50);
+    const buffer = 15;
+    const restoreViewport = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, buffer);
+    if (viewportRequestInFlightRef.current) {
+      pendingViewportParamsRef.current = {
+        x1: restoreViewport.startCol,
+        y1: restoreViewport.startRow,
+        x2: restoreViewport.endCol,
+        y2: restoreViewport.endRow,
+        minimal: false,
+      };
+    } else {
+      panningViewportMinimalRef.current = false;
+      viewportRequestInFlightRef.current = true;
+      setPanningViewportParams({
+        x1: restoreViewport.startCol,
+        y1: restoreViewport.startRow,
+        x2: restoreViewport.endCol,
+        y2: restoreViewport.endRow,
+        minimal: false,
+      });
+    }
+  }, [myPositionData, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, computeWindow]);
+
   // Center on current user's home on initial entry (only if not returning from battle with restorePan)
+  // Fallback when my-position API not available or user's house is in initial viewport (grid-scan)
   useEffect(() => {
     if (!boundsReady.value) return;
     if (restorePan) return; // respect return-from-battle view
@@ -2714,6 +2763,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (homeX != null) break;
     }
     if (homeX == null || homeY == null) return;
+    userMapPositionRef.current = { x: homeX, y: homeY };
     const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
     const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
     const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
@@ -2725,14 +2775,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCenteredOnHome.value = true;
   }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
 
-  // When handle changes (e.g. after profile update), reset center flag so we re-center on home when fresh map data arrives.
-  // Only reset on actual change, not on mount, to avoid undoing initial centering and causing a second jump.
+  // When handle changes (e.g. after profile update), reset center flag and cached position so we re-center on home when fresh map data arrives.
   const prevHandleRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const prev = prevHandleRef.current;
     prevHandleRef.current = currentUserHandle ?? undefined;
     if (prev !== undefined && prev !== (currentUserHandle ?? undefined)) {
       hasCenteredOnHome.value = false;
+      userMapPositionRef.current = null;
     }
   }, [currentUserHandle]);
 
@@ -2889,38 +2939,38 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     [tapGesture, panGesture]
   );
 
+  // Locator: pan to user's house using cached position or my-position API (user-position-and-locator.md)
   const centerOnUserHome = useCallback(() => {
-    if (!currentUserHandle || !grid.length) return;
-    
-    let homeX: number | null = null;
-    let homeY: number | null = null;
-    
-    for (let y = 0; y < grid.length; y++) {
-      const row = grid[y];
-      if (!row) continue;
-      for (let x = 0; x < row.length; x++) {
-        const cell = row[x] as any;
-        if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
-          homeX = x; 
-          homeY = y; 
-          break;
-        }
-      }
-      if (homeX != null) break;
-    }
-    
-    if (homeX != null && homeY != null) {
-      const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
-      const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
+    if (!currentUserHandle) return;
+    const doPanTo = (pos: { x: number; y: number }) => {
+      userMapPositionRef.current = pos;
+      const { x: targetX, y: targetY } = gridToPanCoordinates(pos.x, pos.y, containerSize.width, containerSize.height);
       const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
       const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
-      
       offsetX.value = cx;
       offsetY.value = cy;
       lastComputedPan.value = { x: cx, y: cy };
       computeWindow(cx, cy, containerSize.width, containerSize.height);
+      const gridSize = getGridSize(grid, 50);
+      const buffer = 15;
+      const vp = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, buffer);
+      if (viewportRequestInFlightRef.current) {
+        pendingViewportParamsRef.current = { x1: vp.startCol, y1: vp.startRow, x2: vp.endCol, y2: vp.endRow, minimal: false };
+      } else {
+        panningViewportMinimalRef.current = false;
+        viewportRequestInFlightRef.current = true;
+        setPanningViewportParams({ x1: vp.startCol, y1: vp.startRow, x2: vp.endCol, y2: vp.endRow, minimal: false });
+      }
+    };
+    if (userMapPositionRef.current) {
+      doPanTo(userMapPositionRef.current);
+      return;
     }
-  }, [currentUserHandle, grid, containerSize.width, containerSize.height, maxX, maxY, minX, minY, offsetX, offsetY, computeWindow]);
+    triggerGetMyMapPosition()
+      .unwrap()
+      .then((payload) => doPanTo(payload))
+      .catch(() => {});
+  }, [currentUserHandle, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, computeWindow, triggerGetMyMapPosition]);
 
   const handleAntivirusPress = useCallback(() => {
     // Only show modal if antivirus feature is unlocked (including timer-based unlock)

@@ -282,11 +282,170 @@ function parseViewportFromRequest(req: Request): { hasViewport: boolean; x1: num
   return { hasViewport, x1: x1 ?? 0, y1: y1 ?? 0, x2: x2 ?? 0, y2: y2 ?? 0 };
 }
 
+// GET my-position and POST player-position MUST be before /:name so /api/map/my-position is not matched as name='my-position' (user-position-and-locator.md)
+// GET current user's house position on the map (for centering and locator; does not depend on viewport).
+// If the user has no house (e.g. viewport-only load never ran placement), place them once and return that position.
+router.get('/my-position', auth, async (req: Request, res: Response) => {
+  try {
+    const authUserId: any = (req as any).user?._id;
+    if (!authUserId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    let mapDoc = await MapModel.findOne({ name: 'main' });
+    if (!mapDoc) {
+      res.status(404).json({ error: 'Map not found' });
+      return;
+    }
+
+    const cells = (mapDoc as any).cells as any[];
+    // Prefer the user's house (entityName !== 'YOU'); fallback to any player cell for this user (e.g. YOU marker)
+    let house = cells.find(
+      (c: any) =>
+        c.occupiedBy === 'player' &&
+        c.userId &&
+        String(c.userId) === String(authUserId) &&
+        c.entityName !== 'YOU'
+    );
+    if (!house) {
+      house = cells.find(
+        (c: any) =>
+          c.occupiedBy === 'player' &&
+          c.userId &&
+          String(c.userId) === String(authUserId)
+      );
+    }
+    if (!house) {
+      // User has no house (e.g. viewport-only load never ran placement). Place them once.
+      // Use findOneAndUpdate with positional $ to avoid full-doc save and E11000 duplicate key (cells array index).
+      const user = await User.findById(authUserId, { handle: 1 });
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      const handle = (user as any).handle || 'User';
+      const gridSize = (mapDoc as any).gridSize || 50;
+      let tries = 0;
+      while (tries < 500) {
+        const candidateX = Math.floor(Math.random() * gridSize);
+        const candidateY = Math.floor(Math.random() * gridSize);
+        const updated = await MapModel.findOneAndUpdate(
+          {
+            name: 'main',
+            cells: {
+              $elemMatch: {
+                x: candidateX,
+                y: candidateY,
+                isOccupied: false,
+                canBeOccupied: true,
+                terrain: { $nin: ['water', 'mountain', 'road'] },
+              },
+            },
+          },
+          {
+            $set: {
+              'cells.$.isOccupied': true,
+              'cells.$.occupiedBy': 'player',
+              'cells.$.entityName': handle,
+              'cells.$.userId': authUserId,
+            },
+          },
+          { new: true }
+        );
+        if (updated) {
+          res.json({ x: candidateX, y: candidateY });
+          return;
+        }
+        tries++;
+      }
+      res.status(503).json({ error: 'Map full; no empty cell for placement' });
+      return;
+    }
+
+    res.json({ x: house.x, y: house.y });
+  } catch (error: any) {
+    console.error('My position fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/player-position', auth, async (req: Request, res: Response) => {
+  try {
+    const { x, y } = req.body as { x: number; y: number };
+    if (typeof x !== 'number' || typeof y !== 'number') {
+      res.status(400).json({ error: 'Invalid coordinates' });
+      return;
+    }
+
+    let mapDoc = await MapModel.findOne({ name: 'main' });
+    if (!mapDoc) {
+      const created = await mapService.generateMap('main');
+      mapDoc = await MapModel.findOne({ name: 'main' });
+      if (!mapDoc && created) {
+        mapDoc = created as any;
+      }
+    }
+
+    if (!mapDoc) {
+      res.status(500).json({ error: 'Failed to load map' });
+      return;
+    }
+
+    const authUserId: any = (req as any).user?._id;
+    for (const c of (mapDoc as any).cells as any[]) {
+      // Only clear ephemeral 'YOU' markers for this user, or legacy invalid 'YOU' without userId
+      const belongsToAuthUser = c.userId && String(c.userId) === String(authUserId);
+      const legacyInvalidYou = c.entityName === 'YOU' && !c.userId;
+      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU' && (belongsToAuthUser || legacyInvalidYou)) {
+        c.isOccupied = false;
+        c.occupiedBy = 'none';
+        c.entityName = '';
+        c.userId = null;
+      }
+    }
+
+    const target = (mapDoc.cells as any[]).find((c) => c.x === x && c.y === y);
+    if (!target) {
+      res.status(404).json({ error: 'Target cell not found' });
+      return;
+    }
+    if (!target.canBeOccupied || target.terrain === 'mountain' || target.terrain === 'water' || target.terrain === 'road') {
+      res.status(400).json({ error: 'Cell cannot be occupied' });
+      return;
+    }
+    if (target.isOccupied) {
+      res.status(400).json({ error: 'Cell already occupied' });
+      return;
+    }
+
+    target.isOccupied = true;
+    target.occupiedBy = 'player';
+    target.entityName = 'YOU';
+    target.userId = authUserId;
+
+    await mapDoc.save();
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Player position update error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
+      console.log('[map fetch] no map found for', name, '- dropping legacy index if present and generating');
+      // Drop legacy unique index so insert can succeed (E11000); per-doc uniqueness enforced in app (user-position-and-locator.md)
+      try {
+        await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
+        console.log('[map fetch] dropped legacy unique index cells.x_1_cells.y_1');
+      } catch (_) {
+        // Index may not exist or already dropped
+      }
       const created = await mapService.generateMap(name);
       mapDoc = (created as any) || await MapModel.findOne({ name });
     }
@@ -307,6 +466,10 @@ router.get('/:name', async (req: Request, res: Response) => {
     const docAny = mapDoc as any;
     if (!docAny.version || docAny.version < 2 || docAny.gridSize !== 50) {
       await MapModel.deleteOne({ _id: docAny._id });
+      try {
+        await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
+        console.log('[map fetch] dropped legacy unique index cells.x_1_cells.y_1 (migrate path)');
+      } catch (_) {}
       const recreated = await mapService.generateMap(name);
       mapDoc = (recreated as any) || await MapModel.findOne({ name });
       if (!mapDoc) {
@@ -315,7 +478,28 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     } else {
       // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
-      const cells: any[] = (mapDoc as any).cells;
+      let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
+      // Fix E11000 duplicate key: dedupe cells by (x,y), keeping first occurrence (user-position-and-locator.md).
+      // Use findOneAndUpdate (not doc.save()) so we never trigger an insert on a corrupted doc.
+      const seen = new Set<string>();
+      const deduped = cells.filter((c: any) => {
+        const key = `${c.x},${c.y}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (deduped.length !== cells.length) {
+        console.log('[map fetch] deduping cells', cells.length, '->', deduped.length);
+        const updated = await MapModel.findOneAndUpdate(
+          { _id: (mapDoc as any)._id },
+          { $set: { cells: deduped } },
+          { new: true }
+        );
+        if (updated) {
+          mapDoc = updated as any;
+          cells = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
+        }
+      }
       const isBlocked = (c: any) => c.terrain === 'water' || c.terrain === 'mountain' || c.terrain === 'road';
       let mutatedForCleanup = false;
       for (const c of cells) {
@@ -524,69 +708,6 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
   } catch (error: any) {
     console.error('Map fetch error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.post('/player-position', auth, async (req: Request, res: Response) => {
-  try {
-    const { x, y } = req.body as { x: number; y: number };
-    if (typeof x !== 'number' || typeof y !== 'number') {
-      res.status(400).json({ error: 'Invalid coordinates' });
-      return;
-    }
-
-    let mapDoc = await MapModel.findOne({ name: 'main' });
-    if (!mapDoc) {
-      const created = await mapService.generateMap('main');
-      mapDoc = await MapModel.findOne({ name: 'main' });
-      if (!mapDoc && created) {
-        mapDoc = created as any;
-      }
-    }
-
-    if (!mapDoc) {
-      res.status(500).json({ error: 'Failed to load map' });
-      return;
-    }
-
-    const authUserId: any = (req as any).user?._id;
-    for (const c of (mapDoc as any).cells as any[]) {
-      // Only clear ephemeral 'YOU' markers for this user, or legacy invalid 'YOU' without userId
-      const belongsToAuthUser = c.userId && String(c.userId) === String(authUserId);
-      const legacyInvalidYou = c.entityName === 'YOU' && !c.userId;
-      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU' && (belongsToAuthUser || legacyInvalidYou)) {
-        c.isOccupied = false;
-        c.occupiedBy = 'none';
-        c.entityName = '';
-        c.userId = null;
-      }
-    }
-
-    const target = (mapDoc.cells as any[]).find((c) => c.x === x && c.y === y);
-    if (!target) {
-      res.status(404).json({ error: 'Target cell not found' });
-      return;
-    }
-    if (!target.canBeOccupied || target.terrain === 'mountain' || target.terrain === 'water' || target.terrain === 'road') {
-      res.status(400).json({ error: 'Cell cannot be occupied' });
-      return;
-    }
-    if (target.isOccupied) {
-      res.status(400).json({ error: 'Cell already occupied' });
-      return;
-    }
-
-    target.isOccupied = true;
-    target.occupiedBy = 'player';
-    target.entityName = 'YOU';
-    target.userId = authUserId;
-
-    await mapDoc.save();
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error('Player position update error:', error);
     res.status(500).json({ error: error.message });
   }
 });

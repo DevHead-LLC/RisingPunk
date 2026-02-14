@@ -38,8 +38,8 @@ const MapSchema = new mongoose.Schema({
   lastUpdated: { type: Date, default: Date.now }
 });
 
-// Ensure x,y coordinates are unique within each map
-MapSchema.index({ 'cells.x': 1, 'cells.y': 1 }, { unique: true });
+// Index for lookups by cell coordinates (non-unique: uniqueness within a map is enforced in app code to avoid E11000 on insert)
+MapSchema.index({ 'cells.x': 1, 'cells.y': 1 });
 
 // Index for efficient updates by userId (e.g. handle change, orphan cleanup)
 MapSchema.index({ 'cells.userId': 1 }, { sparse: true });
