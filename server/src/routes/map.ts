@@ -267,6 +267,21 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
   }
 });
 
+// Parse viewport params once (used to skip expensive placement for viewport-only requests)
+function parseViewportFromRequest(req: Request): { hasViewport: boolean; x1: number; y1: number; x2: number; y2: number } {
+  const parse = (param: any): number | undefined => {
+    if (param === undefined || param === null) return undefined;
+    const parsed = parseInt(param as string, 10);
+    return isNaN(parsed) ? undefined : parsed;
+  };
+  const x1 = parse(req.query.x1);
+  const y1 = parse(req.query.y1);
+  const x2 = parse(req.query.x2);
+  const y2 = parse(req.query.y2);
+  const hasViewport = x1 !== undefined && y1 !== undefined && x2 !== undefined && y2 !== undefined;
+  return { hasViewport, x1: x1 ?? 0, y1: y1 ?? 0, x2: x2 ?? 0, y2: y2 ?? 0 };
+}
+
 router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
@@ -281,10 +296,12 @@ router.get('/:name', async (req: Request, res: Response) => {
       return;
     }
 
-    // Get users data for shield status lookup
-    // Note: We query all users here because migration logic needs all users to place houses
-    // After migration, we'll optimize to only query users with houses (see Phase 3B below)
-    const users = await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 });
+    const viewportEarly = parseViewportFromRequest(req);
+    // Viewport requests: skip loading all users and the per-user placement loop (hundreds of DB round-trips).
+    // Placement runs only for full-map requests so new users get a house; viewport just returns tiles.
+    const users = viewportEarly.hasViewport
+      ? []
+      : await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 });
 
     // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
     const docAny = mapDoc as any;
@@ -332,61 +349,62 @@ router.get('/:name', async (req: Request, res: Response) => {
         await (mapDoc as any).save();
       }
 
-      const terrainIsValid = (cc: any) => !cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain' && cc.terrain !== 'road';
-      const pickValidCell = (): { x: number; y: number } | null => {
-        let tries = 0;
-        while (tries < 10000) {
-          const idx = Math.floor(Math.random() * cells.length);
-          const cc = cells[idx];
-          if (terrainIsValid(cc)) {
-            return { x: cc.x, y: cc.y };
+      // Per-user house placement: only for full-map requests. Viewport requests skip this (fast path).
+      if (!viewportEarly.hasViewport && users.length > 0) {
+        const terrainIsValid = (cc: any) => !cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain' && cc.terrain !== 'road';
+        const pickValidCell = (): { x: number; y: number } | null => {
+          let tries = 0;
+          while (tries < 10000) {
+            const idx = Math.floor(Math.random() * cells.length);
+            const cc = cells[idx];
+            if (terrainIsValid(cc)) {
+              return { x: cc.x, y: cc.y };
+            }
+            tries++;
           }
-          tries++;
-        }
-        return null;
-      };
+          return null;
+        };
 
-      for (const u of users) {
-        let attempts = 0;
-        while (attempts < 10) {
-          const candidate = pickValidCell();
-          if (!candidate) break;
-          const result = await MapModel.findOneAndUpdate(
-            {
-              _id: (mapDoc as any)._id,
-              // Ensure this user does not already have a permanent home cell (ignore ephemeral 'YOU')
-              cells: { $not: { $elemMatch: { userId: (u as any)._id, occupiedBy: 'player', entityName: { $ne: 'YOU' } } } },
-              // Atomically target a single array element that matches all conditions
-              $and: [
-                {
-                  cells: {
-                    $elemMatch: {
-                      x: candidate.x,
-                      y: candidate.y,
-                      isOccupied: false,
-                      canBeOccupied: true,
-                      terrain: { $nin: ['water', 'mountain', 'road'] },
+        for (const u of users) {
+          let attempts = 0;
+          while (attempts < 10) {
+            const candidate = pickValidCell();
+            if (!candidate) break;
+            const result = await MapModel.findOneAndUpdate(
+              {
+                _id: (mapDoc as any)._id,
+                cells: { $not: { $elemMatch: { userId: (u as any)._id, occupiedBy: 'player', entityName: { $ne: 'YOU' } } } },
+                $and: [
+                  {
+                    cells: {
+                      $elemMatch: {
+                        x: candidate.x,
+                        y: candidate.y,
+                        isOccupied: false,
+                        canBeOccupied: true,
+                        terrain: { $nin: ['water', 'mountain', 'road'] },
+                      },
                     },
                   },
+                ],
+              } as any,
+              {
+                $set: {
+                  'cells.$.isOccupied': true,
+                  'cells.$.occupiedBy': 'player',
+                  'cells.$.entityName': (u as any).handle,
+                  'cells.$.userId': (u as any)._id,
                 },
-              ],
-            } as any,
-            {
-              $set: {
-                'cells.$.isOccupied': true,
-                'cells.$.occupiedBy': 'player',
-                'cells.$.entityName': (u as any).handle,
-                'cells.$.userId': (u as any)._id,
               },
-            },
-            { new: false }
-          );
-          if (result) break;
-          attempts++;
+              { new: false }
+            );
+            if (result) break;
+            attempts++;
+          }
         }
-      }
 
-      mapDoc = await MapModel.findOne({ name });
+        mapDoc = await MapModel.findOne({ name });
+      }
     }
 
     const gridSize = (mapDoc as any).gridSize || 50;
@@ -402,37 +420,16 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     });
     
-    // Bug Fix: Validate viewport parameters to prevent NaN propagation
-    // Parse and validate viewport coordinates
-    const parseViewportParam = (param: any): number | undefined => {
-      if (param === undefined || param === null) return undefined;
-      const parsed = parseInt(param as string, 10);
-      // Check if parsing resulted in a valid number (not NaN)
-      if (isNaN(parsed)) return undefined;
-      return parsed;
-    };
-    
-    const x1 = parseViewportParam(req.query.x1);
-    const y1 = parseViewportParam(req.query.y1);
-    const x2 = parseViewportParam(req.query.x2);
-    const y2 = parseViewportParam(req.query.y2);
-    
-    // Bug Fix: Only consider viewport valid if all required params are valid numbers
-    // If any viewport param is provided but invalid, fall back to full map
-    const hasViewport = x1 !== undefined && y1 !== undefined && x2 !== undefined && y2 !== undefined;
-    
+    const hasViewport = viewportEarly.hasViewport;
     let viewportX1 = 0;
     let viewportY1 = 0;
     let viewportX2 = gridSize - 1;
     let viewportY2 = gridSize - 1;
-    
     if (hasViewport) {
-      // Bug Fix: Ensure valid viewport bounds (x1 <= x2, y1 <= y2) and clamp to grid bounds
-      const minX = Math.min(x1, x2);
-      const maxX = Math.max(x1, x2);
-      const minY = Math.min(y1, y2);
-      const maxY = Math.max(y1, y2);
-      
+      const minX = Math.min(viewportEarly.x1, viewportEarly.x2);
+      const maxX = Math.max(viewportEarly.x1, viewportEarly.x2);
+      const minY = Math.min(viewportEarly.y1, viewportEarly.y2);
+      const maxY = Math.max(viewportEarly.y1, viewportEarly.y2);
       viewportX1 = Math.max(0, Math.min(minX, gridSize - 1));
       viewportY1 = Math.max(0, Math.min(minY, gridSize - 1));
       viewportX2 = Math.min(gridSize - 1, Math.max(maxX, 0));

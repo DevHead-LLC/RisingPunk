@@ -1185,10 +1185,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (foundUser) break;
     }
     
-    if (!foundUser) {
-      // User's house not in initial viewport, need full map
-      setNeedsFullMap(true);
-    }
+    // Viewport-only initial load: do not fetch full map when user is outside initial viewport.
+    // Show first viewport immediately; location/center for users outside viewport will be addressed in Phase 2 (my-position API).
+    // if (!foundUser) setNeedsFullMap(true); // Disabled for viewport-only first paint (taskItems/ios/hackMap/mapPerformance/viewport-only-initial-load.md)
   }, [initialViewportData, currentUserHandle, needsFullMap, initialViewport]);
   
   // Refetch function - use appropriate query's refetch
