@@ -36,6 +36,8 @@ const PAN_BUFFER = 8; // Buffer in cells for window range calculation
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
+/** Max press duration (ms) to count as a tap; longer presses are ignored. See tile-tap-reliability.md. */
+const TILE_TAP_MAX_DURATION_MS = 500;
 
 /**
  * NPC level-based images (hackMap/npc/). Use the image for the range that contains the NPC's level.
@@ -491,28 +493,60 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           ? (nameForStyle === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
           : styles.enemyHouseBg)
       : null;
-    
+
     const handlePress = useCallback(() => {
       const now = Date.now();
       const startTime = pressStartTimeRef.current;
       const startCoords = pressStartCoordsRef.current;
-      
-      // Only trigger if it was a quick tap (less than 300ms)
-      if (startTime > 0 && now - startTime < 300 && startCoords) {
+      if (startTime > 0 && now - startTime < TILE_TAP_MAX_DURATION_MS && startCoords) {
         onPress(x, y, cell);
       }
-      
       pressStartTimeRef.current = 0;
       pressStartCoordsRef.current = null;
     }, [x, y, cell, onPress]);
-    
+
+    const showShield = cell.owner === 'player' && ((nameForStyle === currentUserHandle && isShieldActive) || isShielded);
+    const imageSource = cell.entity === 'house'
+      ? (cell.owner === 'player'
+          ? (showShield ? require('../assets/images/hackMap/shielded.png') : require('../assets/images/home.png'))
+          : getNpcImageForLevel(cell.npcLevel))
+      : null;
+
+    const cellContent = (
+      <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
+        {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
+        {cell.entity === 'house' && (
+          <>
+            <Image
+              source={imageSource!}
+              style={styles.playerHomeIcon}
+              resizeMode="contain"
+            />
+            <View style={styles.entityLabelContainer} pointerEvents="none">
+              <Text
+                style={[styles.entityLabel, cell.owner === 'player' ? styles.playerLabel : styles.enemyLabel]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {displayName ?? cell.name ?? '…'}
+              </Text>
+            </View>
+            {cell.owner !== 'player' && cell.npcLevel && (
+              <View style={styles.npcLevelContainer} pointerEvents="none">
+                <Text style={styles.npcLevelText}>{cell.npcLevel}</Text>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+    );
+
     return (
       <Pressable
         style={[
           styles.cell,
           xStyle,
           selected && styles.selectedCell,
-          // War takes precedence over alliance (war is more critical to display)
           isWarCrewMember && styles.warCrewMemberCell,
           !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
           !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
@@ -527,8 +561,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           const startTime = pressStartTimeRef.current;
           const startCoords = pressStartCoordsRef.current;
           if (startTime > 0 && startCoords) {
-            const moved = Math.abs(e.nativeEvent.locationX - startCoords.x) > 5 || 
-                         Math.abs(e.nativeEvent.locationY - startCoords.y) > 5;
+            const moved = Math.abs(e.nativeEvent.locationX - startCoords.x) > 5 || Math.abs(e.nativeEvent.locationY - startCoords.y) > 5;
             if (moved) {
               pressStartTimeRef.current = 0;
               pressStartCoordsRef.current = null;
@@ -536,47 +569,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           }
         }}
       >
-        <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
-          {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
-          {cell.entity === 'house' && (
-            <>
-              {cell.owner === 'player' ? (
-                <Image 
-                  source={(nameForStyle === currentUserHandle && isShieldActive) || isShielded
-                    ? require('../assets/images/hackMap/shielded.png')
-                    : require('../assets/images/home.png')
-                  } 
-                  style={styles.playerHomeIcon} 
-                  resizeMode="contain" 
-                />
-              ) : (
-                <Image
-                  source={getNpcImageForLevel(cell.npcLevel)}
-                  style={styles.playerHomeIcon}
-                  resizeMode="contain"
-                />
-              )}
-              <View style={styles.entityLabelContainer} pointerEvents="none">
-                <Text
-                  style={[
-                    styles.entityLabel,
-                    cell.owner === 'player' ? styles.playerLabel : styles.enemyLabel,
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {displayName ?? cell.name ?? '…'}
-                </Text>
-              </View>
-              {/* NPC Level Indicator */}
-              {cell.owner !== 'player' && cell.npcLevel && (
-                <View style={styles.npcLevelContainer} pointerEvents="none">
-                  <Text style={styles.npcLevelText}>{cell.npcLevel}</Text>
-                </View>
-              )}
-            </>
-          )}
-        </View>
+        {cellContent}
       </Pressable>
     );
   }, tileMemoComparison);
@@ -2702,6 +2695,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const PRESS_DEBOUNCE_MS = 300;
   const DOUBLE_PRESS_THRESHOLD_MS = 500;
   const abortControllerRef = useRef<AbortController | null>(null);
+  const mapViewRef = useRef<Animated.View>(null);
+  const mapViewWindowRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
     // Security: Validate coordinates
@@ -2807,6 +2802,45 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Store handler in ref for stable reference
   handleCellPressRef.current = handleCellPress;
+
+  // Tap-at-view coords: use absolute tap position + map view's window position so we get correct cell (e.x/e.y are unreliable when the view has transform). See tile-tap-reliability.md.
+  const handleTapAtViewCoords = useCallback((absoluteX: number, absoluteY: number, offsetAtTapX: number, offsetAtTapY: number) => {
+    const { x: wx, y: wy } = mapViewWindowRef.current;
+    const viewX = absoluteX - wx;
+    const viewY = absoluteY - wy;
+    const contentX = viewX - MARGIN_SIZE;
+    const contentY = viewY - MARGIN_SIZE;
+    const gridX = contentX - offsetAtTapX;
+    const gridY = contentY - offsetAtTapY;
+    const col = Math.floor(gridX / CELL_SIZE);
+    const row = Math.floor(gridY / CELL_SIZE);
+    if (row < 0 || !grid || row >= grid.length) return;
+    const rowData = grid[row];
+    if (!rowData || col < 0 || col >= rowData.length) return;
+    const cell = rowData[col] as CellData;
+    if (!cell) return;
+    const handler = handleCellPressRef.current;
+    if (handler) handler(col, row, cell);
+  }, [grid]);
+
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .maxDistance(9)
+        .maxDuration(400)
+        .onEnd((e) => {
+          'worklet';
+          const ox = offsetX.value;
+          const oy = offsetY.value;
+          runOnJS(handleTapAtViewCoords)(e.absoluteX, e.absoluteY, ox, oy);
+        }),
+    [handleTapAtViewCoords]
+  );
+
+  const combinedMapGesture = useMemo(
+    () => Gesture.Race(tapGesture, panGesture),
+    [tapGesture, panGesture]
+  );
 
   const centerOnUserHome = useCallback(() => {
     if (!currentUserHandle || !grid.length) return;
@@ -3218,30 +3252,35 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
       {renderInfoPanel()}
 
-      <GestureDetector gesture={panGesture}>
+      <GestureDetector gesture={combinedMapGesture}>
         <Animated.View
+          ref={mapViewRef}
           style={[
             styles.marginWrapper,
             { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
             animatedMapStyle as any,
           ]}
+          onLayout={() => {
+            mapViewRef.current?.measureInWindow((x, y) => {
+              mapViewWindowRef.current = { x, y };
+            });
+          }}
         >
           <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
-            {visibleCells.map((assignment, i) => {
+            {visibleCells.map((assignment) => {
               const { x, y, cell } = assignment;
-              const key = `${x},${y}`;
-              const terrain = staticTerrainData[key];
-              const entityImage = entityImageData[key];
-              
-              // Phase 3: Conditional rendering based on panning state
+              const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+              const isCrewMember = !!(cell.owner === 'player' && cell.userId && crewMemberUserIds.has(String(cell.userId)));
+              const isWarCrewMember = !!(cell.owner === 'player' && cell.userId && warCrewMemberUserIds.has(String(cell.userId)));
+              const isAllianceCrewMember = !!(cell.owner === 'player' && cell.userId && !isCrewMember && allianceCrewMemberUserIds.has(String(cell.userId)));
               if (isPanningJS) {
-                // During panning: render simplified tile (terrain + image only, no interactions)
+                const entityImage = cell.entity !== 'empty' ? { entity: cell.entity, owner: cell.owner, userId: cell.userId, npcSlug: cell.npcSlug, npcLevel: cell.npcLevel } : undefined;
                 return (
                   <PanningPoolTile
                     key={`${x}-${y}`}
                     x={x}
                     y={y}
-                    terrain={terrain || cell.terrain}
+                    terrain={cell.terrain}
                     entityImage={entityImage}
                     xStyle={xPosStyles[x]}
                     yStyle={yPosStyles[y]}
@@ -3251,45 +3290,31 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                     styles={styles}
                   />
                 );
-              } else {
-                // When not panning: render full tile with all details and interactions
-                const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-                const isCrewMember = !!(cell.owner === 'player' && 
-                                     cell.userId && 
-                                     crewMemberUserIds.has(String(cell.userId)));
-                const isWarCrewMember = !!(cell.owner === 'player' && 
-                                       cell.userId && 
-                                       warCrewMemberUserIds.has(String(cell.userId)));
-                // Only show yellow border for allies, not our own crew members
-                const isAllianceCrewMember = !!(cell.owner === 'player' && 
-                                             cell.userId && 
-                                             !isCrewMember && // Exclude our own crew members
-                                             allianceCrewMemberUserIds.has(String(cell.userId)));
-                return (
-                  <PoolTile
-                    key={`${x}-${y}`}
-                    x={x}
-                    y={y}
-                    cell={cell}
-                    selected={selected}
-                    onPress={handleCellPress}
-                    xStyle={xPosStyles[x]}
-                    yStyle={yPosStyles[y]}
-                    terrainStyleMap={terrainStyleMap}
-                    currentUserHandle={currentUserHandle}
-                    colors={colors}
-                    themeMode={themeMode}
-                    styles={styles}
-                    dynamicEntityData={dynamicEntityData}
-                    isShieldActive={isShieldActive}
-                    isCrewMember={isCrewMember}
-                    isWarCrewMember={isWarCrewMember}
-                    isAllianceCrewMember={isAllianceCrewMember}
-                    displayName={cell.name}
-                    displayShielded={cell.isShielded}
-                  />
-                );
               }
+              return (
+                <PoolTile
+                  key={`${x}-${y}`}
+                  x={x}
+                  y={y}
+                  cell={cell}
+                  selected={selected}
+                  onPress={handleCellPress}
+                  xStyle={xPosStyles[x]}
+                  yStyle={yPosStyles[y]}
+                  terrainStyleMap={terrainStyleMap}
+                  currentUserHandle={currentUserHandle}
+                  colors={colors}
+                  themeMode={themeMode}
+                  styles={styles}
+                  dynamicEntityData={dynamicEntityData}
+                  isShieldActive={isShieldActive}
+                  isCrewMember={isCrewMember}
+                  isWarCrewMember={isWarCrewMember}
+                  isAllianceCrewMember={isAllianceCrewMember}
+                  displayName={cell.name}
+                  displayShielded={cell.isShielded}
+                />
+              );
             })}
           </View>
         </Animated.View>
@@ -3339,7 +3364,9 @@ type PoolTileProps = {
   isAllianceCrewMember?: boolean;
   displayName?: string | undefined;
   displayShielded?: boolean;
-};const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
+};
+
+const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
