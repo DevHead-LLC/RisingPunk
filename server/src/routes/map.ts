@@ -365,6 +365,29 @@ router.get('/my-position', auth, async (req: Request, res: Response) => {
         }
         tries++;
       }
+      // Race: a concurrent request may have placed the user's house; re-check before 503 (Bugbot).
+      const mapDocAgain = await MapModel.findOne({ name: 'main' });
+      if (mapDocAgain) {
+        const cellsAgain = (mapDocAgain as any).cells as any[];
+        const houseNow =
+          cellsAgain.find(
+            (c: any) =>
+              c.occupiedBy === 'player' &&
+              c.userId &&
+              String(c.userId) === String(authUserId) &&
+              c.entityName !== 'YOU'
+          ) ||
+          cellsAgain.find(
+            (c: any) =>
+              c.occupiedBy === 'player' &&
+              c.userId &&
+              String(c.userId) === String(authUserId)
+          );
+        if (houseNow) {
+          res.json({ x: houseNow.x, y: houseNow.y });
+          return;
+        }
+      }
       res.status(503).json({ error: 'Map full; no empty cell for placement' });
       return;
     }

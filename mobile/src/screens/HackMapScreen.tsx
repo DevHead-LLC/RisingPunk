@@ -543,7 +543,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {displayName ?? cell.name ?? '…'}
+                {((displayName ?? cell.name ?? '').trim() || (cell.owner === 'player' ? 'YOU' : 'NPC'))}
               </Text>
             </View>
             {cell.owner !== 'player' && cell.npcLevel && (
