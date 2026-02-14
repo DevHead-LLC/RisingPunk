@@ -1864,7 +1864,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       const currentUserId = entity?.userId || entityImage?.userId;
       const currentNpcSlug = entity?.npcSlug || entityImage?.npcSlug;
       const currentNpcInstanceId = entity?.npcInstanceId || entityImage?.npcInstanceId;
-      const cacheKey = `${x},${y}-${terrain}-${currentEntity}-${currentOwner || ''}-${currentUserId || ''}-${currentNpcSlug || ''}-${currentNpcInstanceId || ''}-${entity?.npcLevel ?? ''}`;
+      // Fallback to entityImage.npcLevel so minimal (panning) requests show correct NPC level image (Bugbot).
+      const currentNpcLevel = entity?.npcLevel ?? entityImage?.npcLevel;
+      const cacheKey = `${x},${y}-${terrain}-${currentEntity}-${currentOwner || ''}-${currentUserId || ''}-${currentNpcSlug || ''}-${currentNpcInstanceId || ''}-${currentNpcLevel ?? ''}`;
       
       let cell = cache.get(cacheKey);
       
@@ -1875,7 +1877,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           cell.userId !== currentUserId ||
           cell.npcSlug !== currentNpcSlug ||
           cell.npcInstanceId !== currentNpcInstanceId ||
-          cell.npcLevel !== entity?.npcLevel) {
+          cell.npcLevel !== currentNpcLevel) {
         const newCell: CellData = {
           terrain,
           entity: currentEntity,
@@ -1884,7 +1886,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           userId: currentUserId,
           npcSlug: currentNpcSlug,
           npcInstanceId: currentNpcInstanceId,
-          npcLevel: entity?.npcLevel,
+          npcLevel: currentNpcLevel,
           isShielded: entity?.isShielded,
         } as any;
         if (cache.size >= MAX_CACHE_SIZE) {
