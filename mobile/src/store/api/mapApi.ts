@@ -50,7 +50,7 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const mapApi = createApi({
   reducerPath: 'mapApi',
   baseQuery: mapBaseQuery,
-  tagTypes: ['Map'],
+  tagTypes: ['Map', 'MapChat'],
   endpoints: (builder) => ({
     fetchMap: builder.query<MapResponse, void>({
       query: () => '/api/map/main',
@@ -71,7 +71,35 @@ export const mapApi = createApi({
       }),
       invalidatesTags: ['Map'],
     }),
+    getMapChatMessages: builder.query<
+      { success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; timestamp: string }> },
+      string
+    >({
+      query: (mapName) => ({
+        url: `/api/map/${encodeURIComponent(mapName)}/chat-messages`,
+        method: 'GET',
+      }),
+      providesTags: (result, error, mapName) => [{ type: 'MapChat', id: mapName }],
+      keepUnusedDataFor: 30,
+    }),
+    sendMapChatMessage: builder.mutation<
+      { success: boolean; message: { id: string; userId: string; username: string; message: string; timestamp: string } },
+      { mapName: string; message: string }
+    >({
+      query: ({ mapName, message }) => ({
+        url: `/api/map/${encodeURIComponent(mapName)}/chat-messages`,
+        method: 'POST',
+        body: { message },
+      }),
+      invalidatesTags: (result, error, { mapName }) => [{ type: 'MapChat', id: mapName }],
+    }),
   }),
 });
 
-export const { useFetchMapQuery, useFetchMapViewportQuery, useUpdatePlayerPositionMutation } = mapApi;
+export const {
+  useFetchMapQuery,
+  useFetchMapViewportQuery,
+  useUpdatePlayerPositionMutation,
+  useGetMapChatMessagesQuery,
+  useSendMapChatMessageMutation,
+} = mapApi;

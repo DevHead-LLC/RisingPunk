@@ -1,13 +1,30 @@
 import express, { Request, Response, Router } from 'express';
+import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { MapService } from '../services/MapService';
 import { ShieldService } from '../services/ShieldService';
 import { Map as MapModel } from '../models/Map';
 import { User } from '../models/User';
 import { NPCService } from '../services/NPCService';
+import { MapChatMessage } from '../models/MapChatMessage';
+import { filterBadWords } from '../utils/contentModeration';
 
 const router: Router = express.Router();
 const mapService = new MapService();
+
+// Rate limit for map chat POST: per user per map, max 10 messages per 60s to prevent spam/abuse (Bugbot).
+// Evict expired entries on each POST so the Map stays bounded (Bugbot: keys for users who stop posting are never revisited otherwise).
+const MAP_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAP_CHAT_RATE_LIMIT_MAX = 10;
+const mapChatRateLimit = new Map<string, { count: number; windowStartMs: number }>();
+
+function evictExpiredMapChatRateLimitEntries(nowMs: number): void {
+  for (const [key, val] of mapChatRateLimit.entries()) {
+    if (nowMs - val.windowStartMs >= MAP_CHAT_RATE_LIMIT_WINDOW_MS) {
+      mapChatRateLimit.delete(key);
+    }
+  }
+}
 
 function getDisplayLevel(userLevelAssociation: number): number {
   const mapping: { [key: number]: number } = {
@@ -22,6 +39,233 @@ function getDisplayLevel(userLevelAssociation: number): number {
   };
   return mapping[userLevelAssociation] || 1;
 }
+
+// Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
+const MAP_CHAT_ALLOWED_AUTO_CREATE_NAME = 'main';
+
+// Serialize bootstrap per map name so concurrent first requests don't race in generateMap (Bugbot: non-atomic chat map bootstrap).
+const mapBootstrapChains = new Map<string, Promise<void>>();
+
+async function ensureMapExistsForChat(mapName: string): Promise<void> {
+  const run = async (): Promise<void> => {
+    const exists = await MapModel.exists({ name: mapName });
+    if (!exists) await mapService.generateMap(mapName);
+    // Do not swallow errors: bootstrap failures must surface as 500, not 400 Invalid map name (Bugbot).
+  };
+  let chain = mapBootstrapChains.get(mapName);
+  if (!chain) {
+    chain = Promise.resolve();
+    mapBootstrapChains.set(mapName, chain);
+  }
+  const next = chain.then(() => run());
+  mapBootstrapChains.set(mapName, next);
+  // On rejection, clear chain so next request can retry; otherwise rejected promise blocks bootstrap until restart (Bugbot).
+  await next.catch((err) => {
+    mapBootstrapChains.delete(mapName);
+    throw err;
+  });
+}
+
+// Map chat (world chat) - MUST be before /:name to avoid route conflict
+// Visibility is gated by user.unlockedFeatures.hackRig; only users who have unlocked the hack rig can read/send.
+// Restrict mapName to existing maps (or main: create on first use) to prevent storage abuse via arbitrary names (Bugbot).
+router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { mapName } = req.params;
+    if (!mapName || typeof mapName !== 'string' || mapName.trim().length === 0) {
+      res.status(400).json({ error: 'Valid map name is required' });
+      return;
+    }
+    const normalizedMapName = mapName.trim();
+
+    const user = await User.findById(userId).select('unlockedFeatures').lean();
+    if (!user?.unlockedFeatures?.hackRig) {
+      res.status(403).json({ error: 'Hack rig must be unlocked to access world chat' });
+      return;
+    }
+
+    let mapExists = await MapModel.exists({ name: normalizedMapName });
+    if (!mapExists) {
+      if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
+        await ensureMapExistsForChat(normalizedMapName);
+        mapExists = await MapModel.exists({ name: normalizedMapName });
+      }
+      if (!mapExists) {
+        res.status(400).json({ error: 'Invalid map name' });
+        return;
+      }
+    }
+
+    const messages = await MapChatMessage.find({ mapName: normalizedMapName })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    messages.reverse();
+
+    const formattedMessages = messages.map((msg: any) => ({
+      id: String(msg._id),
+      userId: String(msg.userId),
+      username: msg.username,
+      message: msg.message,
+      timestamp: msg.createdAt,
+    }));
+
+    res.json({
+      success: true,
+      messages: formattedMessages,
+    });
+  } catch (error: any) {
+    console.error('Error fetching map chat messages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+interface SendMapChatMessageRequest extends Request {
+  body: {
+    message: string;
+  };
+}
+
+// Same map validation as GET: existing map or auto-create main only (Bugbot).
+router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageRequest, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const { mapName } = req.params;
+    if (!mapName || typeof mapName !== 'string' || mapName.trim().length === 0) {
+      res.status(400).json({ error: 'Valid map name is required' });
+      return;
+    }
+    const normalizedMapName = mapName.trim();
+
+    const user = await User.findById(userId).select('handle unlockedFeatures').lean();
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (!user.unlockedFeatures?.hackRig) {
+      res.status(403).json({ error: 'Hack rig must be unlocked to send world chat messages' });
+      return;
+    }
+
+    let mapExists = await MapModel.exists({ name: normalizedMapName });
+    if (!mapExists) {
+      if (normalizedMapName === MAP_CHAT_ALLOWED_AUTO_CREATE_NAME) {
+        await ensureMapExistsForChat(normalizedMapName);
+        mapExists = await MapModel.exists({ name: normalizedMapName });
+      }
+      if (!mapExists) {
+        res.status(400).json({ error: 'Invalid map name' });
+        return;
+      }
+    }
+
+    const { message } = req.body;
+    if (!message || typeof message !== 'string') {
+      res.status(400).json({ error: 'Message is required' });
+      return;
+    }
+
+    const trimmedMessage = message.trim();
+    if (trimmedMessage.length === 0) {
+      res.status(400).json({ error: 'Message cannot be empty' });
+      return;
+    }
+    if (trimmedMessage.length > 500) {
+      res.status(400).json({ error: 'Message must be 500 characters or less' });
+      return;
+    }
+
+    const rateLimitKey = `${userId}:${normalizedMapName}`;
+    const nowMs = Date.now();
+    evictExpiredMapChatRateLimitEntries(nowMs);
+    const entry = mapChatRateLimit.get(rateLimitKey);
+    if (entry) {
+      if (nowMs - entry.windowStartMs >= MAP_CHAT_RATE_LIMIT_WINDOW_MS) {
+        mapChatRateLimit.delete(rateLimitKey);
+      } else if (entry.count >= MAP_CHAT_RATE_LIMIT_MAX) {
+        res.status(429).json({
+          error: 'Too many messages. Please wait a moment before sending again.',
+        });
+        return;
+      }
+    }
+
+    // Reserve slot before any await so concurrent requests cannot bypass the limit (Bugbot).
+    const entryToIncrement = mapChatRateLimit.get(rateLimitKey);
+    if (!entryToIncrement) {
+      mapChatRateLimit.set(rateLimitKey, { count: 1, windowStartMs: nowMs });
+    } else {
+      entryToIncrement.count += 1;
+    }
+
+    let chatMessage: InstanceType<typeof MapChatMessage>;
+    try {
+      const filteredMessage = filterBadWords(trimmedMessage);
+
+      chatMessage = new MapChatMessage({
+        mapName: normalizedMapName,
+        userId,
+        username: user.handle || 'Unknown',
+        message: filteredMessage,
+        originalMessage: trimmedMessage,
+      });
+
+      await chatMessage.save();
+    } catch (saveError: any) {
+      // Refund only when save (or pre-save) failed; do not refund if save succeeded and post-save steps fail (Bugbot).
+      const entry = mapChatRateLimit.get(rateLimitKey);
+      if (entry) {
+        entry.count -= 1;
+        if (entry.count <= 0) mapChatRateLimit.delete(rateLimitKey);
+      }
+      throw saveError;
+    }
+
+    const totalMessages = await MapChatMessage.countDocuments({ mapName: normalizedMapName });
+    if (totalMessages > 100) {
+      const cutoff = await MapChatMessage.findOne(
+        { mapName: normalizedMapName },
+        { createdAt: 1, _id: 1 },
+        { sort: { createdAt: -1, _id: -1 }, skip: 99, lean: true }
+      );
+      if (cutoff) {
+        await MapChatMessage.deleteMany({
+          mapName: normalizedMapName,
+          $or: [
+            { createdAt: { $lt: cutoff.createdAt } },
+            { createdAt: cutoff.createdAt, _id: { $lt: cutoff._id } },
+          ],
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: {
+        id: (chatMessage._id as mongoose.Types.ObjectId).toString(),
+        userId: (chatMessage.userId as mongoose.Types.ObjectId).toString(),
+        username: chatMessage.username,
+        message: chatMessage.message,
+        timestamp: chatMessage.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error('Error sending map chat message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.get('/:name', async (req: Request, res: Response) => {
   try {
