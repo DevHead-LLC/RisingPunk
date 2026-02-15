@@ -53,7 +53,8 @@ export class MapService {
     await this.addHouses(cells);
 
     // Ensure no duplicate (x,y) so E11000 unique index is satisfied; prefer occupied over empty (Bugbot).
-    // Use Record (not Map): this module imports the Map model, so built-in Map is shadowed.
+    // When both occupied, prefer the cell with stronger occupancy data (userId > entityName/npcSlug) to avoid data loss.
+    const occupancyStrength = (cell: any) => (cell?.userId ? 2 : (cell?.entityName || cell?.npcSlug) ? 1 : 0);
     const cellByKey: Record<string, any> = {};
     for (const c of cells) {
       const key = `${c.x},${c.y}`;
@@ -61,6 +62,8 @@ export class MapService {
       if (!existing) {
         cellByKey[key] = c;
       } else if (c.isOccupied && !existing.isOccupied) {
+        cellByKey[key] = c;
+      } else if (existing.isOccupied && c.isOccupied && occupancyStrength(c) >= occupancyStrength(existing)) {
         cellByKey[key] = c;
       }
     }
