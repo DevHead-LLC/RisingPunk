@@ -358,6 +358,7 @@ const tileMemoComparison = <T extends {
   dynamicEntityData: Record<string, any>;
   displayName?: string | undefined;
   displayShielded?: boolean;
+  tapHandledByGesture?: boolean;
 }>(prevProps: T, nextProps: T): boolean => {
   if (prevProps.cell === nextProps.cell) {
     return (
@@ -372,7 +373,8 @@ const tileMemoComparison = <T extends {
       prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded ===
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded &&
       prevProps.displayName === nextProps.displayName &&
-      prevProps.displayShielded === nextProps.displayShielded
+      prevProps.displayShielded === nextProps.displayShielded &&
+      prevProps.tapHandledByGesture === nextProps.tapHandledByGesture
     );
   }
   return (
@@ -396,7 +398,8 @@ const tileMemoComparison = <T extends {
     prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded ===
     nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded &&
     prevProps.displayName === nextProps.displayName &&
-    prevProps.displayShielded === nextProps.displayShielded
+    prevProps.displayShielded === nextProps.displayShielded &&
+    prevProps.tapHandledByGesture === nextProps.tapHandledByGesture
   );
 };
 
@@ -496,7 +499,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded, tapHandledByGesture }) => {
     const key = `${x},${y}`;
     const dynamicEntity = dynamicEntityData[key];
     const isShielded = displayShielded ?? dynamicEntity?.isShielded ?? (cell as any).isShielded;
@@ -556,16 +559,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       </View>
     );
 
+    const cellStyle = [
+      styles.cell,
+      xStyle,
+      selected && styles.selectedCell,
+      isWarCrewMember && styles.warCrewMemberCell,
+      !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
+      !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
+    ];
+    // Single tap handler: gesture layer (Gesture.Tap) handles map taps; avoid dual Pressable handler (Bugbot).
+    if (tapHandledByGesture) {
+      return <View style={cellStyle}>{cellContent}</View>;
+    }
     return (
       <Pressable
-        style={[
-          styles.cell,
-          xStyle,
-          selected && styles.selectedCell,
-          isWarCrewMember && styles.warCrewMemberCell,
-          !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
-          !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
-        ]}
+        style={cellStyle}
         hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
         onPress={handlePress}
         onPressIn={(e) => {
@@ -685,7 +693,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} displayName={displayName} displayShielded={displayShielded} />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} displayName={displayName} displayShielded={displayShielded} tapHandledByGesture />
       </View>
     );
   }, tileMemoComparison);
@@ -895,6 +903,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Convert refs to shared values to prevent worklet capture warnings
   const lastVelocity = useSharedValue<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
   const rafId = useSharedValue<number | null>(null);
+  const panEndRafIdRef = useRef<number | null>(null);
+  const restorePanRafIdRef = useRef<number | null>(null);
   const lastComputedPan = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastComputeTs = useSharedValue<number>(0);
   const hasCenteredOnHome = useSharedValue<boolean>(false);
@@ -936,6 +946,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       rafId.value = null;
     });
   };
+
+  // Pan-end deferred compute: run in rAF so we can cancel on unmount (Bugbot).
+  const panEndSchedule = useCallback((finalX: number, finalY: number) => {
+    if (panEndRafIdRef.current != null) {
+      cancelAnimationFrame(panEndRafIdRef.current);
+      panEndRafIdRef.current = null;
+    }
+    panEndRafIdRef.current = requestAnimationFrame(() => {
+      panEndRafIdRef.current = null;
+      scheduleCompute(finalX, finalY, 0, 0);
+      lastComputedPan.value = { x: finalX, y: finalY };
+    });
+  }, [scheduleCompute, lastComputedPan]);
 
   // Force pan completion when needed (e.g., for immediate interaction)
   const forcePanCompletion = useCallback(() => {
@@ -1095,16 +1118,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.95 });
       }
       
-      // Single final compute on pan end - no duplicate calls
+      // Single final compute on pan end - no duplicate calls (rAF in JS so we can cancel on unmount; Bugbot).
       const finalX = boundsReady.value ? Math.min(maxX.value, Math.max(minX.value, startX.value + (g.translationX ?? 0))) : startX.value + (g.translationX ?? 0);
       const finalY = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, startY.value + (g.translationY ?? 0))) : startY.value + (g.translationY ?? 0);
-      
-      // Use requestAnimationFrame for smoother final positioning
-      requestAnimationFrame(() => {
-        runOnJS(scheduleCompute)(finalX, finalY, 0, 0);
-        // Update shared value directly instead of calling function that accesses refs
-        lastComputedPan.value = { x: finalX, y: finalY };
-      });
+      runOnJS(panEndSchedule)(finalX, finalY);
     });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
@@ -1210,7 +1227,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
 
   // My-position API: reliable (x,y) for user's house for initial center and locator (user-position-and-locator.md)
-  const shouldFetchMyPosition = !restorePan && !!currentUserHandle;
+  // Skip query when user's house is already in grid (grid-scan will center); only fetch when we need it (Bugbot).
+  const userHouseInGrid = useMemo(() => {
+    if (!grid?.length || !currentUserHandle) return false;
+    for (let y = 0; y < grid.length; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x] as any;
+        if (cell?.entity === 'house' && cell?.name === currentUserHandle) return true;
+      }
+    }
+    return false;
+  }, [grid, currentUserHandle]);
+  const shouldFetchMyPosition = !restorePan && !!currentUserHandle && terrainDataLoaded && !userHouseInGrid;
   const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(undefined, { skip: !shouldFetchMyPosition });
   const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
 
@@ -2599,14 +2629,25 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Update lastComputedPan after setting window range to ensure computeWindow can run if needed
       lastComputedPan.value = { x: clampedX, y: clampedY };
       
-      // Force computeWindow to run to trigger any additional updates (viewport fetch, etc.)
-      requestAnimationFrame(() => {
+      // Force computeWindow to run to trigger any additional updates (viewport fetch, etc.); cancel on cleanup (Bugbot).
+      if (restorePanRafIdRef.current != null) {
+        cancelAnimationFrame(restorePanRafIdRef.current);
+        restorePanRafIdRef.current = null;
+      }
+      restorePanRafIdRef.current = requestAnimationFrame(() => {
+        restorePanRafIdRef.current = null;
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
       });
     } else if (!restorePan) {
       // Clear restored ref when restorePan is cleared (user navigated away)
       restoredPanRef.current = null;
     }
+    return () => {
+      if (restorePanRafIdRef.current != null) {
+        cancelAnimationFrame(restorePanRafIdRef.current);
+        restorePanRafIdRef.current = null;
+      }
+    };
   }, [restorePan, containerSize.width, containerSize.height, computeWindow, grid, boundsReadyJS, gridSize, calculateVirtualViewport]);
 
   useEffect(() => {
@@ -2631,6 +2672,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         if (rafId.value != null) {
           cancelAnimationFrame(rafId.value);
           rafId.value = null;
+        }
+        if (panEndRafIdRef.current != null) {
+          cancelAnimationFrame(panEndRafIdRef.current);
+          panEndRafIdRef.current = null;
         }
         // Reset pan state on cleanup
         isPanning.value = false;
@@ -3465,6 +3510,8 @@ type TileProps = {
   isAllianceCrewMember?: boolean;
   displayName?: string | undefined;
   displayShielded?: boolean;
+  /** When true, tap is handled by parent Gesture.Tap (map); no Pressable so no dual handlers (Bugbot). */
+  tapHandledByGesture?: boolean;
 };
 
 type PoolTileProps = {

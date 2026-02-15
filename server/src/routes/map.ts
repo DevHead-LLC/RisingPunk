@@ -530,36 +530,45 @@ router.get('/:name', async (req: Request, res: Response) => {
         }
       }
       const isBlocked = (c: any) => c.terrain === 'water' || c.terrain === 'mountain' || c.terrain === 'road';
-      let mutatedForCleanup = false;
-      for (const c of cells) {
-        if (c.isOccupied && isBlocked(c)) {
-          c.isOccupied = false;
-          c.occupiedBy = 'none';
-          c.entityName = '';
-          c.userId = null;
-          mutatedForCleanup = true;
+      // Build cleaned cells via copy so we persist with findOneAndUpdate (never save()), avoiding re-persisting duplicates (Bugbot).
+      const cleanedCells = cells.map((c: any) => {
+        const copy = { ...c };
+        if (copy.isOccupied && isBlocked(copy)) {
+          copy.isOccupied = false;
+          copy.occupiedBy = 'none';
+          copy.entityName = '';
+          copy.userId = null;
         }
-        // Clear invalid player-occupied cells (no userId)
-        if (c.isOccupied && c.occupiedBy === 'player' && !c.userId) {
-          c.isOccupied = false;
-          c.occupiedBy = 'none';
-          c.entityName = '';
-          c.userId = null;
-          mutatedForCleanup = true;
+        if (copy.isOccupied && copy.occupiedBy === 'player' && !copy.userId) {
+          copy.isOccupied = false;
+          copy.occupiedBy = 'none';
+          copy.entityName = '';
+          copy.userId = null;
         }
-        // Always clear ephemeral 'YOU' markers regardless of userId to avoid persistence across map loads
-        if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU') {
-          c.isOccupied = false;
-          c.occupiedBy = 'none';
-          c.entityName = '';
-          c.userId = null;
-          mutatedForCleanup = true;
+        if (copy.isOccupied && copy.occupiedBy === 'player' && copy.entityName === 'YOU') {
+          copy.isOccupied = false;
+          copy.occupiedBy = 'none';
+          copy.entityName = '';
+          copy.userId = null;
         }
-      }
-
-      if (mutatedForCleanup) {
-        (mapDoc as any).markModified('cells');
-        await (mapDoc as any).save();
+        return copy;
+      });
+      const needsCleanupPersist = cleanedCells.some((c: any, i: number) => {
+        const o = cells[i];
+        return o.isOccupied !== c.isOccupied || o.occupiedBy !== c.occupiedBy || o.entityName !== c.entityName || (o.userId !== c.userId && (o.userId != null || c.userId != null));
+      });
+      if (needsCleanupPersist) {
+        const updated = await MapModel.findOneAndUpdate(
+          { _id: (mapDoc as any)._id },
+          { $set: { cells: cleanedCells } },
+          { new: true }
+        );
+        if (updated) {
+          mapDoc = updated as any;
+          cells = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : cleanedCells;
+        } else {
+          cells = cleanedCells;
+        }
       }
 
       // Per-user house placement: only for full-map requests. Viewport requests skip this (fast path).
