@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { Map } from '../models/Map';
+import { dedupCellsByCoord } from '../utils/mapCellUtils';
 import { User } from '../models/User';
 import seedrandom from 'seedrandom';
 import { NPCService, NPCDocument } from './NPCService';
@@ -52,15 +53,40 @@ export class MapService {
     // Add houses (entities)
     await this.addHouses(cells);
 
-    // Create and save the map
-    const map = new Map({
+    // Ensure no duplicate (x,y) so E11000 unique index is satisfied; shared dedupe (mapCellUtils) prefers occupied, stronger when both (Bugbot).
+    const deduped = dedupCellsByCoord(cells);
+    if (deduped.length !== cells.length) {
+      console.warn('[MapService.generateMap] deduped cells before save', cells.length, '->', deduped.length);
+    }
+
+    // Use native insertOne with plain objects to avoid Mongoose insert path that can trigger E11000.
+    // Mirror CellSchema.pre('save') invariant: canBeOccupied = false for mountain, water, road (Bugbot).
+    const plainCells = deduped.map((c: any) => {
+      const terrain = c.terrain || 'plain';
+      const impassable = terrain === 'mountain' || terrain === 'water' || terrain === 'road';
+      return {
+        x: c.x,
+        y: c.y,
+        terrain,
+        isActive: c.isActive !== false,
+        isOccupied: !!c.isOccupied,
+        canBeOccupied: impassable ? false : (c.canBeOccupied !== false),
+        occupiedBy: c.occupiedBy || 'none',
+        entityName: c.entityName || '',
+        npcSlug: c.npcSlug || '',
+        npcInstanceId: c.npcInstanceId || '',
+        userId: c.userId || null,
+      };
+    });
+    console.log('[MapService.generateMap] inserting map', name, 'with', plainCells.length, 'cells');
+    await Map.collection.insertOne({
       name,
       gridSize: this.GRID_SIZE,
-      cells,
-      version: 2
+      cells: plainCells,
+      version: 2,
+      lastUpdated: new Date(),
     });
-
-    return map.save();
+    return Map.findOne({ name });
   }
 
   private generateForests(cells: any[]): void {
