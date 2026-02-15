@@ -450,6 +450,52 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-14 (merge dev → android_mergeDev, second pass)
+
+**Branch context:** Merging origin/dev into android_mergeDev (branch already existed; skipped branch creation). Two conflicts: server map dedupe logic (routes + MapService).
+
+### 1. `server/src/routes/map.ts`
+
+**Conflict:** Cell dedupe before validation – inline logic vs shared util.
+
+| Side | Content |
+|------|--------|
+| HEAD | Inline dedupe: occupancyStrength helper, Map/loop, prefer occupied over empty, stronger occupancy when both (userId > entityName/npcSlug). |
+| dev  | `const deduped = dedupCellsByCoord(cells);` with comment "shared dedupe (mapCellUtils)". |
+
+**Resolution:** Accepted **dev**. Final state: `dedupCellsByCoord(cells)` (import already present from dev).
+
+**Rationale:** Server code; not Android deployment–specific. Shared util in `mapCellUtils.ts` is single source of truth and matches Bugbot behavior (prefer occupied, stronger when both). Same semantics, less duplication.
+
+**Rejected from HEAD:** Inline dedupe (duplicates logic that lives in mapCellUtils).
+
+**Failure-mode hints for later:** If E11000 duplicate key reappears on map fetch, confirm `dedupCellsByCoord` in mapCellUtils implements the same preference (occupied over empty, stronger occupancy wins).
+
+---
+
+### 2. `server/src/services/MapService.ts`
+
+**Conflict:** Cell dedupe before insert in generateMap – inline logic vs shared util.
+
+| Side | Content |
+|------|--------|
+| HEAD | Inline dedupe: occupancyStrength, cellByKey record, same preference rules. |
+| dev  | `const deduped = dedupCellsByCoord(cells);` with comment "shared dedupe (mapCellUtils)". |
+
+**Resolution:** Accepted **dev**. Final state: `dedupCellsByCoord(cells)` (import already present from dev).
+
+**Rationale:** Same as map.ts; single source of truth, not Android-specific.
+
+**Rejected from HEAD:** Inline dedupe.
+
+**Failure-mode hints for later:** If E11000 on map generate/insert, confirm dedupCellsByCoord is used before insert and that mapCellUtils logic matches.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – no changes to that file in this merge.
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.

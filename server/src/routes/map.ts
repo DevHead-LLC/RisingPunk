@@ -8,6 +8,7 @@ import { User } from '../models/User';
 import { NPCService } from '../services/NPCService';
 import { MapChatMessage } from '../models/MapChatMessage';
 import { filterBadWords } from '../utils/contentModeration';
+import { dedupCellsByCoord } from '../utils/mapCellUtils';
 
 const router: Router = express.Router();
 const mapService = new MapService();
@@ -508,22 +509,8 @@ router.get('/:name', async (req: Request, res: Response) => {
     } else {
       // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
       let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
-      // Fix E11000 duplicate key: dedupe cells by (x,y), preferring occupied over empty (Bugbot).
-      // When both are occupied, prefer the cell with stronger occupancy data (userId > entityName/npcSlug) to avoid data loss.
-      const occupancyStrength = (cell: any) => (cell?.userId ? 2 : (cell?.entityName || cell?.npcSlug) ? 1 : 0);
-      const cellByKey = new Map<string, any>();
-      for (const c of cells) {
-        const key = `${c.x},${c.y}`;
-        const existing = cellByKey.get(key);
-        if (!existing) {
-          cellByKey.set(key, c);
-        } else if (c.isOccupied && !existing.isOccupied) {
-          cellByKey.set(key, c);
-        } else if (existing.isOccupied && c.isOccupied && occupancyStrength(c) >= occupancyStrength(existing)) {
-          cellByKey.set(key, c);
-        }
-      }
-      const deduped = Array.from(cellByKey.values());
+      // Fix E11000 duplicate key: shared dedupe (mapCellUtils) prefers occupied over empty, stronger occupancy when both occupied (Bugbot).
+      const deduped = dedupCellsByCoord(cells);
       if (deduped.length !== cells.length) {
         console.log('[map fetch] deduping cells', cells.length, '->', deduped.length);
         const updated = await MapModel.findOneAndUpdate(
