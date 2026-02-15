@@ -41,7 +41,9 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       return result;
     }
     // my-position is optional: 404 (no house) or other failures should not trigger global error modal (user-position-and-locator.md)
-    const isMyPositionRequest = typeof args?.url === 'string' && args.url.endsWith('/my-position');
+    const url = typeof args === 'string' ? args : args?.url;
+    const path = typeof url === 'string' ? url.split('?')[0] : '';
+    const isMyPositionRequest = path.endsWith('/my-position');
     if (!isMyPositionRequest) {
       globalErrorHandler.handleDatabaseError(result.error);
     }

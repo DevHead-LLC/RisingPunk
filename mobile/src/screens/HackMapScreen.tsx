@@ -2858,6 +2858,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const mapViewRef = useRef<Animated.View>(null);
   const mapViewWindowRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isMountedRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
     // Security: Validate coordinates
@@ -2969,6 +2976,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const viewRef = mapViewRef.current;
     if (!viewRef) return;
     viewRef.measureInWindow((wx, wy) => {
+      if (!isMountedRef.current) return;
       mapViewWindowRef.current = { x: wx, y: wy };
       // (wx, wy) is the view's rendered top-left (after translate); so view-local tap = (absolute - window).
       // Grid content starts at (MARGIN_SIZE, MARGIN_SIZE) in view; do NOT subtract pan offset — it's already in (wx, wy).
@@ -2983,6 +2991,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (!rowData || col < 0 || col >= rowData.length) return;
       const cell = rowData[col] as CellData;
       if (!cell) return;
+      if (!isMountedRef.current) return;
       const handler = handleCellPressRef.current;
       if (!handler) return;
       handler(col, row, cell);
