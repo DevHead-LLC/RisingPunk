@@ -52,14 +52,22 @@ export class MapService {
     // Add houses (entities)
     await this.addHouses(cells);
 
-    // Ensure no duplicate (x,y) so E11000 unique index is satisfied (user-position-and-locator.md)
-    const seen = new Set<string>();
-    const deduped = cells.filter((c: any) => {
+    // Ensure no duplicate (x,y) so E11000 unique index is satisfied; prefer occupied over empty (Bugbot).
+    // When both occupied, prefer the cell with stronger occupancy data (userId > entityName/npcSlug) to avoid data loss.
+    const occupancyStrength = (cell: any) => (cell?.userId ? 2 : (cell?.entityName || cell?.npcSlug) ? 1 : 0);
+    const cellByKey: Record<string, any> = {};
+    for (const c of cells) {
       const key = `${c.x},${c.y}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+      const existing = cellByKey[key];
+      if (!existing) {
+        cellByKey[key] = c;
+      } else if (c.isOccupied && !existing.isOccupied) {
+        cellByKey[key] = c;
+      } else if (existing.isOccupied && c.isOccupied && occupancyStrength(c) >= occupancyStrength(existing)) {
+        cellByKey[key] = c;
+      }
+    }
+    const deduped = Object.values(cellByKey);
     if (deduped.length !== cells.length) {
       console.warn('[MapService.generateMap] deduped cells before save', cells.length, '->', deduped.length);
     }
