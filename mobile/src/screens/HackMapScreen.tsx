@@ -698,53 +698,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     );
   }, tileMemoComparison);
 
-  type RowProps = {
-    y: number;
-    row: CellData[] | undefined;
-    colStart: number;
-    colEnd: number;
-    rowVisible: boolean;
-    selectedCell: { x: number; y: number; info: CellData } | null;
-    onPress: (x: number, y: number, cell: CellData) => void;
-    rowStyle: any;
-    xPosStyles: Array<any>;
-    terrainStyleMap: Record<TerrainType, any>;
-    disableTiles?: boolean;
-    currentUserHandle?: string | null;
-    colors: ReturnType<typeof useThemeColors>;
-    themeMode: 'light' | 'dark';
-    styles: any;
-    dynamicEntityData: Record<string, any>;
-    isShieldActive: boolean;
-  };
-
-  const Row: React.FC<RowProps> = ({ y, row, colStart, colEnd, rowVisible, selectedCell, onPress, rowStyle, xPosStyles, terrainStyleMap, disableTiles, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive }) => {
-    // Always render the row container (grid shell), but only mount tiles when visible
-    if (!row) {
-      return <View style={[styles.row, rowStyle]} />;
-    }
-
-    if (disableTiles) {
-      return <View style={[styles.row, rowStyle]} />;
-    }
-
-    const tiles = rowVisible
-      ? Array.from({ length: colEnd - colStart + 1 }).map((_, offset) => {
-          const x = colStart + offset;
-          const cell = row[x];
-          if (!cell) return null;
-          const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-          return <Tile key={`${x}-${y}`} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} displayName={cell.name} displayShielded={cell.isShielded} />;
-        })
-      : null;
-
-    return (
-      <View style={[styles.row, rowStyle]}>
-        {tiles}
-      </View>
-    );
-  };
-
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
@@ -994,7 +947,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Compare Set contents to avoid unnecessary updates
       if (prev.visibleTiles.size === visibleTiles.size) {
         let contentsMatch = true;
-        for (const tile of visibleTiles) {
+        for (const tile of Array.from(visibleTiles)) {
           if (!prev.visibleTiles.has(tile)) {
             contentsMatch = false;
             break;
@@ -1270,7 +1223,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     
     // Check visible cells for player tiles
     if (virtualViewport.visibleTiles.size > 0) {
-      for (const tileKey of virtualViewport.visibleTiles) {
+      for (const tileKey of Array.from(virtualViewport.visibleTiles)) {
         const entity = dynamicEntityData[tileKey];
         if (entity && entity.owner === 'player') {
           return true;
@@ -1707,7 +1660,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     
     // Check visible cells for NPC tiles
     if (virtualViewport.visibleTiles.size > 0) {
-      for (const tileKey of virtualViewport.visibleTiles) {
+      for (const tileKey of Array.from(virtualViewport.visibleTiles)) {
         const entity = dynamicEntityData[tileKey];
         if (entity && entity.npcSlug) {
           return true;
