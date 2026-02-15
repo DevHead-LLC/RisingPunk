@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "lib": ["es2019", "es2020.bigint", "es2020.promise", "es2021.promise", "es2022.array", "es2022.object", "es2022.string"],
+    "allowJs": true,
+    "jsx": "react-native",
+    "noEmit": true,
+    "isolatedModules": true,
+    "strict": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "downlevelIteration": true,
+    "forceConsistentCasingInFileNames": false
+  },
+  "include": ["mobile/src/**/*", "mobile/__tests__/**/*"],
+  "exclude": ["node_modules", "**/node_modules", "server"]
+}
