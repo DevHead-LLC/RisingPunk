@@ -15,7 +15,7 @@ import { WorldChatModal } from '../components/hackMap/WorldChatModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
-import { useFetchMapQuery, useFetchMapViewportQuery } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
@@ -31,12 +31,13 @@ const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
 // Constants for viewport fetching and panning
-const VIEWPORT_FETCH_THRESHOLD = 5; // Cells to move before triggering viewport fetch
+const VIEWPORT_FETCH_THRESHOLD = 2; // Cells to move before triggering viewport fetch (lower = request sooner, fewer black areas)
 const PAN_BUFFER = 8; // Buffer in cells for window range calculation
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
-
+/** Max press duration (ms) to count as a tap; longer presses are ignored. See tile-tap-reliability.md. */
+const TILE_TAP_MAX_DURATION_MS = 500;
 /**
  * NPC level-based images (hackMap/npc/). Use the image for the range that contains the NPC's level.
  * Level ranges and assets:
@@ -291,28 +292,44 @@ const shouldFetchViewport = (
 };
 
 /**
+ * Union two viewports and clamp to grid (so one request can cover multiple queued areas)
+ */
+const unionViewports = (
+  a: { x1: number; y1: number; x2: number; y2: number },
+  b: { x1: number; y1: number; x2: number; y2: number },
+  gridSize: number
+): { x1: number; y1: number; x2: number; y2: number } => {
+  return {
+    x1: Math.max(0, Math.min(a.x1, b.x1)),
+    y1: Math.max(0, Math.min(a.y1, b.y1)),
+    x2: Math.min(gridSize - 1, Math.max(a.x2, b.x2)),
+    y2: Math.min(gridSize - 1, Math.max(a.y2, b.y2)),
+  };
+};
+
+/**
  * Trigger viewport fetch with minimal flag
- * Prevents new requests while one is in flight to avoid cancelling requests
- * @param newViewport - New viewport coordinates { x1, y1, x2, y2, minimal?: boolean }
- * @param panningViewportMinimalRef - Ref to store minimal flag
- * @param setPanningViewportParams - State setter for viewport params
- * @param viewportRequestInFlightRef - Ref to track if request is in flight
- * @param pendingViewportParamsRef - Ref to store pending viewport if request is in flight
+ * Prevents new requests while one is in flight; when queueing, unions with existing pending to cover more area in one request
+ * @param gridSize - Grid size for clamping union
  */
 const triggerViewportFetch = (
   newViewport: { x1: number; y1: number; x2: number; y2: number; minimal?: boolean },
   panningViewportMinimalRef: React.MutableRefObject<boolean>,
   setPanningViewportParams: React.Dispatch<React.SetStateAction<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>>,
   viewportRequestInFlightRef: React.MutableRefObject<boolean>,
-  pendingViewportParamsRef: React.MutableRefObject<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>
+  pendingViewportParamsRef: React.MutableRefObject<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>,
+  gridSize: number
 ): void => {
   if (viewportRequestInFlightRef.current) {
-    // Request already in flight - store this as pending instead of cancelling the current one
-    pendingViewportParamsRef.current = newViewport;
+    // Request in flight: union with existing pending so one request covers more area (reduces black regions)
+    const prev = pendingViewportParamsRef.current;
+    const merged = prev
+      ? { ...unionViewports(prev, newViewport, gridSize), minimal: (newViewport.minimal ?? true) && (prev.minimal ?? true) }
+      : newViewport;
+    pendingViewportParamsRef.current = merged;
     return;
   }
   
-  // No request in flight - start new request
   viewportRequestInFlightRef.current = true;
   panningViewportMinimalRef.current = true;
   setPanningViewportParams(newViewport);
@@ -327,22 +344,23 @@ type Props = {
  * Shared memo comparison function for Tile and PoolTile components
  * Uses fast path (cell reference equality) with deep comparison fallback
  */
-const tileMemoComparison = <T extends { 
-  x: number; 
-  y: number; 
-  cell: CellData; 
-  selected: boolean; 
-  currentUserHandle?: string | null; 
-  isShieldActive: boolean; 
-  isCrewMember?: boolean; 
-  isWarCrewMember?: boolean; 
-  isAllianceCrewMember?: boolean; 
-  dynamicEntityData: Record<string, any> 
+// Phase 1c: displayName/displayShielded so tile re-renders when minimal→full updates (same cell ref, label changes)
+const tileMemoComparison = <T extends {
+  x: number;
+  y: number;
+  cell: CellData;
+  selected: boolean;
+  currentUserHandle?: string | null;
+  isShieldActive: boolean;
+  isCrewMember?: boolean;
+  isWarCrewMember?: boolean;
+  isAllianceCrewMember?: boolean;
+  dynamicEntityData: Record<string, any>;
+  displayName?: string | undefined;
+  displayShielded?: boolean;
+  tapHandledByGesture?: boolean;
 }>(prevProps: T, nextProps: T): boolean => {
-  // Phase 4: Enhanced memo comparison with fast path and deep fallback
-  // Fast path: Phase 2's stable cell references enable efficient reference equality check
   if (prevProps.cell === nextProps.cell) {
-    // Same cell object reference - check other props that might affect rendering
     return (
       prevProps.x === nextProps.x &&
       prevProps.y === nextProps.y &&
@@ -352,12 +370,13 @@ const tileMemoComparison = <T extends {
       prevProps.isCrewMember === nextProps.isCrewMember &&
       prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
       prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+      prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded ===
+      nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded &&
+      prevProps.displayName === nextProps.displayName &&
+      prevProps.displayShielded === nextProps.displayShielded &&
+      prevProps.tapHandledByGesture === nextProps.tapHandledByGesture
     );
   }
-  
-  // Deep comparison fallback: cell reference changed, check if cell data actually changed
   return (
     prevProps.x === nextProps.x &&
     prevProps.y === nextProps.y &&
@@ -376,8 +395,11 @@ const tileMemoComparison = <T extends {
     prevProps.isCrewMember === nextProps.isCrewMember &&
     prevProps.isWarCrewMember === nextProps.isWarCrewMember &&
     prevProps.isAllianceCrewMember === nextProps.isAllianceCrewMember &&
-    prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded === 
-    nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded
+    prevProps.dynamicEntityData[`${prevProps.x},${prevProps.y}`]?.isShielded ===
+    nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded &&
+    prevProps.displayName === nextProps.displayName &&
+    prevProps.displayShielded === nextProps.displayShielded &&
+    prevProps.tapHandledByGesture === nextProps.tapHandledByGesture
   );
 };
 
@@ -477,44 +499,81 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded, tapHandledByGesture }) => {
     const key = `${x},${y}`;
     const dynamicEntity = dynamicEntityData[key];
-    const isShielded = dynamicEntity?.isShielded ?? (cell as any).isShielded;
+    const isShielded = displayShielded ?? dynamicEntity?.isShielded ?? (cell as any).isShielded;
     const pressStartTimeRef = useRef<number>(0);
     const pressStartCoordsRef = useRef<{ x: number; y: number } | null>(null);
-    
+    const nameForStyle = displayName ?? cell.name;
     const houseBgStyle = cell.entity === 'house'
       ? (cell.owner === 'player'
-          ? (cell.name === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
+          ? (nameForStyle === currentUserHandle ? styles.userHouseBg : styles.otherUserHouseBg)
           : styles.enemyHouseBg)
       : null;
-    
+
     const handlePress = useCallback(() => {
       const now = Date.now();
       const startTime = pressStartTimeRef.current;
       const startCoords = pressStartCoordsRef.current;
-      
-      // Only trigger if it was a quick tap (less than 300ms)
-      if (startTime > 0 && now - startTime < 300 && startCoords) {
+      if (startTime > 0 && now - startTime < TILE_TAP_MAX_DURATION_MS && startCoords) {
         onPress(x, y, cell);
       }
-      
       pressStartTimeRef.current = 0;
       pressStartCoordsRef.current = null;
     }, [x, y, cell, onPress]);
-    
+
+    const showShield = cell.owner === 'player' && ((nameForStyle === currentUserHandle && isShieldActive) || isShielded);
+    const imageSource = cell.entity === 'house'
+      ? (cell.owner === 'player'
+          ? (showShield ? require('../assets/images/hackMap/shielded.png') : require('../assets/images/home.png'))
+          : getNpcImageForLevel(cell.npcLevel))
+      : null;
+
+    const cellContent = (
+      <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
+        {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
+        {cell.entity === 'house' && (
+          <>
+            <Image
+              source={imageSource!}
+              style={styles.playerHomeIcon}
+              resizeMode="contain"
+            />
+            <View style={styles.entityLabelContainer} pointerEvents="none">
+              <Text
+                style={[styles.entityLabel, cell.owner === 'player' ? styles.playerLabel : styles.enemyLabel]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {((displayName ?? cell.name ?? '').trim() || (cell.owner === 'player' ? 'YOU' : 'NPC'))}
+              </Text>
+            </View>
+            {cell.owner !== 'player' && cell.npcLevel && (
+              <View style={styles.npcLevelContainer} pointerEvents="none">
+                <Text style={styles.npcLevelText}>{cell.npcLevel}</Text>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+    );
+
+    const cellStyle = [
+      styles.cell,
+      xStyle,
+      selected && styles.selectedCell,
+      isWarCrewMember && styles.warCrewMemberCell,
+      !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
+      !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
+    ];
+    // Single tap handler: gesture layer (Gesture.Tap) handles map taps; avoid dual Pressable handler (Bugbot).
+    if (tapHandledByGesture) {
+      return <View style={cellStyle}>{cellContent}</View>;
+    }
     return (
       <Pressable
-        style={[
-          styles.cell,
-          xStyle,
-          selected && styles.selectedCell,
-          // War takes precedence over alliance (war is more critical to display)
-          isWarCrewMember && styles.warCrewMemberCell,
-          !isWarCrewMember && isAllianceCrewMember && styles.allianceCrewMemberCell,
-          !isWarCrewMember && !isAllianceCrewMember && isCrewMember && styles.crewMemberCell,
-        ]}
+        style={cellStyle}
         hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
         onPress={handlePress}
         onPressIn={(e) => {
@@ -525,8 +584,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           const startTime = pressStartTimeRef.current;
           const startCoords = pressStartCoordsRef.current;
           if (startTime > 0 && startCoords) {
-            const moved = Math.abs(e.nativeEvent.locationX - startCoords.x) > 5 || 
-                         Math.abs(e.nativeEvent.locationY - startCoords.y) > 5;
+            const moved = Math.abs(e.nativeEvent.locationX - startCoords.x) > 5 || Math.abs(e.nativeEvent.locationY - startCoords.y) > 5;
             if (moved) {
               pressStartTimeRef.current = 0;
               pressStartCoordsRef.current = null;
@@ -534,47 +592,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           }
         }}
       >
-        <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
-          {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
-          {cell.entity === 'house' && (
-            <>
-              {cell.owner === 'player' ? (
-                <Image 
-                  source={(cell.name === currentUserHandle && isShieldActive) || isShielded
-                    ? require('../assets/images/hackMap/shielded.png')
-                    : require('../assets/images/home.png')
-                  } 
-                  style={styles.playerHomeIcon} 
-                  resizeMode="contain" 
-                />
-              ) : (
-                <Image
-                  source={getNpcImageForLevel(cell.npcLevel)}
-                  style={styles.playerHomeIcon}
-                  resizeMode="contain"
-                />
-              )}
-              <View style={styles.entityLabelContainer} pointerEvents="none">
-                <Text
-                  style={[
-                    styles.entityLabel,
-                    cell.owner === 'player' ? styles.playerLabel : styles.enemyLabel,
-                  ]}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                >
-                  {cell.name || (cell.owner === 'player' ? 'YOU' : 'NPC')}
-                </Text>
-              </View>
-              {/* NPC Level Indicator */}
-              {cell.owner !== 'player' && cell.npcLevel && (
-                <View style={styles.npcLevelContainer} pointerEvents="none">
-                  <Text style={styles.npcLevelText}>{cell.npcLevel}</Text>
-                </View>
-              )}
-            </>
-          )}
-        </View>
+        {cellContent}
       </Pressable>
     );
   }, tileMemoComparison);
@@ -672,10 +690,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     );
   }, panningTileMemoComparison);
 
-  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember }) => {
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} displayName={displayName} displayShielded={displayShielded} tapHandledByGesture />
       </View>
     );
   }, tileMemoComparison);
@@ -716,7 +734,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           const cell = row[x];
           if (!cell) return null;
           const isSelected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-          return <Tile key={`${x}-${y}`} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} />;
+          return <Tile key={`${x}-${y}`} x={x} y={y} cell={cell} selected={isSelected} onPress={onPress} xStyle={xPosStyles[x]} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} displayName={cell.name} displayShielded={cell.isShielded} />;
         })
       : null;
 
@@ -779,24 +797,22 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [isPanningJS, setIsPanningJS] = useState<boolean>(false);
   const [panningStopped, setPanningStopped] = useState<boolean>(true);
   
-  // Phase 5: Sync ref to state when panning stops
+  // Phase 5: Sync ref to state when panning stops (deferred to next frame to smooth view correction)
   useEffect(() => {
     if (!isPanningJS && panningStopped) {
       const refRange = windowRangeRef.current;
       const stateRange = windowRange;
       
-      // Check if state and ref differ
       const differs = stateRange.rowStart !== refRange.rowStart || stateRange.rowEnd !== refRange.rowEnd ||
                       stateRange.colStart !== refRange.colStart || stateRange.colEnd !== refRange.colEnd;
       
       if (differs) {
-        // State and ref differ - sync state to ref (ref has latest panning data)
-        setWindowRange(refRange);
-        // Don't sync ref to state here - wait for state update to complete
-        // The next render will have state == ref, and we can safely sync if needed
+        // Defer sync to next animation frame so the "correct" view doesn't jump in the same tick as tile load
+        const raf = requestAnimationFrame(() => {
+          setWindowRange(refRange);
+        });
+        return () => cancelAnimationFrame(raf);
       } else {
-        // State and ref are equal - safe to keep ref in sync with state
-        // This handles cases where state is updated externally (not through this effect)
         windowRangeRef.current = stateRange;
       }
     }
@@ -878,6 +894,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const lastComputedPanRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastComputeTsRef = useRef<number>(0);
   const hasCenteredOnHomeRef = useRef<boolean>(false);
+  /** Cached user house position from my-position API for locator and initial center (user-position-and-locator.md) */
+  const userMapPositionRef = useRef<{ x: number; y: number } | null>(null);
   const isPanningRef = useRef<boolean>(false);
   const panStartTimeRef = useRef<number>(0);
   const panEndTimeRef = useRef<number>(0);
@@ -885,6 +903,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Convert refs to shared values to prevent worklet capture warnings
   const lastVelocity = useSharedValue<{ vx: number; vy: number }>({ vx: 0, vy: 0 });
   const rafId = useSharedValue<number | null>(null);
+  const panEndRafIdRef = useRef<number | null>(null);
+  const restorePanRafIdRef = useRef<number | null>(null);
   const lastComputedPan = useSharedValue<{ x: number; y: number }>({ x: 0, y: 0 });
   const lastComputeTs = useSharedValue<number>(0);
   const hasCenteredOnHome = useSharedValue<boolean>(false);
@@ -926,6 +946,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       rafId.value = null;
     });
   };
+
+  // Pan-end deferred compute: run in rAF so we can cancel on unmount (Bugbot).
+  const panEndSchedule = useCallback((finalX: number, finalY: number) => {
+    if (panEndRafIdRef.current != null) {
+      cancelAnimationFrame(panEndRafIdRef.current);
+      panEndRafIdRef.current = null;
+    }
+    panEndRafIdRef.current = requestAnimationFrame(() => {
+      panEndRafIdRef.current = null;
+      scheduleCompute(finalX, finalY, 0, 0);
+      lastComputedPan.value = { x: finalX, y: finalY };
+    });
+  }, [scheduleCompute, lastComputedPan]);
 
   // Force pan completion when needed (e.g., for immediate interaction)
   const forcePanCompletion = useCallback(() => {
@@ -1086,16 +1119,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         offsetY.value = withDecay({ velocity: g.velocityY, deceleration: 0.95 });
       }
       
-      // Single final compute on pan end - no duplicate calls
+      // Single final compute on pan end - no duplicate calls (rAF in JS so we can cancel on unmount; Bugbot).
       const finalX = boundsReady.value ? Math.min(maxX.value, Math.max(minX.value, startX.value + (g.translationX ?? 0))) : startX.value + (g.translationX ?? 0);
       const finalY = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, startY.value + (g.translationY ?? 0))) : startY.value + (g.translationY ?? 0);
-      
-      // Use requestAnimationFrame for smoother final positioning
-      requestAnimationFrame(() => {
-        runOnJS(scheduleCompute)(finalX, finalY, 0, 0);
-        // Update shared value directly instead of calling function that accesses refs
-        lastComputedPan.value = { x: finalX, y: finalY };
-      });
+      runOnJS(panEndSchedule)(finalX, finalY);
     });
   const gridSize = grid.length || 50;
   const totalSize = gridSize * CELL_SIZE;
@@ -1186,10 +1213,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (foundUser) break;
     }
     
-    if (!foundUser) {
-      // User's house not in initial viewport, need full map
-      setNeedsFullMap(true);
-    }
+    // Viewport-only initial load: do not fetch full map when user is outside initial viewport.
+    // Show first viewport immediately; location/center for users outside viewport will be addressed in Phase 2 (my-position API).
+    // if (!foundUser) setNeedsFullMap(true); // Disabled for viewport-only first paint (taskItems/ios/hackMap/mapPerformance/viewport-only-initial-load.md)
   }, [initialViewportData, currentUserHandle, needsFullMap, initialViewport]);
   
   // Refetch function - use appropriate query's refetch
@@ -1200,7 +1226,25 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       refetchInitialViewport();
     }
   }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
-  
+
+  // My-position API: reliable (x,y) for user's house for initial center and locator (user-position-and-locator.md)
+  // Skip query when user's house is already in grid (grid-scan will center); only fetch when we need it (Bugbot).
+  const userHouseInGrid = useMemo(() => {
+    if (!grid?.length || !currentUserHandle) return false;
+    for (let y = 0; y < grid.length; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x] as any;
+        if (cell?.entity === 'house' && cell?.name === currentUserHandle) return true;
+      }
+    }
+    return false;
+  }, [grid, currentUserHandle]);
+  const shouldFetchMyPosition = !restorePan && !!currentUserHandle && terrainDataLoaded && !userHouseInGrid;
+  const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(undefined, { skip: !shouldFetchMyPosition });
+  const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
+
   // Phase 6: Viewport fetching during panning with minimal data
   // Track the last viewport we fetched to avoid duplicate requests
   const lastFetchedViewportRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
@@ -1835,39 +1879,36 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     if (!terrainDataLoaded) return cells;
     
     
-    // Use ref for panning state, but read data directly from state (not refs)
-    // This ensures we get the latest data even after cache clears
+    // Use ref for panning state and for range when panning just stopped (avoids one frame of stale range/jump)
     const currentIsPanningJS = isPanningJSRef.current;
-    const currentWindowRange = currentIsPanningJS ? windowRangeRef.current : windowRange;
+    const useRefForRange = currentIsPanningJS || panningStopped;
+    const currentWindowRange = useRefForRange ? windowRangeRef.current : windowRange;
     
     const cache = cellCacheRef.current;
     
     // Phase 2: Cell cache to maintain stable object references
-    // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
-    // This prevents entities from disappearing when panning stops before full details are loaded
+    // Phase 1c: Cache key excludes name and isShielded so minimal→full transition reuses same ref (reduces image blink).
+    // When full details arrive we update the cached cell's name/isShielded in place so the tile can re-render for label only.
     const getOrCreateCell = (x: number, y: number, terrain: TerrainType, entity: any, entityImage: any): CellData => {
-      // Include entityImage in cache key to ensure proper cache invalidation
-      const cacheKey = `${x},${y}-${terrain}-${entity?.entity || entityImage?.entity || 'empty'}-${entity?.owner || entityImage?.owner || ''}-${entity?.name || ''}-${entity?.userId || entityImage?.userId || ''}-${entity?.npcSlug || entityImage?.npcSlug || ''}-${entity?.npcInstanceId || entityImage?.npcInstanceId || ''}-${entity?.npcLevel || ''}-${entity?.isShielded || false}`;
-      
-      let cell = cache.get(cacheKey);
-      
-      // Check if cached cell matches current data (including entityImage fallback)
       const currentEntity = entity?.entity || entityImage?.entity || 'empty';
       const currentOwner = entity?.owner || entityImage?.owner;
       const currentUserId = entity?.userId || entityImage?.userId;
       const currentNpcSlug = entity?.npcSlug || entityImage?.npcSlug;
       const currentNpcInstanceId = entity?.npcInstanceId || entityImage?.npcInstanceId;
+      // Fallback to entityImage.npcLevel so minimal (panning) requests show correct NPC level image (Bugbot).
+      const currentNpcLevel = entity?.npcLevel ?? entityImage?.npcLevel;
+      const cacheKey = `${x},${y}-${terrain}-${currentEntity}-${currentOwner || ''}-${currentUserId || ''}-${currentNpcSlug || ''}-${currentNpcInstanceId || ''}-${currentNpcLevel ?? ''}`;
       
-      if (!cell || 
+      let cell = cache.get(cacheKey);
+      
+      if (!cell ||
           cell.terrain !== terrain ||
           cell.entity !== currentEntity ||
           cell.owner !== currentOwner ||
-          cell.name !== entity?.name ||
           cell.userId !== currentUserId ||
           cell.npcSlug !== currentNpcSlug ||
           cell.npcInstanceId !== currentNpcInstanceId ||
-          cell.npcLevel !== entity?.npcLevel ||
-          cell.isShielded !== entity?.isShielded) {
+          cell.npcLevel !== currentNpcLevel) {
         const newCell: CellData = {
           terrain,
           entity: currentEntity,
@@ -1876,20 +1917,24 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           userId: currentUserId,
           npcSlug: currentNpcSlug,
           npcInstanceId: currentNpcInstanceId,
-          npcLevel: entity?.npcLevel,
+          npcLevel: currentNpcLevel,
           isShielded: entity?.isShielded,
         } as any;
-        
         if (cache.size >= MAX_CACHE_SIZE) {
           const firstKey = cache.keys().next().value;
-          if (firstKey !== undefined) {
-            cache.delete(firstKey);
-          }
+          if (firstKey !== undefined) cache.delete(firstKey);
         }
         cache.set(cacheKey, newCell);
         cell = newCell;
+      } else {
+        // Phase 1c: Update name and isShielded in place when full details arrive (same ref → less image blink)
+        const name = entity?.name;
+        const isShielded = entity?.isShielded;
+        if ((cell as any).name !== name || (cell as any).isShielded !== isShielded) {
+          (cell as any).name = name;
+          (cell as any).isShielded = isShielded;
+        }
       }
-      
       return cell;
     };
     
@@ -1930,13 +1975,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
     }
     
-    // Logging: Track visibleCells count changes (only log if count actually changed)
     if (prevVisibleCellsCountRef.current !== cells.length) {
       prevVisibleCellsCountRef.current = cells.length;
     }
     
     return cells;
-  }, [virtualViewport.visibleTiles, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, entityImageData, terrainDataLoaded]);
+  }, [virtualViewport.visibleTiles, windowRange.rowStart, windowRange.rowEnd, windowRange.colStart, windowRange.colEnd, staticTerrainData, dynamicEntityData, entityImageData, terrainDataLoaded, panningStopped]);
 
 
 
@@ -2222,14 +2266,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     
     // Handle pending requests after processing current data
-    // This ensures non-minimal restorePan data is processed even if a panning request is pending
+    // Skip if pending is the same as the viewport we just merged (avoid redundant re-fetch)
     if ((panningViewportData || panningViewportError) && pendingViewportParamsRef.current) {
       const pending = pendingViewportParamsRef.current;
+      const justMerged = panningViewportData?.viewport;
+      const sameViewport = justMerged &&
+        pending.x1 === justMerged.x1 && pending.y1 === justMerged.y1 &&
+        pending.x2 === justMerged.x2 && pending.y2 === justMerged.y2;
       pendingViewportParamsRef.current = null;
-      viewportRequestInFlightRef.current = true;
-      // Respect the minimal flag from the pending request (restorePan uses minimal: false)
-      panningViewportMinimalRef.current = pending.minimal ?? true;
-      setPanningViewportParams(pending);
+      if (!sameViewport) {
+        viewportRequestInFlightRef.current = true;
+        panningViewportMinimalRef.current = pending.minimal ?? true;
+        setPanningViewportParams(pending);
+      }
     }
   }, [panningViewportData, panningViewportError, separateStaticAndDynamicData, dispatch]);
   
@@ -2241,18 +2290,44 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
   
   // Phase 7: Trigger entity details fetch when panning stops
+  // Also fill missing terrain when panning stops (fixes black areas that never loaded during pan)
   const lastStoppedViewportRef = useRef<string | null>(null);
   useEffect(() => {
     if (panningStopped && terrainDataLoaded && !isPanningJS) {
-      // Calculate current viewport from windowRange
+      // Use ref so we have the viewport that was active during pan (sync effect may not have run yet)
+      const range = windowRangeRef.current;
       const currentViewport = {
-        x1: windowRange.colStart,
-        y1: windowRange.rowStart,
-        x2: windowRange.colEnd,
-        y2: windowRange.rowEnd,
+        x1: range.colStart,
+        y1: range.rowStart,
+        x2: range.colEnd,
+        y2: range.rowEnd,
       };
       
       const viewportKey = `${currentViewport.x1},${currentViewport.y1},${currentViewport.x2},${currentViewport.y2}`;
+      
+      // Check if any visible cell is missing terrain (causes black areas)
+      let hasMissingTerrain = false;
+      for (let y = currentViewport.y1; y <= currentViewport.y2; y++) {
+        for (let x = currentViewport.x1; x <= currentViewport.x2; x++) {
+          if (!staticTerrainData[`${x},${y}`]) {
+            hasMissingTerrain = true;
+            break;
+          }
+        }
+        if (hasMissingTerrain) break;
+      }
+      if (hasMissingTerrain) {
+        const params = { ...currentViewport, minimal: false };
+        if (viewportRequestInFlightRef.current) {
+          pendingViewportParamsRef.current = params;
+        } else {
+          viewportRequestInFlightRef.current = true;
+          panningViewportMinimalRef.current = false;
+          setPanningViewportParams(params);
+        }
+        // Full fetch (minimal: false) includes details; skip separate stoppedViewportParams for this viewport
+        return;
+      }
       
       // Check if we've already fetched details for this viewport
       if (lastStoppedViewportRef.current === viewportKey) {
@@ -2282,7 +2357,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         setStoppedViewportParams({ ...currentViewport, minimal: false });
       }
     }
-  }, [panningStopped, terrainDataLoaded, isPanningJS, windowRange, entityImageData, dynamicEntityData]);
+  }, [panningStopped, terrainDataLoaded, isPanningJS, windowRange, staticTerrainData, entityImageData, dynamicEntityData]);
   
   // Phase 7: Process stopped viewport data (full details only)
   // Track processed viewport to prevent infinite loops
@@ -2406,7 +2481,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     // Phase 4: Conditional throttle - 33ms during panning (30fps), 16ms when not panning (60fps)
     const now = Date.now();
     const throttleMs = isPanningJS ? 33 : 16; // 30fps during panning, 60fps when not panning
-    if (now - lastComputeTs.value < throttleMs) {return;}
+    if (now - lastComputeTs.value < throttleMs) {
+      return;
+    }
     lastComputeTs.value = now;
     
     // Skip tiny pan changes to reduce churn
@@ -2443,8 +2520,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           
           // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
           const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
-          if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
-            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
+          const shouldFetch = shouldFetchViewport(newViewport, lastFetchedViewportRef.current);
+          if (shouldFetch) {
+            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef, gridSize);
           }
         }
       }
@@ -2466,8 +2544,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         
         // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
         const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
-        if (shouldFetchViewport(newViewport, lastFetchedViewportRef.current)) {
-          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
+        const shouldFetch = shouldFetchViewport(newViewport, lastFetchedViewportRef.current);
+        if (shouldFetch) {
+          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef, gridSize);
         }
         
         return newWindowRange;
@@ -2551,14 +2630,25 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Update lastComputedPan after setting window range to ensure computeWindow can run if needed
       lastComputedPan.value = { x: clampedX, y: clampedY };
       
-      // Force computeWindow to run to trigger any additional updates (viewport fetch, etc.)
-      requestAnimationFrame(() => {
+      // Force computeWindow to run to trigger any additional updates (viewport fetch, etc.); cancel on cleanup (Bugbot).
+      if (restorePanRafIdRef.current != null) {
+        cancelAnimationFrame(restorePanRafIdRef.current);
+        restorePanRafIdRef.current = null;
+      }
+      restorePanRafIdRef.current = requestAnimationFrame(() => {
+        restorePanRafIdRef.current = null;
         computeWindow(clampedX, clampedY, containerSize.width, containerSize.height);
       });
     } else if (!restorePan) {
       // Clear restored ref when restorePan is cleared (user navigated away)
       restoredPanRef.current = null;
     }
+    return () => {
+      if (restorePanRafIdRef.current != null) {
+        cancelAnimationFrame(restorePanRafIdRef.current);
+        restorePanRafIdRef.current = null;
+      }
+    };
   }, [restorePan, containerSize.width, containerSize.height, computeWindow, grid, boundsReadyJS, gridSize, calculateVirtualViewport]);
 
   useEffect(() => {
@@ -2583,6 +2673,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         if (rafId.value != null) {
           cancelAnimationFrame(rafId.value);
           rafId.value = null;
+        }
+        if (panEndRafIdRef.current != null) {
+          cancelAnimationFrame(panEndRafIdRef.current);
+          panEndRafIdRef.current = null;
         }
         // Reset pan state on cleanup
         isPanning.value = false;
@@ -2639,21 +2733,74 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             if (homeX != null) break;
           }
           if (homeX != null && homeY != null) {
+            userMapPositionRef.current = { x: homeX, y: homeY };
             const { x: targetX, y: targetY } = gridToPanCoordinates(homeX, homeY, containerSize.width, containerSize.height);
             const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
             const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
             offsetX.value = cx;
             offsetY.value = cy;
+            // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
+            const gridSizeBounds = getGridSize(grid, 50);
+            const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeBounds, PAN_BUFFER);
+            calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+            const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+            windowRangeRef.current = newRange;
+            setWindowRange(newRange);
             lastComputedPan.value = { x: cx, y: cy };
-            computeWindow(cx, cy, containerSize.width, containerSize.height);
             hasCenteredOnHome.value = true;
           }
         }
       }
     }
-  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, currentUserHandle, restorePan]);
+  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, currentUserHandle, restorePan, calculateVirtualViewport]);
+
+  // Center on user's home from my-position API when data arrives (user-position-and-locator.md)
+  useEffect(() => {
+    if (!myPositionData) return;
+    if (restorePan) return;
+    if (hasCenteredOnHome.value) return;
+    if (!boundsReadyJS || containerSize.width <= 0 || containerSize.height <= 0) return;
+    const { x, y } = myPositionData;
+    userMapPositionRef.current = { x, y };
+    const { x: targetX, y: targetY } = gridToPanCoordinates(x, y, containerSize.width, containerSize.height);
+    const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
+    const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
+    offsetX.value = cx;
+    offsetY.value = cy;
+    // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
+    const gridSize = getGridSize(grid, 50);
+    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, PAN_BUFFER);
+    calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+    const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+    windowRangeRef.current = newRange;
+    setWindowRange(newRange);
+    lastComputedPan.value = { x: cx, y: cy };
+    hasCenteredOnHome.value = true;
+    const buffer = 15;
+    const restoreViewport = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, buffer);
+    if (viewportRequestInFlightRef.current) {
+      pendingViewportParamsRef.current = {
+        x1: restoreViewport.startCol,
+        y1: restoreViewport.startRow,
+        x2: restoreViewport.endCol,
+        y2: restoreViewport.endRow,
+        minimal: false,
+      };
+    } else {
+      panningViewportMinimalRef.current = false;
+      viewportRequestInFlightRef.current = true;
+      setPanningViewportParams({
+        x1: restoreViewport.startCol,
+        y1: restoreViewport.startRow,
+        x2: restoreViewport.endCol,
+        y2: restoreViewport.endRow,
+        minimal: false,
+      });
+    }
+  }, [myPositionData, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
 
   // Center on current user's home on initial entry (only if not returning from battle with restorePan)
+  // Fallback when my-position API not available or user's house is in initial viewport (grid-scan)
   useEffect(() => {
     if (!boundsReady.value) return;
     if (restorePan) return; // respect return-from-battle view
@@ -2675,25 +2822,32 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       if (homeX != null) break;
     }
     if (homeX == null || homeY == null) return;
+    userMapPositionRef.current = { x: homeX, y: homeY };
     const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
     const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
     const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
     const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
     offsetX.value = cx;
     offsetY.value = cy;
+    // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
+    const gridSizeEntry = getGridSize(grid, 50);
+    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeEntry, PAN_BUFFER);
+    calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+    const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+    windowRangeRef.current = newRange;
+    setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
-    computeWindow(cx, cy, containerSize.width, containerSize.height);
     hasCenteredOnHome.value = true;
-  }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, computeWindow, offsetX, offsetY]);
+  }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, offsetX, offsetY, calculateVirtualViewport]);
 
-  // When handle changes (e.g. after profile update), reset center flag so we re-center on home when fresh map data arrives.
-  // Only reset on actual change, not on mount, to avoid undoing initial centering and causing a second jump.
+  // When handle changes (e.g. after profile update), reset center flag and cached position so we re-center on home when fresh map data arrives.
   const prevHandleRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     const prev = prevHandleRef.current;
     prevHandleRef.current = currentUserHandle ?? undefined;
     if (prev !== undefined && prev !== (currentUserHandle ?? undefined)) {
       hasCenteredOnHome.value = false;
+      userMapPositionRef.current = null;
     }
   }, [currentUserHandle]);
 
@@ -2703,6 +2857,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const PRESS_DEBOUNCE_MS = 300;
   const DOUBLE_PRESS_THRESHOLD_MS = 500;
   const abortControllerRef = useRef<AbortController | null>(null);
+  const mapViewRef = useRef<Animated.View>(null);
+  const mapViewWindowRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const isMountedRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleCellPress = useCallback(async (x: number, y: number, cellData: CellData) => {
     // Security: Validate coordinates
@@ -2728,10 +2891,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const lastPress = lastPressTimeRef.current;
     const lastCoords = lastPressCoordsRef.current;
     
-    // Don't handle presses if we're currently panning
-    if (isPanningJS) {
-      return;
-    }
+    // Tap is delivered from gesture layer (Race(Tap, Pan)); Tap only wins for short taps.
+    // Do not gate on isPanningJS: it lags behind the gesture (useAnimatedReaction → setState),
+    // so taps right after pan (or after user-position center) were incorrectly dropped. See tile-tap-reliability.md.
     
     // Debounce: ignore if pressed too soon after last press (but only if same coordinates)
     if (lastCoords && lastCoords.x === x && lastCoords.y === y && now - lastPress < PRESS_DEBOUNCE_MS) {
@@ -2804,43 +2966,92 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     
     setSelectedCell({x, y, info: cellData});
-  }, [currentUserHandle, token, isPanningJS, grid]);
+  }, [currentUserHandle, token, grid]);
 
   // Store handler in ref for stable reference
   handleCellPressRef.current = handleCellPress;
 
+  // Tap-at-view coords: use absolute tap position + map view's window position so we get correct cell (e.x/e.y are unreliable when the view has transform). See tile-tap-reliability.md.
+  // Measure map in window at tap time so we don't rely on stale onLayout; Reanimated transform can move the view without firing onLayout.
+  const handleTapAtViewCoords = useCallback((absoluteX: number, absoluteY: number) => {
+    const viewRef = mapViewRef.current;
+    if (!viewRef) return;
+    viewRef.measureInWindow((wx, wy) => {
+      if (!isMountedRef.current) return;
+      mapViewWindowRef.current = { x: wx, y: wy };
+      // (wx, wy) is the view's rendered top-left (after translate); so view-local tap = (absolute - window).
+      // Grid content starts at (MARGIN_SIZE, MARGIN_SIZE) in view; do NOT subtract pan offset — it's already in (wx, wy).
+      const viewX = absoluteX - wx;
+      const viewY = absoluteY - wy;
+      const contentX = viewX - MARGIN_SIZE;
+      const contentY = viewY - MARGIN_SIZE;
+      const col = Math.floor(contentX / CELL_SIZE);
+      const row = Math.floor(contentY / CELL_SIZE);
+      if (row < 0 || !grid || row >= grid.length) return;
+      const rowData = grid[row];
+      if (!rowData || col < 0 || col >= rowData.length) return;
+      const cell = rowData[col] as CellData;
+      if (!cell) return;
+      if (!isMountedRef.current) return;
+      const handler = handleCellPressRef.current;
+      if (!handler) return;
+      handler(col, row, cell);
+    });
+  }, [grid]);
+
+  const tapGesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .maxDistance(9)
+        .maxDuration(400)
+        .onEnd((e) => {
+          'worklet';
+          runOnJS(handleTapAtViewCoords)(e.absoluteX, e.absoluteY);
+        }),
+    [handleTapAtViewCoords]
+  );
+
+  const combinedMapGesture = useMemo(
+    () => Gesture.Race(tapGesture, panGesture),
+    [tapGesture, panGesture]
+  );
+
+  // Locator: pan to user's house using cached position or my-position API (user-position-and-locator.md)
   const centerOnUserHome = useCallback(() => {
-    if (!currentUserHandle || !grid.length) return;
-    
-    let homeX: number | null = null;
-    let homeY: number | null = null;
-    
-    for (let y = 0; y < grid.length; y++) {
-      const row = grid[y];
-      if (!row) continue;
-      for (let x = 0; x < row.length; x++) {
-        const cell = row[x] as any;
-        if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
-          homeX = x; 
-          homeY = y; 
-          break;
-        }
-      }
-      if (homeX != null) break;
-    }
-    
-    if (homeX != null && homeY != null) {
-      const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
-      const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
+    if (!currentUserHandle) return;
+    const doPanTo = (pos: { x: number; y: number }) => {
+      userMapPositionRef.current = pos;
+      const { x: targetX, y: targetY } = gridToPanCoordinates(pos.x, pos.y, containerSize.width, containerSize.height);
       const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
       const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
-      
       offsetX.value = cx;
       offsetY.value = cy;
+      // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
+      const gridSize = getGridSize(grid, 50);
+      const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, PAN_BUFFER);
+      calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+      const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+      windowRangeRef.current = newRange;
+      setWindowRange(newRange);
       lastComputedPan.value = { x: cx, y: cy };
-      computeWindow(cx, cy, containerSize.width, containerSize.height);
+      const vp = { startCol, endCol, startRow, endRow };
+      if (viewportRequestInFlightRef.current) {
+        pendingViewportParamsRef.current = { x1: vp.startCol, y1: vp.startRow, x2: vp.endCol, y2: vp.endRow, minimal: false };
+      } else {
+        panningViewportMinimalRef.current = false;
+        viewportRequestInFlightRef.current = true;
+        setPanningViewportParams({ x1: vp.startCol, y1: vp.startRow, x2: vp.endCol, y2: vp.endRow, minimal: false });
+      }
+    };
+    if (userMapPositionRef.current) {
+      doPanTo(userMapPositionRef.current);
+      return;
     }
-  }, [currentUserHandle, grid, containerSize.width, containerSize.height, maxX, maxY, minX, minY, offsetX, offsetY, computeWindow]);
+    triggerGetMyMapPosition()
+      .unwrap()
+      .then((payload) => doPanTo(payload))
+      .catch(() => {});
+  }, [currentUserHandle, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport, triggerGetMyMapPosition]);
 
   const handleAntivirusPress = useCallback(() => {
     // Only show modal if antivirus feature is unlocked (including timer-based unlock)
@@ -3219,67 +3430,37 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
       {renderInfoPanel()}
 
-      {/* Conditionally render GestureDetector - only when modals are closed */}
+      {/* Conditionally render map - only when modals are closed (Android performance) */}
       {!showAntivirusModal && !showCrewModal && !showCrewOnboardingModal ? (
-        <GestureDetector gesture={panGesture}>
-          <Animated.View
-            style={[
-              styles.marginWrapper,
-              { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
-              animatedMapStyle as any,
-            ]}
-          >
-            <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
-              {visibleCells.map((assignment, i) => {
-                const { x, y, cell } = assignment;
-                const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-                return (
-                  <PoolTile
-                    key={`${x}-${y}`}
-                    x={x}
-                    y={y}
-                    cell={cell}
-                    selected={selected}
-                    onPress={handleCellPress}
-                    xStyle={xPosStyles[x]}
-                    yStyle={yPosStyles[y]}
-                    terrainStyleMap={terrainStyleMap}
-                    currentUserHandle={currentUserHandle}
-                    colors={colors}
-                    themeMode={themeMode}
-                    styles={styles}
-                    dynamicEntityData={dynamicEntityData}
-                    isShieldActive={isShieldActive}
-                  />
-                );
-              })}
-            </View>
-          </Animated.View>
-        </GestureDetector>
-      ) : (
+        <GestureDetector gesture={combinedMapGesture}>
         <Animated.View
+          ref={mapViewRef}
           style={[
             styles.marginWrapper,
             { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
             animatedMapStyle as any,
           ]}
+          onLayout={() => {
+            mapViewRef.current?.measureInWindow((x, y) => {
+              mapViewWindowRef.current = { x, y };
+            });
+          }}
         >
           <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
-            {visibleCells.map((assignment, i) => {
+            {visibleCells.map((assignment) => {
               const { x, y, cell } = assignment;
-              const key = `${x},${y}`;
-              const terrain = staticTerrainData[key];
-              const entityImage = entityImageData[key];
-              
-              // Phase 3: Conditional rendering based on panning state
+              const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
+              const isCrewMember = !!(cell.owner === 'player' && cell.userId && crewMemberUserIds.has(String(cell.userId)));
+              const isWarCrewMember = !!(cell.owner === 'player' && cell.userId && warCrewMemberUserIds.has(String(cell.userId)));
+              const isAllianceCrewMember = !!(cell.owner === 'player' && cell.userId && !isCrewMember && allianceCrewMemberUserIds.has(String(cell.userId)));
               if (isPanningJS) {
-                // During panning: render simplified tile (terrain + image only, no interactions)
+                const entityImage = cell.entity !== 'empty' ? { entity: cell.entity, owner: cell.owner, userId: cell.userId, npcSlug: cell.npcSlug, npcLevel: cell.npcLevel } : undefined;
                 return (
                   <PanningPoolTile
                     key={`${x}-${y}`}
                     x={x}
                     y={y}
-                    terrain={terrain || cell.terrain}
+                    terrain={cell.terrain}
                     entityImage={entityImage}
                     xStyle={xPosStyles[x]}
                     yStyle={yPosStyles[y]}
@@ -3289,47 +3470,36 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                     styles={styles}
                   />
                 );
-              } else {
-                // When not panning: render full tile with all details and interactions
-                const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
-                const isCrewMember = !!(cell.owner === 'player' && 
-                                     cell.userId && 
-                                     crewMemberUserIds.has(String(cell.userId)));
-                const isWarCrewMember = !!(cell.owner === 'player' && 
-                                       cell.userId && 
-                                       warCrewMemberUserIds.has(String(cell.userId)));
-                // Only show yellow border for allies, not our own crew members
-                const isAllianceCrewMember = !!(cell.owner === 'player' && 
-                                             cell.userId && 
-                                             !isCrewMember && // Exclude our own crew members
-                                             allianceCrewMemberUserIds.has(String(cell.userId)));
-                return (
-                  <PoolTile
-                    key={`${x}-${y}`}
-                    x={x}
-                    y={y}
-                    cell={cell}
-                    selected={selected}
-                    onPress={handleCellPress}
-                    xStyle={xPosStyles[x]}
-                    yStyle={yPosStyles[y]}
-                    terrainStyleMap={terrainStyleMap}
-                    currentUserHandle={currentUserHandle}
-                    colors={colors}
-                    themeMode={themeMode}
-                    styles={styles}
-                    dynamicEntityData={dynamicEntityData}
-                    isShieldActive={isShieldActive}
-                    isCrewMember={isCrewMember}
-                    isWarCrewMember={isWarCrewMember}
-                    isAllianceCrewMember={isAllianceCrewMember}
-                  />
-                );
               }
+              return (
+                <PoolTile
+                  key={`${x}-${y}`}
+                  x={x}
+                  y={y}
+                  cell={cell}
+                  selected={selected}
+                  onPress={handleCellPress}
+                  xStyle={xPosStyles[x]}
+                  yStyle={yPosStyles[y]}
+                  terrainStyleMap={terrainStyleMap}
+                  currentUserHandle={currentUserHandle}
+                  colors={colors}
+                  themeMode={themeMode}
+                  styles={styles}
+                  dynamicEntityData={dynamicEntityData}
+                  isShieldActive={isShieldActive}
+                  isCrewMember={isCrewMember}
+                  isWarCrewMember={isWarCrewMember}
+                  isAllianceCrewMember={isAllianceCrewMember}
+                  displayName={cell.name}
+                  displayShielded={cell.isShielded}
+                />
+              );
             })}
           </View>
         </Animated.View>
-      )}
+        </GestureDetector>
+      ) : null}
     </View>
   );
 };
@@ -3351,6 +3521,10 @@ type TileProps = {
   isCrewMember?: boolean;
   isWarCrewMember?: boolean;
   isAllianceCrewMember?: boolean;
+  displayName?: string | undefined;
+  displayShielded?: boolean;
+  /** When true, tap is handled by parent Gesture.Tap (map); no Pressable so no dual handlers (Bugbot). */
+  tapHandledByGesture?: boolean;
 };
 
 type PoolTileProps = {
@@ -3371,7 +3545,11 @@ type PoolTileProps = {
   isCrewMember?: boolean;
   isWarCrewMember?: boolean;
   isAllianceCrewMember?: boolean;
-};const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
+  displayName?: string | undefined;
+  displayShielded?: boolean;
+};
+
+const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

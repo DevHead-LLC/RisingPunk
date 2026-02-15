@@ -418,6 +418,38 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+---
+
+## Session: 2025-02-14 (merge dev → android_mergeDev)
+
+**Branch context:** Merging origin/dev into android_mergeDev (from androidStaging). One conflict: HackMapScreen map/gesture conditional vs always-on map.
+
+### 1. `mobile/src/screens/HackMapScreen.tsx`
+
+**Conflict:** Conditional render of map when modals closed (HEAD) vs always-rendered GestureDetector + map (dev).
+
+| Side | Content |
+|------|--------|
+| HEAD | `{!showAntivirusModal && !showCrewModal && !showCrewOnboardingModal ? (` then `<GestureDetector gesture={panGesture}>` with Animated.View (no ref, no onLayout) and simple PoolTile grid only; ` ) : (` for else branch. |
+| dev  | `<GestureDetector gesture={combinedMapGesture}>` with Animated.View ref={mapViewRef}, onLayout (measureInWindow), and full grid: PanningPoolTile when isPanningJS, PoolTile with isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded. |
+
+**Resolution:** Kept **HEAD’s conditional** and **dev’s map implementation**. Final state: when modals are closed we render `<GestureDetector gesture={combinedMapGesture}>` with Animated.View (ref, onLayout) and the full grid (PanningPoolTile/PoolTile with all props). When any of the three modals is open we render `null` (no map).
+
+**Rationale:** Android first. HEAD’s conditional avoids rendering the heavy map/gesture tree when antivirus, crew, or crew-onboarding modals are open (performance). Dev’s implementation adds tap+pan (combinedMapGesture), mapViewRef/measureInWindow for tap reliability, and PanningPoolTile/crew highlighting. We keep the performance optimization and use dev’s feature set when the map is shown.
+
+**Rejected from HEAD:** panGesture-only (no tap) and simpler PoolTile-only grid (no mapViewRef, no onLayout, no PanningPoolTile, no crew flags). Rejected from dev: always rendering the map (would render map behind modals and lose the conditional optimization).
+
+**Failure-mode hints for later:**
+- If **tap on tile** is unreliable on Android, confirm mapViewRef and onLayout (measureInWindow) are still present and that combinedMapGesture (tap + pan) is used when modals are closed.
+- If **map or gestures** appear or respond when a modal is open, confirm the conditional still uses `!showAntivirusModal && !showCrewModal && !showCrewOnboardingModal` and ` ) : null}`.
+- If **performance** regresses when opening/closing modals, the conditional is intended to reduce work when modals are open; if needed, verify no other map subtree is mounted when modals are open.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
