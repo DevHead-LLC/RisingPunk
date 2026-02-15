@@ -267,11 +267,214 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
   }
 });
 
+// Parse viewport params once (used to skip expensive placement for viewport-only requests)
+function parseViewportFromRequest(req: Request): { hasViewport: boolean; x1: number; y1: number; x2: number; y2: number } {
+  const parse = (param: any): number | undefined => {
+    if (param === undefined || param === null) return undefined;
+    const parsed = parseInt(param as string, 10);
+    return isNaN(parsed) ? undefined : parsed;
+  };
+  const x1 = parse(req.query.x1);
+  const y1 = parse(req.query.y1);
+  const x2 = parse(req.query.x2);
+  const y2 = parse(req.query.y2);
+  const hasViewport = x1 !== undefined && y1 !== undefined && x2 !== undefined && y2 !== undefined;
+  return { hasViewport, x1: x1 ?? 0, y1: y1 ?? 0, x2: x2 ?? 0, y2: y2 ?? 0 };
+}
+
+// GET my-position and POST player-position MUST be before /:name so /api/map/my-position is not matched as name='my-position' (user-position-and-locator.md)
+// GET current user's house position on the map (for centering and locator; does not depend on viewport).
+// If the user has no house (e.g. viewport-only load never ran placement), place them once and return that position.
+router.get('/my-position', auth, async (req: Request, res: Response) => {
+  try {
+    const authUserId: any = (req as any).user?._id;
+    if (!authUserId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    let mapDoc = await MapModel.findOne({ name: 'main' });
+    if (!mapDoc) {
+      res.status(404).json({ error: 'Map not found' });
+      return;
+    }
+
+    const cells = (mapDoc as any).cells as any[];
+    // Prefer the user's house (entityName !== 'YOU'); fallback to any player cell for this user (e.g. YOU marker)
+    let house = cells.find(
+      (c: any) =>
+        c.occupiedBy === 'player' &&
+        c.userId &&
+        String(c.userId) === String(authUserId) &&
+        c.entityName !== 'YOU'
+    );
+    if (!house) {
+      house = cells.find(
+        (c: any) =>
+          c.occupiedBy === 'player' &&
+          c.userId &&
+          String(c.userId) === String(authUserId)
+      );
+    }
+    if (!house) {
+      // User has no house (e.g. viewport-only load never ran placement). Place them once.
+      // Use findOneAndUpdate with positional $ to avoid full-doc save and E11000 duplicate key (cells array index).
+      const user = await User.findById(authUserId, { handle: 1 });
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      const handle = (user as any).handle || 'User';
+      const gridSize = (mapDoc as any).gridSize || 50;
+      let tries = 0;
+      while (tries < 500) {
+        const candidateX = Math.floor(Math.random() * gridSize);
+        const candidateY = Math.floor(Math.random() * gridSize);
+        // Atomic duplicate-house guard: only place if user has no existing house (same as GET /:name placement).
+        const updated = await MapModel.findOneAndUpdate(
+          {
+            name: 'main',
+            $and: [
+              { cells: { $not: { $elemMatch: { userId: authUserId, occupiedBy: 'player', entityName: { $ne: 'YOU' } } } } },
+              {
+                cells: {
+                  $elemMatch: {
+                    x: candidateX,
+                    y: candidateY,
+                    isOccupied: false,
+                    canBeOccupied: true,
+                    terrain: { $nin: ['water', 'mountain', 'road'] },
+                  },
+                },
+              },
+            ],
+          },
+          {
+            $set: {
+              'cells.$.isOccupied': true,
+              'cells.$.occupiedBy': 'player',
+              'cells.$.entityName': handle,
+              'cells.$.userId': authUserId,
+            },
+          },
+          { new: true }
+        );
+        if (updated) {
+          res.json({ x: candidateX, y: candidateY });
+          return;
+        }
+        tries++;
+      }
+      // Race: a concurrent request may have placed the user's house; re-check before 503 (Bugbot).
+      const mapDocAgain = await MapModel.findOne({ name: 'main' });
+      if (mapDocAgain) {
+        const cellsAgain = (mapDocAgain as any).cells as any[];
+        const houseNow =
+          cellsAgain.find(
+            (c: any) =>
+              c.occupiedBy === 'player' &&
+              c.userId &&
+              String(c.userId) === String(authUserId) &&
+              c.entityName !== 'YOU'
+          ) ||
+          cellsAgain.find(
+            (c: any) =>
+              c.occupiedBy === 'player' &&
+              c.userId &&
+              String(c.userId) === String(authUserId)
+          );
+        if (houseNow) {
+          res.json({ x: houseNow.x, y: houseNow.y });
+          return;
+        }
+      }
+      res.status(503).json({ error: 'Map full; no empty cell for placement' });
+      return;
+    }
+
+    res.json({ x: house.x, y: house.y });
+  } catch (error: any) {
+    console.error('My position fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/player-position', auth, async (req: Request, res: Response) => {
+  try {
+    const { x, y } = req.body as { x: number; y: number };
+    if (typeof x !== 'number' || typeof y !== 'number') {
+      res.status(400).json({ error: 'Invalid coordinates' });
+      return;
+    }
+
+    let mapDoc = await MapModel.findOne({ name: 'main' });
+    if (!mapDoc) {
+      const created = await mapService.generateMap('main');
+      mapDoc = await MapModel.findOne({ name: 'main' });
+      if (!mapDoc && created) {
+        mapDoc = created as any;
+      }
+    }
+
+    if (!mapDoc) {
+      res.status(500).json({ error: 'Failed to load map' });
+      return;
+    }
+
+    const authUserId: any = (req as any).user?._id;
+    for (const c of (mapDoc as any).cells as any[]) {
+      // Only clear ephemeral 'YOU' markers for this user, or legacy invalid 'YOU' without userId
+      const belongsToAuthUser = c.userId && String(c.userId) === String(authUserId);
+      const legacyInvalidYou = c.entityName === 'YOU' && !c.userId;
+      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU' && (belongsToAuthUser || legacyInvalidYou)) {
+        c.isOccupied = false;
+        c.occupiedBy = 'none';
+        c.entityName = '';
+        c.userId = null;
+      }
+    }
+
+    const target = (mapDoc.cells as any[]).find((c) => c.x === x && c.y === y);
+    if (!target) {
+      res.status(404).json({ error: 'Target cell not found' });
+      return;
+    }
+    if (!target.canBeOccupied || target.terrain === 'mountain' || target.terrain === 'water' || target.terrain === 'road') {
+      res.status(400).json({ error: 'Cell cannot be occupied' });
+      return;
+    }
+    if (target.isOccupied) {
+      res.status(400).json({ error: 'Cell already occupied' });
+      return;
+    }
+
+    target.isOccupied = true;
+    target.occupiedBy = 'player';
+    target.entityName = 'YOU';
+    target.userId = authUserId;
+
+    await mapDoc.save();
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Player position update error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
+      console.log('[map fetch] no map found for', name, '- dropping legacy index if present and generating');
+      // Drop legacy unique index so insert can succeed (E11000); per-doc uniqueness enforced in app (user-position-and-locator.md)
+      try {
+        await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
+        console.log('[map fetch] dropped legacy unique index cells.x_1_cells.y_1');
+      } catch (_) {
+        // Index may not exist or already dropped
+      }
       const created = await mapService.generateMap(name);
       mapDoc = (created as any) || await MapModel.findOne({ name });
     }
@@ -281,15 +484,21 @@ router.get('/:name', async (req: Request, res: Response) => {
       return;
     }
 
-    // Get users data for shield status lookup
-    // Note: We query all users here because migration logic needs all users to place houses
-    // After migration, we'll optimize to only query users with houses (see Phase 3B below)
-    const users = await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 });
+    const viewportEarly = parseViewportFromRequest(req);
+    // Viewport requests: skip loading all users and the per-user placement loop (hundreds of DB round-trips).
+    // Placement runs only for full-map requests so new users get a house; viewport just returns tiles.
+    const users = viewportEarly.hasViewport
+      ? []
+      : await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 });
 
     // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
     const docAny = mapDoc as any;
     if (!docAny.version || docAny.version < 2 || docAny.gridSize !== 50) {
       await MapModel.deleteOne({ _id: docAny._id });
+      try {
+        await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
+        console.log('[map fetch] dropped legacy unique index cells.x_1_cells.y_1 (migrate path)');
+      } catch (_) {}
       const recreated = await mapService.generateMap(name);
       mapDoc = (recreated as any) || await MapModel.findOne({ name });
       if (!mapDoc) {
@@ -298,95 +507,126 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     } else {
       // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
-      const cells: any[] = (mapDoc as any).cells;
+      let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
+      // Fix E11000 duplicate key: dedupe cells by (x,y), keeping first occurrence (user-position-and-locator.md).
+      // Use findOneAndUpdate (not doc.save()) so we never trigger an insert on a corrupted doc.
+      const seen = new Set<string>();
+      const deduped = cells.filter((c: any) => {
+        const key = `${c.x},${c.y}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      if (deduped.length !== cells.length) {
+        console.log('[map fetch] deduping cells', cells.length, '->', deduped.length);
+        const updated = await MapModel.findOneAndUpdate(
+          { _id: (mapDoc as any)._id },
+          { $set: { cells: deduped } },
+          { new: true }
+        );
+        if (updated) {
+          mapDoc = updated as any;
+          cells = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
+        }
+      }
       const isBlocked = (c: any) => c.terrain === 'water' || c.terrain === 'mountain' || c.terrain === 'road';
-      let mutatedForCleanup = false;
-      for (const c of cells) {
-        if (c.isOccupied && isBlocked(c)) {
-          c.isOccupied = false;
-          c.occupiedBy = 'none';
-          c.entityName = '';
-          c.userId = null;
-          mutatedForCleanup = true;
+      // Build cleaned cells via copy so we persist with findOneAndUpdate (never save()), avoiding re-persisting duplicates (Bugbot).
+      const cleanedCells = cells.map((c: any) => {
+        const copy = { ...c };
+        if (copy.isOccupied && isBlocked(copy)) {
+          copy.isOccupied = false;
+          copy.occupiedBy = 'none';
+          copy.entityName = '';
+          copy.userId = null;
         }
-        // Clear invalid player-occupied cells (no userId)
-        if (c.isOccupied && c.occupiedBy === 'player' && !c.userId) {
-          c.isOccupied = false;
-          c.occupiedBy = 'none';
-          c.entityName = '';
-          c.userId = null;
-          mutatedForCleanup = true;
+        if (copy.isOccupied && copy.occupiedBy === 'player' && !copy.userId) {
+          copy.isOccupied = false;
+          copy.occupiedBy = 'none';
+          copy.entityName = '';
+          copy.userId = null;
         }
-        // Always clear ephemeral 'YOU' markers regardless of userId to avoid persistence across map loads
-        if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU') {
-          c.isOccupied = false;
-          c.occupiedBy = 'none';
-          c.entityName = '';
-          c.userId = null;
-          mutatedForCleanup = true;
+        if (copy.isOccupied && copy.occupiedBy === 'player' && copy.entityName === 'YOU') {
+          copy.isOccupied = false;
+          copy.occupiedBy = 'none';
+          copy.entityName = '';
+          copy.userId = null;
+        }
+        return copy;
+      });
+      const needsCleanupPersist = cleanedCells.some((c: any, i: number) => {
+        const o = cells[i];
+        return o.isOccupied !== c.isOccupied || o.occupiedBy !== c.occupiedBy || o.entityName !== c.entityName || (o.userId !== c.userId && (o.userId != null || c.userId != null));
+      });
+      if (needsCleanupPersist) {
+        const updated = await MapModel.findOneAndUpdate(
+          { _id: (mapDoc as any)._id },
+          { $set: { cells: cleanedCells } },
+          { new: true }
+        );
+        if (updated) {
+          mapDoc = updated as any;
+          cells = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : cleanedCells;
+        } else {
+          cells = cleanedCells;
         }
       }
 
-      if (mutatedForCleanup) {
-        (mapDoc as any).markModified('cells');
-        await (mapDoc as any).save();
-      }
-
-      const terrainIsValid = (cc: any) => !cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain' && cc.terrain !== 'road';
-      const pickValidCell = (): { x: number; y: number } | null => {
-        let tries = 0;
-        while (tries < 10000) {
-          const idx = Math.floor(Math.random() * cells.length);
-          const cc = cells[idx];
-          if (terrainIsValid(cc)) {
-            return { x: cc.x, y: cc.y };
+      // Per-user house placement: only for full-map requests. Viewport requests skip this (fast path).
+      if (!viewportEarly.hasViewport && users.length > 0) {
+        const terrainIsValid = (cc: any) => !cc.isOccupied && cc.canBeOccupied && cc.terrain !== 'water' && cc.terrain !== 'mountain' && cc.terrain !== 'road';
+        const pickValidCell = (): { x: number; y: number } | null => {
+          let tries = 0;
+          while (tries < 10000) {
+            const idx = Math.floor(Math.random() * cells.length);
+            const cc = cells[idx];
+            if (terrainIsValid(cc)) {
+              return { x: cc.x, y: cc.y };
+            }
+            tries++;
           }
-          tries++;
-        }
-        return null;
-      };
+          return null;
+        };
 
-      for (const u of users) {
-        let attempts = 0;
-        while (attempts < 10) {
-          const candidate = pickValidCell();
-          if (!candidate) break;
-          const result = await MapModel.findOneAndUpdate(
-            {
-              _id: (mapDoc as any)._id,
-              // Ensure this user does not already have a permanent home cell (ignore ephemeral 'YOU')
-              cells: { $not: { $elemMatch: { userId: (u as any)._id, occupiedBy: 'player', entityName: { $ne: 'YOU' } } } },
-              // Atomically target a single array element that matches all conditions
-              $and: [
-                {
-                  cells: {
-                    $elemMatch: {
-                      x: candidate.x,
-                      y: candidate.y,
-                      isOccupied: false,
-                      canBeOccupied: true,
-                      terrain: { $nin: ['water', 'mountain', 'road'] },
+        for (const u of users) {
+          let attempts = 0;
+          while (attempts < 10) {
+            const candidate = pickValidCell();
+            if (!candidate) break;
+            const result = await MapModel.findOneAndUpdate(
+              {
+                _id: (mapDoc as any)._id,
+                cells: { $not: { $elemMatch: { userId: (u as any)._id, occupiedBy: 'player', entityName: { $ne: 'YOU' } } } },
+                $and: [
+                  {
+                    cells: {
+                      $elemMatch: {
+                        x: candidate.x,
+                        y: candidate.y,
+                        isOccupied: false,
+                        canBeOccupied: true,
+                        terrain: { $nin: ['water', 'mountain', 'road'] },
+                      },
                     },
                   },
+                ],
+              } as any,
+              {
+                $set: {
+                  'cells.$.isOccupied': true,
+                  'cells.$.occupiedBy': 'player',
+                  'cells.$.entityName': (u as any).handle,
+                  'cells.$.userId': (u as any)._id,
                 },
-              ],
-            } as any,
-            {
-              $set: {
-                'cells.$.isOccupied': true,
-                'cells.$.occupiedBy': 'player',
-                'cells.$.entityName': (u as any).handle,
-                'cells.$.userId': (u as any)._id,
               },
-            },
-            { new: false }
-          );
-          if (result) break;
-          attempts++;
+              { new: false }
+            );
+            if (result) break;
+            attempts++;
+          }
         }
-      }
 
-      mapDoc = await MapModel.findOne({ name });
+        mapDoc = await MapModel.findOne({ name });
+      }
     }
 
     const gridSize = (mapDoc as any).gridSize || 50;
@@ -402,37 +642,16 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     });
     
-    // Bug Fix: Validate viewport parameters to prevent NaN propagation
-    // Parse and validate viewport coordinates
-    const parseViewportParam = (param: any): number | undefined => {
-      if (param === undefined || param === null) return undefined;
-      const parsed = parseInt(param as string, 10);
-      // Check if parsing resulted in a valid number (not NaN)
-      if (isNaN(parsed)) return undefined;
-      return parsed;
-    };
-    
-    const x1 = parseViewportParam(req.query.x1);
-    const y1 = parseViewportParam(req.query.y1);
-    const x2 = parseViewportParam(req.query.x2);
-    const y2 = parseViewportParam(req.query.y2);
-    
-    // Bug Fix: Only consider viewport valid if all required params are valid numbers
-    // If any viewport param is provided but invalid, fall back to full map
-    const hasViewport = x1 !== undefined && y1 !== undefined && x2 !== undefined && y2 !== undefined;
-    
+    const hasViewport = viewportEarly.hasViewport;
     let viewportX1 = 0;
     let viewportY1 = 0;
     let viewportX2 = gridSize - 1;
     let viewportY2 = gridSize - 1;
-    
     if (hasViewport) {
-      // Bug Fix: Ensure valid viewport bounds (x1 <= x2, y1 <= y2) and clamp to grid bounds
-      const minX = Math.min(x1, x2);
-      const maxX = Math.max(x1, x2);
-      const minY = Math.min(y1, y2);
-      const maxY = Math.max(y1, y2);
-      
+      const minX = Math.min(viewportEarly.x1, viewportEarly.x2);
+      const maxX = Math.max(viewportEarly.x1, viewportEarly.x2);
+      const minY = Math.min(viewportEarly.y1, viewportEarly.y2);
+      const maxY = Math.max(viewportEarly.y1, viewportEarly.y2);
       viewportX1 = Math.max(0, Math.min(minX, gridSize - 1));
       viewportY1 = Math.max(0, Math.min(minY, gridSize - 1));
       viewportX2 = Math.min(gridSize - 1, Math.max(maxX, 0));
@@ -527,69 +746,6 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
   } catch (error: any) {
     console.error('Map fetch error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.post('/player-position', auth, async (req: Request, res: Response) => {
-  try {
-    const { x, y } = req.body as { x: number; y: number };
-    if (typeof x !== 'number' || typeof y !== 'number') {
-      res.status(400).json({ error: 'Invalid coordinates' });
-      return;
-    }
-
-    let mapDoc = await MapModel.findOne({ name: 'main' });
-    if (!mapDoc) {
-      const created = await mapService.generateMap('main');
-      mapDoc = await MapModel.findOne({ name: 'main' });
-      if (!mapDoc && created) {
-        mapDoc = created as any;
-      }
-    }
-
-    if (!mapDoc) {
-      res.status(500).json({ error: 'Failed to load map' });
-      return;
-    }
-
-    const authUserId: any = (req as any).user?._id;
-    for (const c of (mapDoc as any).cells as any[]) {
-      // Only clear ephemeral 'YOU' markers for this user, or legacy invalid 'YOU' without userId
-      const belongsToAuthUser = c.userId && String(c.userId) === String(authUserId);
-      const legacyInvalidYou = c.entityName === 'YOU' && !c.userId;
-      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU' && (belongsToAuthUser || legacyInvalidYou)) {
-        c.isOccupied = false;
-        c.occupiedBy = 'none';
-        c.entityName = '';
-        c.userId = null;
-      }
-    }
-
-    const target = (mapDoc.cells as any[]).find((c) => c.x === x && c.y === y);
-    if (!target) {
-      res.status(404).json({ error: 'Target cell not found' });
-      return;
-    }
-    if (!target.canBeOccupied || target.terrain === 'mountain' || target.terrain === 'water' || target.terrain === 'road') {
-      res.status(400).json({ error: 'Cell cannot be occupied' });
-      return;
-    }
-    if (target.isOccupied) {
-      res.status(400).json({ error: 'Cell already occupied' });
-      return;
-    }
-
-    target.isOccupied = true;
-    target.occupiedBy = 'player';
-    target.entityName = 'YOU';
-    target.userId = authUserId;
-
-    await mapDoc.save();
-
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error('Player position update error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -39,7 +39,10 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
       // Dispatch logout action using action type to avoid circular dependency
       api.dispatch({ type: 'auth/logout' });
       return result;
-    } else {
+    }
+    // my-position is optional: 404 (no house) or other failures should not trigger global error modal (user-position-and-locator.md)
+    const isMyPositionRequest = typeof args?.url === 'string' && args.url.endsWith('/my-position');
+    if (!isMyPositionRequest) {
       globalErrorHandler.handleDatabaseError(result.error);
     }
   }
@@ -61,6 +64,10 @@ export const mapApi = createApi({
         url: '/api/map/main',
         params: { x1, y1, x2, y2, minimal: minimal ? 'true' : undefined },
       }),
+      providesTags: ['Map'],
+    }),
+    getMyMapPosition: builder.query<{ x: number; y: number }, void>({
+      query: () => ({ url: '/api/map/my-position' }),
       providesTags: ['Map'],
     }),
     updatePlayerPosition: builder.mutation<any, { x: number; y: number }>({
@@ -99,6 +106,8 @@ export const mapApi = createApi({
 export const {
   useFetchMapQuery,
   useFetchMapViewportQuery,
+  useGetMyMapPositionQuery,
+  useLazyGetMyMapPositionQuery,
   useUpdatePlayerPositionMutation,
   useGetMapChatMessagesQuery,
   useSendMapChatMessageMutation,
