@@ -2233,10 +2233,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         setPanningViewportParams(pending);
       }
     }
+    // On error: only clear pending if it was the same viewport that failed (avoid retry loop).
+    // If user panned to B while A was loading and A failed, keep pending and fetch B (Bugbot).
     if (panningViewportError && pendingViewportParamsRef.current) {
+      const pending = pendingViewportParamsRef.current;
+      const failedSameAsPending = panningViewportParams &&
+        pending.x1 === panningViewportParams.x1 && pending.y1 === panningViewportParams.y1 &&
+        pending.x2 === panningViewportParams.x2 && pending.y2 === panningViewportParams.y2;
       pendingViewportParamsRef.current = null;
+      if (!failedSameAsPending) {
+        viewportRequestInFlightRef.current = true;
+        panningViewportMinimalRef.current = pending.minimal ?? true;
+        setPanningViewportParams(pending);
+      }
     }
-  }, [panningViewportData, panningViewportError, separateStaticAndDynamicData, dispatch]);
+  }, [panningViewportData, panningViewportError, panningViewportParams, separateStaticAndDynamicData, dispatch]);
   
   // Phase 7: Load entity details when panning stops
   const [stoppedViewportParams, setStoppedViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
