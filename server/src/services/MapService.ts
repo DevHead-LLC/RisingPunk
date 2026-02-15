@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { Map } from '../models/Map';
+import { dedupCellsByCoord } from '../utils/mapCellUtils';
 import { User } from '../models/User';
 import seedrandom from 'seedrandom';
 import { NPCService, NPCDocument } from './NPCService';
@@ -52,14 +53,8 @@ export class MapService {
     // Add houses (entities)
     await this.addHouses(cells);
 
-    // Ensure no duplicate (x,y) so E11000 unique index is satisfied (user-position-and-locator.md)
-    const seen = new Set<string>();
-    const deduped = cells.filter((c: any) => {
-      const key = `${c.x},${c.y}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    // Ensure no duplicate (x,y) so E11000 unique index is satisfied; shared dedupe (mapCellUtils) prefers occupied, stronger when both (Bugbot).
+    const deduped = dedupCellsByCoord(cells);
     if (deduped.length !== cells.length) {
       console.warn('[MapService.generateMap] deduped cells before save', cells.length, '->', deduped.length);
     }

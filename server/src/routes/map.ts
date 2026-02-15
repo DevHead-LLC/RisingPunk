@@ -8,6 +8,7 @@ import { User } from '../models/User';
 import { NPCService } from '../services/NPCService';
 import { MapChatMessage } from '../models/MapChatMessage';
 import { filterBadWords } from '../utils/contentModeration';
+import { dedupCellsByCoord } from '../utils/mapCellUtils';
 
 const router: Router = express.Router();
 const mapService = new MapService();
@@ -508,15 +509,8 @@ router.get('/:name', async (req: Request, res: Response) => {
     } else {
       // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
       let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
-      // Fix E11000 duplicate key: dedupe cells by (x,y), keeping first occurrence (user-position-and-locator.md).
-      // Use findOneAndUpdate (not doc.save()) so we never trigger an insert on a corrupted doc.
-      const seen = new Set<string>();
-      const deduped = cells.filter((c: any) => {
-        const key = `${c.x},${c.y}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+      // Fix E11000 duplicate key: shared dedupe (mapCellUtils) prefers occupied over empty, stronger occupancy when both occupied (Bugbot).
+      const deduped = dedupCellsByCoord(cells);
       if (deduped.length !== cells.length) {
         console.log('[map fetch] deduping cells', cells.length, '->', deduped.length);
         const updated = await MapModel.findOneAndUpdate(
