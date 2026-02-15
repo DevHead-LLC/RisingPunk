@@ -52,14 +52,19 @@ export class MapService {
     // Add houses (entities)
     await this.addHouses(cells);
 
-    // Ensure no duplicate (x,y) so E11000 unique index is satisfied (user-position-and-locator.md)
-    const seen = new Set<string>();
-    const deduped = cells.filter((c: any) => {
+    // Ensure no duplicate (x,y) so E11000 unique index is satisfied; prefer occupied over empty (Bugbot).
+    // Use Record (not Map): this module imports the Map model, so built-in Map is shadowed.
+    const cellByKey: Record<string, any> = {};
+    for (const c of cells) {
       const key = `${c.x},${c.y}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+      const existing = cellByKey[key];
+      if (!existing) {
+        cellByKey[key] = c;
+      } else if (c.isOccupied && !existing.isOccupied) {
+        cellByKey[key] = c;
+      }
+    }
+    const deduped = Object.values(cellByKey);
     if (deduped.length !== cells.length) {
       console.warn('[MapService.generateMap] deduped cells before save', cells.length, '->', deduped.length);
     }

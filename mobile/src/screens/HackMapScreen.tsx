@@ -331,7 +331,7 @@ const triggerViewportFetch = (
   }
   
   viewportRequestInFlightRef.current = true;
-  panningViewportMinimalRef.current = true;
+  panningViewportMinimalRef.current = newViewport.minimal ?? true;
   setPanningViewportParams(newViewport);
 };
 
@@ -2217,11 +2217,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       setPanningViewportParams(null);
     }
     
-    // Handle pending requests after processing current data
+    // Handle pending requests after processing current data (success only; on error don't retry to avoid infinite loop — Bugbot).
     // Skip if pending is the same as the viewport we just merged (avoid redundant re-fetch)
-    if ((panningViewportData || panningViewportError) && pendingViewportParamsRef.current) {
+    if (panningViewportData && pendingViewportParamsRef.current) {
       const pending = pendingViewportParamsRef.current;
-      const justMerged = panningViewportData?.viewport;
+      const justMerged = panningViewportData.viewport;
       const sameViewport = justMerged &&
         pending.x1 === justMerged.x1 && pending.y1 === justMerged.y1 &&
         pending.x2 === justMerged.x2 && pending.y2 === justMerged.y2;
@@ -2231,6 +2231,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         panningViewportMinimalRef.current = pending.minimal ?? true;
         setPanningViewportParams(pending);
       }
+    }
+    if (panningViewportError && pendingViewportParamsRef.current) {
+      pendingViewportParamsRef.current = null;
     }
   }, [panningViewportData, panningViewportError, separateStaticAndDynamicData, dispatch]);
   

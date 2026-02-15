@@ -508,15 +508,18 @@ router.get('/:name', async (req: Request, res: Response) => {
     } else {
       // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
       let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
-      // Fix E11000 duplicate key: dedupe cells by (x,y), keeping first occurrence (user-position-and-locator.md).
-      // Use findOneAndUpdate (not doc.save()) so we never trigger an insert on a corrupted doc.
-      const seen = new Set<string>();
-      const deduped = cells.filter((c: any) => {
+      // Fix E11000 duplicate key: dedupe cells by (x,y), preferring occupied over empty to avoid losing player houses (Bugbot).
+      const cellByKey = new Map<string, any>();
+      for (const c of cells) {
         const key = `${c.x},${c.y}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
+        const existing = cellByKey.get(key);
+        if (!existing) {
+          cellByKey.set(key, c);
+        } else if (c.isOccupied && !existing.isOccupied) {
+          cellByKey.set(key, c);
+        }
+      }
+      const deduped = Array.from(cellByKey.values());
       if (deduped.length !== cells.length) {
         console.log('[map fetch] deduping cells', cells.length, '->', deduped.length);
         const updated = await MapModel.findOneAndUpdate(
