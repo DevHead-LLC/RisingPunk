@@ -328,14 +328,14 @@ const triggerViewportFetch = (
       : newViewport;
     pendingViewportParamsRef.current = merged;
     if (__DEV__) {
-      // TODO(temporary): Staging investigation - remove once diagnosed (panning-load.md)
+      // TODO(temporary): Staging investigation - remove once diagnosed (staging-panning-investigation.md)
       console.log('[PanningLog] QUEUED', { viewport: `${merged.x1},${merged.y1}-${merged.x2},${merged.y2}`, minimal: merged.minimal });
     }
     return;
   }
 
   if (__DEV__) {
-    // TODO(temporary): Staging investigation - remove once diagnosed (panning-load.md)
+    // TODO(temporary): Staging investigation - remove once diagnosed (staging-panning-investigation.md)
     console.log('[PanningLog] FETCH_START', { viewport: `${newViewport.x1},${newViewport.y1}-${newViewport.x2},${newViewport.y2}`, minimal: newViewport.minimal ?? true });
   }
   viewportRequestInFlightRef.current = true;
@@ -1936,7 +1936,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     
     if (__DEV__ && prevVisibleCellsCountRef.current !== cells.length) {
-      // TODO(temporary): Staging investigation - remove once diagnosed (panning-load.md)
+      // TODO(temporary): Staging investigation - remove once diagnosed (staging-panning-investigation.md)
       console.log('[PanningLog] VISIBLE_CELLS', cells.length);
     }
     if (prevVisibleCellsCountRef.current !== cells.length) {
@@ -2144,7 +2144,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Phase 6: Prevent processing the same viewport twice
       if (processedViewportRef.current === viewportKey) {
         if (__DEV__) {
-          // TODO(temporary): Staging investigation - remove once diagnosed (panning-load.md)
+          // TODO(temporary): Staging investigation - remove once diagnosed (staging-panning-investigation.md)
           console.log('[PanningLog] MERGE_SKIP already processed', viewportKey);
         }
         // Still handle pending requests even if this viewport was already processed
@@ -2162,7 +2162,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
       const cellsMerged = Object.keys(terrain).length;
       if (__DEV__) {
-        // TODO(temporary): Staging investigation - remove once diagnosed (panning-load.md)
+        // TODO(temporary): Staging investigation - remove once diagnosed (staging-panning-investigation.md)
         console.log('[PanningLog] MERGE_START', { viewport: viewportKey, cellsMerged });
       }
 
@@ -2237,19 +2237,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
       if (__DEV__) {
-        // TODO(temporary): Staging investigation - remove once diagnosed (panning-load.md)
+        // TODO(temporary): Staging investigation - remove once diagnosed (staging-panning-investigation.md)
         console.log('[PanningLog] MERGE_END', { viewport: viewportKey });
       }
     } else if (panningViewportData && panningViewportData.grid && !panningViewportData.viewport) {
       if (__DEV__) {
-        // TODO(temporary): Staging investigation - remove once diagnosed (panning-load.md)
+        // TODO(temporary): Staging investigation - remove once diagnosed (staging-panning-investigation.md)
         console.log('[PanningLog] MERGE_SKIP no viewport in response', panningViewportParams ? { requested: `${panningViewportParams.x1},${panningViewportParams.y1}-${panningViewportParams.x2},${panningViewportParams.y2}` } : '');
       }
     }
 
     if (panningViewportError) {
       if (__DEV__) {
-        // TODO(temporary): Staging investigation - remove once diagnosed (panning-load.md)
+        // TODO(temporary): Staging investigation - remove once diagnosed (staging-panning-investigation.md)
         const err = panningViewportError as any;
         console.log('[PanningLog] FETCH_ERROR', {
           viewport: panningViewportParams ? `${panningViewportParams.x1},${panningViewportParams.y1}-${panningViewportParams.x2},${panningViewportParams.y2}` : null,
