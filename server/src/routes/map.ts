@@ -508,8 +508,8 @@ router.get('/:name', async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to build map' });
         return;
       }
-    } else {
-      // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
+    } else if (!viewportEarly.hasViewport) {
+      // Full-map only: validate and normalize map (dedup, cleanup, placement). Viewport requests skip this to avoid 2–5s response times (staging-panning-investigation.md).
       let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
       // Fix E11000 duplicate key: shared dedupe (mapCellUtils) prefers occupied over empty, stronger occupancy when both occupied (Bugbot).
       const deduped = dedupCellsByCoord(cells);
