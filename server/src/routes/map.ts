@@ -469,7 +469,8 @@ router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
     const viewportEarly = parseViewportFromRequest(req);
-    // PanningLog: we only log on error (catch below) so EC2 "last 100" shows only failed requests and helps find 5xx root cause
+    // PanningLog: one line per map GET (stdout) so we can verify logs appear in EB; error also logged in catch below
+    console.log('[PanningLog] map GET', name, viewportEarly.hasViewport, viewportEarly.x1, viewportEarly.y1, viewportEarly.x2, viewportEarly.y2);
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
       console.log('[map fetch] no map found for', name, '- dropping legacy index if present and generating');
@@ -744,6 +745,8 @@ router.get('/:name', async (req: Request, res: Response) => {
   } catch (error: any) {
     const durationMs = Date.now() - startMapFetch;
     const viewportEarly = parseViewportFromRequest(req);
+    // Use console.log so this appears in web.stdout.log (EB often shows stdout first)
+    console.log('[PanningLog] error', req.params.name, error?.message ?? error, durationMs, 'ms', { hasViewport: viewportEarly.hasViewport, x1: viewportEarly.x1, y1: viewportEarly.y1, x2: viewportEarly.x2, y2: viewportEarly.y2 });
     console.error('[PanningLog] error', req.params.name, error?.message ?? error, durationMs, 'ms', { hasViewport: viewportEarly.hasViewport, x1: viewportEarly.x1, y1: viewportEarly.y1, x2: viewportEarly.x2, y2: viewportEarly.y2 });
     res.status(500).json({ error: error?.message ?? 'Internal server error' });
   }
