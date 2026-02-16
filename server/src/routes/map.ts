@@ -469,8 +469,6 @@ router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
     const viewportEarly = parseViewportFromRequest(req);
-    // PanningLog: one line per map GET (stdout) so we can verify logs appear in EB; error also logged in catch below
-    console.log('[PanningLog] map GET', name, viewportEarly.hasViewport, viewportEarly.x1, viewportEarly.y1, viewportEarly.x2, viewportEarly.y2);
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
       console.log('[map fetch] no map found for', name, '- dropping legacy index if present and generating');
@@ -735,6 +733,9 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
 
     if (hasViewport) {
+      const durationMs = Date.now() - startMapFetch;
+      // Diagnostic: viewport response time — if often 1000+ ms, server slowness may explain timeouts/modal (staging-panning-investigation.md)
+      console.log('[PanningLog] viewport done', name, durationMs, 'ms', viewportX1, viewportY1, viewportX2, viewportY2);
       res.json({
         grid: emptyGrid,
         viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
