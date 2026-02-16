@@ -18,11 +18,11 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
   if (result.error) {
     const error = result.error as any;
     
-    // Check for abort errors first - these are expected during fast map panning (and timeouts can surface as Abort)
+    // Check for request-abort only (expected during fast map panning). Do not match messages that merely contain "abort" (e.g. "Transaction aborted") or we would silently swallow real errors.
     const isAbortError =
       error?.name === 'AbortError' ||
       (error instanceof Error && error.name === 'AbortError') ||
-      (typeof error?.message === 'string' && (error.message === 'Aborted' || error.message.toLowerCase().includes('abort')));
+      (typeof error?.message === 'string' && error.message === 'Aborted');
     if (isAbortError) {
       return result;
     }

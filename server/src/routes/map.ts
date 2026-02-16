@@ -469,9 +469,7 @@ router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
     const viewportEarly = parseViewportFromRequest(req);
-    if (viewportEarly.hasViewport) {
-      console.log('[PanningLog] viewport request', name, { x1: viewportEarly.x1, y1: viewportEarly.y1, x2: viewportEarly.x2, y2: viewportEarly.y2 });
-    }
+    // PanningLog: we only log slow viewport, slow full-map, and error (below) so EC2 "last 100 logs" stays tractable and we avoid I/O on every viewport request
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
       console.log('[map fetch] no map found for', name, '- dropping legacy index if present and generating');
