@@ -463,9 +463,7 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
   }
 });
 
-// TODO(temporary): Staging investigation - remove map fetch logs once panning/loading issue is diagnosed (panning-load.md § Staging investigation)
 router.get('/:name', async (req: Request, res: Response) => {
-  const startMapFetch = Date.now();
   try {
     const name = req.params.name;
     const viewportEarly = parseViewportFromRequest(req);
@@ -509,7 +507,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         return;
       }
     } else if (!viewportEarly.hasViewport) {
-      // Full-map only: validate and normalize map (dedup, cleanup, placement). Viewport requests skip this to avoid 2–5s response times (staging-panning-investigation.md).
+      // Full-map only: validate and normalize map (dedup, cleanup, placement). Viewport requests skip this to avoid 2–5s response times (staging-panning-investigation.md). Bugbot: viewport skips this by design; we never save() from viewport path (npcInstanceId only mutated when !hasViewport) so we do not persist unnormalized cells.
       let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
       // Fix E11000 duplicate key: shared dedupe (mapCellUtils) prefers occupied over empty, stronger occupancy when both occupied (Bugbot).
       const deduped = dedupCellsByCoord(cells);
@@ -702,11 +700,12 @@ router.get('/:name', async (req: Request, res: Response) => {
       const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
       const name = c.entityName || undefined;
       const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
-      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
+      // Compute npcInstanceId for response; only mutate and persist on full-map so viewport never save()s unnormalized cells (Bugbot: viewport skips dedup/cleanup).
+      const npcInstanceId = c.occupiedBy === 'npc' && npcSlug ? (c.npcInstanceId || `${npcSlug}-${x}-${y}`) : undefined;
+      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId && !hasViewport) {
         c.npcInstanceId = `${npcSlug}-${x}-${y}`;
         mutated = true;
       }
-      const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
       const npcLevel = c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined;
       
       let isShielded = false;
@@ -733,9 +732,6 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
 
     if (hasViewport) {
-      const durationMs = Date.now() - startMapFetch;
-      // Diagnostic: viewport response time — if often 1000+ ms, server slowness may explain timeouts/modal (staging-panning-investigation.md)
-      console.log('[PanningLog] viewport done', name, durationMs, 'ms', viewportX1, viewportY1, viewportX2, viewportY2);
       res.json({
         grid: emptyGrid,
         viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
@@ -744,11 +740,7 @@ router.get('/:name', async (req: Request, res: Response) => {
       res.json({ grid: emptyGrid });
     }
   } catch (error: any) {
-    const durationMs = Date.now() - startMapFetch;
-    const viewportEarly = parseViewportFromRequest(req);
-    // Use console.log so this appears in web.stdout.log (EB often shows stdout first)
-    console.log('[PanningLog] error', req.params.name, error?.message ?? error, durationMs, 'ms', { hasViewport: viewportEarly.hasViewport, x1: viewportEarly.x1, y1: viewportEarly.y1, x2: viewportEarly.x2, y2: viewportEarly.y2 });
-    console.error('[PanningLog] error', req.params.name, error?.message ?? error, durationMs, 'ms', { hasViewport: viewportEarly.hasViewport, x1: viewportEarly.x1, y1: viewportEarly.y1, x2: viewportEarly.x2, y2: viewportEarly.y2 });
+    console.error('Map fetch error:', error);
     res.status(500).json({ error: error?.message ?? 'Internal server error' });
   }
 });
