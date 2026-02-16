@@ -463,9 +463,7 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
   }
 });
 
-// TODO(temporary): Staging investigation - remove map fetch logs once panning/loading issue is diagnosed (panning-load.md § Staging investigation)
 router.get('/:name', async (req: Request, res: Response) => {
-  const startMapFetch = Date.now();
   try {
     const name = req.params.name;
     const viewportEarly = parseViewportFromRequest(req);
@@ -733,9 +731,6 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
 
     if (hasViewport) {
-      const durationMs = Date.now() - startMapFetch;
-      // Diagnostic: viewport response time — if often 1000+ ms, server slowness may explain timeouts/modal (staging-panning-investigation.md)
-      console.log('[PanningLog] viewport done', name, durationMs, 'ms', viewportX1, viewportY1, viewportX2, viewportY2);
       res.json({
         grid: emptyGrid,
         viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
@@ -744,11 +739,7 @@ router.get('/:name', async (req: Request, res: Response) => {
       res.json({ grid: emptyGrid });
     }
   } catch (error: any) {
-    const durationMs = Date.now() - startMapFetch;
-    const viewportEarly = parseViewportFromRequest(req);
-    // Use console.log so this appears in web.stdout.log (EB often shows stdout first)
-    console.log('[PanningLog] error', req.params.name, error?.message ?? error, durationMs, 'ms', { hasViewport: viewportEarly.hasViewport, x1: viewportEarly.x1, y1: viewportEarly.y1, x2: viewportEarly.x2, y2: viewportEarly.y2 });
-    console.error('[PanningLog] error', req.params.name, error?.message ?? error, durationMs, 'ms', { hasViewport: viewportEarly.hasViewport, x1: viewportEarly.x1, y1: viewportEarly.y1, x2: viewportEarly.x2, y2: viewportEarly.y2 });
+    console.error('Map fetch error:', error);
     res.status(500).json({ error: error?.message ?? 'Internal server error' });
   }
 });
