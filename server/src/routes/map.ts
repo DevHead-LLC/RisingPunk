@@ -466,6 +466,7 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
 router.get('/:name', async (req: Request, res: Response) => {
   try {
     const name = req.params.name;
+    const viewportEarly = parseViewportFromRequest(req);
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
       console.log('[map fetch] no map found for', name, '- dropping legacy index if present and generating');
@@ -485,7 +486,6 @@ router.get('/:name', async (req: Request, res: Response) => {
       return;
     }
 
-    const viewportEarly = parseViewportFromRequest(req);
     // Viewport requests: skip loading all users and the per-user placement loop (hundreds of DB round-trips).
     // Placement runs only for full-map requests so new users get a house; viewport just returns tiles.
     const users = viewportEarly.hasViewport
@@ -506,8 +506,8 @@ router.get('/:name', async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to build map' });
         return;
       }
-    } else {
-      // Validate and normalize map: ensure per-user homes exist and no blocked occupied cells
+    } else if (!viewportEarly.hasViewport) {
+      // Full-map only: validate and normalize map (dedup, cleanup, placement). Viewport requests skip this to avoid 2–5s response times (staging-panning-investigation.md). Bugbot: viewport skips this by design; we never save() from viewport path (npcInstanceId only mutated when !hasViewport) so we do not persist unnormalized cells.
       let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
       // Fix E11000 duplicate key: shared dedupe (mapCellUtils) prefers occupied over empty, stronger occupancy when both occupied (Bugbot).
       const deduped = dedupCellsByCoord(cells);
@@ -700,11 +700,12 @@ router.get('/:name', async (req: Request, res: Response) => {
       const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
       const name = c.entityName || undefined;
       const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
-      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
+      // Compute npcInstanceId for response; only mutate and persist on full-map so viewport never save()s unnormalized cells (Bugbot: viewport skips dedup/cleanup).
+      const npcInstanceId = c.occupiedBy === 'npc' && npcSlug ? (c.npcInstanceId || `${npcSlug}-${x}-${y}`) : undefined;
+      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId && !hasViewport) {
         c.npcInstanceId = `${npcSlug}-${x}-${y}`;
         mutated = true;
       }
-      const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
       const npcLevel = c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined;
       
       let isShielded = false;
@@ -731,7 +732,7 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
 
     if (hasViewport) {
-      res.json({ 
+      res.json({
         grid: emptyGrid,
         viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
       });
@@ -740,7 +741,7 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
   } catch (error: any) {
     console.error('Map fetch error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error?.message ?? 'Internal server error' });
   }
 });
 

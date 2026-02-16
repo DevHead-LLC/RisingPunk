@@ -496,6 +496,33 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-15 (merge dev → android_mergeDev)
+
+**Branch context:** Merging origin/dev into android_mergeDev (from androidStaging). One conflict: versionCode in mobile/package.json.
+
+### 1. `mobile/package.json`
+
+**Conflict:** versionCode field – present on HEAD (Android) vs absent on dev.
+
+| Side | Content |
+|------|--------|
+| HEAD | `"versionCode": 80` (after version) |
+| dev  | No versionCode field |
+
+**Resolution:** Accepted **HEAD**. Final state: `"versionCode": 80` retained in package.json.
+
+**Rationale:** Android first. versionCode is required for Android/Play Console (internal testing and production). Dev does not carry it; the Android branch must keep it so builds and store uploads use the correct version code.
+
+**Rejected from dev:** Omitting versionCode (would break or confuse Android versioning for Play Console).
+
+**Failure-mode hints for later:** If Play Console rejects a build for version code (e.g. "version code must be greater than previous"), increment versionCode in mobile/package.json on the Android branch and ensure it stays in sync with Android-specific versioning.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
