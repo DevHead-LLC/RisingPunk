@@ -463,9 +463,13 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
   }
 });
 
+// TODO(temporary): Staging investigation - remove map fetch logs once panning/loading issue is diagnosed (panning-load.md § Staging investigation)
 router.get('/:name', async (req: Request, res: Response) => {
+  const startMapFetch = Date.now();
   try {
     const name = req.params.name;
+    const viewportEarly = parseViewportFromRequest(req);
+    // PanningLog: we only log on error (catch below) so EC2 "last 100" shows only failed requests and helps find 5xx root cause
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
       console.log('[map fetch] no map found for', name, '- dropping legacy index if present and generating');
@@ -485,7 +489,6 @@ router.get('/:name', async (req: Request, res: Response) => {
       return;
     }
 
-    const viewportEarly = parseViewportFromRequest(req);
     // Viewport requests: skip loading all users and the per-user placement loop (hundreds of DB round-trips).
     // Placement runs only for full-map requests so new users get a house; viewport just returns tiles.
     const users = viewportEarly.hasViewport
@@ -731,7 +734,7 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
 
     if (hasViewport) {
-      res.json({ 
+      res.json({
         grid: emptyGrid,
         viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
       });
@@ -739,8 +742,10 @@ router.get('/:name', async (req: Request, res: Response) => {
       res.json({ grid: emptyGrid });
     }
   } catch (error: any) {
-    console.error('Map fetch error:', error);
-    res.status(500).json({ error: error.message });
+    const durationMs = Date.now() - startMapFetch;
+    const viewportEarly = parseViewportFromRequest(req);
+    console.error('[PanningLog] error', req.params.name, error?.message ?? error, durationMs, 'ms', { hasViewport: viewportEarly.hasViewport, x1: viewportEarly.x1, y1: viewportEarly.y1, x2: viewportEarly.x2, y2: viewportEarly.y2 });
+    res.status(500).json({ error: error?.message ?? 'Internal server error' });
   }
 });
 
