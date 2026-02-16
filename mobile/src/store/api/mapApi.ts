@@ -18,33 +18,37 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
   if (result.error) {
     const error = result.error as any;
     
-    // Check for abort errors first - these are expected during fast map panning
-    const isAbortError = error?.name === 'AbortError' || 
-                         (error instanceof Error && error.name === 'AbortError');
-    
+    // Check for request-abort only (expected during fast map panning). Do not match messages that merely contain "abort" (e.g. "Transaction aborted") or we would silently swallow real errors.
+    const isAbortError =
+      error?.name === 'AbortError' ||
+      (error instanceof Error && error.name === 'AbortError') ||
+      (typeof error?.message === 'string' && error.message === 'Aborted');
     if (isAbortError) {
       return result;
     }
-    
+
     // Check for account switched error
     if (error?.status === 401 && error?.data?.error === 'ACCOUNT_SWITCHED') {
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately
       api.dispatch({ type: 'auth/handleAccountSwitched' });
-      
+
       // Clear RTK Query caches to prevent data leakage between users
       resetAllApiCaches(api);
-      
+
       return result; // Return early to prevent other error handling
     } else if (error?.status === 401 && error?.data?.error === 'Token expired') {
       // Dispatch logout action using action type to avoid circular dependency
       api.dispatch({ type: 'auth/logout' });
       return result;
     }
-    // my-position is optional: 404 (no house) or other failures should not trigger global error modal (user-position-and-locator.md)
+    // Optional map requests: do not trigger global error modal so user can keep using the app (panning-load.md)
+    // - my-position: 404 (no house) or other failures (user-position-and-locator.md)
+    // - viewport (x1,y1,x2,y2): timeouts/500s on staging would otherwise show "Something went wrong... Log out"
     const url = typeof args === 'string' ? args : args?.url;
     const path = typeof url === 'string' ? url.split('?')[0] : '';
     const isMyPositionRequest = path.endsWith('/my-position');
-    if (!isMyPositionRequest) {
+    const isViewportRequest = args?.params && typeof args.params === 'object' && 'x1' in args.params && 'x2' in args.params;
+    if (!isMyPositionRequest && !isViewportRequest) {
       globalErrorHandler.handleDatabaseError(result.error);
     }
   }
