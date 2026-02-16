@@ -507,7 +507,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         return;
       }
     } else if (!viewportEarly.hasViewport) {
-      // Full-map only: validate and normalize map (dedup, cleanup, placement). Viewport requests skip this to avoid 2–5s response times (staging-panning-investigation.md).
+      // Full-map only: validate and normalize map (dedup, cleanup, placement). Viewport requests skip this to avoid 2–5s response times (staging-panning-investigation.md). Bugbot: viewport skips this by design; we never save() from viewport path (npcInstanceId only mutated when !hasViewport) so we do not persist unnormalized cells.
       let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
       // Fix E11000 duplicate key: shared dedupe (mapCellUtils) prefers occupied over empty, stronger occupancy when both occupied (Bugbot).
       const deduped = dedupCellsByCoord(cells);
@@ -700,11 +700,12 @@ router.get('/:name', async (req: Request, res: Response) => {
       const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
       const name = c.entityName || undefined;
       const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
-      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
+      // Compute npcInstanceId for response; only mutate and persist on full-map so viewport never save()s unnormalized cells (Bugbot: viewport skips dedup/cleanup).
+      const npcInstanceId = c.occupiedBy === 'npc' && npcSlug ? (c.npcInstanceId || `${npcSlug}-${x}-${y}`) : undefined;
+      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId && !hasViewport) {
         c.npcInstanceId = `${npcSlug}-${x}-${y}`;
         mutated = true;
       }
-      const npcInstanceId = c.occupiedBy === 'npc' ? (c.npcInstanceId || undefined) : undefined;
       const npcLevel = c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined;
       
       let isShielded = false;

@@ -2143,6 +2143,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       processedViewportRef.current = viewportKey;
 
+      // Bugbot: cellsMerged (debug-only) was removed with staging log revert; no debug-only computation here.
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
 
       // Phase 6: Check if this is a minimal request using ref (avoids dependency issues)
