@@ -329,8 +329,16 @@ export async function setPlayerPosition(
   if (!mapId) return false;
 
   if (usesMapCells(mapDoc)) {
+    // Bugbot: Only update if cell still empty (same guard as placeUserHouse/placeNpcOnRandomCell; prevents overwriting concurrent placement).
     const res = await MapCell.updateOne(
-      { mapId, x, y },
+      {
+        mapId,
+        x,
+        y,
+        isOccupied: false,
+        canBeOccupied: true,
+        terrain: { $nin: ['water', 'mountain', 'road'] },
+      },
       {
         $set: {
           isOccupied: true,
