@@ -341,7 +341,9 @@ router.get('/my-position', auth, async (req: Request, res: Response) => {
       res.json({ x: placed.x, y: placed.y });
       return;
     }
-    house = await findHouseForUser(mapDoc, authUserId);
+    // Bugbot: Re-fetch map so fallback findHouseForUser sees concurrent placement (embedded path reads mapDoc.cells; stale doc would miss it).
+    const freshMapDoc = await MapModel.findOne({ name: 'main' });
+    house = freshMapDoc ? await findHouseForUser(freshMapDoc, authUserId) : null;
     if (house) {
       res.json({ x: house.x, y: house.y });
       return;
@@ -376,8 +378,8 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
     }
 
     const authUserId: any = (req as any).user?._id;
-    await clearYouMarkersForUser(mapDoc, authUserId);
 
+    // Bugbot: Validate target cell before clearing YOU markers so MapCell path doesn't commit delete on validation failure.
     const target = await getCell(mapDoc, x, y);
     if (!target) {
       res.status(404).json({ error: 'Target cell not found' });
@@ -392,6 +394,7 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       return;
     }
 
+    await clearYouMarkersForUser(mapDoc, authUserId);
     const updated = await setPlayerPosition(mapDoc, x, y, authUserId, 'YOU');
     if (!updated) {
       res.status(500).json({ error: 'Failed to update position' });
