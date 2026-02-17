@@ -31,8 +31,8 @@ const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
 // Constants for viewport fetching and panning
-const VIEWPORT_FETCH_THRESHOLD = 2; // Cells to move before triggering viewport fetch (lower = request sooner, fewer black areas)
-const PAN_BUFFER = 8; // Buffer in cells for window range calculation
+const VIEWPORT_FETCH_THRESHOLD = 1; // Cells to move before triggering viewport fetch (1 = request as soon as we leave last fetch)
+const PAN_BUFFER = 12; // Buffer in cells for window range (larger = prefetch more so next pan is often cached)
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
@@ -153,11 +153,16 @@ const cleanupEmptyCells = (
   viewport: { x1: number; y1: number; x2: number; y2: number }
 ): string[] => {
   const deletedKeys: string[] = [];
+  const viewportH = viewport.y2 - viewport.y1 + 1;
+  const viewportW = viewport.x2 - viewport.x1 + 1;
+  const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
   for (let y = viewport.y1; y <= viewport.y2; y++) {
-    const row = grid[y];
+    const rowIdx = isViewportSized ? y - viewport.y1 : y;
+    const row = grid[rowIdx];
     if (!row) continue;
     for (let x = viewport.x1; x <= viewport.x2; x++) {
-      const cell = row[x];
+      const colIdx = isViewportSized ? x - viewport.x1 : x;
+      const cell = row[colIdx];
       const key = `${x},${y}`;
       if (cell && cell.entity === 'empty' && merged[key]) {
         delete merged[key];
@@ -207,13 +212,9 @@ const getCellsToCheck = (
 };
 
 /**
- * Merge grid data from new grid into current grid for a specific viewport
- * Creates a deep copy of current grid and merges new data within viewport bounds
- * @param currentGrid - Current grid data (from gridRef or state)
- * @param newGrid - New grid data to merge
- * @param viewport - Viewport coordinates { x1, y1, x2, y2 }
- * @param gridSize - Grid size (for fallback empty grid creation)
- * @returns Merged grid (deep copy, safe to mutate)
+ * Merge grid data from new grid into current grid for a specific viewport.
+ * Supports (1) viewport-sized newGrid: newGrid[ry][rx] = cell at (viewport.x1+rx, viewport.y1+ry);
+ * (2) full-size newGrid: newGrid[y][x] = cell at (x, y).
  */
 const mergeGridData = (
   currentGrid: any[][],
@@ -221,20 +222,20 @@ const mergeGridData = (
   viewport: { x1: number; y1: number; x2: number; y2: number },
   gridSize: number
 ): any[][] => {
-  // Create a deep copy to avoid mutating Redux state
-  const mergedGrid = (currentGrid.length > 0 ? currentGrid : Array.from({ length: gridSize }, () => 
+  const mergedGrid = (currentGrid.length > 0 ? currentGrid : Array.from({ length: gridSize }, () =>
     Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
   )).map(row => row ? [...row] : []);
-  
-  // Only update cells within viewport
+
+  const viewportH = viewport.y2 - viewport.y1 + 1;
+  const viewportW = viewport.x2 - viewport.x1 + 1;
+  const isViewportSized = newGrid.length === viewportH && (newGrid[0]?.length ?? 0) === viewportW;
+
   for (let y = viewport.y1; y <= viewport.y2; y++) {
-    const row = newGrid[y];
-    if (!row) continue;
-    if (!mergedGrid[y]) {
-      mergedGrid[y] = [];
-    }
+    if (!mergedGrid[y]) mergedGrid[y] = [];
     for (let x = viewport.x1; x <= viewport.x2; x++) {
-      const cell = row[x];
+      const cell = isViewportSized
+        ? newGrid[y - viewport.y1]?.[x - viewport.x1]
+        : newGrid[y]?.[x];
       if (cell) {
         if (!mergedGrid[y][x]) {
           mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
@@ -243,17 +244,16 @@ const mergeGridData = (
       }
     }
   }
-  
   return mergedGrid;
 };
 
 /**
  * Get grid size from grid array with fallback
  * @param grid - Grid array
- * @param fallback - Fallback size if grid is empty (default: 50)
+ * @param fallback - Fallback size if grid is empty (default: 500)
  * @returns Grid size
  */
-const getGridSize = (grid: any[][] | null | undefined, fallback: number = 50): number => {
+const getGridSize = (grid: any[][] | null | undefined, fallback: number = 500): number => {
   if (!grid || grid.length === 0) return fallback;
   return grid.length;
 };
@@ -1076,7 +1076,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       const finalY = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, startY.value + (g.translationY ?? 0))) : startY.value + (g.translationY ?? 0);
       runOnJS(panEndSchedule)(finalX, finalY);
     });
-  const gridSize = grid.length || 50;
+  const gridSize = grid.length || 500;
   const totalSize = gridSize * CELL_SIZE;
   
   // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
@@ -1214,6 +1214,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     panningViewportParams!,
     { skip: shouldSkipPanningViewport }
   );
+
   // Phase 5: Optimize shield status polling - increase interval and make viewport-aware
   // Check if there are any player tiles in the visible viewport
   // Phase 5: Use ref for windowRange during panning to reduce re-renders
@@ -1954,34 +1955,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       npcLevel?: number;
     }> = {};
     const entityDetails: Record<string, any> = {};
-    
+    const viewportH = viewport ? viewport.y2 - viewport.y1 + 1 : 0;
+    const viewportW = viewport ? viewport.x2 - viewport.x1 + 1 : 0;
+    const isViewportSized = viewport && gridData.length === viewportH && (gridData[0]?.length ?? 0) === viewportW;
     for (let y = 0; y < gridData.length; y++) {
       const row = gridData[y];
       if (!row) continue;
       for (let x = 0; x < row.length; x++) {
         const cell = row[x];
         if (!cell) continue;
-        
-        // Bug Fix: For viewport requests, only process cells within viewport bounds
-        // This prevents overwriting cached terrain outside viewport with 'plain'
-        if (viewport) {
-          // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
-          if (isValidViewport(viewport)) {
-            const isInViewport = x >= viewport.x1 && x <= viewport.x2 && y >= viewport.y1 && y <= viewport.y2;
-            if (!isInViewport) {
-              continue; // Skip cells outside viewport to preserve cached data
-            }
-          }
-        }
-        
-        const key = `${x},${y}`;
-        
-        // Terrain is static - load once and cache
+        const globalX = isViewportSized && viewport ? viewport.x1 + x : x;
+        const globalY = isViewportSized && viewport ? viewport.y1 + y : y;
+        const key = `${globalX},${globalY}`;
         terrain[key] = cell.terrain;
-        
-        // Phase 2: Split entities into images (minimal) and details (full)
         if (cell.entity !== 'empty') {
-          // EntityImages: minimal info for rendering images (npcLevel needed for level-based NPC image)
           entityImages[key] = {
             entity: cell.entity,
             owner: cell.owner,
@@ -1989,9 +1976,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             npcSlug: cell.npcSlug,
             npcLevel: cell.npcLevel,
           };
-          
-          // EntityDetails: full info for interactions
-          // Keep entity and owner in details too for backward compatibility with existing rendering code
           entityDetails[key] = {
             entity: cell.entity,
             owner: cell.owner,
@@ -2005,7 +1989,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         }
       }
     }
-    
     return { terrain, entityImages, entityDetails };
   }, []);
 
@@ -2013,11 +1996,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     dispatch(setLoading(isLoading));
     if (mapData && mapData.grid) {
       // Phase 4B: Merge new data with existing cache instead of replacing
-      // This ensures cached terrain data persists across refetches
-      // Bug Fix: For viewport requests, only process cells within viewport to preserve cached data outside
-      // Phase 2: Now returns three layers: terrain, entityImages, entityDetails
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(mapData.grid, mapData.viewport);
-      
       // Phase 1: Batch state updates to reduce re-renders
       unstable_batchedUpdates(() => {
         setStaticTerrainData(prev => {
@@ -2082,17 +2061,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         if (mapData.viewport) {
           // Bug Fix: Validate viewport coordinates are valid numbers (defensive check)
           if (!isValidViewport(mapData.viewport)) {
-            // Invalid viewport - treat as full map request
             dispatch(setGrid(mapData.grid));
           } else {
-            // Viewport request - merge with existing grid
-            // Bug Fix: Read from ref to get latest grid value, avoiding stale closures
-            // This ensures sequential viewport updates don't overwrite each other's changes
+            // Viewport request - merge with existing grid. Use full map gridSize (from API), not viewport row count.
+            // Passing mapData.grid.length would create a 25×25 grid and break 500×500 (nothing loads outside 0–24).
+            const fullGridSize = mapData.gridSize ?? gridSize;
             const mergedGrid = mergeGridData(
               gridRef.current,
               mapData.grid,
               mapData.viewport,
-              mapData.grid.length
+              fullGridSize
             );
             
             dispatch(setGrid(mergedGrid));
@@ -2143,7 +2121,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
       processedViewportRef.current = viewportKey;
 
-      // Bugbot: cellsMerged (debug-only) was removed with staging log revert; no debug-only computation here.
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
 
       // Phase 6: Check if this is a minimal request using ref (avoids dependency issues)
@@ -2248,7 +2225,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       }
     }
   }, [panningViewportData, panningViewportError, panningViewportParams, separateStaticAndDynamicData, dispatch]);
-  
+
   // Phase 7: Load entity details when panning stops
   const [stoppedViewportParams, setStoppedViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
   const { data: stoppedViewportData, isLoading: isLoadingStoppedViewport } = useFetchMapViewportQuery(
@@ -2385,7 +2362,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       // Calculate viewport around restorePan location instead of clearing everything
       const buffer = 15;
-      const gridSize = getGridSize(grid, 50);
+      const gridSize = getGridSize(grid);
       
       // Convert restorePan grid coordinates to pan coordinates to calculate correct viewport
       const { x: panX, y: panY } = gridToPanCoordinates(
@@ -2706,7 +2683,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             offsetX.value = cx;
             offsetY.value = cy;
             // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-            const gridSizeBounds = getGridSize(grid, 50);
+            const gridSizeBounds = getGridSize(grid);
             const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeBounds, PAN_BUFFER);
             calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
             const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -2734,7 +2711,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     offsetX.value = cx;
     offsetY.value = cy;
     // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-    const gridSize = getGridSize(grid, 50);
+    const gridSize = getGridSize(grid);
     const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, PAN_BUFFER);
     calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -2796,7 +2773,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     offsetX.value = cx;
     offsetY.value = cy;
     // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-    const gridSizeEntry = getGridSize(grid, 50);
+    const gridSizeEntry = getGridSize(grid);
     const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeEntry, PAN_BUFFER);
     calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -2993,7 +2970,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       offsetX.value = cx;
       offsetY.value = cy;
       // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-      const gridSize = getGridSize(grid, 50);
+      const gridSize = getGridSize(grid);
       const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, PAN_BUFFER);
       calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
       const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };

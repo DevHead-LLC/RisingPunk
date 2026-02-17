@@ -1,5 +1,11 @@
 import mongoose from 'mongoose';
 import { Map as MapModel } from '../models/Map';
+import {
+  usesMapCells,
+  clearNpcBySlugFromMap,
+  clearNpcInstanceFromMapCell,
+  placeNpcOnRandomCell,
+} from './CellAccessorService';
 
 type RespawnTask = {
   npcSlug: string;
@@ -14,6 +20,10 @@ export class NPCRespawnService {
   static async clearNpcFromMap(npcSlug: string, mapName: string = 'main'): Promise<void> {
     const doc: any = await MapModel.findOne({ name: mapName });
     if (!doc) return;
+    if (usesMapCells(doc)) {
+      await clearNpcBySlugFromMap(doc, npcSlug);
+      return;
+    }
     const cells: any[] = doc.cells || [];
     let changed = false;
     for (const c of cells) {
@@ -35,6 +45,10 @@ export class NPCRespawnService {
   static async clearNpcInstanceFromMap(npcInstanceId: string, mapName: string = 'main'): Promise<void> {
     const doc: any = await MapModel.findOne({ name: mapName });
     if (!doc) return;
+    if (usesMapCells(doc)) {
+      await clearNpcInstanceFromMapCell(doc, npcInstanceId);
+      return;
+    }
     const cells: any[] = doc.cells || [];
     let changed = false;
     for (const c of cells) {
@@ -75,48 +89,45 @@ export class NPCRespawnService {
 
   private static async respawnNpc(npcSlug: string, mapName: string = 'main', npcInstanceId?: string): Promise<void> {
     const doc: any = await MapModel.findOne({ name: mapName });
-    if (!doc) {
+    if (!doc) return;
+    const title = this.titleForSlug(npcSlug);
+    const instanceId = npcInstanceId || `${npcSlug}-${Date.now()}`;
+    if (usesMapCells(doc)) {
+      // Full map (e.g. 500×500): placeNpcOnRandomCell samples from all valid empty cells, no bounds
+      await placeNpcOnRandomCell(doc, npcSlug, instanceId, title);
       return;
     }
     const cells: any[] = doc.cells || [];
     const valid: any[] = cells.filter((c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road');
-    if (valid.length === 0) {
-      return;
-    }
-
+    if (valid.length === 0) return;
     const cell = valid[Math.floor(Math.random() * valid.length)];
-    const title = this.titleForSlug(npcSlug);
-
     cell.isOccupied = true;
     cell.occupiedBy = 'npc';
     cell.entityName = title;
     (cell as any).npcSlug = npcSlug;
-    (cell as any).npcInstanceId = npcInstanceId || `${npcSlug}-${Date.now()}`;
-
+    (cell as any).npcInstanceId = instanceId;
     doc.markModified('cells');
     await doc.save();
   }
 
   private static async respawnNpcInstance(npcSlug: string, npcInstanceId: string, mapName: string = 'main'): Promise<void> {
     const doc: any = await MapModel.findOne({ name: mapName });
-    if (!doc) {
+    if (!doc) return;
+    const title = this.titleForSlug(npcSlug);
+    if (usesMapCells(doc)) {
+      // Full map (e.g. 500×500): placeNpcOnRandomCell samples from all valid empty cells, no bounds
+      await placeNpcOnRandomCell(doc, npcSlug, npcInstanceId, title);
       return;
     }
     const cells: any[] = doc.cells || [];
     const valid: any[] = cells.filter((c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road');
-    if (valid.length === 0) {
-      return;
-    }
-
+    if (valid.length === 0) return;
     const cell = valid[Math.floor(Math.random() * valid.length)];
-    const title = this.titleForSlug(npcSlug);
-
     cell.isOccupied = true;
     cell.occupiedBy = 'npc';
     cell.entityName = title;
     (cell as any).npcSlug = npcSlug;
     (cell as any).npcInstanceId = npcInstanceId;
-
     doc.markModified('cells');
     await doc.save();
   }

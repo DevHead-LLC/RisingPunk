@@ -19,11 +19,12 @@ export interface MapState {
   loading: boolean;
 }
 
-const GRID_SIZE = 50;
+/** Default grid size when map is expanded (500×500). Client uses this until API returns grid/gridSize. */
+const DEFAULT_GRID_SIZE = 500;
 
-const initialFog = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(true));
-const initialGrid: GridData = Array(GRID_SIZE).fill(null).map(() =>
-  Array(GRID_SIZE).fill(null).map((): CellData => ({
+const initialFog = Array(DEFAULT_GRID_SIZE).fill(null).map(() => Array(DEFAULT_GRID_SIZE).fill(true));
+const initialGrid: GridData = Array(DEFAULT_GRID_SIZE).fill(null).map(() =>
+  Array(DEFAULT_GRID_SIZE).fill(null).map((): CellData => ({
     terrain: 'plain',
     entity: 'empty',
   }))
@@ -48,11 +49,12 @@ export const mapSlice = createSlice({
     },
     revealFog: (state, action: PayloadAction<{ x: number; y: number; radius: number }>) => {
       const { x, y, radius } = action.payload;
+      const size = state.grid?.length ?? DEFAULT_GRID_SIZE;
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
           const nx = x + dx;
           const ny = y + dy;
-          if (nx >= 0 && nx < GRID_SIZE && ny >= 0 && ny < GRID_SIZE) {
+          if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
             state.fog[ny][nx] = false;
           }
         }

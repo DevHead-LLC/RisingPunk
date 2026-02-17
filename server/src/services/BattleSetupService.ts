@@ -12,6 +12,7 @@ import { BotService } from './BotService';
 import { NPCService } from './NPCService';
 import { Map as MapModel } from '../models/Map';
 import { User } from '../models/User';
+import { findCellByNpcInstanceId } from './CellAccessorService';
 import mongoose from 'mongoose';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 
@@ -92,14 +93,7 @@ export class BattleSetupService {
       if (!mapDoc) {
         throw new Error('Map not found');
       }
-      
-      const npcCell = mapDoc.cells.find((cell: any) => 
-        cell.npcInstanceId === defenderNpcInstanceId && 
-        cell.npcSlug === actualDefenderNpcSlug &&
-        cell.isOccupied && 
-        cell.occupiedBy === 'npc'
-      );
-      
+      const npcCell = await findCellByNpcInstanceId(mapDoc, defenderNpcInstanceId, actualDefenderNpcSlug);
       if (!npcCell) {
         throw new Error(`NPC instance ${defenderNpcInstanceId} not found on map`);
       }

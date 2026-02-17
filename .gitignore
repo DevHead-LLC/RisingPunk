@@ -39,3 +39,10 @@ current-task.md
 .DS_Store
 
 /deployments
+
+# Server one-off / run-as-needed scripts (not part of production runtime)
+server/scripts/
+server/scripts/replaceForests.ts
+server/scripts/replaceMountains.ts
+server/scripts/replacePlainTiles.ts
+server/scripts/clearOrphanedMapUsers.ts
