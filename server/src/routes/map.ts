@@ -444,9 +444,12 @@ router.get('/:name', async (req: Request, res: Response) => {
     const gridSizeVal = docAny.gridSize ?? 500;
     const validGridSize = gridSizeVal === 50 || gridSizeVal === 500;
     const isExpandedMap = gridSizeVal === 500;
-    const needsMigration = !validGridSize || (!isExpandedMap && (!docAny.version || docAny.version < 2));
+    const needsVersionBump = !docAny.version || docAny.version < 2;
+    // Bugbot: expanded maps with version < 2 must be reachable for version-only update; invalid gridSize or 50×50 with old version → delete/recreate.
+    const needsMigration = !validGridSize || needsVersionBump;
     if (needsMigration) {
       if (isExpandedMap) {
+        // Only set version; never delete/recreate a 500×500 map.
         await MapModel.updateOne({ _id: docAny._id }, { $set: { version: 2, lastUpdated: new Date() } });
         mapDoc = (await MapModel.findOne({ name })) as any;
       } else {

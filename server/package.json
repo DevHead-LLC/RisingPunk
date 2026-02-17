@@ -14,7 +14,6 @@
     "backup:guide": "node scripts/backupRestore.js",
     "update:npc": "ts-node scripts/updateNPCs.ts",
     "update:npc-spreadsheet": "ts-node scripts/updateNpcCollectionFromSpreadsheet.ts",
-    "script:clear-orphaned-map-users": "ts-node scripts/clearOrphanedMapUsers.ts",
     "script:grandfather-research": "ts-node scripts/grandfatherResearchUnlocks.ts",
     "script:grandfather-research:dry": "DRY_RUN=1 ts-node scripts/grandfatherResearchUnlocks.ts",
     "script:setup-roads": "ts-node scripts/setupRoads.ts",
