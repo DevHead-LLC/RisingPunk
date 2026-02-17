@@ -12,23 +12,25 @@ export type CellData = {
 
 export type GridData = CellData[][];
 
+/** Sparse grid: rows may be null until loaded (avoids 250K cells at startup; Bugbot: 500×500 memory bloat). */
+export type SparseGridData = (CellData[] | null)[];
+
+/** Sparse fog: rows may be null until revealed. */
+export type SparseFogData = (boolean[] | null)[];
+
 export interface MapState {
-  grid: GridData;
+  grid: GridData | SparseGridData;
   playerPosition: { x: number; y: number };
-  fog: boolean[][];
+  fog: boolean[][] | SparseFogData;
   loading: boolean;
 }
 
 /** Default grid size when map is expanded (500×500). Client uses this until API returns grid/gridSize. */
 const DEFAULT_GRID_SIZE = 500;
 
-const initialFog = Array(DEFAULT_GRID_SIZE).fill(null).map(() => Array(DEFAULT_GRID_SIZE).fill(true));
-const initialGrid: GridData = Array(DEFAULT_GRID_SIZE).fill(null).map(() =>
-  Array(DEFAULT_GRID_SIZE).fill(null).map((): CellData => ({
-    terrain: 'plain',
-    entity: 'empty',
-  }))
-);
+// Bugbot: Avoid 250K CellData + 250K booleans at module load; use sparse arrays, allocate rows on demand (merge/reveal).
+const initialFog: SparseFogData = Array(DEFAULT_GRID_SIZE).fill(null);
+const initialGrid: SparseGridData = Array(DEFAULT_GRID_SIZE).fill(null);
 
 const initialState: MapState = {
   grid: initialGrid,
@@ -41,7 +43,7 @@ export const mapSlice = createSlice({
   name: 'map',
   initialState,
   reducers: {
-    setGrid: (state, action: PayloadAction<GridData>) => {
+    setGrid: (state, action: PayloadAction<GridData | SparseGridData>) => {
       state.grid = action.payload;
     },
     setPlayerPosition: (state, action: PayloadAction<{ x: number; y: number }>) => {
@@ -50,12 +52,14 @@ export const mapSlice = createSlice({
     revealFog: (state, action: PayloadAction<{ x: number; y: number; radius: number }>) => {
       const { x, y, radius } = action.payload;
       const size = state.grid?.length ?? DEFAULT_GRID_SIZE;
+      const fog = state.fog as SparseFogData;
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
           const nx = x + dx;
           const ny = y + dy;
           if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
-            state.fog[ny][nx] = false;
+            if (!fog[ny]) fog[ny] = Array(size).fill(true);
+            fog[ny]![nx] = false;
           }
         }
       }
@@ -67,14 +71,15 @@ export const mapSlice = createSlice({
     clearPlayerCellsByUserIds: (state, action: PayloadAction<string[]>) => {
       const userIdsToRemove = new Set(action.payload.map((id) => String(id ?? '').trim()).filter(Boolean));
       if (userIdsToRemove.size === 0) return;
-      for (let y = 0; y < state.grid.length; y++) {
-        const row = state.grid[y];
+      const grid = state.grid as SparseGridData;
+      for (let y = 0; y < grid.length; y++) {
+        const row = grid[y];
         if (!row) continue;
         for (let x = 0; x < row.length; x++) {
           const cell = row[x] as CellData & { userId?: unknown };
           const cellUserId = cell?.userId != null ? String(cell.userId).trim() : '';
           if (cellUserId && userIdsToRemove.has(cellUserId)) {
-            state.grid[y][x] = {
+            row[x] = {
               terrain: cell.terrain,
               entity: 'empty',
             };

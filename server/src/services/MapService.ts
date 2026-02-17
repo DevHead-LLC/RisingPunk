@@ -84,14 +84,41 @@ export class MapService {
         userId: c.userId || null,
       };
     });
-    console.log('[MapService.generateMap] inserting map', name, 'with', plainCells.length, 'cells');
-    await Map.collection.insertOne({
+
+    // Bugbot: GRID_SIZE 500 → 250K cells; embedding in one Map doc would exceed MongoDB 16MB BSON limit.
+    // Insert Map doc without cells, then bulk-insert cells into MapCell collection (used when gridSize === 500).
+    const mapResult = await Map.collection.insertOne({
       name,
       gridSize: this.GRID_SIZE,
-      cells: plainCells,
+      cells: [],
       version: 2,
       lastUpdated: new Date(),
     });
+    const mapId = mapResult.insertedId;
+    if (!mapId) {
+      throw new Error('[MapService.generateMap] Map insert did not return insertedId');
+    }
+
+    const BULK_CHUNK_SIZE = 10_000;
+    for (let i = 0; i < plainCells.length; i += BULK_CHUNK_SIZE) {
+      const chunk = plainCells.slice(i, i + BULK_CHUNK_SIZE);
+      const mapCellDocs = chunk.map((c) => ({
+        mapId,
+        x: c.x,
+        y: c.y,
+        terrain: c.terrain,
+        isActive: c.isActive,
+        isOccupied: c.isOccupied,
+        canBeOccupied: c.canBeOccupied,
+        occupiedBy: c.occupiedBy,
+        entityName: c.entityName,
+        npcSlug: c.npcSlug,
+        npcInstanceId: c.npcInstanceId,
+        userId: c.userId,
+      }));
+      await MapCell.collection.insertMany(mapCellDocs);
+    }
+    console.log('[MapService.generateMap] inserted map', name, 'with', plainCells.length, 'cells in MapCell collection');
     return Map.findOne({ name });
   }
 

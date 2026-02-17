@@ -192,7 +192,9 @@ export async function clearYouMarkersForUser(
 
 /** Place a user's house on a random valid empty cell. Returns position or null if map full.
  * For 500×500 (mapcells): samples from entire map (no x,y bounds) so new users spread across 0..499.
- * Existing users are unaffected (findHouseForUser returns their house; placement only when none). */
+ * Existing users are unaffected (findHouseForUser returns their house; placement only when none).
+ * Bugbot: MapCells path uses a transaction so we atomically (1) clear any existing house for this user,
+ * (2) pick a random empty cell, (3) updateOne only if cell still empty (guards against duplicate house + double-place). */
 export async function placeUserHouse(
   mapDoc: any,
   userId: mongoose.Types.ObjectId,
@@ -203,32 +205,67 @@ export async function placeUserHouse(
   if (!mapId) return null;
 
   if (usesMapCells(mapDoc)) {
-    const valid = await MapCell.aggregate([
-      {
-        $match: {
+    const session = await mongoose.startSession();
+    try {
+      return await session.withTransaction(async (): Promise<{ x: number; y: number } | null> => {
+        // (1) Atomic guard: ensure user has at most one house (clear any existing)
+        await MapCell.updateMany(
+          { mapId, userId, occupiedBy: 'player' },
+          {
+            $set: {
+              isOccupied: false,
+              occupiedBy: 'none',
+              entityName: '',
+              userId: null,
+            },
+          },
+          { session }
+        );
+        const terrainFilter = { $nin: ['water', 'mountain', 'road'] as const };
+        const emptyCellFilter = {
           mapId,
           isOccupied: false,
           canBeOccupied: true,
-          terrain: { $nin: ['water', 'mountain', 'road'] },
-        },
-      },
-      { $sample: { size: 1 } },
-      { $project: { x: 1, y: 1 } },
-    ]);
-    if (valid.length === 0) return null;
-    const { x, y } = valid[0];
-    await MapCell.updateOne(
-      { mapId, x, y },
-      {
-        $set: {
-          isOccupied: true,
-          occupiedBy: 'player',
-          entityName: handle,
-          userId,
-        },
-      }
-    );
-    return { x, y };
+          terrain: terrainFilter,
+        };
+        const maxTries = 5;
+        for (let tryCount = 0; tryCount < maxTries; tryCount++) {
+          // (2) Sample one valid empty cell (within transaction)
+          const valid = await MapCell.aggregate([
+            { $match: emptyCellFilter },
+            { $sample: { size: 1 } },
+            { $project: { x: 1, y: 1 } },
+          ]).session(session);
+          if (valid.length === 0) return null;
+          const { x, y } = valid[0];
+          // (3) Update only if cell still empty (atomic; prevents overwriting another placement)
+          const res = await MapCell.updateOne(
+            {
+              mapId,
+              x,
+              y,
+              isOccupied: false,
+              canBeOccupied: true,
+              terrain: terrainFilter,
+            },
+            {
+              $set: {
+                isOccupied: true,
+                occupiedBy: 'player',
+                entityName: handle,
+                userId,
+              },
+            },
+            { session }
+          );
+          if (res.modifiedCount === 1) return { x, y };
+          // Cell was taken by a concurrent request; retry with new sample
+        }
+        return null;
+      });
+    } finally {
+      await session.endSession();
+    }
   }
 
   const cells: any[] = (mapDoc as any).cells || [];

@@ -211,10 +211,13 @@ const getCellsToCheck = (
   return cells;
 };
 
+/** Empty cell used when allocating new rows (Bugbot: sparse merge avoids 500×500 copy). */
+const EMPTY_CELL = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
+
 /**
  * Merge grid data from new grid into current grid for a specific viewport.
- * Supports (1) viewport-sized newGrid: newGrid[ry][rx] = cell at (viewport.x1+rx, viewport.y1+ry);
- * (2) full-size newGrid: newGrid[y][x] = cell at (x, y).
+ * Returns a sparse grid: only viewport rows are allocated/copied to avoid 250K copy on each pan (Bugbot).
+ * Supports (1) viewport-sized newGrid; (2) full-size newGrid.
  */
 const mergeGridData = (
   currentGrid: any[][],
@@ -222,25 +225,30 @@ const mergeGridData = (
   viewport: { x1: number; y1: number; x2: number; y2: number },
   gridSize: number
 ): any[][] => {
-  const mergedGrid = (currentGrid.length > 0 ? currentGrid : Array.from({ length: gridSize }, () =>
-    Array.from({ length: gridSize }, () => ({ terrain: 'plain' as TerrainType, entity: 'empty' as EntityType }))
-  )).map(row => row ? [...row] : []);
-
   const viewportH = viewport.y2 - viewport.y1 + 1;
   const viewportW = viewport.x2 - viewport.x1 + 1;
   const isViewportSized = newGrid.length === viewportH && (newGrid[0]?.length ?? 0) === viewportW;
 
+  // Sparse result: length gridSize, only viewport rows allocated; others preserve currentGrid reference or null.
+  const mergedGrid: any[][] = Array.from({ length: gridSize }, (_, y) => {
+    if (y >= viewport.y1 && y <= viewport.y2) {
+      const existingRow = currentGrid[y];
+      return existingRow
+        ? [...existingRow]
+        : Array.from({ length: gridSize }, () => ({ ...EMPTY_CELL }));
+    }
+    return currentGrid[y] ?? null;
+  });
+
   for (let y = viewport.y1; y <= viewport.y2; y++) {
-    if (!mergedGrid[y]) mergedGrid[y] = [];
+    const row = mergedGrid[y];
+    if (!row) continue;
     for (let x = viewport.x1; x <= viewport.x2; x++) {
       const cell = isViewportSized
         ? newGrid[y - viewport.y1]?.[x - viewport.x1]
         : newGrid[y]?.[x];
       if (cell) {
-        if (!mergedGrid[y][x]) {
-          mergedGrid[y][x] = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityType };
-        }
-        mergedGrid[y][x] = { ...mergedGrid[y][x], ...cell };
+        row[x] = row[x] ? { ...row[x], ...cell } : { ...EMPTY_CELL, ...cell };
       }
     }
   }
