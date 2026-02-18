@@ -30,6 +30,11 @@ const MapCellSchema = new mongoose.Schema({
 
 MapCellSchema.index({ mapId: 1, x: 1, y: 1 }, { unique: true });
 MapCellSchema.index({ mapId: 1, userId: 1 }, { sparse: true });
+// Bugbot: At most one house per user per map; prevents concurrent placeUserHouse from creating duplicate houses (snapshot isolation would otherwise let both clear then both place).
+MapCellSchema.index(
+  { mapId: 1, userId: 1 },
+  { unique: true, partialFilterExpression: { occupiedBy: 'player' } }
+);
 // Bugbot: Index for clearUserFromMapCells and updatePlayerHandleInMapCells (query by userId only); sparse since many cells have userId null.
 MapCellSchema.index({ userId: 1 }, { sparse: true });
 // Bugbot: Index for findCellByNpcInstanceId and clearNpcInstanceFromMapCell (query by mapId + npcInstanceId); avoids collection scan on 250K docs.

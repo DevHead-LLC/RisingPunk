@@ -196,8 +196,9 @@ export async function clearYouMarkersForUser(
  * For 500×500 (mapcells): samples from entire map (no x,y bounds) so new users spread across 0..499.
  * Existing users are unaffected (findHouseForUser returns their house; placement only when none).
  * Bugbot: MapCells path uses a transaction so we atomically (1) clear any existing house for this user,
- * (2) pick a random empty cell, (3) updateOne only if cell still empty (guards against duplicate house + double-place).
- * Bugbot: If placement fails (no empty cells or all retries taken), throw so the transaction aborts and the clear is rolled back; never commit having deleted the user's house without placing a new one. */
+ * (2) pick a random empty cell, (3) updateOne only if cell still empty. A partial unique index (mapId, userId) where occupiedBy='player'
+ * enforces at most one house per user; concurrent transactions cause duplicate key on the second commit — we catch it and return findHouseForUser so the losing request gets the winner's house.
+ * If placement fails (no empty cells or all retries taken), throw so the transaction aborts and the clear is rolled back; never commit having deleted the user's house without placing a new one. */
 export async function placeUserHouse(
   mapDoc: any,
   userId: mongoose.Types.ObjectId,
@@ -211,69 +212,78 @@ export async function placeUserHouse(
   if (usesMapCells(mapDoc)) {
     const session = await mongoose.startSession();
     try {
-      return await session.withTransaction(async (): Promise<{ x: number; y: number } | null> => {
-        // (1) Atomic guard: ensure user has at most one house (clear any existing)
-        await MapCell.updateMany(
-          { mapId, userId, occupiedBy: 'player' },
-          {
-            $set: {
-              isOccupied: false,
-              occupiedBy: 'none',
-              entityName: '',
-              userId: null,
-            },
-          },
-          { session }
-        );
-        const terrainFilter = { $nin: ['water', 'mountain', 'road'] as const };
-        const emptyCellFilter = {
-          mapId,
-          isOccupied: false,
-          canBeOccupied: true,
-          terrain: terrainFilter,
-        };
-        const maxTries = 5;
-        const emptySampleSize = 1000;
-        for (let tryCount = 0; tryCount < maxTries; tryCount++) {
-          // (2) Get empty cells via $match + $sort by $rand + $limit (Bugbot: $sample can miss uncommitted writes; $match sees snapshot. Sort by $rand so we don't cluster in first columns per index order.)
-          const valid = await MapCell.aggregate([
-            { $match: emptyCellFilter },
-            { $set: { _r: { $rand: {} } } },
-            { $sort: { _r: 1 } },
-            { $limit: emptySampleSize },
-            { $project: { x: 1, y: 1 } },
-          ])
-            .session(session)
-            .exec();
-          if (valid.length === 0) {
-            throw new Error('placeUserHouse: no empty cells; transaction aborted to preserve existing house');
-          }
-          const { x, y } = valid[Math.floor(Math.random() * valid.length)];
-          // (3) Update only if cell still empty (atomic; prevents overwriting another placement)
-          const res = await MapCell.updateOne(
-            {
-              mapId,
-              x,
-              y,
-              isOccupied: false,
-              canBeOccupied: true,
-              terrain: terrainFilter,
-            },
+      try {
+        return await session.withTransaction(async (): Promise<{ x: number; y: number } | null> => {
+          // (1) Clear any existing house for this user (in this transaction's snapshot)
+          await MapCell.updateMany(
+            { mapId, userId, occupiedBy: 'player' },
             {
               $set: {
-                isOccupied: true,
-                occupiedBy: 'player',
-                entityName: handle,
-                userId,
+                isOccupied: false,
+                occupiedBy: 'none',
+                entityName: '',
+                userId: null,
               },
             },
             { session }
           );
-          if (res.modifiedCount === 1) return { x, y };
-          // Cell was taken by a concurrent request; retry with new sample
+          const terrainFilter = { $nin: ['water', 'mountain', 'road'] as const };
+          const emptyCellFilter = {
+            mapId,
+            isOccupied: false,
+            canBeOccupied: true,
+            terrain: terrainFilter,
+          };
+          const maxTries = 5;
+          const emptySampleSize = 1000;
+          for (let tryCount = 0; tryCount < maxTries; tryCount++) {
+            // (2) Get empty cells via $match + $sort by $rand + $limit (Bugbot: $sample can miss uncommitted writes; $match sees snapshot. Sort by $rand so we don't cluster in first columns per index order.)
+            const valid = await MapCell.aggregate([
+              { $match: emptyCellFilter },
+              { $set: { _r: { $rand: {} } } },
+              { $sort: { _r: 1 } },
+              { $limit: emptySampleSize },
+              { $project: { x: 1, y: 1 } },
+            ])
+              .session(session)
+              .exec();
+            if (valid.length === 0) {
+              throw new Error('placeUserHouse: no empty cells; transaction aborted to preserve existing house');
+            }
+            const { x, y } = valid[Math.floor(Math.random() * valid.length)];
+            // (3) Update only if cell still empty (atomic). Partial unique index (mapId, userId) where occupiedBy='player' causes duplicate key if another transaction already placed for this user (Bugbot: atomic duplicate-house guard).
+            const res = await MapCell.updateOne(
+              {
+                mapId,
+                x,
+                y,
+                isOccupied: false,
+                canBeOccupied: true,
+                terrain: terrainFilter,
+              },
+              {
+                $set: {
+                  isOccupied: true,
+                  occupiedBy: 'player',
+                  entityName: handle,
+                  userId,
+                },
+              },
+              { session }
+            );
+            if (res.modifiedCount === 1) return { x, y };
+            // Cell was taken by a concurrent request; retry with new sample
+          }
+          throw new Error('placeUserHouse: could not place after max attempts; transaction aborted to preserve existing house');
+        });
+      } catch (err: any) {
+        // Duplicate key (11000): another request placed a house for this user; return that house so caller gets consistent result (Bugbot: MapCell duplicate-house guard).
+        if (err?.code === 11000 || err?.codeName === 'DuplicateKey') {
+          const house = await findHouseForUser(mapDoc, userId);
+          if (house) return house;
         }
-        throw new Error('placeUserHouse: could not place after max attempts; transaction aborted to preserve existing house');
-      });
+        throw err;
+      }
     } finally {
       await session.endSession();
     }

@@ -2140,7 +2140,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         }
       });
     }
-  }, [mapData, isLoading, dispatch, separateStaticAndDynamicData, gridSize]);
+  // Bugbot: Omit gridSize from deps to avoid double-processing; effect dispatches setMapGridSize so gridSize (mapGridSize ?? ...) changes and would re-trigger. gridSize only used as fallback in fullMapSize; server always sends gridSize.
+  }, [mapData, isLoading, dispatch, separateStaticAndDynamicData]);
   
   // Phase 6: Process panning viewport data (minimal: terrain + images only, skip details)
   // Track processed viewport to prevent infinite loops
