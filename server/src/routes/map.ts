@@ -418,13 +418,16 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
     }
 
     // Bugbot: For MapCell maps, clear+set in one transaction so concurrent position updates cannot leave two YOU markers or overwrite without detection.
+    // Bugbot: If setPlayerPosition returns false (e.g. cell taken concurrently), throw so the transaction aborts; otherwise we would commit clearYouMarkersForUser and leave the user with no YOU marker.
     let updated: boolean;
     if (usesMapCells(mapDoc)) {
       const session = await mongoose.startSession();
       try {
         updated = await session.withTransaction(async () => {
           await clearYouMarkersForUser(mapDoc, authUserId, session);
-          return await setPlayerPosition(mapDoc, x, y, authUserId, 'YOU', session);
+          const ok = await setPlayerPosition(mapDoc, x, y, authUserId, 'YOU', session);
+          if (!ok) throw new Error('Failed to update position');
+          return true;
         });
       } finally {
         await session.endSession();
