@@ -2131,8 +2131,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           if (mapData.gridSize != null) dispatch(setMapGridSize(mapData.gridSize));
           // Bug Fix: Update gridRef immediately to prevent race conditions
           gridRef.current = mapData.grid;
-          // Phase 5 Fix: Initialize last fetched viewport to full map bounds
-          lastFetchedViewportRef.current = { x1: 0, y1: 0, x2: gridSize - 1, y2: gridSize - 1 };
+          // Phase 5 Fix: Initialize last fetched viewport to full map bounds (Bugbot: use mapData.gridSize so 50×50 gets 0-49; closure gridSize is still 500 until Redux updates).
+          const fullMapSize = mapData.gridSize ?? gridSize;
+          lastFetchedViewportRef.current = { x1: 0, y1: 0, x2: fullMapSize - 1, y2: fullMapSize - 1 };
         }
       });
     }
