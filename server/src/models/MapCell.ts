@@ -30,10 +30,10 @@ const MapCellSchema = new mongoose.Schema({
 
 MapCellSchema.index({ mapId: 1, x: 1, y: 1 }, { unique: true });
 MapCellSchema.index({ mapId: 1, userId: 1 }, { sparse: true });
-// Bugbot: At most one house per user per map; prevents concurrent placeUserHouse from creating duplicate houses (snapshot isolation would otherwise let both clear then both place).
+// Bugbot: At most one house per user per map (exclude YOU marker so setPlayerPosition can set occupiedBy: 'player' on a second cell).
 MapCellSchema.index(
   { mapId: 1, userId: 1 },
-  { unique: true, partialFilterExpression: { occupiedBy: 'player' } }
+  { unique: true, partialFilterExpression: { occupiedBy: 'player', entityName: { $ne: 'YOU' } } }
 );
 // Bugbot: Index for clearUserFromMapCells and updatePlayerHandleInMapCells (query by userId only); sparse since many cells have userId null.
 MapCellSchema.index({ userId: 1 }, { sparse: true });
