@@ -14,7 +14,7 @@ import { WorldChatIconButton } from '../components/hackMap/WorldChatIconButton';
 import { WorldChatModal } from '../components/hackMap/WorldChatModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
-import { setGrid, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
+import { setGrid, setMapGridSize, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
 import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
@@ -223,6 +223,7 @@ const EMPTY_CELL = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityT
  * Returns a sparse grid: only viewport rows are allocated/copied to avoid 250K copy on each pan (Bugbot).
  * Supports (1) viewport-sized newGrid; (2) full-size newGrid.
  * Bugbot: Use effective size >= currentGrid.length so we never discard rows when gridSize is stale or wrong.
+ * Sparse contract: result has length effectiveGridSize but only rows in [v.y1, v.y2] are allocated; other rows are currentGrid[y] ?? null. Any code that indexes by y must null-check the row (e.g. if (!row) continue).
  */
 const mergeGridData = (
   currentGrid: any[][],
@@ -464,6 +465,7 @@ const panningTileMemoComparison = <T extends {
 export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
+  const mapGridSize = useAppSelector((state) => state.map.mapGridSize);
   const loading = useAppSelector((state) => state.map.loading);
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
   const currentUserId = useAppSelector((state) => state.auth.user?._id);
@@ -1103,7 +1105,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       const finalY = boundsReady.value ? Math.min(maxY.value, Math.max(minY.value, startY.value + (g.translationY ?? 0))) : startY.value + (g.translationY ?? 0);
       runOnJS(panEndSchedule)(finalX, finalY);
     });
-  const gridSize = grid.length || 500;
+  // Bugbot: Use server-provided mapGridSize for bounds when set; else grid.length inflates pan for 50×50 (initial grid is 500 rows).
+  const gridSize = mapGridSize ?? (grid?.length ? grid.length : 500);
   const totalSize = gridSize * CELL_SIZE;
   
   // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
@@ -1792,6 +1795,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           gridSize
         );
         dispatch(setGrid(mergedGrid));
+        if (entityUpdateViewportData.gridSize != null) dispatch(setMapGridSize(entityUpdateViewportData.gridSize));
         // Bug Fix: Update gridRef immediately to prevent race conditions
         // If multiple effects run in the same cycle, they need to read the updated value
         gridRef.current = mergedGrid;
@@ -2110,6 +2114,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             );
             
             dispatch(setGrid(mergedGrid));
+            if (mapData.gridSize != null) dispatch(setMapGridSize(mapData.gridSize));
             // Bug Fix: Update gridRef immediately to prevent race conditions
             // If multiple effects run in the same cycle, they need to read the updated value
             gridRef.current = mergedGrid;
@@ -2119,6 +2124,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         } else {
           // Full map request - replace entire grid
           dispatch(setGrid(mapData.grid));
+          if (mapData.gridSize != null) dispatch(setMapGridSize(mapData.gridSize));
           // Bug Fix: Update gridRef immediately to prevent race conditions
           gridRef.current = mapData.grid;
           // Phase 5 Fix: Initialize last fetched viewport to full map bounds
@@ -2211,6 +2217,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           fullGridSize
         );
         dispatch(setGrid(mergedGrid));
+        if (panningViewportData.gridSize != null) dispatch(setMapGridSize(panningViewportData.gridSize));
         // Bug Fix: Update gridRef immediately to prevent race conditions
         // If multiple effects run in the same cycle, they need to read the updated value
         gridRef.current = mergedGrid;
@@ -2374,6 +2381,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           fullGridSize
         );
         dispatch(setGrid(mergedGrid));
+        if (stoppedViewportData.gridSize != null) dispatch(setMapGridSize(stoppedViewportData.gridSize));
         // Bug Fix: Update gridRef immediately to prevent race conditions
         // If multiple effects run in the same cycle, they need to read the updated value
         gridRef.current = mergedGrid;

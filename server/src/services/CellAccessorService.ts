@@ -196,14 +196,16 @@ export async function clearYouMarkersForUser(
  * For 500×500 (mapcells): samples from entire map (no x,y bounds) so new users spread across 0..499.
  * Existing users are unaffected (findHouseForUser returns their house; placement only when none).
  * Bugbot: MapCells path uses a transaction so we atomically (1) clear any existing house for this user,
- * (2) pick a random empty cell, (3) updateOne only if cell still empty (guards against duplicate house + double-place). */
+ * (2) pick a random empty cell, (3) updateOne only if cell still empty (guards against duplicate house + double-place).
+ * Bugbot: If placement fails (no empty cells or all retries taken), throw so the transaction aborts and the clear is rolled back; never commit having deleted the user's house without placing a new one. */
 export async function placeUserHouse(
   mapDoc: any,
   userId: mongoose.Types.ObjectId,
   handle: string
 ): Promise<{ x: number; y: number } | null> {
   const mapId = mapDoc._id;
-  const gridSize = mapDoc.gridSize ?? 50;
+  // Bugbot: Use 500 fallback to match new standard; else a 500×500 map without gridSize would place users only in 0..49 (inconsistent with route/MapCell path).
+  const gridSize = mapDoc.gridSize ?? GRID_SIZE_USES_MAPCELLS;
   if (!mapId) return null;
 
   if (usesMapCells(mapDoc)) {
@@ -231,17 +233,20 @@ export async function placeUserHouse(
           terrain: terrainFilter,
         };
         const maxTries = 5;
+        const emptySampleSize = 1000;
         for (let tryCount = 0; tryCount < maxTries; tryCount++) {
-          // (2) Sample one valid empty cell (within transaction; Bugbot: session must be passed so aggregate sees transaction context).
+          // (2) Get empty cells via $match + $limit (Bugbot: $sample can miss uncommitted transaction writes; $match sees snapshot, then random pick in app).
           const valid = await MapCell.aggregate([
             { $match: emptyCellFilter },
-            { $sample: { size: 1 } },
+            { $limit: emptySampleSize },
             { $project: { x: 1, y: 1 } },
           ])
             .session(session)
             .exec();
-          if (valid.length === 0) return null;
-          const { x, y } = valid[0];
+          if (valid.length === 0) {
+            throw new Error('placeUserHouse: no empty cells; transaction aborted to preserve existing house');
+          }
+          const { x, y } = valid[Math.floor(Math.random() * valid.length)];
           // (3) Update only if cell still empty (atomic; prevents overwriting another placement)
           const res = await MapCell.updateOne(
             {
@@ -265,7 +270,7 @@ export async function placeUserHouse(
           if (res.modifiedCount === 1) return { x, y };
           // Cell was taken by a concurrent request; retry with new sample
         }
-        return null;
+        throw new Error('placeUserHouse: could not place after max attempts; transaction aborted to preserve existing house');
       });
     } finally {
       await session.endSession();
@@ -442,20 +447,24 @@ export async function placeNpcOnRandomCell(
   if (!mapId) return false;
 
   if (usesMapCells(mapDoc)) {
+    // Bugbot: Require userId null so we never select/overwrite cells with orphaned player data (isOccupied: false but userId set).
     const emptyCellFilter = {
       mapId,
       isOccupied: false,
       canBeOccupied: true,
       terrain: { $nin: [...IMPASSABLE_TERRAIN] } as any,
+      userId: null,
     };
+    const emptySampleSize = 1000;
     for (let attempt = 0; attempt < NPC_PLACEMENT_MAX_ATTEMPTS; attempt++) {
+      // Bugbot: Use $match + $limit + random pick instead of $sample so transaction snapshot is respected (placeUserHouse); consistent here.
       const valid = await MapCell.aggregate([
         { $match: emptyCellFilter },
-        { $sample: { size: 1 } },
+        { $limit: emptySampleSize },
         { $project: { x: 1, y: 1 } },
       ]);
       if (valid.length === 0) return false;
-      const { x, y } = valid[0];
+      const { x, y } = valid[Math.floor(Math.random() * valid.length)];
       const res = await MapCell.updateOne(
         {
           mapId,
@@ -464,6 +473,7 @@ export async function placeNpcOnRandomCell(
           isOccupied: false,
           canBeOccupied: true,
           terrain: { $nin: IMPASSABLE_TERRAIN },
+          userId: null,
         },
         {
           $set: {
@@ -511,7 +521,8 @@ export async function findCellByNpcInstanceId(
   return c ? { x: c.x, y: c.y } : null;
 }
 
-/** Clear all map cells occupied by this user (MapCell collection only). Returns count updated. */
+/** Clear all map cells occupied by this user (MapCell collection only). Returns count updated.
+ * Used by AccountDeletionService on account delete. Bugbot: For one-off orphan cleanup (users deleted outside app), call for each userId present in MapCell but not in User collection; no standalone npm script (see taskItems/in-progress.md). */
 export async function clearUserFromMapCells(
   userId: mongoose.Types.ObjectId
 ): Promise<number> {

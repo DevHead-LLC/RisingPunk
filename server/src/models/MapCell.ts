@@ -30,5 +30,9 @@ const MapCellSchema = new mongoose.Schema({
 
 MapCellSchema.index({ mapId: 1, x: 1, y: 1 }, { unique: true });
 MapCellSchema.index({ mapId: 1, userId: 1 }, { sparse: true });
+// Bugbot: Index for clearUserFromMapCells and updatePlayerHandleInMapCells (query by userId only); sparse since many cells have userId null.
+MapCellSchema.index({ userId: 1 }, { sparse: true });
+// Bugbot: Index for findCellByNpcInstanceId and clearNpcInstanceFromMapCell (query by mapId + npcInstanceId); avoids collection scan on 250K docs.
+MapCellSchema.index({ mapId: 1, npcInstanceId: 1 });
 
 export const MapCell = mongoose.model('MapCell', MapCellSchema);

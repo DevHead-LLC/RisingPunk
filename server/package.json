@@ -15,9 +15,7 @@
     "update:npc": "ts-node scripts/updateNPCs.ts",
     "update:npc-spreadsheet": "ts-node scripts/updateNpcCollectionFromSpreadsheet.ts",
     "script:grandfather-research": "ts-node scripts/grandfatherResearchUnlocks.ts",
-    "script:grandfather-research:dry": "DRY_RUN=1 ts-node scripts/grandfatherResearchUnlocks.ts",
-    "script:setup-roads": "ts-node scripts/setupRoads.ts",
-    "script:seed-npcs-level1": "ts-node scripts/NPCs/seedNPCsLevel1.ts"
+    "script:grandfather-research:dry": "DRY_RUN=1 ts-node scripts/grandfatherResearchUnlocks.ts"
   },
   "keywords": [],
   "author": "",

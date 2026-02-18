@@ -69,12 +69,14 @@ function getDisplayLevel(userLevelAssociation: number): number {
   const sortedDbLevels = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 99];
   if (userLevelAssociation < sortedDbLevels[0]) return 1;
   if (userLevelAssociation >= sortedDbLevels[sortedDbLevels.length - 1]) return 21;
-  let prev = sortedDbLevels[0];
+  // Single pass: largest mapped level <= input, then one return (Bugbot: avoid redundant in-loop vs after-loop return).
+  // Bugbot: Post-loop return is reachable — we break out of the loop when db > input; no unreachable code.
+  let largestLeq = sortedDbLevels[0];
   for (const db of sortedDbLevels) {
-    if (db > userLevelAssociation) return mapping[prev];
-    prev = db;
+    if (db > userLevelAssociation) break;
+    largestLeq = db;
   }
-  return mapping[prev];
+  return mapping[largestLeq];
 }
 
 // Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
@@ -403,6 +405,7 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
     }
     if (target.isOccupied) {
       // Allow re-place at user's own YOU marker (clear + set same cell); otherwise cell is taken by someone else.
+      // Bugbot: Re-place at same cell works for MapCell: we clear YOU markers first (in same transaction), then setPlayerPosition runs so the cell is already empty when updateOne runs.
       const isOwnYouMarker =
         target.occupiedBy === 'player' &&
         target.entityName === 'YOU' &&
@@ -483,20 +486,27 @@ router.get('/:name', async (req: Request, res: Response) => {
     const validGridSize = docAny.gridSize === 50 || docAny.gridSize === 500;
     const isExpandedMap = docAny.gridSize === 500;
     const needsVersionBump = !docAny.version || docAny.version < 2;
-    // Bugbot: expanded maps with version < 2 must be reachable for version-only update; invalid gridSize or 50×50 with old version → delete/recreate.
+    // Bugbot: Handle expanded map first so version-only path is clearly reachable; then needsMigration is only for delete/recreate (no fall-through confusion).
     const needsMigration = !validGridSize || needsVersionBump;
-    if (needsMigration) {
-      if (isExpandedMap) {
-        // Only set version and gridSize; never delete/recreate a 500×500 map. Persist gridSize so cell access and route use same value (Bugbot: avoid split-brain).
-        await MapModel.updateOne(
-          { _id: docAny._id },
-          { $set: { version: 2, gridSize: 500, lastUpdated: new Date() } }
-        );
-        mapDoc = (await MapModel.findOne({ name })) as any;
-      } else {
-        // Bugbot: Delete MapCell documents for this map before deleting the map doc to avoid orphaned cells (e.g. if map was ever 500×500 then re-migrated).
-        await MapCell.deleteMany({ mapId: docAny._id });
-        await MapModel.deleteOne({ _id: docAny._id });
+    if (isExpandedMap && needsVersionBump) {
+      // Only set version and gridSize; never delete/recreate a 500×500 map. Persist gridSize so cell access and route use same value (Bugbot: avoid split-brain).
+      await MapModel.updateOne(
+        { _id: docAny._id },
+        { $set: { version: 2, gridSize: 500, lastUpdated: new Date() } }
+      );
+      mapDoc = (await MapModel.findOne({ name })) as any;
+    } else if (needsMigration) {
+      // Invalid gridSize or 50×50 with old version: delete/recreate (never for 500×500; isExpandedMap handled above).
+      // Bugbot: Delete MapCell then map doc in one transaction so we never leave a zombie map (map doc without cells) if deleteOne fails.
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          await MapCell.deleteMany({ mapId: docAny._id }, { session });
+          await MapModel.deleteOne({ _id: docAny._id }, { session });
+        });
+      } finally {
+        await session.endSession();
+      }
       try {
         await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
         console.log('[map fetch] dropped legacy unique index cells.x_1_cells.y_1 (migrate path)');
@@ -506,7 +516,6 @@ router.get('/:name', async (req: Request, res: Response) => {
       if (!mapDoc) {
         res.status(500).json({ error: 'Failed to build map' });
         return;
-      }
       }
     } else if (!viewportEarly.hasViewport && !usesMapCells(mapDoc)) {
       // Full-map only (and only for embedded 50×50): validate and normalize map (dedup, cleanup, placement). Skip for mapcells (500×500) which requires viewport.
@@ -702,8 +711,10 @@ router.get('/:name', async (req: Request, res: Response) => {
     const allNPCs = await NPCService.getAllNPCs();
     const npcLevelMap = new Map<string, number>();
     for (const npc of allNPCs) {
-      if (npc.slug && npc.userLevelAssociation) {
-        npcLevelMap.set(npc.slug, getDisplayLevel(npc.userLevelAssociation));
+      // Bugbot: Only call getDisplayLevel when userLevelAssociation is a valid number; undefined/null/NaN would yield wrong display level (e.g. 21).
+      const level = npc.userLevelAssociation;
+      if (npc.slug && typeof level === 'number' && !Number.isNaN(level)) {
+        npcLevelMap.set(npc.slug, getDisplayLevel(level));
       }
     }
     const mapId = (mapDoc as any)._id;

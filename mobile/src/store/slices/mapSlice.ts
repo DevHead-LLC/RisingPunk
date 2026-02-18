@@ -20,6 +20,8 @@ export type SparseFogData = (boolean[] | null)[];
 
 export interface MapState {
   grid: GridData | SparseGridData;
+  /** Bugbot: Authoritative map size from API (50 or 500). Used for pan bounds so 50×50 maps don't use grid.length (500) and allow scrolling into empty area. */
+  mapGridSize: number | null;
   playerPosition: { x: number; y: number };
   fog: boolean[][] | SparseFogData;
   loading: boolean;
@@ -34,6 +36,7 @@ const initialGrid: SparseGridData = Array(DEFAULT_GRID_SIZE).fill(null);
 
 const initialState: MapState = {
   grid: initialGrid,
+  mapGridSize: null,
   playerPosition: { x: 0, y: 0 },
   fog: initialFog,
   loading: false,
@@ -45,6 +48,10 @@ export const mapSlice = createSlice({
   reducers: {
     setGrid: (state, action: PayloadAction<GridData | SparseGridData>) => {
       state.grid = action.payload;
+    },
+    /** Set authoritative map size from API (50 or 500) for pan bounds; avoids using grid.length when it's 500 but map is 50×50. */
+    setMapGridSize: (state, action: PayloadAction<number>) => {
+      state.mapGridSize = action.payload;
     },
     setPlayerPosition: (state, action: PayloadAction<{ x: number; y: number }>) => {
       state.playerPosition = action.payload;
@@ -92,5 +99,5 @@ export const mapSlice = createSlice({
   },
 });
 
-export const { setGrid, setPlayerPosition, revealFog, setLoading, clearPlayerCellsByUserIds, resetMap } = mapSlice.actions;
+export const { setGrid, setMapGridSize, setPlayerPosition, revealFog, setLoading, clearPlayerCellsByUserIds, resetMap } = mapSlice.actions;
 export default mapSlice.reducer;
