@@ -15,6 +15,8 @@ export interface CellData {
 
 export interface MapResponse {
   grid: CellData[][];
+  /** Full map grid size (e.g. 50 or 500). Use for pan bounds and viewport clamping. */
+  gridSize?: number;
   viewport?: {
     x1: number;
     y1: number;

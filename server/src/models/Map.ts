@@ -32,7 +32,8 @@ CellSchema.pre('save', function(next) {
 
 const MapSchema = new mongoose.Schema({
   name: { type: String, default: 'main' },
-  gridSize: { type: Number, default: 50 },
+  // Bugbot: Default 500 to match MapService.GRID_SIZE and expanded map standard; legacy 50×50 docs have gridSize 50 or undefined.
+  gridSize: { type: Number, default: 500 },
   cells: [CellSchema],
   version: { type: Number, default: 1 },
   lastUpdated: { type: Date, default: Date.now }

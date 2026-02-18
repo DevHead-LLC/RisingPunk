@@ -11,6 +11,7 @@ import { UserActivitySummary } from '../models/UserActivitySummary';
 import { Battle } from '../models/Battle';
 import { Map } from '../models/Map';
 import { Crew, ICrew } from '../models/Crew';
+import { clearUserFromMapCells } from './CellAccessorService';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 
 export interface DeletionResult {
@@ -139,13 +140,12 @@ export class AccountDeletionService {
     result: DeletionResult
   ): Promise<void> {
     try {
-      const maps = await Map.find({ 'cells.userId': userIdObjectId });
-      let totalCellsUpdated = 0;
+      let totalCellsUpdated = await clearUserFromMapCells(userIdObjectId);
 
+      const maps = await Map.find({ 'cells.userId': userIdObjectId });
       for (const map of maps) {
         const cells: any[] = (map as any).cells || [];
         let changed = false;
-
         for (const cell of cells) {
           if (cell.userId && cell.userId.toString() === userIdObjectId.toString()) {
             cell.isOccupied = false;
@@ -156,7 +156,6 @@ export class AccountDeletionService {
             totalCellsUpdated++;
           }
         }
-
         if (changed) {
           (map as any).markModified('cells');
           await (map as any).save();
