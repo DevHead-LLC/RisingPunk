@@ -232,7 +232,7 @@ const mergeGridData = (
 
   const effectiveGridSize = Math.max(gridSize, currentGrid.length || 0);
   // Bugbot: Only warn when API gridSize is larger than current grid (stale client); skip when gridSize < currentGrid.length (e.g. 50×50 map with 500-row initial sparse grid) to avoid console noise on every pan.
-  if (effectiveGridSize !== gridSize && gridSize > (currentGrid.length || 0)) {
+  if (gridSize > (currentGrid.length || 0)) {
     console.warn('[mergeGridData] gridSize', gridSize, 'larger than currentGrid.length', currentGrid.length, '; using', effectiveGridSize);
   }
 
