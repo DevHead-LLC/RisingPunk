@@ -153,10 +153,8 @@ const cleanupEmptyCells = (
   viewport: { x1: number; y1: number; x2: number; y2: number }
 ): string[] => {
   const deletedKeys: string[] = [];
-  const v = normalizeViewport(viewport);
-  const viewportH = v.y2 - v.y1 + 1;
-  const viewportW = v.x2 - v.x1 + 1;
-  const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
+  const { v, isViewportSized } = getViewportSizing(viewport, grid);
+  if (!v) return deletedKeys;
   for (let y = v.y1; y <= v.y2; y++) {
     const rowIdx = isViewportSized ? y - v.y1 : y;
     const row = grid[rowIdx];
@@ -186,10 +184,8 @@ const getCellsToCheck = (
   const cells: Array<{ x: number; y: number; cell: any }> = [];
 
   if (viewport) {
-    const v = normalizeViewport(viewport);
-    const viewportH = v.y2 - v.y1 + 1;
-    const viewportW = v.x2 - v.x1 + 1;
-    const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
+    const { v, isViewportSized } = getViewportSizing(viewport, grid);
+    if (!v) return cells;
     for (let y = v.y1; y <= v.y2; y++) {
       const rowIdx = isViewportSized ? y - v.y1 : y;
       const row = grid[rowIdx];
@@ -231,14 +227,13 @@ const mergeGridData = (
   viewport: { x1: number; y1: number; x2: number; y2: number },
   gridSize: number
 ): any[][] => {
-  const v = normalizeViewport(viewport);
-  const viewportH = v.y2 - v.y1 + 1;
-  const viewportW = v.x2 - v.x1 + 1;
-  const isViewportSized = newGrid.length === viewportH && (newGrid[0]?.length ?? 0) === viewportW;
+  const { v, isViewportSized } = getViewportSizing(viewport, newGrid);
+  if (!v) return currentGrid;
 
   const effectiveGridSize = Math.max(gridSize, currentGrid.length || 0);
-  if (effectiveGridSize !== gridSize) {
-    console.warn('[mergeGridData] gridSize', gridSize, 'smaller than currentGrid.length', currentGrid.length, '; using', effectiveGridSize);
+  // Bugbot: Only warn when API gridSize is larger than current grid (stale client); skip when gridSize < currentGrid.length (e.g. 50×50 map with 500-row initial sparse grid) to avoid console noise on every pan.
+  if (gridSize > (currentGrid.length || 0)) {
+    console.warn('[mergeGridData] gridSize', gridSize, 'larger than currentGrid.length', currentGrid.length, '; using', effectiveGridSize);
   }
 
   // Sparse result: length effectiveGridSize, only viewport rows allocated; others preserve currentGrid reference or null.
@@ -297,6 +292,19 @@ const normalizeViewport = (viewport: { x1: number; y1: number; x2: number; y2: n
   x2: Math.max(viewport.x1, viewport.x2),
   y2: Math.max(viewport.y1, viewport.y2),
 });
+
+/** Bugbot: Single source of truth for viewport normalization + viewportH/viewportW + isViewportSized; used by cleanupEmptyCells, getCellsToCheck, mergeGridData, separateStaticAndDynamicData, and initial-viewport user search. */
+const getViewportSizing = (
+  viewport: { x1: number; y1: number; x2: number; y2: number } | undefined,
+  grid: any[][]
+): { v: { x1: number; y1: number; x2: number; y2: number } | undefined; viewportH: number; viewportW: number; isViewportSized: boolean } => {
+  if (!viewport) return { v: undefined, viewportH: 0, viewportW: 0, isViewportSized: false };
+  const v = normalizeViewport(viewport);
+  const viewportH = v.y2 - v.y1 + 1;
+  const viewportW = v.x2 - v.x1 + 1;
+  const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
+  return { v, viewportH, viewportW, isViewportSized };
+};
 
 /**
  * Check if viewport has moved significantly outside the last fetched viewport
@@ -1180,11 +1188,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCheckedUserLocationRef.current = true; // Mark as checked before doing the check
     
     const viewport = initialViewportData.viewport || initialViewport;
-    const v = normalizeViewport(viewport);
     const grid = initialViewportData.grid;
-    const viewportH = v.y2 - v.y1 + 1;
-    const viewportW = v.x2 - v.x1 + 1;
-    const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
+    const { v, isViewportSized } = getViewportSizing(viewport, grid);
+    if (!v) return;
     let foundUser = false;
 
     for (let y = v.y1; y <= v.y2; y++) {
@@ -1787,12 +1793,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           return merged;
         });
         
-        // Update grid data - use ref to get latest grid value to avoid stale closures
+        // Update grid data - use response gridSize for merge (Bugbot: same pattern as mapData/panning/stopped so we use authoritative size, not stale component gridSize).
+        const fullGridSize = entityUpdateViewportData.gridSize ?? getGridSize(gridRef.current) ?? 500;
         const mergedGrid = mergeGridData(
           gridRef.current,
           entityUpdateViewportData.grid,
           viewport,
-          gridSize
+          fullGridSize
         );
         dispatch(setGrid(mergedGrid));
         if (entityUpdateViewportData.gridSize != null) dispatch(setMapGridSize(entityUpdateViewportData.gridSize));
@@ -1804,7 +1811,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clear viewport params to allow next refresh
       setEntityUpdateViewportParams(null);
     }
-  }, [entityUpdateViewportData, dispatch, gridSize]);
+  }, [entityUpdateViewportData, dispatch]);
 
   // Phase 8: Synchronized 10-second polling group
   // Phase 9: Added entity updates (NPCs, player positions, entity changes) to 10s group
@@ -1993,11 +2000,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       npcLevel?: number;
     }> = {};
     const entityDetails: Record<string, any> = {};
-    // Bugbot: Normalize viewport so reversed bounds don't yield negative viewportH/viewportW or wrong cache keys (match cleanupEmptyCells, getCellsToCheck, mergeGridData).
-    const v = viewport ? normalizeViewport(viewport) : undefined;
-    const viewportH = v ? v.y2 - v.y1 + 1 : 0;
-    const viewportW = v ? v.x2 - v.x1 + 1 : 0;
-    const isViewportSized = v && gridData.length === viewportH && (gridData[0]?.length ?? 0) === viewportW;
+    const { v, isViewportSized } = getViewportSizing(viewport, gridData);
     for (let y = 0; y < gridData.length; y++) {
       const row = gridData[y];
       if (!row) continue;

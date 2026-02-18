@@ -326,6 +326,42 @@ export class MapService {
     }
   }
 
+  /** Bugbot: Single place for NPC distribution (levels, shuffle, unique-slug-first, remaining fill); MapCell and embedded paths both use this with a placement callback. */
+  private static async runNpcDistribution(
+    distribution: { [key: number]: number },
+    npcsByLevel: { [key: number]: NPCDocument[] },
+    placeOne: (npc: NPCDocument) => Promise<boolean> | boolean
+  ): Promise<void> {
+    const levels = [1, 5, 10, 15, 20, 25, 30, 35];
+    for (const level of levels) {
+      let npcs = npcsByLevel[level] || [];
+      if (npcs.length === 0) continue;
+      const targetCount = distribution[level] || 5;
+      const minCount = Math.max(5, targetCount);
+      const shuffled = [...npcs].sort(() => Math.random() - 0.5);
+      const npcsToPlace: NPCDocument[] = [];
+      const npcTypesPlaced = new Set<string>();
+      for (const npc of shuffled) {
+        if (!npcTypesPlaced.has(npc.slug)) {
+          npcsToPlace.push(npc);
+          npcTypesPlaced.add(npc.slug);
+        }
+      }
+      const remaining = Math.max(0, minCount - npcsToPlace.length);
+      for (let i = 0; i < remaining; i++) {
+        const randomNPC = shuffled[Math.floor(Math.random() * shuffled.length)];
+        npcsToPlace.push(randomNPC);
+      }
+      for (const npc of npcsToPlace) {
+        const ok = await placeOne(npc);
+        if (!ok) {
+          console.warn('[MapService.updateNPCsOnMap] NPC placement failed after retries, skipping rest of level', { level, npcSlug: npc.slug });
+          break;
+        }
+      }
+    }
+  }
+
   static async updateNPCsOnMap(mapName: string = 'main'): Promise<void> {
     const mapDoc = await Map.findOne({ name: mapName });
     if (!mapDoc) {
@@ -364,36 +400,12 @@ export class MapService {
 
     if (usesMapCells(mapDoc)) {
       await clearNpcsFromMap(mapDoc);
-      const levels = [1, 5, 10, 15, 20, 25, 30, 35];
-      for (const level of levels) {
-        let npcs = npcsByLevel[level] || [];
-        if (npcs.length === 0) continue;
-        const targetCount = distribution[level] || 5;
-        const minCount = Math.max(5, targetCount);
-        const shuffled = [...npcs].sort(() => Math.random() - 0.5);
-        const npcsToPlace: NPCDocument[] = [];
-        const npcTypesPlaced = new Set<string>();
-        for (const npc of shuffled) {
-          if (!npcTypesPlaced.has(npc.slug)) {
-            npcsToPlace.push(npc);
-            npcTypesPlaced.add(npc.slug);
-          }
-        }
-        const remaining = Math.max(0, minCount - npcsToPlace.length);
-        for (let i = 0; i < remaining; i++) {
-          const randomNPC = shuffled[Math.floor(Math.random() * shuffled.length)];
-          npcsToPlace.push(randomNPC);
-        }
-        for (const npc of npcsToPlace) {
-          const entityName = npc.name || npc.title || 'NPC';
-          const npcInstanceId = `${npc.slug}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-          const placed = await placeNpcOnRandomCell(mapDoc, npc.slug, npcInstanceId, entityName);
-          if (!placed) {
-            console.warn('[MapService.updateNPCsOnMap] NPC placement failed after retries, skipping rest of level', { level, npcSlug: npc.slug });
-            break;
-          }
-        }
-      }
+      await MapService.runNpcDistribution(distribution, npcsByLevel, async (npc) => {
+        const entityName = npc.name || npc.title || 'NPC';
+        const npcInstanceId = `${npc.slug}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+        const placed = await placeNpcOnRandomCell(mapDoc, npc.slug, npcInstanceId, entityName);
+        return !!placed;
+      });
       return;
     }
 
@@ -427,37 +439,17 @@ export class MapService {
       return null;
     };
 
-    const levels = [1, 5, 10, 15, 20, 25, 30, 35];
-    for (const level of levels) {
-      let npcs = npcsByLevel[level] || [];
-      if (npcs.length === 0) continue;
-      const targetCount = distribution[level] || 5;
-      const minCount = Math.max(5, targetCount);
-      const shuffled = [...npcs].sort(() => Math.random() - 0.5);
-      const npcsToPlace: NPCDocument[] = [];
-      const npcTypesPlaced = new Set<string>();
-      for (const npc of shuffled) {
-        if (!npcTypesPlaced.has(npc.slug)) {
-          npcsToPlace.push(npc);
-          npcTypesPlaced.add(npc.slug);
-        }
-      }
-      const remaining = Math.max(0, minCount - npcsToPlace.length);
-      for (let i = 0; i < remaining; i++) {
-        const randomNPC = shuffled[Math.floor(Math.random() * shuffled.length)];
-        npcsToPlace.push(randomNPC);
-      }
-      for (const npc of npcsToPlace) {
-        const validCell = pickValidCell();
-        if (!validCell) break;
-        const cell = cells[validCell.index];
-        cell.isOccupied = true;
-        cell.occupiedBy = 'npc';
-        cell.entityName = npc.name || npc.title || 'NPC';
-        (cell as any).npcSlug = npc.slug;
-        (cell as any).npcInstanceId = `${npc.slug}-${validCell.x}-${validCell.y}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-      }
-    }
+    await MapService.runNpcDistribution(distribution, npcsByLevel, (npc) => {
+      const validCell = pickValidCell();
+      if (!validCell) return false;
+      const cell = cells[validCell.index];
+      cell.isOccupied = true;
+      cell.occupiedBy = 'npc';
+      cell.entityName = npc.name || npc.title || 'NPC';
+      (cell as any).npcSlug = npc.slug;
+      (cell as any).npcInstanceId = `${npc.slug}-${validCell.x}-${validCell.y}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      return true;
+    });
     (mapDoc as any).markModified('cells');
     await (mapDoc as any).save();
   }
