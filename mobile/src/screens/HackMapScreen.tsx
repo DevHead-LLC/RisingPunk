@@ -237,12 +237,13 @@ const mergeGridData = (
   }
 
   // Sparse result: length effectiveGridSize, only viewport rows allocated; others preserve currentGrid reference or null.
+  // Bugbot: New row column count must be gridSize (map width), not effectiveGridSize (row count); 50×50 map would otherwise get 500-column rows and ~450 wasted EMPTY_CELL per new row.
   const mergedGrid: any[][] = Array.from({ length: effectiveGridSize }, (_, y) => {
     if (y >= v.y1 && y <= v.y2) {
       const existingRow = currentGrid[y];
       return existingRow
         ? [...existingRow]
-        : Array.from({ length: effectiveGridSize }, () => ({ ...EMPTY_CELL }));
+        : Array.from({ length: gridSize }, () => ({ ...EMPTY_CELL }));
     }
     return currentGrid[y] ?? null;
   });
