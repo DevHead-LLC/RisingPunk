@@ -2010,6 +2010,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         if (!cell) continue;
         const globalX = isViewportSized && v ? v.x1 + x : x;
         const globalY = isViewportSized && v ? v.y1 + y : y;
+        // Bugbot: Explicit viewport-bounds filter so we never key/write cells outside viewport when viewport is provided (guards against isViewportSized heuristic wrong for viewport-sized grid).
+        if (v && (globalX < v.x1 || globalX > v.x2 || globalY < v.y1 || globalY > v.y2)) continue;
         const key = `${globalX},${globalY}`;
         terrain[key] = cell.terrain;
         if (cell.entity !== 'empty') {

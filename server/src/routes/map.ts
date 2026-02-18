@@ -66,7 +66,8 @@ function getDisplayLevel(userLevelAssociation: number): number {
   const exact = mapping[userLevelAssociation];
   if (typeof exact === 'number') return exact;
   // Bugbot: Unmapped DB levels (e.g. 37, 42) — use display level of largest mapped DB level <= input; clamp to 1–21.
-  const sortedDbLevels = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 99];
+  // Bugbot: Derive from mapping so adding/removing a level doesn't require updating a second list (single source of truth).
+  const sortedDbLevels = Object.keys(mapping).map(Number).sort((a, b) => a - b);
   if (userLevelAssociation < sortedDbLevels[0]) return 1;
   if (userLevelAssociation >= sortedDbLevels[sortedDbLevels.length - 1]) return 21;
   // Single pass: largest mapped level <= input, then one return (Bugbot: avoid redundant in-loop vs after-loop return).
