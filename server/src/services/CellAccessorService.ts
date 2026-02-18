@@ -235,9 +235,11 @@ export async function placeUserHouse(
         const maxTries = 5;
         const emptySampleSize = 1000;
         for (let tryCount = 0; tryCount < maxTries; tryCount++) {
-          // (2) Get empty cells via $match + $limit (Bugbot: $sample can miss uncommitted transaction writes; $match sees snapshot, then random pick in app).
+          // (2) Get empty cells via $match + $sort by $rand + $limit (Bugbot: $sample can miss uncommitted writes; $match sees snapshot. Sort by $rand so we don't cluster in first columns per index order.)
           const valid = await MapCell.aggregate([
             { $match: emptyCellFilter },
+            { $set: { _r: { $rand: {} } } },
+            { $sort: { _r: 1 } },
             { $limit: emptySampleSize },
             { $project: { x: 1, y: 1 } },
           ])
@@ -457,9 +459,11 @@ export async function placeNpcOnRandomCell(
     };
     const emptySampleSize = 1000;
     for (let attempt = 0; attempt < NPC_PLACEMENT_MAX_ATTEMPTS; attempt++) {
-      // Bugbot: Use $match + $limit + random pick instead of $sample so transaction snapshot is respected (placeUserHouse); consistent here.
+      // Bugbot: $match + $sort by $rand + $limit so we don't cluster in first columns (index order); random pick in app for final cell.
       const valid = await MapCell.aggregate([
         { $match: emptyCellFilter },
+        { $set: { _r: { $rand: {} } } },
+        { $sort: { _r: 1 } },
         { $limit: emptySampleSize },
         { $project: { x: 1, y: 1 } },
       ]);
