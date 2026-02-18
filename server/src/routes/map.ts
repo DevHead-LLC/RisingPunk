@@ -452,8 +452,11 @@ router.get('/:name', async (req: Request, res: Response) => {
     const needsMigration = !validGridSize || needsVersionBump;
     if (needsMigration) {
       if (isExpandedMap) {
-        // Only set version; never delete/recreate a 500×500 map.
-        await MapModel.updateOne({ _id: docAny._id }, { $set: { version: 2, lastUpdated: new Date() } });
+        // Only set version and gridSize; never delete/recreate a 500×500 map. Persist gridSize so cell access and route use same value (Bugbot: avoid split-brain).
+        await MapModel.updateOne(
+          { _id: docAny._id },
+          { $set: { version: 2, gridSize: 500, lastUpdated: new Date() } }
+        );
         mapDoc = (await MapModel.findOne({ name })) as any;
       } else {
         await MapModel.deleteOne({ _id: docAny._id });
@@ -585,7 +588,7 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     }
 
-    const gridSize = (mapDoc as any).gridSize || 500;
+    const gridSize = (mapDoc as any).gridSize ?? 500;
     const hasViewport = viewportEarly.hasViewport;
     if (gridSize === 500 && !hasViewport) {
       res.status(400).json({ error: 'Viewport required for large map' });
@@ -675,7 +678,8 @@ router.get('/:name', async (req: Request, res: Response) => {
       const name = c.entityName || undefined;
       const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
       const npcInstanceId = c.occupiedBy === 'npc' && npcSlug ? (c.npcInstanceId || `${npcSlug}-${x}-${y}`) : undefined;
-      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId && !hasViewport) {
+      // Bugbot: Set mutated when we synthesize npcInstanceId so MapCells path can persist it (was only when !hasViewport, making updateCell loop dead).
+      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
         c.npcInstanceId = `${npcSlug}-${x}-${y}`;
         mutated = true;
       }

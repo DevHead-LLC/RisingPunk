@@ -1,6 +1,7 @@
 /**
  * Single abstraction over map cells: embedded (map.cells) vs mapcells collection.
  * When map.gridSize === 500 we use the MapCell collection; otherwise we use the map document's cells array.
+ * Bugbot: Default when gridSize is missing must match route/migration (500) to avoid split-brain: cell access vs viewport/grid construction.
  */
 import mongoose from 'mongoose';
 import { Map as MapModel } from '../models/Map';
@@ -8,8 +9,11 @@ import { MapCell } from '../models/MapCell';
 
 const GRID_SIZE_USES_MAPCELLS = 500;
 
+/** Default gridSize when document has none; must match server/src/routes/map.ts (migration gridSizeVal and viewport gridSize). */
+const DEFAULT_GRID_SIZE_WHEN_MISSING = 500;
+
 export function usesMapCells(mapDoc: any): boolean {
-  const gridSize = mapDoc?.gridSize ?? 50;
+  const gridSize = mapDoc?.gridSize ?? DEFAULT_GRID_SIZE_WHEN_MISSING;
   return gridSize === GRID_SIZE_USES_MAPCELLS;
 }
 
