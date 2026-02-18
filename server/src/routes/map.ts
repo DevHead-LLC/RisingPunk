@@ -365,6 +365,13 @@ router.get('/my-position', auth, async (req: Request, res: Response) => {
     res.status(503).json({ error: 'Map full; no empty cell for placement' });
   } catch (error: any) {
     console.error('My position fetch error:', error);
+    // Bugbot: MapCell placeUserHouse throws on placement failure; embedded returns null. Return same status and message for "map full" so clients get consistent 503.
+    const msg = error?.message ?? '';
+    const isPlacementFailure = msg.includes('placeUserHouse') && (msg.includes('no empty cells') || msg.includes('could not place after max attempts'));
+    if (isPlacementFailure) {
+      res.status(503).json({ error: 'Map full; no empty cell for placement' });
+      return;
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -489,8 +496,8 @@ router.get('/:name', async (req: Request, res: Response) => {
     const validGridSize = docAny.gridSize === 50 || docAny.gridSize === 500;
     const isExpandedMap = docAny.gridSize === 500;
     const needsVersionBump = !docAny.version || docAny.version < 2;
-    // Bugbot: Handle expanded map first so version-only path is clearly reachable; then needsMigration is only for delete/recreate (no fall-through confusion).
-    const needsMigration = !validGridSize || needsVersionBump;
+    // Bugbot: needsMigration = delete/recreate only when gridSize is invalid. Valid 50×50 or 500×500 with old version get version bump only (never delete).
+    const needsMigration = !validGridSize;
     if (isExpandedMap && needsVersionBump) {
       // Only set version and gridSize; never delete/recreate a 500×500 map. Persist gridSize so cell access and route use same value (Bugbot: avoid split-brain).
       await MapModel.updateOne(
@@ -498,8 +505,15 @@ router.get('/:name', async (req: Request, res: Response) => {
         { $set: { version: 2, gridSize: 500, lastUpdated: new Date() } }
       );
       mapDoc = (await MapModel.findOne({ name })) as any;
+    } else if (docAny.gridSize === 50 && needsVersionBump) {
+      // Valid 50×50 with old version: version bump only; never delete/recreate (preserve existing cells).
+      await MapModel.updateOne(
+        { _id: docAny._id },
+        { $set: { version: 2, lastUpdated: new Date() } }
+      );
+      mapDoc = (await MapModel.findOne({ name })) as any;
     } else if (needsMigration) {
-      // Invalid gridSize or 50×50 with old version: delete/recreate (never for 500×500; isExpandedMap handled above).
+      // Invalid or missing gridSize only: delete/recreate. Never for valid 50×50 or 500×500 (handled above).
       // Bugbot: Delete MapCell then map doc in one transaction so we never leave a zombie map (map doc without cells) if deleteOne fails.
       const session = await mongoose.startSession();
       try {

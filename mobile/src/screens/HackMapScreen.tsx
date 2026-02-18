@@ -759,7 +759,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const boundsReady = useSharedValue(false);
   const initialDims = Dimensions.get('window');
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: initialDims.width, height: initialDims.height });
-  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, getGridSize(grid) - 1), colStart: 0, colEnd: Math.min(14, getGridSize(grid) - 1) });
+  const authoritativeGridSize = mapGridSize ?? getGridSize(grid);
+  const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, authoritativeGridSize - 1), colStart: 0, colEnd: Math.min(14, authoritativeGridSize - 1) });
   
   // Phase 5: Use ref for windowRange during panning to reduce re-renders
   const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
@@ -968,11 +969,11 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, []);
 
   // Phase 7A: Virtual Scrolling - Calculate which tiles are actually visible
+  // Bugbot: Use authoritative mapGridSize for viewport clamping; getGridSize(grid) returns grid.length which is 500 for 50×50 sparse grid, causing wrong bounds (0-499 instead of 0-49).
   const calculateVirtualViewport = useCallback((panX: number, panY: number, width: number, height: number) => {
     if (width <= 0 || height <= 0) return;
     
-    // Calculate the exact visible area in grid coordinates (no buffer)
-    const gridSize = getGridSize(grid);
+    const gridSize = mapGridSize ?? getGridSize(grid);
     const { startCol: clampedStartCol, endCol: clampedEndCol, startRow: clampedStartRow, endRow: clampedEndRow } = 
       calculateViewportFromPan(panX, panY, width, height, gridSize, 0);
     
@@ -1004,7 +1005,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         totalTiles
       };
     });
-  }, [grid]);
+  }, [grid, mapGridSize]);
 
   const animatedMapStyle = useAnimatedStyle(() => {
     const tx = boundsReady.value
@@ -2409,7 +2410,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       
       // Calculate viewport around restorePan location instead of clearing everything
       const buffer = 15;
-      const gridSize = getGridSize(grid);
+      const gridSize = mapGridSize ?? getGridSize(grid);
       
       // Convert restorePan grid coordinates to pan coordinates to calculate correct viewport
       const { x: panX, y: panY } = gridToPanCoordinates(
@@ -2571,14 +2572,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         return;
       }
       
-      // Validate grid coordinates are within bounds
-      // y represents row index, validate against number of rows
-      if (!grid || restorePan.y < 0 || restorePan.y >= grid.length) {
-        return;
-      }
-      // x represents column index, validate against number of columns in that row
-      const row = grid[restorePan.y];
-      if (!row || restorePan.x < 0 || restorePan.x >= row.length) {
+      // Validate grid coordinates against authoritative map size (Bugbot: grid.length is 500 for 50×50 sparse grid; use mapGridSize so coords like (100,100) are rejected on 50×50).
+      const boundsSize = mapGridSize ?? getGridSize(grid);
+      if (!grid || restorePan.x < 0 || restorePan.x >= boundsSize || restorePan.y < 0 || restorePan.y >= boundsSize) {
         return;
       }
       
@@ -2639,7 +2635,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         restorePanRafIdRef.current = null;
       }
     };
-  }, [restorePan, containerSize.width, containerSize.height, computeWindow, grid, boundsReadyJS, gridSize, calculateVirtualViewport]);
+  }, [restorePan, containerSize.width, containerSize.height, computeWindow, grid, mapGridSize, boundsReadyJS, gridSize, calculateVirtualViewport]);
 
   useEffect(() => {
     // Only compute initial window after bounds are ready and container is set
@@ -2707,14 +2703,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Bounds are now set; attempt centering on user's home
       if (!restorePan && !hasCenteredOnHome.value && currentUserHandle) {
         // Inline center-on-home logic to avoid using computeWindow before declaration
-        const size = grid.length;
-        if (size) {
+        // Bugbot: Use authoritative map size for iteration; grid.length is 500 for 50×50 sparse grid (unnecessary 500 rows + wrong viewport).
+        const size = mapGridSize ?? getGridSize(grid);
+        if (size && grid) {
           let homeX: number | null = null;
           let homeY: number | null = null;
           for (let y = 0; y < size; y++) {
             const row = grid[y];
             if (!row) continue;
-            for (let x = 0; x < row.length; x++) {
+            for (let x = 0; x < size; x++) {
               const cell = row[x] as any;
               if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
                 homeX = x; homeY = y; break;
@@ -2730,7 +2727,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             offsetX.value = cx;
             offsetY.value = cy;
             // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-            const gridSizeBounds = getGridSize(grid);
+            const gridSizeBounds = mapGridSize ?? getGridSize(grid);
             const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeBounds, PAN_BUFFER);
             calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
             const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -2742,7 +2739,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         }
       }
     }
-  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, currentUserHandle, restorePan, calculateVirtualViewport]);
+  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, mapGridSize, currentUserHandle, restorePan, calculateVirtualViewport]);
 
   // Center on user's home from my-position API when data arrives (user-position-and-locator.md)
   useEffect(() => {
@@ -2758,7 +2755,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     offsetX.value = cx;
     offsetY.value = cy;
     // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-    const gridSize = getGridSize(grid);
+    const gridSize = mapGridSize ?? getGridSize(grid);
     const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, PAN_BUFFER);
     calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -2787,7 +2784,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         minimal: false,
       });
     }
-  }, [myPositionData, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
+  }, [myPositionData, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
 
   // Center on current user's home on initial entry (only if not returning from battle with restorePan)
   // Fallback when my-position API not available or user's house is in initial viewport (grid-scan)
@@ -2796,14 +2793,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     if (restorePan) return; // respect return-from-battle view
     if (hasCenteredOnHome.value) return;
     if (!currentUserHandle) return;
-    const size = grid.length;
-    if (!size) return;
+    // Bugbot: Use authoritative map size for iteration; grid.length is 500 for 50×50 sparse grid.
+    const size = mapGridSize ?? getGridSize(grid);
+    if (!size || !grid) return;
     let homeX: number | null = null;
     let homeY: number | null = null;
     for (let y = 0; y < size; y++) {
       const row = grid[y];
       if (!row) continue;
-      for (let x = 0; x < row.length; x++) {
+      for (let x = 0; x < size; x++) {
         const cell = row[x];
         if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
           homeX = x; homeY = y; break;
@@ -2820,7 +2818,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     offsetX.value = cx;
     offsetY.value = cy;
     // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-    const gridSizeEntry = getGridSize(grid);
+    const gridSizeEntry = mapGridSize ?? getGridSize(grid);
     const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeEntry, PAN_BUFFER);
     calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -2828,7 +2826,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
-  }, [grid, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, offsetX, offsetY, calculateVirtualViewport]);
+  }, [grid, mapGridSize, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, offsetX, offsetY, calculateVirtualViewport]);
 
   // When handle changes (e.g. after profile update), reset center flag and cached position so we re-center on home when fresh map data arrives.
   const prevHandleRef = useRef<string | undefined>(undefined);
@@ -3017,7 +3015,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       offsetX.value = cx;
       offsetY.value = cy;
       // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-      const gridSize = getGridSize(grid);
+      const gridSize = mapGridSize ?? getGridSize(grid);
       const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, PAN_BUFFER);
       calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
       const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -3041,7 +3039,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       .unwrap()
       .then((payload) => doPanTo(payload))
       .catch(() => {});
-  }, [currentUserHandle, containerSize.width, containerSize.height, grid, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport, triggerGetMyMapPosition]);
+  }, [currentUserHandle, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport, triggerGetMyMapPosition]);
 
   const handleAntivirusPress = useCallback(() => {
     // Only show modal if antivirus feature is unlocked (including timer-based unlock)

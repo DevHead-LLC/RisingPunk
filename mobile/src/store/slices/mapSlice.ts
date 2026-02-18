@@ -56,9 +56,10 @@ export const mapSlice = createSlice({
     setPlayerPosition: (state, action: PayloadAction<{ x: number; y: number }>) => {
       state.playerPosition = action.payload;
     },
+    // Bugbot: Use authoritative mapGridSize for bounds; grid.length is 500 for 50×50 sparse grid (would reveal fog for 0-499 instead of 0-49).
     revealFog: (state, action: PayloadAction<{ x: number; y: number; radius: number }>) => {
       const { x, y, radius } = action.payload;
-      const size = state.grid?.length ?? DEFAULT_GRID_SIZE;
+      const size = state.mapGridSize ?? state.grid?.length ?? DEFAULT_GRID_SIZE;
       const fog = state.fog as SparseFogData;
       for (let dy = -radius; dy <= radius; dy++) {
         for (let dx = -radius; dx <= radius; dx++) {
