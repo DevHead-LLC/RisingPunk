@@ -153,15 +153,16 @@ const cleanupEmptyCells = (
   viewport: { x1: number; y1: number; x2: number; y2: number }
 ): string[] => {
   const deletedKeys: string[] = [];
-  const viewportH = viewport.y2 - viewport.y1 + 1;
-  const viewportW = viewport.x2 - viewport.x1 + 1;
+  const v = normalizeViewport(viewport);
+  const viewportH = v.y2 - v.y1 + 1;
+  const viewportW = v.x2 - v.x1 + 1;
   const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
-  for (let y = viewport.y1; y <= viewport.y2; y++) {
-    const rowIdx = isViewportSized ? y - viewport.y1 : y;
+  for (let y = v.y1; y <= v.y2; y++) {
+    const rowIdx = isViewportSized ? y - v.y1 : y;
     const row = grid[rowIdx];
     if (!row) continue;
-    for (let x = viewport.x1; x <= viewport.x2; x++) {
-      const colIdx = isViewportSized ? x - viewport.x1 : x;
+    for (let x = v.x1; x <= v.x2; x++) {
+      const colIdx = isViewportSized ? x - v.x1 : x;
       const cell = row[colIdx];
       const key = `${x},${y}`;
       if (cell && cell.entity === 'empty' && merged[key]) {
@@ -175,24 +176,27 @@ const cleanupEmptyCells = (
 
 /**
  * Get cells to check for cleanup operations
- * Returns array of {x, y, cell} objects either from viewport or full grid
- * @param grid - Grid data
- * @param viewport - Optional viewport coordinates { x1, y1, x2, y2 }
- * @returns Array of {x, y, cell} objects
+ * Returns array of {x, y, cell} objects either from viewport or full grid.
+ * Bugbot: When viewport is provided and grid is viewport-sized (local indices), use rowIdx/colIdx so we don't assume global indices.
  */
 const getCellsToCheck = (
   grid: any[][],
   viewport?: { x1: number; y1: number; x2: number; y2: number }
 ): Array<{ x: number; y: number; cell: any }> => {
   const cells: Array<{ x: number; y: number; cell: any }> = [];
-  
+
   if (viewport) {
-    // Viewport: only iterate through cells in viewport
-    for (let y = viewport.y1; y <= viewport.y2; y++) {
-      const row = grid[y];
+    const v = normalizeViewport(viewport);
+    const viewportH = v.y2 - v.y1 + 1;
+    const viewportW = v.x2 - v.x1 + 1;
+    const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
+    for (let y = v.y1; y <= v.y2; y++) {
+      const rowIdx = isViewportSized ? y - v.y1 : y;
+      const row = grid[rowIdx];
       if (!row) continue;
-      for (let x = viewport.x1; x <= viewport.x2; x++) {
-        const cell = row[x];
+      for (let x = v.x1; x <= v.x2; x++) {
+        const colIdx = isViewportSized ? x - v.x1 : x;
+        const cell = row[colIdx];
         if (cell) cells.push({ x, y, cell });
       }
     }
@@ -218,6 +222,7 @@ const EMPTY_CELL = { terrain: 'plain' as TerrainType, entity: 'empty' as EntityT
  * Merge grid data from new grid into current grid for a specific viewport.
  * Returns a sparse grid: only viewport rows are allocated/copied to avoid 250K copy on each pan (Bugbot).
  * Supports (1) viewport-sized newGrid; (2) full-size newGrid.
+ * Bugbot: Use effective size >= currentGrid.length so we never discard rows when gridSize is stale or wrong.
  */
 const mergeGridData = (
   currentGrid: any[][],
@@ -225,27 +230,33 @@ const mergeGridData = (
   viewport: { x1: number; y1: number; x2: number; y2: number },
   gridSize: number
 ): any[][] => {
-  const viewportH = viewport.y2 - viewport.y1 + 1;
-  const viewportW = viewport.x2 - viewport.x1 + 1;
+  const v = normalizeViewport(viewport);
+  const viewportH = v.y2 - v.y1 + 1;
+  const viewportW = v.x2 - v.x1 + 1;
   const isViewportSized = newGrid.length === viewportH && (newGrid[0]?.length ?? 0) === viewportW;
 
-  // Sparse result: length gridSize, only viewport rows allocated; others preserve currentGrid reference or null.
-  const mergedGrid: any[][] = Array.from({ length: gridSize }, (_, y) => {
-    if (y >= viewport.y1 && y <= viewport.y2) {
+  const effectiveGridSize = Math.max(gridSize, currentGrid.length || 0);
+  if (effectiveGridSize !== gridSize) {
+    console.warn('[mergeGridData] gridSize', gridSize, 'smaller than currentGrid.length', currentGrid.length, '; using', effectiveGridSize);
+  }
+
+  // Sparse result: length effectiveGridSize, only viewport rows allocated; others preserve currentGrid reference or null.
+  const mergedGrid: any[][] = Array.from({ length: effectiveGridSize }, (_, y) => {
+    if (y >= v.y1 && y <= v.y2) {
       const existingRow = currentGrid[y];
       return existingRow
         ? [...existingRow]
-        : Array.from({ length: gridSize }, () => ({ ...EMPTY_CELL }));
+        : Array.from({ length: effectiveGridSize }, () => ({ ...EMPTY_CELL }));
     }
     return currentGrid[y] ?? null;
   });
 
-  for (let y = viewport.y1; y <= viewport.y2; y++) {
+  for (let y = v.y1; y <= v.y2; y++) {
     const row = mergedGrid[y];
     if (!row) continue;
-    for (let x = viewport.x1; x <= viewport.x2; x++) {
+    for (let x = v.x1; x <= v.x2; x++) {
       const cell = isViewportSized
-        ? newGrid[y - viewport.y1]?.[x - viewport.x1]
+        ? newGrid[y - v.y1]?.[x - v.x1]
         : newGrid[y]?.[x];
       if (cell) {
         row[x] = row[x] ? { ...row[x], ...cell } : { ...EMPTY_CELL, ...cell };
@@ -274,9 +285,17 @@ const getGridSize = (grid: any[][] | null | undefined, fallback: number = 500): 
 const isValidViewport = (viewport: { x1: number; y1: number; x2: number; y2: number } | undefined): boolean => {
   if (!viewport) return false;
   const { x1, y1, x2, y2 } = viewport;
-  return !isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2) && 
+  return !isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2) &&
          x1 >= 0 && y1 >= 0 && x2 >= x1 && y2 >= y1;
 };
+
+/** Normalize viewport so x1<=x2 and y1<=y2 (Bugbot: avoid wrong viewportH/viewportW and indexing when bounds reversed). */
+const normalizeViewport = (viewport: { x1: number; y1: number; x2: number; y2: number }): { x1: number; y1: number; x2: number; y2: number } => ({
+  x1: Math.min(viewport.x1, viewport.x2),
+  y1: Math.min(viewport.y1, viewport.y2),
+  x2: Math.max(viewport.x1, viewport.x2),
+  y2: Math.max(viewport.y1, viewport.y2),
+});
 
 /**
  * Check if viewport has moved significantly outside the last fetched viewport
@@ -1158,18 +1177,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCheckedUserLocationRef.current = true; // Mark as checked before doing the check
     
     const viewport = initialViewportData.viewport || initialViewport;
+    const v = normalizeViewport(viewport);
     const grid = initialViewportData.grid;
-    const viewportH = viewport.y2 - viewport.y1 + 1;
-    const viewportW = viewport.x2 - viewport.x1 + 1;
+    const viewportH = v.y2 - v.y1 + 1;
+    const viewportW = v.x2 - v.x1 + 1;
     const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
     let foundUser = false;
 
-    for (let y = viewport.y1; y <= viewport.y2; y++) {
-      const rowIdx = isViewportSized ? y - viewport.y1 : y;
+    for (let y = v.y1; y <= v.y2; y++) {
+      const rowIdx = isViewportSized ? y - v.y1 : y;
       const row = grid[rowIdx];
       if (!row) continue;
-      for (let x = viewport.x1; x <= viewport.x2; x++) {
-        const colIdx = isViewportSized ? x - viewport.x1 : x;
+      for (let x = v.x1; x <= v.x2; x++) {
+        const colIdx = isViewportSized ? x - v.x1 : x;
         const cell = row[colIdx];
         if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
           foundUser = true;
@@ -2078,8 +2098,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             dispatch(setGrid(mapData.grid));
           } else {
             // Viewport request - merge with existing grid. Use full map gridSize (from API), not viewport row count.
-            // Passing mapData.grid.length would create a 25×25 grid and break 500×500 (nothing loads outside 0–24).
-            const fullGridSize = mapData.gridSize ?? gridSize;
+            // Bugbot: If server omits gridSize, never use grid.length (viewport-sized = 25); use ref length or 500.
+            const fullGridSize = mapData.gridSize ?? getGridSize(gridRef.current) ?? 500;
             const mergedGrid = mergeGridData(
               gridRef.current,
               mapData.grid,
@@ -2181,13 +2201,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         }
         
         // Merge grid data - use ref to get latest grid value to avoid stale closures
-        // Bug #13: Calculate gridSize from ref inside effect (not from outer scope)
-        const gridSize = getGridSize(gridRef.current);
+        const fullGridSize = panningViewportData.gridSize ?? getGridSize(gridRef.current) ?? 500;
         const mergedGrid = mergeGridData(
           gridRef.current,
           panningViewportData.grid,
           viewport,
-          gridSize
+          fullGridSize
         );
         dispatch(setGrid(mergedGrid));
         // Bug Fix: Update gridRef immediately to prevent race conditions
@@ -2345,11 +2364,12 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         });
         
         // Merge grid data (update entity details in grid) - use ref to get latest grid value to avoid stale closures
+        const fullGridSize = stoppedViewportData.gridSize ?? getGridSize(gridRef.current) ?? 500;
         const mergedGrid = mergeGridData(
           gridRef.current,
           stoppedViewportData.grid,
           viewport,
-          gridSize
+          fullGridSize
         );
         dispatch(setGrid(mergedGrid));
         // Bug Fix: Update gridRef immediately to prevent race conditions
@@ -2360,7 +2380,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       // Clear stopped viewport params to allow next fetch
       setStoppedViewportParams(null);
     }
-  }, [stoppedViewportData, separateStaticAndDynamicData, dispatch, gridSize]);
+  }, [stoppedViewportData, separateStaticAndDynamicData, dispatch]);
 
   // Force refresh map data when returning from battle to ensure NPCs are updated
   // Phase 4B: Only clear cache when explicitly needed (restorePan = returning from battle)

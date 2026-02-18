@@ -153,10 +153,11 @@ export async function findHouseForUser(
   return house ? { x: house.x, y: house.y } : null;
 }
 
-/** Clear ephemeral YOU markers for a user (mapcells: updateMany; embedded: mutate and caller saves). */
+/** Clear ephemeral YOU markers for a user (mapcells: updateMany; embedded: mutate and caller saves). Optional session for atomicity with setPlayerPosition (Bugbot: concurrent position updates). */
 export async function clearYouMarkersForUser(
   mapDoc: any,
-  userId: mongoose.Types.ObjectId
+  userId: mongoose.Types.ObjectId,
+  session?: mongoose.mongo.ClientSession
 ): Promise<void> {
   if (usesMapCells(mapDoc)) {
     await MapCell.updateMany(
@@ -173,7 +174,8 @@ export async function clearYouMarkersForUser(
           entityName: '',
           userId: null,
         },
-      }
+      },
+      session ? { session } : undefined
     );
     return;
   }
@@ -234,12 +236,14 @@ export async function placeUserHouse(
         };
         const maxTries = 5;
         for (let tryCount = 0; tryCount < maxTries; tryCount++) {
-          // (2) Sample one valid empty cell (within transaction)
+          // (2) Sample one valid empty cell (within transaction; Bugbot: session must be passed so aggregate sees transaction context).
           const valid = await MapCell.aggregate([
             { $match: emptyCellFilter },
             { $sample: { size: 1 } },
             { $project: { x: 1, y: 1 } },
-          ]).session(session);
+          ])
+            .session(session)
+            .exec();
           if (valid.length === 0) return null;
           const { x, y } = valid[0];
           // (3) Update only if cell still empty (atomic; prevents overwriting another placement)
@@ -321,13 +325,14 @@ export async function placeUserHouse(
   return null;
 }
 
-/** Set a specific cell to player occupancy (e.g. POST player-position). Returns true if updated. */
+/** Set a specific cell to player occupancy (e.g. POST player-position). Returns true if updated. Optional session for atomicity with clearYouMarkersForUser (Bugbot: concurrent position updates). */
 export async function setPlayerPosition(
   mapDoc: any,
   x: number,
   y: number,
   userId: mongoose.Types.ObjectId,
-  entityName: string
+  entityName: string,
+  session?: mongoose.mongo.ClientSession
 ): Promise<boolean> {
   const mapId = mapDoc._id;
   if (!mapId) return false;
@@ -350,7 +355,8 @@ export async function setPlayerPosition(
           entityName,
           userId,
         },
-      }
+      },
+      session ? { session } : undefined
     );
     return res.modifiedCount > 0;
   }

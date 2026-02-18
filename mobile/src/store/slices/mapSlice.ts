@@ -76,8 +76,9 @@ export const mapSlice = createSlice({
         const row = grid[y];
         if (!row) continue;
         for (let x = 0; x < row.length; x++) {
-          const cell = row[x] as CellData & { userId?: unknown };
-          const cellUserId = cell?.userId != null ? String(cell.userId).trim() : '';
+          const cell = row[x] as CellData & { userId?: unknown } | undefined;
+          if (cell == null) continue; // Bugbot: sparse rows may have undefined columns; only process defined cells.
+          const cellUserId = cell.userId != null ? String(cell.userId).trim() : '';
           if (cellUserId && userIdsToRemove.has(cellUserId)) {
             row[x] = {
               terrain: cell.terrain,

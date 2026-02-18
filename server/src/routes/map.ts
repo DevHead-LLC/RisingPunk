@@ -4,6 +4,7 @@ import auth from '../middleware/auth';
 import { MapService } from '../services/MapService';
 import { ShieldService } from '../services/ShieldService';
 import { Map as MapModel } from '../models/Map';
+import { MapCell } from '../models/MapCell';
 import { User } from '../models/User';
 import {
   usesMapCells,
@@ -62,7 +63,18 @@ function getDisplayLevel(userLevelAssociation: number): number {
     95: 20,
     99: 21,
   };
-  return mapping[userLevelAssociation] ?? 1;
+  const exact = mapping[userLevelAssociation];
+  if (typeof exact === 'number') return exact;
+  // Bugbot: Unmapped DB levels (e.g. 37, 42) — use display level of largest mapped DB level <= input; clamp to 1–21.
+  const sortedDbLevels = [1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 99];
+  if (userLevelAssociation < sortedDbLevels[0]) return 1;
+  if (userLevelAssociation >= sortedDbLevels[sortedDbLevels.length - 1]) return 21;
+  let prev = sortedDbLevels[0];
+  for (const db of sortedDbLevels) {
+    if (db > userLevelAssociation) return mapping[prev];
+    prev = db;
+  }
+  return mapping[prev];
 }
 
 // Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
@@ -402,8 +414,23 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       }
     }
 
-    await clearYouMarkersForUser(mapDoc, authUserId);
-    const updated = await setPlayerPosition(mapDoc, x, y, authUserId, 'YOU');
+    // Bugbot: For MapCell maps, clear+set in one transaction so concurrent position updates cannot leave two YOU markers or overwrite without detection.
+    let updated: boolean;
+    if (usesMapCells(mapDoc)) {
+      const session = await mongoose.startSession();
+      try {
+        updated = await session.withTransaction(async () => {
+          await clearYouMarkersForUser(mapDoc, authUserId, session);
+          return await setPlayerPosition(mapDoc, x, y, authUserId, 'YOU', session);
+        });
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      await clearYouMarkersForUser(mapDoc, authUserId);
+      updated = await setPlayerPosition(mapDoc, x, y, authUserId, 'YOU');
+    }
+    // Bugbot: We always check setPlayerPosition's return value; never send success when placement failed (avoids client/server desync).
     if (!updated) {
       res.status(500).json({ error: 'Failed to update position' });
       return;
@@ -452,9 +479,9 @@ router.get('/:name', async (req: Request, res: Response) => {
     // Migrate old maps: enforce version >=2 and gridSize 50 or 500 (expanded map), friendly cleanup, and placement rules.
     // Never delete/recreate a 500×500 map (Phase 1 expanded); only set version if missing so it is not re-migrated.
     const docAny = mapDoc as any;
-    const gridSizeVal = docAny.gridSize ?? 500;
-    const validGridSize = gridSizeVal === 50 || gridSizeVal === 500;
-    const isExpandedMap = gridSizeVal === 500;
+    // Bugbot: Do not assume missing gridSize means 500×500. Old 50×50 maps may have no gridSize; treating undefined as 500 would set gridSize:500 and usesMapCells→true while MapCell collection is empty, breaking the map. Only treat as expanded when gridSize is explicitly 500.
+    const validGridSize = docAny.gridSize === 50 || docAny.gridSize === 500;
+    const isExpandedMap = docAny.gridSize === 500;
     const needsVersionBump = !docAny.version || docAny.version < 2;
     // Bugbot: expanded maps with version < 2 must be reachable for version-only update; invalid gridSize or 50×50 with old version → delete/recreate.
     const needsMigration = !validGridSize || needsVersionBump;
@@ -467,6 +494,8 @@ router.get('/:name', async (req: Request, res: Response) => {
         );
         mapDoc = (await MapModel.findOne({ name })) as any;
       } else {
+        // Bugbot: Delete MapCell documents for this map before deleting the map doc to avoid orphaned cells (e.g. if map was ever 500×500 then re-migrated).
+        await MapCell.deleteMany({ mapId: docAny._id });
         await MapModel.deleteOne({ _id: docAny._id });
       try {
         await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
@@ -722,6 +751,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         await (mapDoc as any).save();
       }
     }
+    // Bugbot: Always include gridSize so client never falls back to grid.length (viewport-sized grid would yield wrong pan bounds).
     if (hasViewport) {
       res.json({
         grid: emptyGrid,
