@@ -372,7 +372,10 @@ export class MapService {
           const entityName = npc.name || npc.title || 'NPC';
           const npcInstanceId = `${npc.slug}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
           const placed = await placeNpcOnRandomCell(mapDoc, npc.slug, npcInstanceId, entityName);
-          if (!placed) break;
+          if (!placed) {
+            console.warn('[MapService.updateNPCsOnMap] NPC placement failed after retries, skipping rest of level', { level, npcSlug: npc.slug });
+            break;
+          }
         }
       }
       return;

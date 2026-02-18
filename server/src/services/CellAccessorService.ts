@@ -419,13 +419,16 @@ export async function clearNpcInstanceFromMapCell(mapDoc: any, npcInstanceId: st
 /** Terrain types that are not placeable for NPCs or player houses. */
 const IMPASSABLE_TERRAIN = ['water', 'mountain', 'road'] as const;
 
+/** Max placement attempts when sample+update races with another writer (Bugbot: avoid respawn silently lost). */
+const NPC_PLACEMENT_MAX_ATTEMPTS = 5;
+
 /**
  * Place one NPC on a random valid empty cell. Returns true if placed.
  * For mapcells (500×500): samples from the full map (no x,y bounds), so placement and respawn
  * are uniformly random across 0..499×0..499. Never places on water, mountain, or road.
  * Bugbot: updateOne filter includes isOccupied: false (and canBeOccupied, terrain) so we never
- * overwrite player houses or already-occupied cells; return value reflects modifiedCount so callers
- * (e.g. seeding scripts) can detect collision and avoid overwriting existing users.
+ * overwrite player houses or already-occupied cells; retry up to NPC_PLACEMENT_MAX_ATTEMPTS on
+ * modifiedCount 0 so respawn/updateNPCsOnMap don't silently lose NPCs.
  */
 export async function placeNpcOnRandomCell(
   mapDoc: any,
@@ -437,41 +440,42 @@ export async function placeNpcOnRandomCell(
   if (!mapId) return false;
 
   if (usesMapCells(mapDoc)) {
-    const valid = await MapCell.aggregate([
-      {
-        $match: {
+    const emptyCellFilter = {
+      mapId,
+      isOccupied: false,
+      canBeOccupied: true,
+      terrain: { $nin: [...IMPASSABLE_TERRAIN] } as any,
+    };
+    for (let attempt = 0; attempt < NPC_PLACEMENT_MAX_ATTEMPTS; attempt++) {
+      const valid = await MapCell.aggregate([
+        { $match: emptyCellFilter },
+        { $sample: { size: 1 } },
+        { $project: { x: 1, y: 1 } },
+      ]);
+      if (valid.length === 0) return false;
+      const { x, y } = valid[0];
+      const res = await MapCell.updateOne(
+        {
           mapId,
+          x,
+          y,
           isOccupied: false,
           canBeOccupied: true,
-          terrain: { $nin: [...IMPASSABLE_TERRAIN] },
+          terrain: { $nin: IMPASSABLE_TERRAIN },
         },
-      },
-      { $sample: { size: 1 } },
-      { $project: { x: 1, y: 1 } },
-    ]);
-    if (valid.length === 0) return false;
-    const { x, y } = valid[0];
-    // Only update if cell still empty (guards against concurrent player/NPC placement; seeding never overwrites users).
-    const res = await MapCell.updateOne(
-      {
-        mapId,
-        x,
-        y,
-        isOccupied: false,
-        canBeOccupied: true,
-        terrain: { $nin: IMPASSABLE_TERRAIN },
-      },
-      {
-        $set: {
-          isOccupied: true,
-          occupiedBy: 'npc',
-          entityName,
-          npcSlug,
-          npcInstanceId,
-        },
-      }
-    );
-    return res.modifiedCount === 1;
+        {
+          $set: {
+            isOccupied: true,
+            occupiedBy: 'npc',
+            entityName,
+            npcSlug,
+            npcInstanceId,
+          },
+        }
+      );
+      if (res.modifiedCount === 1) return true;
+    }
+    return false;
   }
   return false;
 }

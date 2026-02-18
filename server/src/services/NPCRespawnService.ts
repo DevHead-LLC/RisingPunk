@@ -93,8 +93,11 @@ export class NPCRespawnService {
     const title = this.titleForSlug(npcSlug);
     const instanceId = npcInstanceId || `${npcSlug}-${Date.now()}`;
     if (usesMapCells(doc)) {
-      // Full map (e.g. 500×500): placeNpcOnRandomCell samples from all valid empty cells, no bounds
-      await placeNpcOnRandomCell(doc, npcSlug, instanceId, title);
+      // Full map (e.g. 500×500): placeNpcOnRandomCell samples from all valid empty cells, no bounds (retries inside on collision).
+      const placed = await placeNpcOnRandomCell(doc, npcSlug, instanceId, title);
+      if (!placed) {
+        console.warn('[NPCRespawnService.respawnNpc] placement failed after retries', { npcSlug, mapName });
+      }
       return;
     }
     const cells: any[] = doc.cells || [];
@@ -115,8 +118,11 @@ export class NPCRespawnService {
     if (!doc) return;
     const title = this.titleForSlug(npcSlug);
     if (usesMapCells(doc)) {
-      // Full map (e.g. 500×500): placeNpcOnRandomCell samples from all valid empty cells, no bounds
-      await placeNpcOnRandomCell(doc, npcSlug, npcInstanceId, title);
+      // Full map (e.g. 500×500): placeNpcOnRandomCell samples from all valid empty cells, no bounds (retries inside on collision).
+      const placed = await placeNpcOnRandomCell(doc, npcSlug, npcInstanceId, title);
+      if (!placed) {
+        console.warn('[NPCRespawnService.respawnNpcInstance] placement failed after retries', { npcSlug, npcInstanceId, mapName });
+      }
       return;
     }
     const cells: any[] = doc.cells || [];
