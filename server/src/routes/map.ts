@@ -653,6 +653,8 @@ router.get('/:name', async (req: Request, res: Response) => {
       Array.from({ length: viewportCols }, () => ({ terrain: 'plain', entity: 'empty' }))
     );
     let mutated = false;
+    /** Only cells we synthesized npcInstanceId for (Bugbot: persist only these, not every NPC in viewport). */
+    const synthesizedNpcInstanceIds: { x: number; y: number; npcInstanceId: string }[] = [];
 
     const shieldStatusMap = await ShieldService.checkAndUpdateMultipleShieldStatuses(usersToQuery);
 
@@ -680,7 +682,9 @@ router.get('/:name', async (req: Request, res: Response) => {
       const npcInstanceId = c.occupiedBy === 'npc' && npcSlug ? (c.npcInstanceId || `${npcSlug}-${x}-${y}`) : undefined;
       // Bugbot: Set mutated when we synthesize npcInstanceId so MapCells path can persist it (was only when !hasViewport, making updateCell loop dead).
       if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
-        c.npcInstanceId = `${npcSlug}-${x}-${y}`;
+        const synthesized = `${npcSlug}-${x}-${y}`;
+        c.npcInstanceId = synthesized;
+        synthesizedNpcInstanceIds.push({ x, y, npcInstanceId: synthesized });
         mutated = true;
       }
       const npcLevel = c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined;
@@ -702,10 +706,8 @@ router.get('/:name', async (req: Request, res: Response) => {
     }
     if (mutated) {
       if (usesMapCells(mapDoc)) {
-        for (const c of viewportCells) {
-          if (c.occupiedBy === 'npc' && c.npcSlug && c.npcInstanceId) {
-            await updateCell(mapId, c.x, c.y, { npcInstanceId: c.npcInstanceId });
-          }
+        for (const { x, y, npcInstanceId } of synthesizedNpcInstanceIds) {
+          await updateCell(mapId, x, y, { npcInstanceId });
         }
       } else {
         (mapDoc as any).markModified('cells');
