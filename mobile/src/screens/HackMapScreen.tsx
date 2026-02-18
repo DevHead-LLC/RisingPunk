@@ -1989,17 +1989,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       npcLevel?: number;
     }> = {};
     const entityDetails: Record<string, any> = {};
-    const viewportH = viewport ? viewport.y2 - viewport.y1 + 1 : 0;
-    const viewportW = viewport ? viewport.x2 - viewport.x1 + 1 : 0;
-    const isViewportSized = viewport && gridData.length === viewportH && (gridData[0]?.length ?? 0) === viewportW;
+    // Bugbot: Normalize viewport so reversed bounds don't yield negative viewportH/viewportW or wrong cache keys (match cleanupEmptyCells, getCellsToCheck, mergeGridData).
+    const v = viewport ? normalizeViewport(viewport) : undefined;
+    const viewportH = v ? v.y2 - v.y1 + 1 : 0;
+    const viewportW = v ? v.x2 - v.x1 + 1 : 0;
+    const isViewportSized = v && gridData.length === viewportH && (gridData[0]?.length ?? 0) === viewportW;
     for (let y = 0; y < gridData.length; y++) {
       const row = gridData[y];
       if (!row) continue;
       for (let x = 0; x < row.length; x++) {
         const cell = row[x];
         if (!cell) continue;
-        const globalX = isViewportSized && viewport ? viewport.x1 + x : x;
-        const globalY = isViewportSized && viewport ? viewport.y1 + y : y;
+        const globalX = isViewportSized && v ? v.x1 + x : x;
+        const globalY = isViewportSized && v ? v.y1 + y : y;
         const key = `${globalX},${globalY}`;
         terrain[key] = cell.terrain;
         if (cell.entity !== 'empty') {
