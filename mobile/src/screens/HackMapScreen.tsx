@@ -1158,13 +1158,19 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     hasCheckedUserLocationRef.current = true; // Mark as checked before doing the check
     
     const viewport = initialViewportData.viewport || initialViewport;
+    const grid = initialViewportData.grid;
+    const viewportH = viewport.y2 - viewport.y1 + 1;
+    const viewportW = viewport.x2 - viewport.x1 + 1;
+    const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
     let foundUser = false;
-    
+
     for (let y = viewport.y1; y <= viewport.y2; y++) {
-      const row = initialViewportData.grid[y];
+      const rowIdx = isViewportSized ? y - viewport.y1 : y;
+      const row = grid[rowIdx];
       if (!row) continue;
       for (let x = viewport.x1; x <= viewport.x2; x++) {
-        const cell = row[x];
+        const colIdx = isViewportSized ? x - viewport.x1 : x;
+        const cell = row[colIdx];
         if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
           foundUser = true;
           break;
