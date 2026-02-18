@@ -390,8 +390,16 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       return;
     }
     if (target.isOccupied) {
-      res.status(400).json({ error: 'Cell already occupied' });
-      return;
+      // Allow re-place at user's own YOU marker (clear + set same cell); otherwise cell is taken by someone else.
+      const isOwnYouMarker =
+        target.occupiedBy === 'player' &&
+        target.entityName === 'YOU' &&
+        target.userId &&
+        String(target.userId) === String(authUserId);
+      if (!isOwnYouMarker) {
+        res.status(400).json({ error: 'Cell already occupied' });
+        return;
+      }
     }
 
     await clearYouMarkersForUser(mapDoc, authUserId);
