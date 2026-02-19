@@ -303,7 +303,9 @@ const getViewportSizing = (
   const v = normalizeViewport(viewport);
   const viewportH = v.y2 - v.y1 + 1;
   const viewportW = v.x2 - v.x1 + 1;
-  const isViewportSized = grid.length === viewportH && (grid[0]?.length ?? 0) === viewportW;
+  // Bugbot: Use first non-null row's length so sparse grids (grid[0] null) don't wrongly set isViewportSized false.
+  const gridW = grid.find((r): r is any[] => r != null && Array.isArray(r))?.length ?? 0;
+  const isViewportSized = grid.length === viewportH && gridW === viewportW;
   return { v, viewportH, viewportW, isViewportSized };
 };
 
@@ -1117,6 +1119,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     });
   // Bugbot: Use server-provided mapGridSize for bounds when set; else grid.length inflates pan for 50×50 (initial grid is 500 rows).
   const gridSize = mapGridSize ?? (grid?.length ? grid.length : 500);
+  const gridSizeRef = useRef(gridSize);
+  gridSizeRef.current = gridSize;
   const totalSize = gridSize * CELL_SIZE;
   
   // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
@@ -2134,13 +2138,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           if (mapData.gridSize != null) dispatch(setMapGridSize(mapData.gridSize));
           // Bug Fix: Update gridRef immediately to prevent race conditions
           gridRef.current = mapData.grid;
-          // Phase 5 Fix: Initialize last fetched viewport to full map bounds (Bugbot: use mapData.gridSize so 50×50 gets 0-49; closure gridSize is still 500 until Redux updates).
-          const fullMapSize = mapData.gridSize ?? gridSize;
+          // Phase 5 Fix: Initialize last fetched viewport to full map bounds. Bugbot: use gridSizeRef.current for fallback so when server omits gridSize we don't use stale closure value (gridSize omitted from deps to avoid double-processing).
+          const fullMapSize = mapData.gridSize ?? gridSizeRef.current ?? 500;
           lastFetchedViewportRef.current = { x1: 0, y1: 0, x2: fullMapSize - 1, y2: fullMapSize - 1 };
         }
       });
     }
-  // Bugbot: Omit gridSize from deps to avoid double-processing; effect dispatches setMapGridSize so gridSize (mapGridSize ?? ...) changes and would re-trigger. gridSize only used as fallback in fullMapSize; server always sends gridSize.
+  // Bugbot: Omit gridSize from deps to avoid double-processing; effect dispatches setMapGridSize so gridSize changes and would re-trigger. Fallback uses gridSizeRef.current so server-omitted gridSize gets fresh value.
   }, [mapData, isLoading, dispatch, separateStaticAndDynamicData]);
   
   // Phase 6: Process panning viewport data (minimal: terrain + images only, skip details)
