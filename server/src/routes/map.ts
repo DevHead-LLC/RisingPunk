@@ -754,7 +754,8 @@ router.get('/:name', async (req: Request, res: Response) => {
         for (const { x, y, npcInstanceId } of synthesizedNpcInstanceIds) {
           await updateCell(mapId, x, y, { npcInstanceId });
         }
-      } else {
+      } else if (!hasViewport) {
+        // Bugbot: Only persist embedded cells when full-map path; viewport skips dedup/cleanup (lines 517–526), so save() here could persist duplicates. Concurrent viewport saves would also cause lost writes. Synthesized npcInstanceId is deterministic (npcSlug-x-y) so next request re-synthesizes the same value.
         (mapDoc as any).markModified('cells');
         await (mapDoc as any).save();
       }
