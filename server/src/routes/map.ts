@@ -4,7 +4,18 @@ import auth from '../middleware/auth';
 import { MapService } from '../services/MapService';
 import { ShieldService } from '../services/ShieldService';
 import { Map as MapModel } from '../models/Map';
+import { MapCell } from '../models/MapCell';
 import { User } from '../models/User';
+import {
+  usesMapCells,
+  getCellsForMap,
+  getCell,
+  findHouseForUser,
+  placeUserHouse,
+  clearYouMarkersForUser,
+  setPlayerPosition,
+  updateCell,
+} from '../services/CellAccessorService';
 import { NPCService } from '../services/NPCService';
 import { MapChatMessage } from '../models/MapChatMessage';
 import { filterBadWords } from '../utils/contentModeration';
@@ -27,18 +38,25 @@ function evictExpiredMapChatRateLimitEntries(nowMs: number): void {
   }
 }
 
+/** userLevelAssociation (DB) → display level 1–21 shown on map. Levels 9–21 use 40,45,…,99. Single source of truth; SORTED_DB_LEVELS derived once (Bugbot: avoid recomputing sort on every fallback call). */
+const DISPLAY_LEVEL_MAPPING: { [key: number]: number } = {
+  1: 1, 5: 2, 10: 3, 15: 4, 20: 5, 25: 6, 30: 7, 35: 8, 40: 9, 45: 10,
+  50: 11, 55: 12, 60: 13, 65: 14, 70: 15, 75: 16, 80: 17, 85: 18, 90: 19, 95: 20, 99: 21,
+};
+const SORTED_DB_LEVELS = Object.keys(DISPLAY_LEVEL_MAPPING).map(Number).sort((a, b) => a - b);
+
 function getDisplayLevel(userLevelAssociation: number): number {
-  const mapping: { [key: number]: number } = {
-    1: 1,
-    5: 2,
-    10: 3,
-    15: 4,
-    20: 5,
-    25: 6,
-    30: 7,
-    35: 8,
-  };
-  return mapping[userLevelAssociation] || 1;
+  const exact = DISPLAY_LEVEL_MAPPING[userLevelAssociation];
+  if (typeof exact === 'number') return exact;
+  // Bugbot: Unmapped DB levels (e.g. 37, 42) — use display level of largest mapped DB level <= input; clamp to 1–21.
+  if (userLevelAssociation < SORTED_DB_LEVELS[0]) return 1;
+  if (userLevelAssociation >= SORTED_DB_LEVELS[SORTED_DB_LEVELS.length - 1]) return 21;
+  let largestLeq = SORTED_DB_LEVELS[0];
+  for (const db of SORTED_DB_LEVELS) {
+    if (db > userLevelAssociation) break;
+    largestLeq = db;
+  }
+  return DISPLAY_LEVEL_MAPPING[largestLeq];
 }
 
 // Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
@@ -294,108 +312,46 @@ router.get('/my-position', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    let mapDoc = await MapModel.findOne({ name: 'main' });
+    const mapDoc = await MapModel.findOne({ name: 'main' });
     if (!mapDoc) {
       res.status(404).json({ error: 'Map not found' });
       return;
     }
 
-    const cells = (mapDoc as any).cells as any[];
-    // Prefer the user's house (entityName !== 'YOU'); fallback to any player cell for this user (e.g. YOU marker)
-    let house = cells.find(
-      (c: any) =>
-        c.occupiedBy === 'player' &&
-        c.userId &&
-        String(c.userId) === String(authUserId) &&
-        c.entityName !== 'YOU'
-    );
-    if (!house) {
-      house = cells.find(
-        (c: any) =>
-          c.occupiedBy === 'player' &&
-          c.userId &&
-          String(c.userId) === String(authUserId)
-      );
-    }
-    if (!house) {
-      // User has no house (e.g. viewport-only load never ran placement). Place them once.
-      // Use findOneAndUpdate with positional $ to avoid full-doc save and E11000 duplicate key (cells array index).
-      const user = await User.findById(authUserId, { handle: 1 });
-      if (!user) {
-        res.status(404).json({ error: 'User not found' });
-        return;
-      }
-      const handle = (user as any).handle || 'User';
-      const gridSize = (mapDoc as any).gridSize || 50;
-      let tries = 0;
-      while (tries < 500) {
-        const candidateX = Math.floor(Math.random() * gridSize);
-        const candidateY = Math.floor(Math.random() * gridSize);
-        // Atomic duplicate-house guard: only place if user has no existing house (same as GET /:name placement).
-        const updated = await MapModel.findOneAndUpdate(
-          {
-            name: 'main',
-            $and: [
-              { cells: { $not: { $elemMatch: { userId: authUserId, occupiedBy: 'player', entityName: { $ne: 'YOU' } } } } },
-              {
-                cells: {
-                  $elemMatch: {
-                    x: candidateX,
-                    y: candidateY,
-                    isOccupied: false,
-                    canBeOccupied: true,
-                    terrain: { $nin: ['water', 'mountain', 'road'] },
-                  },
-                },
-              },
-            ],
-          },
-          {
-            $set: {
-              'cells.$.isOccupied': true,
-              'cells.$.occupiedBy': 'player',
-              'cells.$.entityName': handle,
-              'cells.$.userId': authUserId,
-            },
-          },
-          { new: true }
-        );
-        if (updated) {
-          res.json({ x: candidateX, y: candidateY });
-          return;
-        }
-        tries++;
-      }
-      // Race: a concurrent request may have placed the user's house; re-check before 503 (Bugbot).
-      const mapDocAgain = await MapModel.findOne({ name: 'main' });
-      if (mapDocAgain) {
-        const cellsAgain = (mapDocAgain as any).cells as any[];
-        const houseNow =
-          cellsAgain.find(
-            (c: any) =>
-              c.occupiedBy === 'player' &&
-              c.userId &&
-              String(c.userId) === String(authUserId) &&
-              c.entityName !== 'YOU'
-          ) ||
-          cellsAgain.find(
-            (c: any) =>
-              c.occupiedBy === 'player' &&
-              c.userId &&
-              String(c.userId) === String(authUserId)
-          );
-        if (houseNow) {
-          res.json({ x: houseNow.x, y: houseNow.y });
-          return;
-        }
-      }
-      res.status(503).json({ error: 'Map full; no empty cell for placement' });
+    let house = await findHouseForUser(mapDoc, authUserId);
+    if (house) {
+      res.json({ x: house.x, y: house.y });
       return;
     }
 
-    res.json({ x: house.x, y: house.y });
+    const user = await User.findById(authUserId, { handle: 1 });
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const handle = (user as any).handle || 'User';
+    const placed = await placeUserHouse(mapDoc, authUserId, handle);
+    if (placed) {
+      res.json({ x: placed.x, y: placed.y });
+      return;
+    }
+    // Bugbot: Re-fetch map so fallback findHouseForUser sees concurrent placement (embedded path reads mapDoc.cells; stale doc would miss it).
+    const freshMapDoc = await MapModel.findOne({ name: 'main' });
+    house = freshMapDoc ? await findHouseForUser(freshMapDoc, authUserId) : null;
+    if (house) {
+      res.json({ x: house.x, y: house.y });
+      return;
+    }
+    res.status(503).json({ error: 'Map full; no empty cell for placement' });
   } catch (error: any) {
     console.error('My position fetch error:', error);
+    // Bugbot: MapCell placeUserHouse throws on placement failure; embedded returns null. Return same status and message for "map full" so clients get consistent 503.
+    const msg = error?.message ?? '';
+    const isPlacementFailure = msg.includes('placeUserHouse') && (msg.includes('no empty cells') || msg.includes('could not place after max attempts'));
+    if (isPlacementFailure) {
+      res.status(503).json({ error: 'Map full; no empty cell for placement' });
+      return;
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -423,19 +379,9 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
     }
 
     const authUserId: any = (req as any).user?._id;
-    for (const c of (mapDoc as any).cells as any[]) {
-      // Only clear ephemeral 'YOU' markers for this user, or legacy invalid 'YOU' without userId
-      const belongsToAuthUser = c.userId && String(c.userId) === String(authUserId);
-      const legacyInvalidYou = c.entityName === 'YOU' && !c.userId;
-      if (c.isOccupied && c.occupiedBy === 'player' && c.entityName === 'YOU' && (belongsToAuthUser || legacyInvalidYou)) {
-        c.isOccupied = false;
-        c.occupiedBy = 'none';
-        c.entityName = '';
-        c.userId = null;
-      }
-    }
 
-    const target = (mapDoc.cells as any[]).find((c) => c.x === x && c.y === y);
+    // Bugbot: Validate target cell before clearing YOU markers so MapCell path doesn't commit delete on validation failure.
+    const target = await getCell(mapDoc, x, y);
     if (!target) {
       res.status(404).json({ error: 'Target cell not found' });
       return;
@@ -445,16 +391,47 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       return;
     }
     if (target.isOccupied) {
-      res.status(400).json({ error: 'Cell already occupied' });
-      return;
+      // Allow re-place at user's own YOU marker (clear + set same cell); otherwise cell is taken by someone else.
+      // Bugbot: Re-place at same cell works for MapCell: we clear YOU markers first (in same transaction), then setPlayerPosition runs so the cell is already empty when updateOne runs.
+      const isOwnYouMarker =
+        target.occupiedBy === 'player' &&
+        target.entityName === 'YOU' &&
+        target.userId &&
+        String(target.userId) === String(authUserId);
+      if (!isOwnYouMarker) {
+        res.status(400).json({ error: 'Cell already occupied' });
+        return;
+      }
     }
 
-    target.isOccupied = true;
-    target.occupiedBy = 'player';
-    target.entityName = 'YOU';
-    target.userId = authUserId;
-
-    await mapDoc.save();
+    // Bugbot: For MapCell maps, clear+set in one transaction so concurrent position updates cannot leave two YOU markers or overwrite without detection.
+    // Bugbot: If setPlayerPosition returns false (e.g. cell taken concurrently), throw so the transaction aborts; otherwise we would commit clearYouMarkersForUser and leave the user with no YOU marker.
+    let updated: boolean;
+    if (usesMapCells(mapDoc)) {
+      const session = await mongoose.startSession();
+      try {
+        updated = await session.withTransaction(async () => {
+          await clearYouMarkersForUser(mapDoc, authUserId, session);
+          const ok = await setPlayerPosition(mapDoc, x, y, authUserId, 'YOU', session);
+          if (!ok) throw new Error('Failed to update position');
+          return true;
+        });
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      await clearYouMarkersForUser(mapDoc, authUserId);
+      updated = await setPlayerPosition(mapDoc, x, y, authUserId, 'YOU');
+    }
+    // Bugbot: We always check setPlayerPosition's return value; never send success when placement failed (avoids client/server desync).
+    if (!updated) {
+      res.status(500).json({ error: 'Failed to update position' });
+      return;
+    }
+    if (!usesMapCells(mapDoc)) {
+      (mapDoc as any).markModified('cells');
+      await (mapDoc as any).save();
+    }
 
     res.json({ success: true });
   } catch (error: any) {
@@ -492,10 +469,41 @@ router.get('/:name', async (req: Request, res: Response) => {
       ? []
       : await User.find({}, { _id: 1, handle: 1, antivirusShield: 1 });
 
-    // Migrate old maps: enforce version >=2 and gridSize 50, friendly cleanup, and placement rules
+    // Migrate old maps: enforce version >=2 and gridSize 50 or 500 (expanded map), friendly cleanup, and placement rules.
+    // Never delete/recreate a 500×500 map (Phase 1 expanded); only set version if missing so it is not re-migrated.
     const docAny = mapDoc as any;
-    if (!docAny.version || docAny.version < 2 || docAny.gridSize !== 50) {
-      await MapModel.deleteOne({ _id: docAny._id });
+    // Bugbot: Do not assume missing gridSize means 500×500. Old 50×50 maps may have no gridSize; treating undefined as 500 would set gridSize:500 and usesMapCells→true while MapCell collection is empty, breaking the map. Only treat as expanded when gridSize is explicitly 500.
+    const validGridSize = docAny.gridSize === 50 || docAny.gridSize === 500;
+    const isExpandedMap = docAny.gridSize === 500;
+    const needsVersionBump = !docAny.version || docAny.version < 2;
+    // Bugbot: needsMigration = delete/recreate only when gridSize is invalid. Valid 50×50 or 500×500 with old version get version bump only (never delete).
+    const needsMigration = !validGridSize;
+    if (isExpandedMap && needsVersionBump) {
+      // Only set version and gridSize; never delete/recreate a 500×500 map. Persist gridSize so cell access and route use same value (Bugbot: avoid split-brain).
+      await MapModel.updateOne(
+        { _id: docAny._id },
+        { $set: { version: 2, gridSize: 500, lastUpdated: new Date() } }
+      );
+      mapDoc = (await MapModel.findOne({ name })) as any;
+    } else if (docAny.gridSize === 50 && needsVersionBump) {
+      // Valid 50×50 with old version: version bump only; never delete/recreate (preserve existing cells).
+      await MapModel.updateOne(
+        { _id: docAny._id },
+        { $set: { version: 2, lastUpdated: new Date() } }
+      );
+      mapDoc = (await MapModel.findOne({ name })) as any;
+    } else if (needsMigration) {
+      // Invalid or missing gridSize only: delete/recreate. Never for valid 50×50 or 500×500 (handled above).
+      // Bugbot: Delete MapCell then map doc in one transaction so we never leave a zombie map (map doc without cells) if deleteOne fails.
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          await MapCell.deleteMany({ mapId: docAny._id }, { session });
+          await MapModel.deleteOne({ _id: docAny._id }, { session });
+        });
+      } finally {
+        await session.endSession();
+      }
       try {
         await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
         console.log('[map fetch] dropped legacy unique index cells.x_1_cells.y_1 (migrate path)');
@@ -506,8 +514,8 @@ router.get('/:name', async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Failed to build map' });
         return;
       }
-    } else if (!viewportEarly.hasViewport) {
-      // Full-map only: validate and normalize map (dedup, cleanup, placement). Viewport requests skip this to avoid 2–5s response times (staging-panning-investigation.md). Bugbot: viewport skips this by design; we never save() from viewport path (npcInstanceId only mutated when !hasViewport) so we do not persist unnormalized cells.
+    } else if (!viewportEarly.hasViewport && !usesMapCells(mapDoc)) {
+      // Full-map only (and only for embedded 50×50): validate and normalize map (dedup, cleanup, placement). Skip for mapcells (500×500) which requires viewport.
       let cells: any[] = Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : [];
       // Fix E11000 duplicate key: shared dedupe (mapCellUtils) prefers occupied over empty, stronger occupancy when both occupied (Bugbot).
       const deduped = dedupCellsByCoord(cells);
@@ -623,20 +631,13 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     }
 
-    const gridSize = (mapDoc as any).gridSize || 50;
-    
-    // Phase 3B: After migration, extract cells and userIds for optimized user query
-    const cells = (mapDoc as any).cells as any[];
-    
-    // Extract userIds from all cells (for full map optimization)
-    const userIdsInMap = new Set<string>();
-    cells.forEach((c: any) => {
-      if (c.occupiedBy === 'player' && c.userId) {
-        userIdsInMap.add(String(c.userId));
-      }
-    });
-    
+    const gridSize = (mapDoc as any).gridSize ?? 500;
     const hasViewport = viewportEarly.hasViewport;
+    if (gridSize === 500 && !hasViewport) {
+      res.status(400).json({ error: 'Viewport required for large map' });
+      return;
+    }
+
     let viewportX1 = 0;
     let viewportY1 = 0;
     let viewportX2 = gridSize - 1;
@@ -651,11 +652,26 @@ router.get('/:name', async (req: Request, res: Response) => {
       viewportX2 = Math.min(gridSize - 1, Math.max(maxX, 0));
       viewportY2 = Math.min(gridSize - 1, Math.max(maxY, 0));
     }
-    
-    const viewportCells = hasViewport 
-      ? cells.filter((c: any) => 
-          c.x >= viewportX1 && c.x <= viewportX2 && 
-          c.y >= viewportY1 && c.y <= viewportY2
+
+    const viewportForFetch = hasViewport
+      ? { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
+      : undefined;
+    const cells: any[] = usesMapCells(mapDoc)
+      ? await getCellsForMap(mapDoc, viewportForFetch)
+      : (Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : []);
+
+    const userIdsInMap = new Set<string>();
+    cells.forEach((c: any) => {
+      if (c.occupiedBy === 'player' && c.userId) {
+        userIdsInMap.add(String(c.userId));
+      }
+    });
+
+    const viewportCells = hasViewport
+      ? cells.filter(
+          (c: any) =>
+            c.x >= viewportX1 && c.x <= viewportX2 &&
+            c.y >= viewportY1 && c.y <= viewportY2
         )
       : cells;
     
@@ -673,47 +689,55 @@ router.get('/:name', async (req: Request, res: Response) => {
       ? await User.find({ _id: { $in: Array.from(userIdsInViewport) } }, { _id: 1, handle: 1, antivirusShield: 1 })
       : await User.find({ _id: { $in: Array.from(userIdsInMap) } }, { _id: 1, handle: 1, antivirusShield: 1 });
     
-    const emptyGrid = Array.from({ length: gridSize }, () =>
-      Array.from({ length: gridSize }, () => ({ terrain: 'plain', entity: 'empty' }))
+    // Viewport requests: build only viewport-sized grid (fast, small payload). Full-map: build gridSize×gridSize.
+    const viewportRows = hasViewport ? viewportY2 - viewportY1 + 1 : gridSize;
+    const viewportCols = hasViewport ? viewportX2 - viewportX1 + 1 : gridSize;
+    const emptyGrid = Array.from({ length: viewportRows }, () =>
+      Array.from({ length: viewportCols }, () => ({ terrain: 'plain', entity: 'empty' }))
     );
     let mutated = false;
-    
+    /** Only cells we synthesized npcInstanceId for (Bugbot: persist only these, not every NPC in viewport). */
+    const synthesizedNpcInstanceIds: { x: number; y: number; npcInstanceId: string }[] = [];
+
     const shieldStatusMap = await ShieldService.checkAndUpdateMultipleShieldStatuses(usersToQuery);
-    
+
     const userMap = new Map();
     usersToQuery.forEach((user: any) => {
       userMap.set(String(user._id), user);
     });
-    
     const allNPCs = await NPCService.getAllNPCs();
     const npcLevelMap = new Map<string, number>();
     for (const npc of allNPCs) {
-      if (npc.slug && npc.userLevelAssociation) {
-        npcLevelMap.set(npc.slug, getDisplayLevel(npc.userLevelAssociation));
+      // Bugbot: Only call getDisplayLevel when userLevelAssociation is a valid number; undefined/null/NaN would yield wrong display level (e.g. 21).
+      const level = npc.userLevelAssociation;
+      if (npc.slug && typeof level === 'number' && !Number.isNaN(level)) {
+        npcLevelMap.set(npc.slug, getDisplayLevel(level));
       }
     }
-    
+    const mapId = (mapDoc as any)._id;
     for (const c of viewportCells) {
       const y = c.y;
       const x = c.x;
+      const rowIdx = hasViewport ? y - viewportY1 : y;
+      const colIdx = hasViewport ? x - viewportX1 : x;
       const entity = c.isOccupied ? 'house' : 'empty';
       const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
       const name = c.entityName || undefined;
       const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
-      // Compute npcInstanceId for response; only mutate and persist on full-map so viewport never save()s unnormalized cells (Bugbot: viewport skips dedup/cleanup).
       const npcInstanceId = c.occupiedBy === 'npc' && npcSlug ? (c.npcInstanceId || `${npcSlug}-${x}-${y}`) : undefined;
-      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId && !hasViewport) {
-        c.npcInstanceId = `${npcSlug}-${x}-${y}`;
+      // Bugbot: Set mutated when we synthesize npcInstanceId so MapCells path can persist it (was only when !hasViewport, making updateCell loop dead).
+      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
+        const synthesized = `${npcSlug}-${x}-${y}`;
+        c.npcInstanceId = synthesized;
+        synthesizedNpcInstanceIds.push({ x, y, npcInstanceId: synthesized });
         mutated = true;
       }
       const npcLevel = c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined;
-      
       let isShielded = false;
       if (c.occupiedBy === 'player' && c.userId) {
         isShielded = shieldStatusMap.get(String(c.userId)) || false;
       }
-      
-      emptyGrid[y][x] = {
+      emptyGrid[rowIdx][colIdx] = {
         terrain: c.terrain,
         entity,
         owner,
@@ -725,19 +749,26 @@ router.get('/:name', async (req: Request, res: Response) => {
         isShielded,
       } as any;
     }
-
     if (mutated) {
-      (mapDoc as any).markModified('cells');
-      await (mapDoc as any).save();
+      if (usesMapCells(mapDoc)) {
+        for (const { x, y, npcInstanceId } of synthesizedNpcInstanceIds) {
+          await updateCell(mapId, x, y, { npcInstanceId });
+        }
+      } else if (!hasViewport) {
+        // Bugbot: Only persist embedded cells when full-map path; viewport skips dedup/cleanup (lines 517–526), so save() here could persist duplicates. Concurrent viewport saves would also cause lost writes. Synthesized npcInstanceId is deterministic (npcSlug-x-y) so next request re-synthesizes the same value.
+        (mapDoc as any).markModified('cells');
+        await (mapDoc as any).save();
+      }
     }
-
+    // Bugbot: Always include gridSize so client never falls back to grid.length (viewport-sized grid would yield wrong pan bounds).
     if (hasViewport) {
       res.json({
         grid: emptyGrid,
+        gridSize,
         viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
       });
     } else {
-      res.json({ grid: emptyGrid });
+      res.json({ grid: emptyGrid, gridSize });
     }
   } catch (error: any) {
     console.error('Map fetch error:', error);
