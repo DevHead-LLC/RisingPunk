@@ -76,7 +76,7 @@ export class NPCRespawnService {
     if (this.scheduled.has(key)) return;
     const delayMs = Math.max(1, delaySeconds) * 1000;
     const respawnAt = new Date(Date.now() + delayMs);
-    await PendingNpcRespawn.create({ mapName, npcSlug, npcInstanceId, respawnAt });
+    // Bugbot: Set timer before DB create so a transient create failure doesn't prevent in-memory respawn (NPC already cleared from map).
     const timeout = setTimeout(async () => {
       this.scheduled.delete(key);
       try {
@@ -88,6 +88,11 @@ export class NPCRespawnService {
       }
     }, delayMs);
     this.scheduled.set(key, timeout);
+    try {
+      await PendingNpcRespawn.create({ mapName, npcSlug, npcInstanceId, respawnAt });
+    } catch (err) {
+      console.warn('[NPCRespawnService.scheduleRespawnForInstance] failed to persist pending respawn (timer still set)', { mapName, npcInstanceId }, err);
+    }
   }
 
   /**
@@ -164,19 +169,24 @@ export class NPCRespawnService {
 
   private static async respawnNpcInstance(npcSlug: string, npcInstanceId: string, mapName: string = 'main'): Promise<void> {
     const doc: any = await MapModel.findOne({ name: mapName });
-    if (!doc) return;
+    if (!doc) {
+      throw new Error(`[NPCRespawnService.respawnNpcInstance] map not found: ${mapName}`);
+    }
     const title = this.titleForSlug(npcSlug);
     if (usesMapCells(doc)) {
       // Full map (e.g. 500×500): placeNpcOnRandomCell samples from all valid empty cells, no bounds (retries inside on collision).
       const placed = await placeNpcOnRandomCell(doc, npcSlug, npcInstanceId, title);
       if (!placed) {
         console.warn('[NPCRespawnService.respawnNpcInstance] placement failed after retries', { npcSlug, npcInstanceId, mapName });
+        throw new Error('[NPCRespawnService.respawnNpcInstance] placement failed after retries');
       }
       return;
     }
     const cells: any[] = doc.cells || [];
     const valid: any[] = cells.filter((c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road');
-    if (valid.length === 0) return;
+    if (valid.length === 0) {
+      throw new Error('[NPCRespawnService.respawnNpcInstance] no valid cells for placement');
+    }
     const cell = valid[Math.floor(Math.random() * valid.length)];
     cell.isOccupied = true;
     cell.occupiedBy = 'npc';
