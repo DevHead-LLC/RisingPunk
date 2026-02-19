@@ -81,8 +81,10 @@ export class NPCRespawnService {
       this.scheduled.delete(key);
       try {
         await this.respawnNpcInstance(npcSlug, npcInstanceId, mapName);
-      } finally {
         await PendingNpcRespawn.deleteOne({ mapName, npcInstanceId });
+      } catch (err) {
+        console.warn('[NPCRespawnService.scheduleRespawnForInstance] timer respawn failed', { mapName, npcInstanceId }, err);
+        // Bugbot: Do not delete on failure so the record is retried on next startup.
       }
     }, delayMs);
     this.scheduled.set(key, timeout);
@@ -124,8 +126,10 @@ export class NPCRespawnService {
         this.scheduled.delete(key);
         try {
           await this.respawnNpcInstance(doc.npcSlug, doc.npcInstanceId, doc.mapName);
-        } finally {
           await PendingNpcRespawn.deleteOne({ mapName: doc.mapName, npcInstanceId: doc.npcInstanceId });
+        } catch (err) {
+          console.warn('[NPCRespawnService.runRespawnCatchUp] timer respawn failed for future', doc, err);
+          // Bugbot: Do not delete on failure so the record is retried on next startup.
         }
       }, remainingMs);
       this.scheduled.set(key, timeout);
