@@ -125,6 +125,14 @@ mongoose.connect(process.env.MONGODB_URI, {
     }
   }
 
+  // Restore NPC respawn timers after server reset (defeated bots respawn or re-schedule)
+  try {
+    const { NPCRespawnService } = require('./src/services/NPCRespawnService');
+    await NPCRespawnService.runRespawnCatchUp();
+  } catch (respawnErr: unknown) {
+    console.warn('NPC respawn catch-up failed (non-fatal):', respawnErr);
+  }
+
   // Initialize Google Auth Service
   try {
     const { GoogleAuthService } = require('./src/services/GoogleAuthService');
