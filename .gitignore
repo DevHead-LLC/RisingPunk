@@ -39,3 +39,7 @@ current-task.md
 .DS_Store
 
 /deployments
+
+# Server one-off / run-as-needed scripts (not part of production runtime).
+# Bugbot: Ignoring server/scripts/ is intentional; scripts here are optional/local. To commit a script, use git add -f. npm script entries in package.json may reference files that are not in the repo.
+server/scripts/
