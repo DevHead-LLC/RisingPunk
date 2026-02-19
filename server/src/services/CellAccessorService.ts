@@ -214,9 +214,9 @@ export async function placeUserHouse(
     try {
       try {
         return await session.withTransaction(async (): Promise<{ x: number; y: number } | null> => {
-          // (1) Clear any existing house for this user (in this transaction's snapshot)
+          // (1) Clear any existing house for this user only (exclude YOU markers; Bugbot: unique index allows one house + one YOU per user).
           await MapCell.updateMany(
-            { mapId, userId, occupiedBy: 'player' },
+            { mapId, userId, occupiedBy: 'player', entityName: { $ne: 'YOU' } },
             {
               $set: {
                 isOccupied: false,
@@ -228,11 +228,13 @@ export async function placeUserHouse(
             { session }
           );
           const terrainFilter = { $nin: ['water', 'mountain', 'road'] as const };
+          // Bugbot: Require userId: null so we never select/overwrite cells with orphaned player data (same as placeNpcOnRandomCell).
           const emptyCellFilter = {
             mapId,
             isOccupied: false,
             canBeOccupied: true,
             terrain: terrainFilter,
+            userId: null,
           };
           const maxTries = 5;
           const emptySampleSize = 1000;
@@ -251,7 +253,7 @@ export async function placeUserHouse(
               throw new Error('placeUserHouse: no empty cells; transaction aborted to preserve existing house');
             }
             const { x, y } = valid[Math.floor(Math.random() * valid.length)];
-            // (3) Update only if cell still empty (atomic). Partial unique index (mapId, userId) where occupiedBy='player' causes duplicate key if another transaction already placed for this user (Bugbot: atomic duplicate-house guard).
+            // (3) Update only if cell still empty (atomic). Require userId: null so we never overwrite orphaned player data (Bugbot: same as placeNpcOnRandomCell).
             const res = await MapCell.updateOne(
               {
                 mapId,
@@ -260,6 +262,7 @@ export async function placeUserHouse(
                 isOccupied: false,
                 canBeOccupied: true,
                 terrain: terrainFilter,
+                userId: null,
               },
               {
                 $set: {
