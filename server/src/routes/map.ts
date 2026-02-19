@@ -38,46 +38,25 @@ function evictExpiredMapChatRateLimitEntries(nowMs: number): void {
   }
 }
 
-/** userLevelAssociation (DB) → display level 1–21 shown on map. Levels 9–21 use 40,45,…,99. */
+/** userLevelAssociation (DB) → display level 1–21 shown on map. Levels 9–21 use 40,45,…,99. Single source of truth; SORTED_DB_LEVELS derived once (Bugbot: avoid recomputing sort on every fallback call). */
+const DISPLAY_LEVEL_MAPPING: { [key: number]: number } = {
+  1: 1, 5: 2, 10: 3, 15: 4, 20: 5, 25: 6, 30: 7, 35: 8, 40: 9, 45: 10,
+  50: 11, 55: 12, 60: 13, 65: 14, 70: 15, 75: 16, 80: 17, 85: 18, 90: 19, 95: 20, 99: 21,
+};
+const SORTED_DB_LEVELS = Object.keys(DISPLAY_LEVEL_MAPPING).map(Number).sort((a, b) => a - b);
+
 function getDisplayLevel(userLevelAssociation: number): number {
-  const mapping: { [key: number]: number } = {
-    1: 1,
-    5: 2,
-    10: 3,
-    15: 4,
-    20: 5,
-    25: 6,
-    30: 7,
-    35: 8,
-    40: 9,
-    45: 10,
-    50: 11,
-    55: 12,
-    60: 13,
-    65: 14,
-    70: 15,
-    75: 16,
-    80: 17,
-    85: 18,
-    90: 19,
-    95: 20,
-    99: 21,
-  };
-  const exact = mapping[userLevelAssociation];
+  const exact = DISPLAY_LEVEL_MAPPING[userLevelAssociation];
   if (typeof exact === 'number') return exact;
   // Bugbot: Unmapped DB levels (e.g. 37, 42) — use display level of largest mapped DB level <= input; clamp to 1–21.
-  // Bugbot: Derive from mapping so adding/removing a level doesn't require updating a second list (single source of truth).
-  const sortedDbLevels = Object.keys(mapping).map(Number).sort((a, b) => a - b);
-  if (userLevelAssociation < sortedDbLevels[0]) return 1;
-  if (userLevelAssociation >= sortedDbLevels[sortedDbLevels.length - 1]) return 21;
-  // Single pass: largest mapped level <= input, then one return (Bugbot: avoid redundant in-loop vs after-loop return).
-  // Bugbot: Post-loop return is reachable — we break out of the loop when db > input; no unreachable code.
-  let largestLeq = sortedDbLevels[0];
-  for (const db of sortedDbLevels) {
+  if (userLevelAssociation < SORTED_DB_LEVELS[0]) return 1;
+  if (userLevelAssociation >= SORTED_DB_LEVELS[SORTED_DB_LEVELS.length - 1]) return 21;
+  let largestLeq = SORTED_DB_LEVELS[0];
+  for (const db of SORTED_DB_LEVELS) {
     if (db > userLevelAssociation) break;
     largestLeq = db;
   }
-  return mapping[largestLeq];
+  return DISPLAY_LEVEL_MAPPING[largestLeq];
 }
 
 // Map name used by World Chat; only this name may be auto-created if missing so chat works on fresh environments (Bugbot).
