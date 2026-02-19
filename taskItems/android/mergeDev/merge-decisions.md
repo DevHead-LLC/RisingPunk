@@ -523,6 +523,80 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-19 (merge dev → android_mergeDev)
+
+**Branch context:** Merging origin/dev into android_mergeDev (from androidStaging). Three conflicts: .gitignore (deployments + server/scripts), mobile/package.json (version/versionCode + scripts), mobile/ios/mobile.xcodeproj/project.pbxproj (CURRENT_PROJECT_VERSION).
+
+### 1. `.gitignore`
+
+**Conflict:** Deployment and script ignore entries.
+
+| Side | Content |
+|------|--------|
+| HEAD | "# Deployment files", deployments/, *.aab |
+| dev  | /deployments, "# Server one-off..." comment, server/scripts/ |
+
+**Resolution:** Combined **both**. Final state: "# Deployment files", deployments/, /deployments, *.aab, then dev’s server/scripts comment and server/scripts/.
+
+**Rationale:** Android first: keep deployments/ and *.aab for Android deployment outputs. Dev’s /deployments and server/scripts/ are desired (user is fine with server/scripts being ignored; scripts in branch were untracked and are not committed).
+
+**Rejected content:** None—both sides merged.
+
+**Failure-mode hints for later:** If server scripts are needed in repo, use `git add -f` for specific files; npm script references may point to non-tracked files.
+
+---
+
+### 2. `mobile/package.json`
+
+**Conflict A (version + versionCode):**
+
+| Side | Content |
+|------|--------|
+| HEAD | "version": "2.4.3", "versionCode": 82 |
+| dev  | "version": "2.5.0" (no versionCode) |
+
+**Resolution:** Accepted **dev version** and **HEAD versionCode**. Final state: "version": "2.5.0", "versionCode": 82.
+
+**Rationale:** Android first. versionCode is required for Play Console; dev does not carry it. Take dev’s version (2.5.0) for consistency; keep versionCode 82 from Android branch.
+
+**Rejected from dev:** Omitting versionCode.
+
+**Conflict B (scripts – ios:staging/ios:prod + lint/start/test/android:build:release):**
+
+| Side | Content |
+|------|--------|
+| HEAD | ios:staging and ios:prod without --simulator; no lint, start, test, android:build:release scripts |
+| dev  | ios:staging/ios:prod with --simulator='iPhone 17 Pro Max'; lint, start, test, android:build:release* |
+
+**Resolution:** Accepted **dev**. Final state: dev’s ios scripts and full script set (lint, start, test, android:build:release).
+
+**Rationale:** Not Android deployment–specific. Dev’s scripts are the single source of truth; android:build:release is useful for Android builds.
+
+**Failure-mode hints for later:** If Play Console version code fails, ensure versionCode remains in mobile/package.json and is incremented as needed.
+
+---
+
+### 3. `mobile/ios/mobile.xcodeproj/project.pbxproj`
+
+**Conflict:** CURRENT_PROJECT_VERSION in Debug, Release, and Staging build configurations.
+
+| Side | Content |
+|------|--------|
+| HEAD | CURRENT_PROJECT_VERSION = 80 |
+| dev  | CURRENT_PROJECT_VERSION = 82 |
+
+**Resolution:** Accepted **dev**. Final state: CURRENT_PROJECT_VERSION = 82 in all three configurations.
+
+**Rationale:** iOS versioning only; does not affect Android deployment. Keeping dev’s 82 aligns iOS with dev.
+
+**Failure-mode hints for later:** None for Android; iOS build number is 82.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.

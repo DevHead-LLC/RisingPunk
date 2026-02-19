@@ -32,6 +32,7 @@ CellSchema.pre('save', function(next) {
 
 const MapSchema = new mongoose.Schema({
   name: { type: String, default: 'main' },
+  // Bugbot: Default 50 so legacy Map docs without a stored gridSize are hydrated as 50 and use embedded cells; if we defaulted to 500, usesMapCells() would be true and lookups would hit the empty MapCell collection. Expanded 500×500 maps must have gridSize: 500 explicitly stored (e.g. by migration or generateMap).
   gridSize: { type: Number, default: 50 },
   cells: [CellSchema],
   version: { type: Number, default: 1 },
