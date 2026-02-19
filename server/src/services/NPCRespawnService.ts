@@ -98,17 +98,28 @@ export class NPCRespawnService {
     for (const doc of overdue) {
       try {
         await this.respawnNpcInstance(doc.npcSlug, doc.npcInstanceId, doc.mapName);
+        await PendingNpcRespawn.deleteOne({ mapName: doc.mapName, npcInstanceId: doc.npcInstanceId });
       } catch (err) {
         console.warn('[NPCRespawnService.runRespawnCatchUp] respawn failed for overdue', doc, err);
+        // Bugbot: Do not delete on failure so the record is retried on next startup.
       }
-      await PendingNpcRespawn.deleteOne({ mapName: doc.mapName, npcInstanceId: doc.npcInstanceId });
     }
     const future = await PendingNpcRespawn.find({ respawnAt: { $gt: now } }).lean();
     for (const doc of future) {
       const key = `${doc.mapName}:${doc.npcInstanceId}`;
       if (this.scheduled.has(key)) continue;
+      // Bugbot: Recompute remainingMs per doc so we don't drop docs that became overdue while processing the overdue list.
       const remainingMs = doc.respawnAt.getTime() - Date.now();
-      if (remainingMs <= 0) continue;
+      if (remainingMs <= 0) {
+        try {
+          await this.respawnNpcInstance(doc.npcSlug, doc.npcInstanceId, doc.mapName);
+          await PendingNpcRespawn.deleteOne({ mapName: doc.mapName, npcInstanceId: doc.npcInstanceId });
+        } catch (err) {
+          console.warn('[NPCRespawnService.runRespawnCatchUp] respawn failed for became-overdue', doc, err);
+          // Bugbot: Do not delete on failure so the record is retried on next startup.
+        }
+        continue;
+      }
       const timeout = setTimeout(async () => {
         this.scheduled.delete(key);
         try {
