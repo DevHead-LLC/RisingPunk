@@ -1,13 +1,19 @@
 import mongoose from 'mongoose';
 import { Map } from '../models/Map';
+import { MapCell } from '../models/MapCell';
 import { dedupCellsByCoord } from '../utils/mapCellUtils';
 import { User } from '../models/User';
 import seedrandom from 'seedrandom';
 import { NPCService, NPCDocument } from './NPCService';
+import {
+  usesMapCells,
+  clearNpcsFromMap,
+  placeNpcOnRandomCell,
+} from './CellAccessorService';
 
 export class MapService {
   private rng: seedrandom.PRNG;
-  private readonly GRID_SIZE = 50;
+  private readonly GRID_SIZE = 500;
 
   constructor(seed: string = 'risingpunk-v1') {
     this.rng = seedrandom(seed);
@@ -78,14 +84,57 @@ export class MapService {
         userId: c.userId || null,
       };
     });
-    console.log('[MapService.generateMap] inserting map', name, 'with', plainCells.length, 'cells');
-    await Map.collection.insertOne({
-      name,
-      gridSize: this.GRID_SIZE,
-      cells: plainCells,
-      version: 2,
-      lastUpdated: new Date(),
-    });
+
+    // Bugbot: GRID_SIZE 500 → 250K cells; embedding in one Map doc would exceed MongoDB 16MB BSON limit.
+    // Insert Map doc without cells, then bulk-insert cells into MapCell collection (used when gridSize === 500).
+    // Bugbot: Use a single transaction so if cell insertion fails, the Map doc is not committed (no zombie map).
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const mapResult = await Map.collection.insertOne(
+          {
+            name,
+            gridSize: this.GRID_SIZE,
+            cells: [],
+            version: 2,
+            lastUpdated: new Date(),
+          },
+          { session }
+        );
+        const mapId = mapResult.insertedId;
+        if (!mapId) {
+          throw new Error('[MapService.generateMap] Map insert did not return insertedId');
+        }
+
+        const BULK_CHUNK_SIZE = 10_000;
+        let totalInserted = 0;
+        for (let i = 0; i < plainCells.length; i += BULK_CHUNK_SIZE) {
+          const chunk = plainCells.slice(i, i + BULK_CHUNK_SIZE);
+          const mapCellDocs = chunk.map((c) => ({
+            mapId,
+            x: c.x,
+            y: c.y,
+            terrain: c.terrain,
+            isActive: c.isActive,
+            isOccupied: c.isOccupied,
+            canBeOccupied: c.canBeOccupied,
+            occupiedBy: c.occupiedBy,
+            entityName: c.entityName,
+            npcSlug: c.npcSlug,
+            npcInstanceId: c.npcInstanceId,
+            userId: c.userId,
+          }));
+          const result = await MapCell.collection.insertMany(mapCellDocs, { session });
+          totalInserted += result.insertedCount;
+        }
+        if (totalInserted !== plainCells.length) {
+          throw new Error(`[MapService.generateMap] MapCell insert incomplete: expected ${plainCells.length}, got ${totalInserted}`);
+        }
+      });
+    } finally {
+      await session.endSession();
+    }
+    console.log('[MapService.generateMap] inserted map', name, 'with', plainCells.length, 'cells in MapCell collection');
     return Map.findOne({ name });
   }
 
@@ -277,29 +326,46 @@ export class MapService {
     }
   }
 
+  /** Bugbot: Single place for NPC distribution (levels, shuffle, unique-slug-first, remaining fill); MapCell and embedded paths both use this with a placement callback. */
+  private static async runNpcDistribution(
+    distribution: { [key: number]: number },
+    npcsByLevel: { [key: number]: NPCDocument[] },
+    placeOne: (npc: NPCDocument) => Promise<boolean> | boolean
+  ): Promise<void> {
+    const levels = [1, 5, 10, 15, 20, 25, 30, 35];
+    for (const level of levels) {
+      let npcs = npcsByLevel[level] || [];
+      if (npcs.length === 0) continue;
+      const targetCount = distribution[level] || 5;
+      const minCount = Math.max(5, targetCount);
+      const shuffled = [...npcs].sort(() => Math.random() - 0.5);
+      const npcsToPlace: NPCDocument[] = [];
+      const npcTypesPlaced = new Set<string>();
+      for (const npc of shuffled) {
+        if (!npcTypesPlaced.has(npc.slug)) {
+          npcsToPlace.push(npc);
+          npcTypesPlaced.add(npc.slug);
+        }
+      }
+      const remaining = Math.max(0, minCount - npcsToPlace.length);
+      for (let i = 0; i < remaining; i++) {
+        const randomNPC = shuffled[Math.floor(Math.random() * shuffled.length)];
+        npcsToPlace.push(randomNPC);
+      }
+      for (const npc of npcsToPlace) {
+        const ok = await placeOne(npc);
+        if (!ok) {
+          console.warn('[MapService.updateNPCsOnMap] NPC placement failed after retries, skipping rest of level', { level, npcSlug: npc.slug });
+          break;
+        }
+      }
+    }
+  }
+
   static async updateNPCsOnMap(mapName: string = 'main'): Promise<void> {
     const mapDoc = await Map.findOne({ name: mapName });
     if (!mapDoc) {
       throw new Error(`Map '${mapName}' not found`);
-    }
-
-    const cells: any[] = (mapDoc as any).cells || [];
-    let changed = false;
-
-    for (const cell of cells) {
-      if (cell.isOccupied && cell.occupiedBy === 'npc') {
-        cell.isOccupied = false;
-        cell.occupiedBy = 'none';
-        cell.entityName = '';
-        (cell as any).npcSlug = '';
-        (cell as any).npcInstanceId = '';
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      (mapDoc as any).markModified('cells');
-      await (mapDoc as any).save();
     }
 
     const distribution: { [key: number]: number } = {
@@ -315,13 +381,12 @@ export class MapService {
 
     const allNPCs = await NPCService.getAllNPCs();
     const npcsByLevel: { [key: number]: NPCDocument[] } = {};
-    
+
     for (const npc of allNPCs) {
       const level = npc.userLevelAssociation;
       if (!npcsByLevel[level]) {
         npcsByLevel[level] = [];
       }
-      
       if (typeof npc.mapRecoverySeconds !== 'number' || npc.mapRecoverySeconds <= 0) {
         const npcCollection = mongoose.connection.collection('npcs');
         await npcCollection.updateOne(
@@ -330,8 +395,35 @@ export class MapService {
         );
         npc.mapRecoverySeconds = 300;
       }
-      
       npcsByLevel[level].push(npc);
+    }
+
+    if (usesMapCells(mapDoc)) {
+      await clearNpcsFromMap(mapDoc);
+      await MapService.runNpcDistribution(distribution, npcsByLevel, async (npc) => {
+        const entityName = npc.name || npc.title || 'NPC';
+        const npcInstanceId = `${npc.slug}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+        const placed = await placeNpcOnRandomCell(mapDoc, npc.slug, npcInstanceId, entityName);
+        return !!placed;
+      });
+      return;
+    }
+
+    const cells: any[] = (mapDoc as any).cells || [];
+    let changed = false;
+    for (const cell of cells) {
+      if (cell.isOccupied && cell.occupiedBy === 'npc') {
+        cell.isOccupied = false;
+        cell.occupiedBy = 'none';
+        cell.entityName = '';
+        (cell as any).npcSlug = '';
+        (cell as any).npcInstanceId = '';
+        changed = true;
+      }
+    }
+    if (changed) {
+      (mapDoc as any).markModified('cells');
+      await (mapDoc as any).save();
     }
 
     const pickValidCell = (): { x: number; y: number; index: number } | null => {
@@ -347,43 +439,17 @@ export class MapService {
       return null;
     };
 
-    const levels = [1, 5, 10, 15, 20, 25, 30, 35];
-    for (const level of levels) {
-      let npcs = npcsByLevel[level] || [];
-      if (npcs.length === 0) continue;
-
-      const targetCount = distribution[level] || 5;
-      const minCount = Math.max(5, targetCount);
-
-      const shuffled = [...npcs].sort(() => Math.random() - 0.5);
-      const npcsToPlace: NPCDocument[] = [];
-      const npcTypesPlaced = new Set<string>();
-      
-      for (const npc of shuffled) {
-        if (!npcTypesPlaced.has(npc.slug)) {
-          npcsToPlace.push(npc);
-          npcTypesPlaced.add(npc.slug);
-        }
-      }
-
-      const remaining = Math.max(0, minCount - npcsToPlace.length);
-      for (let i = 0; i < remaining; i++) {
-        const randomNPC = shuffled[Math.floor(Math.random() * shuffled.length)];
-        npcsToPlace.push(randomNPC);
-      }
-
-      for (const npc of npcsToPlace) {
-        const validCell = pickValidCell();
-        if (!validCell) break;
-        const cell = cells[validCell.index];
-        cell.isOccupied = true;
-        cell.occupiedBy = 'npc';
-        cell.entityName = npc.name || npc.title || 'NPC';
-        (cell as any).npcSlug = npc.slug;
-        (cell as any).npcInstanceId = `${npc.slug}-${validCell.x}-${validCell.y}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-      }
-    }
-
+    await MapService.runNpcDistribution(distribution, npcsByLevel, (npc) => {
+      const validCell = pickValidCell();
+      if (!validCell) return false;
+      const cell = cells[validCell.index];
+      cell.isOccupied = true;
+      cell.occupiedBy = 'npc';
+      cell.entityName = npc.name || npc.title || 'NPC';
+      (cell as any).npcSlug = npc.slug;
+      (cell as any).npcInstanceId = `${npc.slug}-${validCell.x}-${validCell.y}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      return true;
+    });
     (mapDoc as any).markModified('cells');
     await (mapDoc as any).save();
   }
@@ -421,6 +487,11 @@ export class MapService {
       { 'cells.userId': userId },
       { $set: { 'cells.$[elem].entityName': newHandle } },
       options
+    );
+    await MapCell.updateMany(
+      { userId },
+      { $set: { entityName: newHandle } },
+      session ? { session } : {}
     );
   }
 } 
