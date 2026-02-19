@@ -22,6 +22,24 @@ if (process.env.NODE_ENV !== nodeEnv) {
 }
 
 /**
+ * Mongo client options for seed scripts (NPCs, etc.) to reduce ECONNREFUSED / getMore
+ * errors when talking to Atlas replica sets. Use with mongoose.connect(uri, { ...getSeedScriptMongoOptions('my-script'), dbName: getDatabaseName() }).
+ * - readPreference: 'primary' avoids secondaries that may be unreachable from your network.
+ * - family: 4 forces IPv4 (Node 17+ can prefer IPv6 and cause connection issues).
+ * - Timeouts are generous for long-running seed runs.
+ */
+export function getSeedScriptMongoOptions(appName: string): Record<string, unknown> {
+  return {
+    appName,
+    readPreference: 'primary',
+    family: 4,
+    serverSelectionTimeoutMS: 60000,
+    connectTimeoutMS: 30000,
+    socketTimeoutMS: 120000,
+  };
+}
+
+/**
  * Database name for mongoose connect({ dbName }) by NODE_ENV.
  * Single source of truth for all scripts.
  * Staging and development share the same DB (RisingPunk); production uses RisingPunkProd.
