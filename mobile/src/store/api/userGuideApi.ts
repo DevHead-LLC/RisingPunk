@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
+import { setAppVersionHeader } from './appVersionHeader';
 import { balanceApi } from './balanceApi';
 import type {
   CurrentTaskResponse,
@@ -34,6 +35,7 @@ export const userGuideApi = createApi({
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
       }
+      setAppVersionHeader(headers);
       return headers;
     },
   }),

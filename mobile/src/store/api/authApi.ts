@@ -3,6 +3,7 @@ import type { RootState } from '../index';
 import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { setAppVersionHeader } from './appVersionHeader';
 import { balanceApi } from './balanceApi';
 
 export interface LoginRequest {
@@ -223,6 +224,7 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
       }
 
       headers.set('Content-Type', 'application/json');
+      setAppVersionHeader(headers);
       return headers;
     },
   })(args, api, extraOptions);

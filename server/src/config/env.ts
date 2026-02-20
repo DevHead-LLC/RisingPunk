@@ -53,3 +53,8 @@ export const APPLE_PRIVATE_KEY: string = process.env.APPLE_PRIVATE_KEY || '';
 export const APP_STORE_WEB_URL = process.env.APP_STORE_WEB_URL || 'https://apps.apple.com/app/risingpunk/id6749834469';
 export const GOOGLE_PLAY_WEB_URL = process.env.GOOGLE_PLAY_WEB_URL || 'https://play.google.com/store/apps/details?id=com.devheadllc.risingpunk';
 export const DESKTOP_LANDING_URL = process.env.DESKTOP_LANDING_URL || 'https://risingpunk.com';
+
+// Minimum app version (semver). When set, clients below this version are blocked (force update).
+// For rollout: set MIN_APP_VERSION=2.5.0 so 2.5.0 and higher are allowed; anything below is blocked.
+export const MIN_APP_VERSION: string | undefined = process.env.MIN_APP_VERSION;
+export const RECOMMENDED_APP_VERSION: string | undefined = process.env.RECOMMENDED_APP_VERSION;
