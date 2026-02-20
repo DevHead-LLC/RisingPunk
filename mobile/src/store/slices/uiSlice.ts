@@ -1,6 +1,11 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+/** Payload for setForceUpdateRequired: sticky (only set true / preserve minAppVersion). */
+export type ForceUpdatePayload = { updateRequired: boolean; minAppVersion?: string };
+
 interface UIState {
+  /** Set when server requires min app version (health or 426). Show UpdateRequiredScreen until user updates. */
+  forceUpdate: { updateRequired: boolean; minAppVersion?: string };
   // Map UI state
   map: {
     legendExpanded: boolean;
@@ -20,6 +25,7 @@ interface UIState {
 }
 
 const initialState: UIState = {
+  forceUpdate: { updateRequired: false },
   map: {
     legendExpanded: false,
   },
@@ -66,6 +72,14 @@ export const uiSlice = createSlice({
       state.modals.globalError = action.payload;
     },
 
+    /** Sticky on failure: set updateRequired true when true; clear when we get successful health with false + minAppVersion. */
+    setForceUpdateRequired: (state, action: PayloadAction<ForceUpdatePayload>) => {
+      const { updateRequired, minAppVersion } = action.payload;
+      if (updateRequired) state.forceUpdate.updateRequired = true;
+      else if (minAppVersion !== undefined) state.forceUpdate.updateRequired = false;
+      if (minAppVersion !== undefined) state.forceUpdate.minAppVersion = minAppVersion;
+    },
+
     // Screen navigation actions (for future use)
     setCurrentTurfScreen: (state, action: PayloadAction<string>) => {
       state.screens.currentTurfScreen = action.payload;
@@ -81,6 +95,7 @@ export const {
   setBotSelector,
   setFinancialStatements,
   setGlobalErrorModal,
+  setForceUpdateRequired,
   setCurrentTurfScreen,
 } = uiSlice.actions;
 

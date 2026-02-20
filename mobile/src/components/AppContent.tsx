@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useCallback, useState } from 'react';
+import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
@@ -11,7 +11,7 @@ import { useGetProfileQuery } from '../store/api/authApi';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
 import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
-import { setFinancialStatements, setGlobalErrorModal } from '../store/slices/uiSlice';
+import { setFinancialStatements, setGlobalErrorModal, setForceUpdateRequired } from '../store/slices/uiSlice';
 import { useNetworkConnectivity } from '../providers/NetworkConnectivityProvider';
 import { ConnectivityOverlay } from './common/ConnectivityOverlay';
 import { HandleSelectionModal } from './modals/HandleSelectionModal';
@@ -28,8 +28,7 @@ import { UpdateRequiredScreen } from './UpdateRequiredScreen';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
-  const [updateRequired, setUpdateRequired] = useState(false);
-  const [minAppVersion, setMinAppVersion] = useState<string | undefined>(undefined);
+  const { updateRequired, minAppVersion } = useAppSelector((state) => state.ui.forceUpdate);
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
@@ -92,8 +91,10 @@ const AppContent = memo(() => {
       await trackFirstOpen();
       dispatch(loadStoredAuth());
       const versionResult = await checkAppVersion();
-      setUpdateRequired((prev) => prev || versionResult.updateRequired);
-      setMinAppVersion((prev) => versionResult.minAppVersion ?? prev);
+      dispatch(setForceUpdateRequired({
+        updateRequired: versionResult.updateRequired,
+        minAppVersion: versionResult.minAppVersion,
+      }));
     };
     init();
   }, [dispatch]);
@@ -253,8 +254,10 @@ const AppContent = memo(() => {
       if (wasBackgroundOrInactive && nextAppState === 'active') {
         // Version check and user-data refresh run in parallel so slow health fetch doesn't block refresh
         checkAppVersion().then((versionResult) => {
-          setUpdateRequired((prev) => prev || versionResult.updateRequired);
-          setMinAppVersion((prev) => versionResult.minAppVersion ?? prev);
+          dispatch(setForceUpdateRequired({
+            updateRequired: versionResult.updateRequired,
+            minAppVersion: versionResult.minAppVersion,
+          }));
         });
         if (token && user) {
           trackAppReturned();
