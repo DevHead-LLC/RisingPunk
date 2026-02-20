@@ -3,6 +3,7 @@ import { API_URL } from '../../config';
 import { MapResponse } from '../../types/map';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { setAppVersionHeader } from './appVersionHeader';
 
 // Custom base query with error handling for mapApi
 const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -11,6 +12,7 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any)?.auth?.token;
       if (token) {headers.set('Authorization', `Bearer ${token}`);}
+      setAppVersionHeader(headers);
       return headers;
     },
   })(args, api, extraOptions);

@@ -5,6 +5,7 @@ import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { setAppVersionHeader } from './appVersionHeader';
 import { trackFirstBots } from '../../services/analyticsService';
 
 // Custom base query with error handling for botsApi
@@ -15,6 +16,7 @@ const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any)?.auth?.token;
       if (token) {headers.set('Authorization', `Bearer ${token}`);}
+      setAppVersionHeader(headers);
       return headers;
     },
   })(args, api, extraOptions);

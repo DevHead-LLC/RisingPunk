@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
+import { setAppVersionHeader } from './appVersionHeader';
 
 export const antivirusApi = createApi({
   reducerPath: 'antivirusApi',
@@ -10,6 +11,7 @@ export const antivirusApi = createApi({
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
       }
+      setAppVersionHeader(headers);
       return headers;
     },
   }),

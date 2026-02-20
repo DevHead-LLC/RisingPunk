@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { RootState } from '../index';
 import { API_URL } from '../../config';
+import { setAppVersionHeader } from './appVersionHeader';
 
 export interface RentalHousingIncome {
   totalIncomePerSecond: number;
@@ -33,6 +34,7 @@ export const rentalHousingApi = createApi({
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
       }
+      setAppVersionHeader(headers);
       return headers;
     },
   }),
