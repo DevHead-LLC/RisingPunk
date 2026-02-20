@@ -39,7 +39,7 @@ const userGuideBaseQuery = async (args: any, api: any, extraOptions: any) => {
       return headers;
     },
   })(args, api, extraOptions);
-  if (result.error && handle426IfNeeded(result, api)) {}
+  if (handle426IfNeeded(result, api)) return result;
   return result;
 };
 
