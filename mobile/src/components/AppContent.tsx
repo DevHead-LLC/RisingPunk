@@ -246,15 +246,16 @@ const AppContent = memo(() => {
   // changes after refresh) the new listener can fire again, causing a repeated refresh loop and
   // prolonged "Refreshing..." / loading state (especially noticeable with guest sign-in).
   useEffect(() => {
-    const handleAppStateChange = async (nextAppState: string) => {
+    const handleAppStateChange = (nextAppState: string) => {
       const wasBackgroundOrInactive = appStateRef.current.match(/inactive|background/);
       appStateRef.current = nextAppState;
 
       if (wasBackgroundOrInactive && nextAppState === 'active') {
-        const versionResult = await checkAppVersion();
-        // Sticky: once update required, don't clear on transient failure (checkAppVersion returns false on error)
-        setUpdateRequired((prev) => prev || versionResult.updateRequired);
-        setMinAppVersion((prev) => versionResult.minAppVersion ?? prev);
+        // Version check and user-data refresh run in parallel so slow health fetch doesn't block refresh
+        checkAppVersion().then((versionResult) => {
+          setUpdateRequired((prev) => prev || versionResult.updateRequired);
+          setMinAppVersion((prev) => versionResult.minAppVersion ?? prev);
+        });
         if (token && user) {
           trackAppReturned();
           dispatch(refreshUserData());
