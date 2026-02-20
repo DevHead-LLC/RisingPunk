@@ -3,6 +3,7 @@ import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
 import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 
 // Custom base query with error handling for balanceApi
 const balanceBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -18,6 +19,7 @@ const balanceBaseQuery = async (args: any, api: any, extraOptions: any) => {
   })(args, api, extraOptions);
 
   if (result.error) {
+    if (handle426IfNeeded(result, api)) return result;
     // Check for account switched error first
     if ((result.error as any).status === 401 && (result.error as any).data?.error === 'ACCOUNT_SWITCHED') {
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately

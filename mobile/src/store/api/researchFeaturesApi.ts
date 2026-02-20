@@ -1,5 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 import { API_URL } from '../../config';
 import { RootState } from '../index';
 import { balanceApi } from './balanceApi';
@@ -36,9 +37,8 @@ export interface SpeedupFeatureResearchResponse {
 /** Cash-flow feature IDs (spec 18) that affect balance/expense modifiers; used to invalidate balance cache on complete/speedup. Excludes legacy financial/reduce-expenses (categoryId is always cash-flow in these mutations). */
 const CASH_FLOW_SYNC_FEATURE_IDS: readonly string[] = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'];
 
-export const researchFeaturesApi = createApi({
-  reducerPath: 'researchFeaturesApi',
-  baseQuery: fetchBaseQuery({
+const researchBaseQuery = async (args: any, api: any, extraOptions: any) => {
+  const result = await fetchBaseQuery({
     baseUrl: `${API_URL}/api/research`,
     prepareHeaders: (headers, { getState, endpoint }) => {
       const token = (getState() as RootState).auth.token;
@@ -51,7 +51,14 @@ export const researchFeaturesApi = createApi({
       setAppVersionHeader(headers);
       return headers;
     },
-  }),
+  })(args, api, extraOptions);
+  if (result.error && handle426IfNeeded(result, api)) {}
+  return result;
+};
+
+export const researchFeaturesApi = createApi({
+  reducerPath: 'researchFeaturesApi',
+  baseQuery: researchBaseQuery,
   tagTypes: ['ResearchFeature', 'ResearchFeatures', 'ExpenseModifiers'],
   endpoints: (builder) => ({
     getExpenseModifiers: builder.query<{ insuranceReduction: number; taxReduction: number }, void>({
