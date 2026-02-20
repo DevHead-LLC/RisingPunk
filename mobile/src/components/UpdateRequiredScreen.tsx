@@ -23,15 +23,17 @@ type UpdateRequiredScreenProps = {
 export const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({ minAppVersion }) => {
   const colors = useThemeColors();
   const { width, height } = useWindowDimensions();
-  const versionMessage = minAppVersion
-    ? `Please update to version ${minAppVersion} and restart your application to continue a better experience.`
-    : 'Please update to the latest version and restart your application to continue a better experience.';
+  const whyLine = 'We’ve updated our services and no longer support this version of the app for security and compatibility.';
+  const actionLine = minAppVersion
+    ? `Please update to version ${minAppVersion} or newer, then restart the app to continue.`
+    : 'Please update to the latest version, then restart the app to continue.';
 
   const handleUpdatePress = () => {
     Linking.openURL(getUpdateUrl());
   };
 
-  const contentWidth = Math.min(width * 0.4, 400);
+  // Use wider content on narrow screens (phones) so message is readable; keep 40% cap on larger screens
+  const contentWidth = width < 500 ? Math.min(width * 0.85, 400) : Math.min(width * 0.4, 400);
   return (
     <View style={[styles.container, { width, height, backgroundColor: colors.background }]}>
       <View style={[styles.content, { width: contentWidth, maxWidth: 400, borderColor: colors.matrix }]}>
@@ -39,7 +41,7 @@ export const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({ minA
           Update required
         </Text>
         <Text style={[styles.message, { color: colors.text.secondary }]}>
-          Older versions of this app no longer operate correctly. {versionMessage}
+          {whyLine} {actionLine}
         </Text>
         <Pressable
           style={({ pressed }) => [
