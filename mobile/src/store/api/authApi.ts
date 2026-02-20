@@ -4,6 +4,7 @@ import { API_URL } from '../../config';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
 import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 import { balanceApi } from './balanceApi';
 
 export interface LoginRequest {
@@ -230,7 +231,7 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
   })(args, api, extraOptions);
 
   if (result.error) {
-    
+    if (handle426IfNeeded(result, api)) return result;
     // Check for account switched error first
     if (result.error?.status === 401 && (result.error?.data as any)?.error === 'ACCOUNT_SWITCHED') {
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately

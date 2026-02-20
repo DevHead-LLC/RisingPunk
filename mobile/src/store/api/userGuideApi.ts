@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 import { balanceApi } from './balanceApi';
 import type {
   CurrentTaskResponse,
@@ -25,9 +26,8 @@ import type {
   TrackTaskGuidePillTapResponse
 } from '../../types/userGuide';
 
-export const userGuideApi = createApi({
-  reducerPath: 'userGuideApi',
-  baseQuery: fetchBaseQuery({
+const userGuideBaseQuery = async (args: any, api: any, extraOptions: any) => {
+  const result = await fetchBaseQuery({
     baseUrl: API_URL,
     prepareHeaders: (headers, { getState }) => {
       const state = getState() as { auth: { token: string | null } };
@@ -38,7 +38,14 @@ export const userGuideApi = createApi({
       setAppVersionHeader(headers);
       return headers;
     },
-  }),
+  })(args, api, extraOptions);
+  if (handle426IfNeeded(result, api)) return result;
+  return result;
+};
+
+export const userGuideApi = createApi({
+  reducerPath: 'userGuideApi',
+  baseQuery: userGuideBaseQuery,
   tagTypes: ['UserTaskProgress'],
   endpoints: (builder) => ({
     getCurrentTaskGuideTask: builder.query<CurrentTaskResponse, void>({

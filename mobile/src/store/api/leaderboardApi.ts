@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import type { RootState } from '../index';
 import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 
 export interface LeaderboardUser {
   rank: number;
@@ -54,9 +55,8 @@ const calculateNextPollTime = (): number => {
   return timeUntilNext;
 };
 
-export const leaderboardApi = createApi({
-  reducerPath: 'leaderboardApi',
-  baseQuery: fetchBaseQuery({
+const leaderboardBaseQuery = async (args: any, api: any, extraOptions: any) => {
+  const result = await fetchBaseQuery({
     baseUrl: API_URL,
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as RootState).auth.token;
@@ -66,7 +66,14 @@ export const leaderboardApi = createApi({
       setAppVersionHeader(headers);
       return headers;
     },
-  }),
+  })(args, api, extraOptions);
+  if (handle426IfNeeded(result, api)) return result;
+  return result;
+};
+
+export const leaderboardApi = createApi({
+  reducerPath: 'leaderboardApi',
+  baseQuery: leaderboardBaseQuery,
   tagTypes: ['Leaderboard'],
   endpoints: (builder) => ({
     getIndividualBotsDestroyedLeaderboard: builder.query<IndividualLeaderboardResponse, void>({
