@@ -3,6 +3,7 @@ import { API_URL } from '../../config';
 import type { RootState } from '../index';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { setAppVersionHeader } from './appVersionHeader';
 
 // Debounce mechanism for ACCOUNT_SWITCHED errors
 let accountSwitchedDispatched = false;
@@ -24,6 +25,7 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
       // Device ID no longer needed for simple token invalidation approach
 
       headers.set('Content-Type', 'application/json');
+      setAppVersionHeader(headers);
       return headers;
     },
   })(args, api, extraOptions);

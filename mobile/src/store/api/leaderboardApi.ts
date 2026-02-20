@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import type { RootState } from '../index';
+import { setAppVersionHeader } from './appVersionHeader';
 
 export interface LeaderboardUser {
   rank: number;
@@ -62,6 +63,7 @@ export const leaderboardApi = createApi({
       if (token) {
         headers.set('authorization', `Bearer ${token}`);
       }
+      setAppVersionHeader(headers);
       return headers;
     },
   }),

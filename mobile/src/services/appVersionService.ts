@@ -4,6 +4,8 @@ import semver from 'semver';
 
 export type VersionCheckResult = {
   updateRequired: boolean;
+  /** When updateRequired is true, the server's minimum required version (for display in UI). */
+  minAppVersion?: string;
 };
 
 /**
@@ -26,7 +28,8 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     const current = semver.valid(APP_VERSION);
     const min = semver.valid(minAppVersion);
     if (!current || !min) return { updateRequired: false };
-    return { updateRequired: semver.lt(current, min) };
+    const required = semver.lt(current, min);
+    return { updateRequired: required, ...(required && { minAppVersion }) };
   } catch {
     return { updateRequired: false };
   }

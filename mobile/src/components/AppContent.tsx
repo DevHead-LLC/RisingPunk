@@ -29,6 +29,7 @@ import { UpdateRequiredScreen } from './UpdateRequiredScreen';
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
   const [updateRequired, setUpdateRequired] = useState(false);
+  const [minAppVersion, setMinAppVersion] = useState<string | undefined>(undefined);
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
@@ -91,7 +92,8 @@ const AppContent = memo(() => {
       await trackFirstOpen();
       dispatch(loadStoredAuth());
       const versionResult = await checkAppVersion();
-      setUpdateRequired(versionResult.updateRequired);
+      setUpdateRequired((prev) => prev || versionResult.updateRequired);
+      setMinAppVersion((prev) => versionResult.minAppVersion ?? prev);
     };
     init();
   }, [dispatch]);
@@ -250,7 +252,9 @@ const AppContent = memo(() => {
 
       if (wasBackgroundOrInactive && nextAppState === 'active') {
         const versionResult = await checkAppVersion();
-        setUpdateRequired(versionResult.updateRequired);
+        // Sticky: once update required, don't clear on transient failure (checkAppVersion returns false on error)
+        setUpdateRequired((prev) => prev || versionResult.updateRequired);
+        setMinAppVersion((prev) => versionResult.minAppVersion ?? prev);
         if (token && user) {
           trackAppReturned();
           dispatch(refreshUserData());
@@ -321,7 +325,7 @@ const AppContent = memo(() => {
   if (updateRequired) {
     return (
       <>
-        <UpdateRequiredScreen />
+        <UpdateRequiredScreen minAppVersion={minAppVersion} />
         <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
       </>
     );

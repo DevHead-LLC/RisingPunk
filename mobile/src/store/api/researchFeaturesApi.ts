@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { setAppVersionHeader } from './appVersionHeader';
 import { API_URL } from '../../config';
 import { RootState } from '../index';
 import { balanceApi } from './balanceApi';
@@ -47,6 +48,7 @@ export const researchFeaturesApi = createApi({
       if (endpoint === 'getUserFeatures') {
         headers.set('X-Research-API-Version', '2');
       }
+      setAppVersionHeader(headers);
       return headers;
     },
   }),

@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { NetworkConnection, LineProperties, MovementState } from '../../types/battleTypes';
 import type { RootState } from '../index';
+import { setAppVersionHeader } from './appVersionHeader';
 
 export interface BattalionLoss {
   battalionId: string;
@@ -112,6 +113,7 @@ export const battleApi = createApi({
       }
 
       headers.set('Content-Type', 'application/json');
+      setAppVersionHeader(headers);
       return headers;
     },
   }),

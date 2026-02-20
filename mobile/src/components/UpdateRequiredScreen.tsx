@@ -11,12 +11,20 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { SIZING, styleGuide } from '../styles/theme';
 import { getUpdateUrl } from '../constants/updateUrls';
 
+type UpdateRequiredScreenProps = {
+  /** Server's minimum required version (from version check). Shown in message when provided. */
+  minAppVersion?: string;
+};
+
 /**
  * Full-screen, non-dismissable "Update required" screen.
  * Shown when app version is below server minimum. Single CTA opens store (or risingpunk.com).
  */
-export const UpdateRequiredScreen: React.FC = () => {
+export const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({ minAppVersion }) => {
   const colors = useThemeColors();
+  const versionMessage = minAppVersion
+    ? `Please update to version ${minAppVersion} and restart your application to continue a better experience.`
+    : 'Please update to the latest version and restart your application to continue a better experience.';
 
   const handleUpdatePress = () => {
     Linking.openURL(getUpdateUrl());
@@ -29,7 +37,7 @@ export const UpdateRequiredScreen: React.FC = () => {
           Update required
         </Text>
         <Text style={[styles.message, { color: colors.text.secondary }]}>
-          Older versions of this app no longer operate correctly. Please update to version 2.5.0 and restart your application to continue a better experience.
+          Older versions of this app no longer operate correctly. {versionMessage}
         </Text>
         <Pressable
           style={({ pressed }) => [
