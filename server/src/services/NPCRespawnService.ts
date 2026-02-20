@@ -80,6 +80,7 @@ export class NPCRespawnService {
     const timeout = setTimeout(async () => {
       this.scheduled.delete(key);
       try {
+        await this.clearNpcInstanceFromMap(npcInstanceId, mapName);
         await this.respawnNpcInstance(npcSlug, npcInstanceId, mapName);
         await PendingNpcRespawn.deleteOne({ mapName, npcInstanceId });
       } catch (err) {
@@ -98,12 +99,14 @@ export class NPCRespawnService {
   /**
    * Run on server startup: respawn all overdue pending NPCs and re-schedule future ones.
    * Ensures bots are not permanently lost after a server reset.
+   * Bugbot: We clear by npcInstanceId before each respawn so a crash after respawn but before deleteOne doesn't leave a duplicate on next restart.
    */
   static async runRespawnCatchUp(): Promise<void> {
     const now = new Date();
     const overdue = await PendingNpcRespawn.find({ respawnAt: { $lte: now } }).lean();
     for (const doc of overdue) {
       try {
+        await this.clearNpcInstanceFromMap(doc.npcInstanceId, doc.mapName);
         await this.respawnNpcInstance(doc.npcSlug, doc.npcInstanceId, doc.mapName);
         await PendingNpcRespawn.deleteOne({ mapName: doc.mapName, npcInstanceId: doc.npcInstanceId });
       } catch (err) {
@@ -119,6 +122,7 @@ export class NPCRespawnService {
       const remainingMs = doc.respawnAt.getTime() - Date.now();
       if (remainingMs <= 0) {
         try {
+          await this.clearNpcInstanceFromMap(doc.npcInstanceId, doc.mapName);
           await this.respawnNpcInstance(doc.npcSlug, doc.npcInstanceId, doc.mapName);
           await PendingNpcRespawn.deleteOne({ mapName: doc.mapName, npcInstanceId: doc.npcInstanceId });
         } catch (err) {
@@ -130,6 +134,7 @@ export class NPCRespawnService {
       const timeout = setTimeout(async () => {
         this.scheduled.delete(key);
         try {
+          await this.clearNpcInstanceFromMap(doc.npcInstanceId, doc.mapName);
           await this.respawnNpcInstance(doc.npcSlug, doc.npcInstanceId, doc.mapName);
           await PendingNpcRespawn.deleteOne({ mapName: doc.mapName, npcInstanceId: doc.npcInstanceId });
         } catch (err) {
