@@ -31,9 +31,10 @@ export const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({ minA
     Linking.openURL(getUpdateUrl());
   };
 
+  const contentWidth = Math.min(width * 0.4, 400);
   return (
     <View style={[styles.container, { width, height, backgroundColor: colors.background }]}>
-      <View style={[styles.content, { borderColor: colors.matrix }]}>
+      <View style={[styles.content, { width: contentWidth, maxWidth: 400, borderColor: colors.matrix }]}>
         <Text style={[styles.title, { color: colors.text.accent }]}>
           Update required
         </Text>
@@ -66,8 +67,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: {
-    width: SIZING.screen.width * 0.4,
-    maxWidth: 400,
     borderWidth: 1,
     borderRadius: 8,
     padding: SIZING.spacing.lg,
