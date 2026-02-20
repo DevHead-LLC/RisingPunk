@@ -4,7 +4,7 @@ import semver from 'semver';
 
 export type VersionCheckResult = {
   updateRequired: boolean;
-  /** When updateRequired is true, the server's minimum required version (for display in UI). */
+  /** Server's minimum required version when set (for display and so reducer can clear after update). */
   minAppVersion?: string;
 };
 
@@ -29,7 +29,8 @@ export async function checkAppVersion(): Promise<VersionCheckResult> {
     const min = semver.valid(minAppVersion);
     if (!current || !min) return { updateRequired: false };
     const required = semver.lt(current, min);
-    return { updateRequired: required, ...(required && { minAppVersion }) };
+    // Always include minAppVersion when server sent it so reducer can clear updateRequired after user updates
+    return { updateRequired: required, minAppVersion };
   } catch {
     return { updateRequired: false };
   }
