@@ -1,18 +1,23 @@
 import { Request, Response, NextFunction } from 'express';
 import { MIN_APP_VERSION } from '../config/env';
 
-/** Version core (numeric parts), pre-release flag, and pre-release identifier (e.g. "beta.1") for comparison. */
-function parseVersion(s: string): { parts: number[]; hasPreRelease: boolean; preRelease: string } {
+/** Parsed version or null if invalid (non-numeric core segment or missing core). Handles leading "v" (e.g. v2.5.0). */
+function parseVersion(s: string): { parts: number[]; hasPreRelease: boolean; preRelease: string } | null {
   const trimmed = s.trim();
-  const dashIdx = trimmed.indexOf('-');
+  const normalized = /^v/i.test(trimmed) ? trimmed.slice(1).trim() : trimmed;
+  const dashIdx = normalized.indexOf('-');
   const hasPreRelease = dashIdx >= 0;
-  const core = hasPreRelease ? trimmed.slice(0, dashIdx) : trimmed;
-  const preRelease = hasPreRelease ? trimmed.slice(dashIdx + 1) : '';
+  const core = hasPreRelease ? normalized.slice(0, dashIdx).trim() : normalized;
+  const preRelease = hasPreRelease ? normalized.slice(dashIdx + 1) : '';
+  if (!core) return null;
   const partStrs = core.split('.');
-  const parts = partStrs.map((p) => {
+  const parts: number[] = [];
+  for (const p of partStrs) {
     const n = parseInt(p, 10);
-    return Number.isNaN(n) ? 0 : n;
-  });
+    if (Number.isNaN(n) || n < 0) return null;
+    parts.push(n);
+  }
+  if (parts.length === 0) return null;
   return { parts, hasPreRelease, preRelease };
 }
 
@@ -44,11 +49,12 @@ function isPreReleaseLess(a: string, b: string): boolean {
 
 /**
  * Returns true if client is less than min (reject with 426).
- * Matches semver: release > pre-release; when both pre-release, compare identifiers (e.g. beta.1 < beta.2).
+ * Returns false if either version is unparseable (don't enforce), so we don't 426 valid v-prefix clients or treat malformed as 0.0.0.
  */
 function isVersionBelowMin(client: string, min: string): boolean {
   const a = parseVersion(client);
   const b = parseVersion(min);
+  if (a === null || b === null) return false;
   const maxLen = Math.max(a.parts.length, b.parts.length);
   for (let i = 0; i < maxLen; i++) {
     const va = a.parts[i] ?? 0;
@@ -66,7 +72,7 @@ function isVersionBelowMin(client: string, min: string): boolean {
 /**
  * When MIN_APP_VERSION is set, rejects requests with X-App-Version below it (426 Upgrade Required).
  * Pre-release handling matches client (semver): 2.5.0-beta.1 < 2.5.0; when min is pre-release (e.g. 2.5.0-beta.2), beta.1 is below beta.2. No extra dependency.
- * Skips when MIN_APP_VERSION is unset or X-App-Version is missing (allow through).
+ * Skips when MIN_APP_VERSION is unset or X-App-Version is missing (allow through). Unparseable versions (non-numeric core segment or empty core) skip enforcement (allow through).
  */
 export function requireMinAppVersion(req: Request, res: Response, next: NextFunction): void {
   if (!MIN_APP_VERSION) {

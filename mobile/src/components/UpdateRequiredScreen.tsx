@@ -4,8 +4,8 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  Dimensions,
   Linking,
+  useWindowDimensions,
 } from 'react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { SIZING, styleGuide } from '../styles/theme';
@@ -22,6 +22,7 @@ type UpdateRequiredScreenProps = {
  */
 export const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({ minAppVersion }) => {
   const colors = useThemeColors();
+  const { width, height } = useWindowDimensions();
   const versionMessage = minAppVersion
     ? `Please update to version ${minAppVersion} and restart your application to continue a better experience.`
     : 'Please update to the latest version and restart your application to continue a better experience.';
@@ -30,9 +31,10 @@ export const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({ minA
     Linking.openURL(getUpdateUrl());
   };
 
+  const contentWidth = Math.min(width * 0.4, 400);
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.content, { borderColor: colors.matrix }]}>
+    <View style={[styles.container, { width, height, backgroundColor: colors.background }]}>
+      <View style={[styles.content, { width: contentWidth, maxWidth: 400, borderColor: colors.matrix }]}>
         <Text style={[styles.title, { color: colors.text.accent }]}>
           Update required
         </Text>
@@ -56,21 +58,15 @@ export const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({ minA
   );
 };
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     top: 0,
     left: 0,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
     justifyContent: 'center',
     alignItems: 'center',
   },
   content: {
-    width: SIZING.screen.width * 0.4,
-    maxWidth: 400,
     borderWidth: 1,
     borderRadius: 8,
     padding: SIZING.spacing.lg,
