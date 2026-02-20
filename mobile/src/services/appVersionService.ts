@@ -1,0 +1,33 @@
+import { APP_VERSION } from '../appVersion';
+import { API_URL } from '../config';
+import semver from 'semver';
+
+export type VersionCheckResult = {
+  updateRequired: boolean;
+};
+
+/**
+ * Fetches server health (which includes minAppVersion when set) and returns whether
+ * the current app version is below minimum (force update required).
+ * On network/parse error, returns updateRequired: false so we don't block the user.
+ */
+export async function checkAppVersion(): Promise<VersionCheckResult> {
+  try {
+    const res = await fetch(`${API_URL}/health`, {
+      method: 'GET',
+      headers: {
+        'X-App-Version': APP_VERSION,
+      },
+    });
+    if (!res.ok) return { updateRequired: false };
+    const data = (await res.json()) as { minAppVersion?: string };
+    const minAppVersion = data.minAppVersion;
+    if (!minAppVersion || typeof minAppVersion !== 'string') return { updateRequired: false };
+    const current = semver.valid(APP_VERSION);
+    const min = semver.valid(minAppVersion);
+    if (!current || !min) return { updateRequired: false };
+    return { updateRequired: semver.lt(current, min) };
+  } catch {
+    return { updateRequired: false };
+  }
+}

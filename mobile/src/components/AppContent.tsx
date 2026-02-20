@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useCallback } from 'react';
+import React, { memo, useEffect, useRef, useCallback, useState } from 'react';
 import { View, Text, Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
@@ -23,9 +23,12 @@ import { globalErrorHandler } from '../services/GlobalErrorHandler';
 import { getAnalytics, setAnalyticsCollectionEnabled, setUserProperty, logEvent } from '@react-native-firebase/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trackAppReturned, trackFirstOpen, getAccountCreatedThisSession, clearAccountCreatedThisSession } from '../services/analyticsService';
+import { checkAppVersion } from '../services/appVersionService';
+import { UpdateRequiredScreen } from './UpdateRequiredScreen';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
+  const [updateRequired, setUpdateRequired] = useState(false);
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
@@ -87,6 +90,8 @@ const AppContent = memo(() => {
       // Set first-open flag before loading auth so token/user effect doesn't race past it
       await trackFirstOpen();
       dispatch(loadStoredAuth());
+      const versionResult = await checkAppVersion();
+      setUpdateRequired(versionResult.updateRequired);
     };
     init();
   }, [dispatch]);
@@ -239,13 +244,17 @@ const AppContent = memo(() => {
   // changes after refresh) the new listener can fire again, causing a repeated refresh loop and
   // prolonged "Refreshing..." / loading state (especially noticeable with guest sign-in).
   useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
+    const handleAppStateChange = async (nextAppState: string) => {
       const wasBackgroundOrInactive = appStateRef.current.match(/inactive|background/);
       appStateRef.current = nextAppState;
 
-      if (wasBackgroundOrInactive && nextAppState === 'active' && token && user) {
-        trackAppReturned();
-        dispatch(refreshUserData());
+      if (wasBackgroundOrInactive && nextAppState === 'active') {
+        const versionResult = await checkAppVersion();
+        setUpdateRequired(versionResult.updateRequired);
+        if (token && user) {
+          trackAppReturned();
+          dispatch(refreshUserData());
+        }
       }
     };
 
@@ -307,6 +316,16 @@ const AppContent = memo(() => {
   // Determine if we should show the connectivity overlay
   // Only show when we're definitely disconnected (both flags are false)
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
+
+  // Force update: block entire app until user updates (iOS → App Store, Android → Play Store, else → risingpunk.com)
+  if (updateRequired) {
+    return (
+      <>
+        <UpdateRequiredScreen />
+        <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
+      </>
+    );
+  }
 
   // Show loading state while checking stored auth or fetching data
   if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {
