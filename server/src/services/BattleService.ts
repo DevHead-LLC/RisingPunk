@@ -164,9 +164,7 @@ export class BattleService {
     BattalionService.stopMovementUpdates(battleId);
     
     const battle = await this.getBattle(battleId);
-    if (!battle) {
-      return;
-    }
+    if (!battle) return;
 
     // Check for complete elimination first
     const eliminationResult = CombatService.checkCompleteElimination(battle.battalions);
@@ -228,16 +226,15 @@ export class BattleService {
     if (npcSlug && winner === NodeOwner.USER) {
       try {
         if (npcInstanceId) {
-          await (NPCRespawnService as any).clearNpcInstanceFromMap(npcInstanceId, 'main');
-          
+          await NPCRespawnService.clearNpcInstanceFromMap(npcInstanceId, 'main');
           const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
           const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
-          (NPCRespawnService as any).scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
+          await NPCRespawnService.scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
         } else {
-          // Handle case where no npcInstanceId is available
+          console.warn('[BattleService.handleBattleEnd] Skipping NPC respawn schedule: battle has defenderNpcSlug but no defenderNpcInstanceId. Ensure the client sends defenderNpcInstanceId when starting an NPC battle.', { battleId, defenderNpcSlug: npcSlug });
         }
       } catch (error) {
-        // NPC handling failed, but battle will complete
+        console.error('[BattleService.handleBattleEnd] NPC respawn failed (battle will still complete):', { battleId, npcSlug, npcInstanceId: npcInstanceId || '(none)' }, error);
       }
     }
 

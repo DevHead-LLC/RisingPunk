@@ -1,18 +1,12 @@
 import mongoose from 'mongoose';
 import { Map as MapModel } from '../models/Map';
+import { PendingNpcRespawn } from '../models/PendingNpcRespawn';
 import {
   usesMapCells,
   clearNpcBySlugFromMap,
   clearNpcInstanceFromMapCell,
   placeNpcOnRandomCell,
 } from './CellAccessorService';
-
-type RespawnTask = {
-  npcSlug: string;
-  runAt: number;
-  mapName: string;
-  npcInstanceId?: string;
-};
 
 export class NPCRespawnService {
   private static scheduled: globalThis.Map<string, NodeJS.Timeout> = new globalThis.Map();
@@ -77,14 +71,72 @@ export class NPCRespawnService {
     this.scheduled.set(key, timeout);
   }
 
-  static scheduleRespawnForInstance(npcSlug: string, npcInstanceId: string, delaySeconds: number, mapName: string = 'main'): void {
+  /**
+   * Clear instance from map, respawn NPC, delete pending record. On failure, log and do not delete so record is retried on next startup.
+   * Bugbot: Single helper for the four call sites that shared this sequence to avoid inconsistent future changes.
+   */
+  private static async executeRespawnAndDeletePending(
+    npcSlug: string,
+    npcInstanceId: string,
+    mapName: string,
+    logContext: string,
+    logContextObj?: object
+  ): Promise<void> {
+    try {
+      await this.clearNpcInstanceFromMap(npcInstanceId, mapName);
+      await this.respawnNpcInstance(npcSlug, npcInstanceId, mapName);
+      await PendingNpcRespawn.deleteOne({ mapName, npcInstanceId });
+    } catch (err) {
+      console.warn(`[NPCRespawnService] respawn failed (${logContext})`, logContextObj ?? { mapName, npcInstanceId }, err);
+      // Bugbot: Do not delete on failure so the record is retried on next startup.
+    }
+  }
+
+  static async scheduleRespawnForInstance(npcSlug: string, npcInstanceId: string, delaySeconds: number, mapName: string = 'main'): Promise<void> {
     const key = `${mapName}:${npcInstanceId}`;
-    if (this.scheduled.has(key)) { return; }
+    if (this.scheduled.has(key)) return;
+    const delayMs = Math.max(1, delaySeconds) * 1000;
+    const respawnAt = new Date(Date.now() + delayMs);
+    // Bugbot: Set timer before DB create so a transient create failure doesn't prevent in-memory respawn (NPC already cleared from map).
     const timeout = setTimeout(async () => {
       this.scheduled.delete(key);
-      await this.respawnNpcInstance(npcSlug, npcInstanceId, mapName);
-    }, Math.max(1, delaySeconds) * 1000);
+      await this.executeRespawnAndDeletePending(npcSlug, npcInstanceId, mapName, 'scheduleRespawnForInstance timer');
+    }, delayMs);
     this.scheduled.set(key, timeout);
+    try {
+      await PendingNpcRespawn.create({ mapName, npcSlug, npcInstanceId, respawnAt });
+    } catch (err) {
+      console.warn('[NPCRespawnService.scheduleRespawnForInstance] failed to persist pending respawn (timer still set)', { mapName, npcInstanceId }, err);
+    }
+  }
+
+  /**
+   * Run on server startup: respawn all overdue pending NPCs and re-schedule future ones.
+   * Ensures bots are not permanently lost after a server reset.
+   * Bugbot: We clear by npcInstanceId before each respawn so a crash after respawn but before deleteOne doesn't leave a duplicate on next restart.
+   */
+  static async runRespawnCatchUp(): Promise<void> {
+    const now = new Date();
+    const overdue = await PendingNpcRespawn.find({ respawnAt: { $lte: now } }).lean();
+    for (const doc of overdue) {
+      await this.executeRespawnAndDeletePending(doc.npcSlug, doc.npcInstanceId, doc.mapName, 'runRespawnCatchUp overdue', doc);
+    }
+    const future = await PendingNpcRespawn.find({ respawnAt: { $gt: now } }).lean();
+    for (const doc of future) {
+      const key = `${doc.mapName}:${doc.npcInstanceId}`;
+      if (this.scheduled.has(key)) continue;
+      // Bugbot: Recompute remainingMs per doc so we don't drop docs that became overdue while processing the overdue list.
+      const remainingMs = doc.respawnAt.getTime() - Date.now();
+      if (remainingMs <= 0) {
+        await this.executeRespawnAndDeletePending(doc.npcSlug, doc.npcInstanceId, doc.mapName, 'runRespawnCatchUp became-overdue', doc);
+        continue;
+      }
+      const timeout = setTimeout(async () => {
+        this.scheduled.delete(key);
+        await this.executeRespawnAndDeletePending(doc.npcSlug, doc.npcInstanceId, doc.mapName, 'runRespawnCatchUp future timer', doc);
+      }, remainingMs);
+      this.scheduled.set(key, timeout);
+    }
   }
 
   private static async respawnNpc(npcSlug: string, mapName: string = 'main', npcInstanceId?: string): Promise<void> {
@@ -115,19 +167,24 @@ export class NPCRespawnService {
 
   private static async respawnNpcInstance(npcSlug: string, npcInstanceId: string, mapName: string = 'main'): Promise<void> {
     const doc: any = await MapModel.findOne({ name: mapName });
-    if (!doc) return;
+    if (!doc) {
+      throw new Error(`[NPCRespawnService.respawnNpcInstance] map not found: ${mapName}`);
+    }
     const title = this.titleForSlug(npcSlug);
     if (usesMapCells(doc)) {
       // Full map (e.g. 500×500): placeNpcOnRandomCell samples from all valid empty cells, no bounds (retries inside on collision).
       const placed = await placeNpcOnRandomCell(doc, npcSlug, npcInstanceId, title);
       if (!placed) {
         console.warn('[NPCRespawnService.respawnNpcInstance] placement failed after retries', { npcSlug, npcInstanceId, mapName });
+        throw new Error('[NPCRespawnService.respawnNpcInstance] placement failed after retries');
       }
       return;
     }
     const cells: any[] = doc.cells || [];
     const valid: any[] = cells.filter((c: any) => !c.isOccupied && c.canBeOccupied && c.terrain !== 'water' && c.terrain !== 'mountain' && c.terrain !== 'road');
-    if (valid.length === 0) return;
+    if (valid.length === 0) {
+      throw new Error('[NPCRespawnService.respawnNpcInstance] no valid cells for placement');
+    }
     const cell = valid[Math.floor(Math.random() * valid.length)];
     cell.isOccupied = true;
     cell.occupiedBy = 'npc';
