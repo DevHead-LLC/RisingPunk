@@ -176,6 +176,7 @@ export class NPCRespawnService {
       const placed = await placeNpcOnRandomCell(doc, npcSlug, npcInstanceId, title);
       if (!placed) {
         console.warn('[NPCRespawnService.respawnNpcInstance] placement failed after retries', { npcSlug, npcInstanceId, mapName });
+        // Bugbot: next line is inside if (!placed); throw so callers preserve pending record.
         throw new Error('[NPCRespawnService.respawnNpcInstance] placement failed after retries');
       }
       return;
