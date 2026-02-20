@@ -32,8 +32,9 @@ export const UpdateRequiredScreen: React.FC<UpdateRequiredScreenProps> = ({ minA
     Linking.openURL(getUpdateUrl());
   };
 
-  // Use wider content on narrow screens (phones) so message is readable; keep 40% cap on larger screens
-  const contentWidth = width < 500 ? Math.min(width * 0.85, 400) : Math.min(width * 0.4, 400);
+  // Smooth scale: 85% on narrow (phones), 40% on wide; interpolate between 400–600px to avoid abrupt jump at breakpoint
+  const mult = width <= 400 ? 0.85 : width >= 600 ? 0.4 : 0.85 - (0.45 * (width - 400)) / 200;
+  const contentWidth = Math.min(width * mult, 400);
   return (
     <View style={[styles.container, { width, height, backgroundColor: colors.background }]}>
       <View style={[styles.content, { width: contentWidth, maxWidth: 400, borderColor: colors.matrix }]}>
