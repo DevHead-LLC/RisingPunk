@@ -47,7 +47,7 @@ app.use(helmet());
 app.use(cors({
   origin: CORS_ORIGINS.length ? CORS_ORIGINS : true,
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-device-id'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-device-id', 'X-App-Version'],
 }));
 app.use(express.json());
 
@@ -227,6 +227,9 @@ app.use('/', marketingRoutes);
 // Activity logging middleware for privacy policy compliance
 // This runs AFTER auth routes so req.user is available
 app.use(activityLogging);
+
+import { requireMinAppVersion } from './src/middleware/requireMinAppVersion';
+app.use('/api', requireMinAppVersion);
 
 // Add this route to verify database connection
 app.get('/api/dbcheck', async (req: Request, res: Response) => {

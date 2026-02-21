@@ -11,7 +11,7 @@ import { useGetProfileQuery } from '../store/api/authApi';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
 import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
-import { setFinancialStatements, setGlobalErrorModal } from '../store/slices/uiSlice';
+import { setFinancialStatements, setGlobalErrorModal, setForceUpdateRequired } from '../store/slices/uiSlice';
 import { useNetworkConnectivity } from '../providers/NetworkConnectivityProvider';
 import { ConnectivityOverlay } from './common/ConnectivityOverlay';
 import { HandleSelectionModal } from './modals/HandleSelectionModal';
@@ -23,9 +23,12 @@ import { globalErrorHandler } from '../services/GlobalErrorHandler';
 import { getAnalytics, setAnalyticsCollectionEnabled, setUserProperty, logEvent } from '@react-native-firebase/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trackAppReturned, trackFirstOpen, getAccountCreatedThisSession, clearAccountCreatedThisSession } from '../services/analyticsService';
+import { checkAppVersion } from '../services/appVersionService';
+import { UpdateRequiredScreen } from './UpdateRequiredScreen';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
+  const { updateRequired, minAppVersion } = useAppSelector((state) => state.ui.forceUpdate);
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
@@ -87,6 +90,12 @@ const AppContent = memo(() => {
       // Set first-open flag before loading auth so token/user effect doesn't race past it
       await trackFirstOpen();
       dispatch(loadStoredAuth());
+      const versionResult = await checkAppVersion();
+      dispatch(setForceUpdateRequired({
+        updateRequired: versionResult.updateRequired,
+        minAppVersion: versionResult.minAppVersion,
+        success: versionResult.success,
+      }));
     };
     init();
   }, [dispatch]);
@@ -243,9 +252,19 @@ const AppContent = memo(() => {
       const wasBackgroundOrInactive = appStateRef.current.match(/inactive|background/);
       appStateRef.current = nextAppState;
 
-      if (wasBackgroundOrInactive && nextAppState === 'active' && token && user) {
-        trackAppReturned();
-        dispatch(refreshUserData());
+      if (wasBackgroundOrInactive && nextAppState === 'active') {
+        // Version check and user-data refresh run in parallel so slow health fetch doesn't block refresh
+        checkAppVersion().then((versionResult) => {
+          dispatch(setForceUpdateRequired({
+            updateRequired: versionResult.updateRequired,
+            minAppVersion: versionResult.minAppVersion,
+            success: versionResult.success,
+          }));
+        });
+        if (token && user) {
+          trackAppReturned();
+          dispatch(refreshUserData());
+        }
       }
     };
 
@@ -307,6 +326,16 @@ const AppContent = memo(() => {
   // Determine if we should show the connectivity overlay
   // Only show when we're definitely disconnected (both flags are false)
   const shouldShowConnectivityOverlay = isConnected === false && isInternetReachable === false;
+
+  // Force update: block entire app until user updates (iOS → App Store, Android → Play Store, else → risingpunk.com)
+  if (updateRequired) {
+    return (
+      <>
+        <UpdateRequiredScreen minAppVersion={minAppVersion} />
+        <ConnectivityOverlay visible={shouldShowConnectivityOverlay} />
+      </>
+    );
+  }
 
   // Show loading state while checking stored auth or fetching data
   if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {
