@@ -290,7 +290,7 @@ const FEATURES: FeatureRow[] = [
     researchTimeHours: 12,
     requiredFeatureRefs: [{ categoryId: 'hack-crew', featureId: 'crew-system-unlock' }],
     researchCenterLevelRequirement: 4,
-    effect: { type: 'improvement', value: 1, target: 'crew-strength' },
+    effect: { type: 'improvement', value: 0.5, target: 'crew-strength' },
   },
 ];
 

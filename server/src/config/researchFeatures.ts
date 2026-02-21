@@ -1,10 +1,18 @@
 import { IResearchFeature } from '../models/Research';
 import { ResearchFeatureDefinition, toResearchFeature } from '../models/ResearchFeatureDefinition';
-import { getSpecFeaturesByCategory } from './researchSpec18';
 
-const specFeatures = getSpecFeaturesByCategory();
+/** DB-backed categories (research_feature_definitions): empty here so getResearchFeaturesAsync loads from DB only. */
+const DB_BACKED_CATEGORIES: Record<string, IResearchFeature[]> = {
+  'home-defense': [],
+  'cash-flow': [],
+  'hack-ability': [],
+  'hack-crew': [],
+  'investments': [],
+  'npc': [],
+};
+
 export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
-  ...specFeatures,
+  ...DB_BACKED_CATEGORIES,
 
   'financial': [
     {
@@ -57,48 +65,6 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
         type: 'reduction',
         value: 12,
         target: 'operational-costs'
-      }
-    }
-  ],
-
-  'npc': [
-    {
-      id: 'reduce-cost',
-      name: 'Reduce Cost',
-      description: 'Reduce the cost of NPC interactions and services',
-      unlockCost: 20000,
-      levelRequirement: 8,
-      isUnlocked: false,
-      effect: {
-        type: 'reduction',
-        value: 15,
-        target: 'npc-cost'
-      }
-    },
-    {
-      id: 'decrease-attack-time',
-      name: 'Decrease Attack Time',
-      description: 'Reduce the time NPCs take to attack enemies',
-      unlockCost: 25000,
-      levelRequirement: 10,
-      isUnlocked: false,
-      effect: {
-        type: 'improvement',
-        value: 20,
-        target: 'npc-attack-speed'
-      }
-    },
-    {
-      id: 'hack-speed-boost',
-      name: 'Hack Speed +10%',
-      description: 'Increase NPC hack speed by 10%',
-      unlockCost: 30000,
-      levelRequirement: 12,
-      isUnlocked: false,
-      effect: {
-        type: 'improvement',
-        value: 10,
-        target: 'npc-hack-speed'
       }
     }
   ],

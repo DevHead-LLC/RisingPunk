@@ -69,7 +69,8 @@ const researchFeatureDefinitionSchema = new Schema({
   }
 }, {
   collection: 'research_feature_definitions',
-  timestamps: true
+  timestamps: true,
+  id: false
 });
 
 researchFeatureDefinitionSchema.index({ categoryId: 1, id: 1 }, { unique: true });
