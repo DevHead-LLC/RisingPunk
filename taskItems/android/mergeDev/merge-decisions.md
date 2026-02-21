@@ -597,6 +597,63 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-20 (merge dev → android_mergeDev)
+
+**Branch context:** Merging origin/dev into android_mergeDev (from androidStaging). Two conflicts: AppContent.tsx (theme + force-update), mobile/package-lock.json (root version + hasInstallScript).
+
+### 1. `mobile/src/components/AppContent.tsx`
+
+**Conflict A (selector / theme):**
+
+| Side | Content |
+|------|--------|
+| HEAD | `const colors = useThemeColors();` |
+| dev  | `const { updateRequired, minAppVersion } = useAppSelector((state) => state.ui.forceUpdate);` |
+
+**Resolution:** Combined **both**. Final state: both `useThemeColors()` and `useAppSelector(..., state.ui.forceUpdate)`.
+
+**Rationale:** colors is used for loading View background (`colors.background`); updateRequired/minAppVersion are required for force-update screen from dev. Neither is Android-deployment–specific; both needed.
+
+**Rejected content:** None—both sides kept.
+
+**Conflict B (force-update block vs comment):**
+
+| Side | Content |
+|------|--------|
+| HEAD | Comment: "Note: Debug logging removed - was used for troubleshooting black screen issue" |
+| dev  | Force-update block: `if (updateRequired) { return (<> <UpdateRequiredScreen ... /> <ConnectivityOverlay ... /> </>); }` |
+
+**Resolution:** Accepted **dev**. Final state: force-update block retained; HEAD comment removed.
+
+**Rationale:** Dev adds required force-update UI (iOS/Android/risingpunk.com). Not Android-specific; we want the behavior.
+
+**Failure-mode hints for later:** If loading state shows black background, `colors` from useThemeColors is still present; confirm it is used in the loading View.
+
+---
+
+### 2. `mobile/package-lock.json`
+
+**Conflict:** Root package version and hasInstallScript.
+
+| Side | Content |
+|------|--------|
+| HEAD | `"version": "0.0.1"`, `"hasInstallScript": true` |
+| dev  | `"version": "2.5.0"` (no hasInstallScript) |
+
+**Resolution:** Combined **both**. Final state: `"version": "2.5.0"`, `"hasInstallScript": true`.
+
+**Rationale:** Lockfile version should match package.json (2.5.0 from dev/merged). hasInstallScript is npm metadata for postinstall; keeping it from HEAD does not affect Android deployment.
+
+**Rejected content:** None—version from dev, hasInstallScript from HEAD.
+
+**Failure-mode hints for later:** If package.json version and lockfile root version drift, align lockfile to package.json.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
