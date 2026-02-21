@@ -3,6 +3,8 @@ import { API_URL } from '../../config';
 import type { RootState } from '../index';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 
 // Debounce mechanism for ACCOUNT_SWITCHED errors
 let accountSwitchedDispatched = false;
@@ -24,12 +26,14 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
       // Device ID no longer needed for simple token invalidation approach
 
       headers.set('Content-Type', 'application/json');
+      setAppVersionHeader(headers);
       return headers;
     },
   })(args, api, extraOptions);
 
   if (result.error) {
-    
+    if (handle426IfNeeded(result, api)) return result;
+
     // Check for account switched error first
     if (result.error?.status === 401 && (result.error?.data as any)?.error === 'ACCOUNT_SWITCHED') {
       

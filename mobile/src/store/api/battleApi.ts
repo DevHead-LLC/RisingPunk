@@ -2,6 +2,8 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { NetworkConnection, LineProperties, MovementState } from '../../types/battleTypes';
 import type { RootState } from '../index';
+import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 
 export interface BattalionLoss {
   battalionId: string;
@@ -99,9 +101,8 @@ export interface StartBattleRequest {
   defenderNpcInstanceId?: string;
 }
 
-export const battleApi = createApi({
-  reducerPath: 'battleApi',
-  baseQuery: fetchBaseQuery({
+const battleBaseQuery = async (args: any, api: any, extraOptions: any) => {
+  const result = await fetchBaseQuery({
     baseUrl: API_URL,
     prepareHeaders: (headers, { getState }) => {
       const state = getState() as RootState;
@@ -112,9 +113,17 @@ export const battleApi = createApi({
       }
 
       headers.set('Content-Type', 'application/json');
+      setAppVersionHeader(headers);
       return headers;
     },
-  }),
+  })(args, api, extraOptions);
+  if (handle426IfNeeded(result, api)) return result;
+  return result;
+};
+
+export const battleApi = createApi({
+  reducerPath: 'battleApi',
+  baseQuery: battleBaseQuery,
   tagTypes: ['Battle'],
   endpoints: (builder) => ({
     startBattle: builder.mutation<{ battleId: string }, StartBattleRequest>({
