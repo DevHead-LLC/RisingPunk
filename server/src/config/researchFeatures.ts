@@ -1,9 +1,18 @@
 import { IResearchFeature } from '../models/Research';
-import { getSpecFeaturesByCategory } from './researchSpec18';
+import { ResearchFeatureDefinition, toResearchFeature } from '../models/ResearchFeatureDefinition';
 
-const specFeatures = getSpecFeaturesByCategory();
+/** DB-backed categories (research_feature_definitions): empty here so getResearchFeaturesAsync loads from DB only. */
+const DB_BACKED_CATEGORIES: Record<string, IResearchFeature[]> = {
+  'home-defense': [],
+  'cash-flow': [],
+  'hack-ability': [],
+  'hack-crew': [],
+  'investments': [],
+  'npc': [],
+};
+
 export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
-  ...specFeatures,
+  ...DB_BACKED_CATEGORIES,
 
   'financial': [
     {
@@ -56,48 +65,6 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
         type: 'reduction',
         value: 12,
         target: 'operational-costs'
-      }
-    }
-  ],
-
-  'npc': [
-    {
-      id: 'reduce-cost',
-      name: 'Reduce Cost',
-      description: 'Reduce the cost of NPC interactions and services',
-      unlockCost: 20000,
-      levelRequirement: 8,
-      isUnlocked: false,
-      effect: {
-        type: 'reduction',
-        value: 15,
-        target: 'npc-cost'
-      }
-    },
-    {
-      id: 'decrease-attack-time',
-      name: 'Decrease Attack Time',
-      description: 'Reduce the time NPCs take to attack enemies',
-      unlockCost: 25000,
-      levelRequirement: 10,
-      isUnlocked: false,
-      effect: {
-        type: 'improvement',
-        value: 20,
-        target: 'npc-attack-speed'
-      }
-    },
-    {
-      id: 'hack-speed-boost',
-      name: 'Hack Speed +10%',
-      description: 'Increase NPC hack speed by 10%',
-      unlockCost: 30000,
-      levelRequirement: 12,
-      isUnlocked: false,
-      effect: {
-        type: 'improvement',
-        value: 10,
-        target: 'npc-hack-speed'
       }
     }
   ],
@@ -437,13 +404,27 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
   ]
 };
 
-export function getResearchFeatures(categoryId: string): IResearchFeature[] {
-  return RESEARCH_FEATURES[categoryId] || [];
+/**
+ * Get research features for a category, merging DB definitions with file (DB wins for same id).
+ * Use this so features like Antivirus can be read from research_feature_definitions.
+ */
+export async function getResearchFeaturesAsync(categoryId: string): Promise<IResearchFeature[]> {
+  const fileList = RESEARCH_FEATURES[categoryId] || [];
+  const dbDocs = await ResearchFeatureDefinition.find({ categoryId }).lean();
+  const dbById = new Map(dbDocs.map(d => [d.id, toResearchFeature(d as any)]));
+  const merged = fileList.map(f => dbById.get(f.id) ?? f);
+  for (const d of dbDocs) {
+    if (!fileList.some(f => f.id === d.id)) {
+      merged.push(toResearchFeature(d as any));
+    }
+  }
+  return merged;
 }
 
-export function getFeatureById(categoryId: string, featureId: string): IResearchFeature | null {
-  const features = RESEARCH_FEATURES[categoryId];
-  if (!features) return null;
-  
-  return features.find(feature => feature.id === featureId) || null;
+/**
+ * Get a single feature by category and id, merging DB with file (DB wins).
+ */
+export async function getFeatureByIdAsync(categoryId: string, featureId: string): Promise<IResearchFeature | null> {
+  const features = await getResearchFeaturesAsync(categoryId);
+  return features.find(f => f.id === featureId) || null;
 }
