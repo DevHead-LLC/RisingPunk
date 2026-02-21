@@ -404,17 +404,6 @@ export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
   ]
 };
 
-export function getResearchFeatures(categoryId: string): IResearchFeature[] {
-  return RESEARCH_FEATURES[categoryId] || [];
-}
-
-export function getFeatureById(categoryId: string, featureId: string): IResearchFeature | null {
-  const features = RESEARCH_FEATURES[categoryId];
-  if (!features) return null;
-
-  return features.find(feature => feature.id === featureId) || null;
-}
-
 /**
  * Get research features for a category, merging DB definitions with file (DB wins for same id).
  * Use this so features like Antivirus can be read from research_feature_definitions.
