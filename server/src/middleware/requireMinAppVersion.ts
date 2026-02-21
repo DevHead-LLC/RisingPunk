@@ -15,8 +15,9 @@ function parseVersion(s: string): { parts: number[]; hasPreRelease: boolean; pre
   const partStrs = core.split('.');
   const parts: number[] = [];
   for (const p of partStrs) {
+    if (!/^\d+$/.test(p)) return null; // semver: numeric identifiers must be digits only
     const n = parseInt(p, 10);
-    if (Number.isNaN(n) || n < 0) return null;
+    if (n < 0) return null;
     parts.push(n);
   }
   if (parts.length === 0) return null;
@@ -34,11 +35,11 @@ function isPreReleaseLess(a: string, b: string): boolean {
     if (pa === undefined && pb === undefined) return false;
     if (pa === undefined) return true;  // a is prefix → a is less
     if (pb === undefined) return false; // b is prefix → a is greater
-    const na = parseInt(pa, 10);
-    const nb = parseInt(pb, 10);
-    const aNum = !Number.isNaN(na);
-    const bNum = !Number.isNaN(nb);
+    const aNum = /^\d+$/.test(pa);
+    const bNum = /^\d+$/.test(pb);
     if (aNum && bNum) {
+      const na = parseInt(pa, 10);
+      const nb = parseInt(pb, 10);
       if (na < nb) return true;
       if (na > nb) return false;
     } else {
