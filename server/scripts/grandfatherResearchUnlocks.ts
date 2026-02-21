@@ -15,7 +15,7 @@
 import mongoose from 'mongoose';
 import { getDatabaseName } from './scriptEnv';
 import { UserResearchFeature } from '../src/models/UserResearchFeature';
-import { getFeatureById } from '../src/config/researchFeatures';
+import { getFeatureByIdAsync } from '../src/config/researchFeatures';
 
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 
@@ -94,7 +94,7 @@ async function run(): Promise<void> {
             continue; // already have new doc (e.g. user already did new research)
           }
 
-          const feature = getFeatureById(entry.categoryId, entry.featureId);
+          const feature = await getFeatureByIdAsync(entry.categoryId, entry.featureId);
           if (!feature) {
             console.warn(`   ⚠️  No feature config for ${entry.categoryId}/${entry.featureId}; skipping insert.`);
             continue;

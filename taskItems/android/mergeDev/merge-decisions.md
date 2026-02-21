@@ -654,6 +654,18 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-21 (merge dev → android_mergeDev)
+
+**Branch context:** Merging origin/dev into android_mergeDev (from androidStaging). No conflicts; merge completed cleanly.
+
+**Files merged from dev:** research assets (botUpgradeEvolution.png, crewStrengthBonus.png), FeatureCard.tsx, ResearchFeaturesList.tsx, server scripts (grandfatherResearchUnlocks, seedResearchFeatureAntivirus, seedResearchFeatureDefinitionsFromImage), server config/researchFeatures.ts, ResearchFeatureDefinition model, research routes, ResearchFeatureService.
+
+**Conflict resolutions:** None.
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
