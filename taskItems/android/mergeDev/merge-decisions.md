@@ -666,6 +666,18 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-21 (merge flow pass – clean merge)
+
+**Branch context:** Full merge flow run per merge-flow.md: created `android_mergeDev` from `androidStaging`, pushed, merged `origin/dev`. No conflicts; merge completed cleanly.
+
+**Files merged from dev:** `mobile/ios/mobile.xcodeproj/project.pbxproj` (6 insertions, 6 deletions).
+
+**Conflict resolutions:** None.
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
