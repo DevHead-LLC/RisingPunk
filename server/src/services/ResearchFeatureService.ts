@@ -1,7 +1,7 @@
 import { User } from '../models/User';
 import { Research } from '../models/Research';
 import { UserResearchFeature } from '../models/UserResearchFeature';
-import { getResearchFeatures, getFeatureById } from '../config/researchFeatures';
+import { getResearchFeaturesAsync, getFeatureByIdAsync } from '../config/researchFeatures';
 import mongoose from 'mongoose';
 
 export interface ResearchFeatureValidation {
@@ -90,7 +90,7 @@ export class ResearchFeatureService {
       }
 
       const user = await User.findById(userId);
-      const feature = getFeatureById(categoryId, featureId);
+      const feature = await getFeatureByIdAsync(categoryId, featureId);
       
       if (!user || !feature) {
         return {
@@ -190,7 +190,7 @@ export class ResearchFeatureService {
     try {
       return await session.withTransaction(async () => {
         const user = await User.findById(userId).session(session);
-        const feature = getFeatureById(categoryId, featureId);
+        const feature = await getFeatureByIdAsync(categoryId, featureId);
         
         if (!user || !feature) {
           return {
@@ -532,8 +532,8 @@ export class ResearchFeatureService {
     categoryId: string
   ): Promise<any[]> {
     try {
-      // Get base features from config
-      const baseFeatures = getResearchFeatures(categoryId);
+      // Get base features (DB + file merge)
+      const baseFeatures = await getResearchFeaturesAsync(categoryId);
 
       // Get user's research progress for this category from UserResearchFeature collection
       const userFeatures = await UserResearchFeature.find({
@@ -652,7 +652,7 @@ export class ResearchFeatureService {
         return null;
       }
 
-      const baseFeature = getFeatureById(categoryId, featureId);
+      const baseFeature = await getFeatureByIdAsync(categoryId, featureId);
       if (!baseFeature) {
         return null;
       }
