@@ -1,4 +1,5 @@
 import { IResearchFeature } from '../models/Research';
+import { ResearchFeatureDefinition, toResearchFeature } from '../models/ResearchFeatureDefinition';
 import { getSpecFeaturesByCategory } from './researchSpec18';
 
 const specFeatures = getSpecFeaturesByCategory();
@@ -444,6 +445,31 @@ export function getResearchFeatures(categoryId: string): IResearchFeature[] {
 export function getFeatureById(categoryId: string, featureId: string): IResearchFeature | null {
   const features = RESEARCH_FEATURES[categoryId];
   if (!features) return null;
-  
+
   return features.find(feature => feature.id === featureId) || null;
+}
+
+/**
+ * Get research features for a category, merging DB definitions with file (DB wins for same id).
+ * Use this so features like Antivirus can be read from research_feature_definitions.
+ */
+export async function getResearchFeaturesAsync(categoryId: string): Promise<IResearchFeature[]> {
+  const fileList = RESEARCH_FEATURES[categoryId] || [];
+  const dbDocs = await ResearchFeatureDefinition.find({ categoryId }).lean();
+  const dbById = new Map(dbDocs.map(d => [d.id, toResearchFeature(d as any)]));
+  const merged = fileList.map(f => dbById.get(f.id) ?? f);
+  for (const d of dbDocs) {
+    if (!fileList.some(f => f.id === d.id)) {
+      merged.push(toResearchFeature(d as any));
+    }
+  }
+  return merged;
+}
+
+/**
+ * Get a single feature by category and id, merging DB with file (DB wins).
+ */
+export async function getFeatureByIdAsync(categoryId: string, featureId: string): Promise<IResearchFeature | null> {
+  const features = await getResearchFeaturesAsync(categoryId);
+  return features.find(f => f.id === featureId) || null;
 }
