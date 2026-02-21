@@ -5,6 +5,8 @@ import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 import { trackFirstBots } from '../../services/analyticsService';
 
 // Custom base query with error handling for botsApi
@@ -15,11 +17,13 @@ const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any)?.auth?.token;
       if (token) {headers.set('Authorization', `Bearer ${token}`);}
+      setAppVersionHeader(headers);
       return headers;
     },
   })(args, api, extraOptions);
 
   if (result.error) {
+    if (handle426IfNeeded(result, api)) return result;
     // Check for account switched error first
     if ((result.error as any)?.status === 401 && (result.error as any)?.data?.error === 'ACCOUNT_SWITCHED') {
       // Always dispatch account switched action - the auth slice will handle showing banner appropriately

@@ -3,6 +3,8 @@ import { API_URL } from '../../config';
 import { MapResponse } from '../../types/map';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
+import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
 
 // Custom base query with error handling for mapApi
 const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -11,13 +13,14 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as any)?.auth?.token;
       if (token) {headers.set('Authorization', `Bearer ${token}`);}
+      setAppVersionHeader(headers);
       return headers;
     },
   })(args, api, extraOptions);
 
   if (result.error) {
+    if (handle426IfNeeded(result, api)) return result;
     const error = result.error as any;
-    
     // Check for request-abort only (expected during fast map panning). Do not match messages that merely contain "abort" (e.g. "Transaction aborted") or we would silently swallow real errors.
     const isAbortError =
       error?.name === 'AbortError' ||
