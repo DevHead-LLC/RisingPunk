@@ -94,6 +94,7 @@ const AppContent = memo(() => {
       dispatch(setForceUpdateRequired({
         updateRequired: versionResult.updateRequired,
         minAppVersion: versionResult.minAppVersion,
+        success: versionResult.success,
       }));
     };
     init();
@@ -257,6 +258,7 @@ const AppContent = memo(() => {
           dispatch(setForceUpdateRequired({
             updateRequired: versionResult.updateRequired,
             minAppVersion: versionResult.minAppVersion,
+            success: versionResult.success,
           }));
         });
         if (token && user) {

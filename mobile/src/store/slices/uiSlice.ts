@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-/** Payload for setForceUpdateRequired: sticky (only set true / preserve minAppVersion). */
-export type ForceUpdatePayload = { updateRequired: boolean; minAppVersion?: string };
+/** Payload for setForceUpdateRequired: sticky on failure; clear when updateRequired false and we have minAppVersion or success. */
+export type ForceUpdatePayload = { updateRequired: boolean; minAppVersion?: string; success?: boolean };
 
 interface UIState {
   /** Set when server requires min app version (health or 426). Show UpdateRequiredScreen until user updates. */
@@ -72,11 +72,11 @@ export const uiSlice = createSlice({
       state.modals.globalError = action.payload;
     },
 
-    /** Sticky on failure: set updateRequired true when true; clear when we get successful health with false + minAppVersion. */
+    /** Sticky on failure: set updateRequired true when true; clear when updateRequired false and (minAppVersion set or success from health). */
     setForceUpdateRequired: (state, action: PayloadAction<ForceUpdatePayload>) => {
-      const { updateRequired, minAppVersion } = action.payload;
+      const { updateRequired, minAppVersion, success } = action.payload;
       if (updateRequired) state.forceUpdate.updateRequired = true;
-      else if (minAppVersion !== undefined) state.forceUpdate.updateRequired = false;
+      else if (minAppVersion !== undefined || success) state.forceUpdate.updateRequired = false;
       if (minAppVersion !== undefined) state.forceUpdate.minAppVersion = minAppVersion;
     },
 
