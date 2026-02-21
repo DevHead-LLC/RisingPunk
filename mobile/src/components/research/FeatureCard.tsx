@@ -67,6 +67,8 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'reduce-insurance-02': require('../../assets/images/researchCenter/decreaseInsurance.png'),
   'reduce-tax-expense-02': require('../../assets/images/researchCenter/taxExpenseReduction.png'),
   'probe': require('../../assets/images/researchCenter/increaseBattalions.png'),
+  'mark-2-bots': require('../../assets/images/researchCenter/botUpgradeEvolution.png'),
+  'crew-strength-increase': require('../../assets/images/researchCenter/crewStrengthBonus.png'),
 };
 
 export function FeatureCard({

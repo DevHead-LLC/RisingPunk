@@ -4,7 +4,6 @@ import { ResearchUnlockService } from '../services/ResearchUnlockService';
 import { ResearchFeatureService } from '../services/ResearchFeatureService';
 import { Research } from '../models/Research';
 import { ResearchUser } from '../models/ResearchUser';
-import { getResearchFeatures } from '../config/researchFeatures';
 import { User } from '../models/User';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { getTaskList } from '../config/taskListData';
