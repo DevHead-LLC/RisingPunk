@@ -1,10 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import { MIN_APP_VERSION } from '../config/env';
 
-/** Parsed version or null if invalid (non-numeric core segment or missing core). Handles leading "v" (e.g. v2.5.0). */
+/** Parsed version or null if invalid. Handles leading "v" (v2.5.0) and strips SemVer build metadata (+...). */
 function parseVersion(s: string): { parts: number[]; hasPreRelease: boolean; preRelease: string } | null {
   const trimmed = s.trim();
-  const normalized = /^v/i.test(trimmed) ? trimmed.slice(1).trim() : trimmed;
+  let normalized = /^v/i.test(trimmed) ? trimmed.slice(1).trim() : trimmed;
+  const plusIdx = normalized.indexOf('+');
+  if (plusIdx >= 0) normalized = normalized.slice(0, plusIdx).trim(); // build metadata ignored for comparison
   const dashIdx = normalized.indexOf('-');
   const hasPreRelease = dashIdx >= 0;
   const core = hasPreRelease ? normalized.slice(0, dashIdx).trim() : normalized;
