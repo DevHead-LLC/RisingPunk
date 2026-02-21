@@ -104,6 +104,10 @@ export function ResearchFeaturesList({
   const visibleFeatures = features.filter(feature => {
     if (feature.id === 'bot-trap') return false;
     if (feature.id === 'probe') return false; // TODO: re-enable when Probe ability development is done
+    if (feature.id === 'mark-2-bots') return false; // TODO: re-enable when planned feature 5.4 (Research Center new abilities) is done
+    if (feature.id === 'crew-strength-increase') return false; // TODO: re-enable when planned feature 5.4 (Research Center new abilities) is done
+    if (feature.id === 'energy-regen-increase') return false; // TODO: re-enable when planned feature 5.4 (Research Center new abilities) is done
+    if (feature.id === 'energy-max-increase') return false; // TODO: re-enable when planned feature 5.4 (Research Center new abilities) is done
     return true;
   });
 
