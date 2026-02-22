@@ -204,6 +204,8 @@ android {
             println "   The app will fail to determine correct API URL!"
             println ""
         }
+        // As of RN 0.82 we cannot override IS_NEW_ARCHITECTURE_ENABLED; New Arch is mandatory.
+        // react-native-svg Fabric crash: see taskItems/android/appWide/android-crash.md.
     }
     
     compileOptions {
@@ -271,6 +273,9 @@ android {
 }
 
 afterEvaluate {
+    // As of RN 0.82, BuildConfig/variant properties are locked by the RN plugin; we cannot override
+    // IS_NEW_ARCHITECTURE_ENABLED here. react-native-svg Fabric crash must be fixed by upgrading
+    // react-native-svg or avoiding components that crash. See taskItems/android/appWide/android-crash.md
     tasks.matching { task ->
         def name = task.name.toLowerCase()
         (name.contains("release") && name.contains("bundle")) || 
