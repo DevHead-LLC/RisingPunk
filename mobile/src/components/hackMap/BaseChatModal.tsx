@@ -30,6 +30,8 @@ export interface ChatMessageForModal {
   username: string;
   message: string;
   timestamp: Date;
+  /** When true, show as "Admin" (or "You (Admin)" if current user). Set by server for world/crew/PM. */
+  isFromAdmin?: boolean;
 }
 
 export interface BaseChatModalProps {
@@ -126,6 +128,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
   };
 
   const handleClose = useCallback(() => {
+    if (__DEV__) console.log('[BaseChatModal] close (×) pressed');
     setMessageInput('');
     setShowReportModal(false);
     setReportedMessage(null);
@@ -173,9 +176,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
         onRequestClose={handleClose}
         statusBarTranslucent
         hardwareAccelerated
-        supportedOrientations={['landscape']}
+        supportedOrientations={['landscape-left', 'landscape-right']}
         presentationStyle="overFullScreen"
       >
+        <View style={styles.modalRoot}>
         <KeyboardAvoidingView
           style={styles.overlay}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -241,6 +245,9 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
               ) : (
                 messages.map((message) => {
                   const isOwnMessage = isCurrentUser(message.userId);
+                  const displayName = isOwnMessage
+                    ? (currentUser?.isAdmin ? 'You (Admin)' : 'You')
+                    : (message.isFromAdmin ? 'Admin' : message.username);
                   return (
                     <View
                       key={message.id}
@@ -255,7 +262,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                           isOwnMessage ? styles.usernameTextRight : styles.usernameTextLeft,
                         ]}
                       >
-                        {isOwnMessage ? 'You' : message.username}
+                        {displayName}
                       </Text>
                       <View style={styles.messageBubbleWrapper}>
                         <View
@@ -361,6 +368,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
             renderAsOverlay
           />
         )}
+        </View>
       </Modal>
     </>
   );
@@ -368,6 +376,11 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
 
 const createStyles = (colors: any) =>
   StyleSheet.create({
+    modalRoot: {
+      flex: 1,
+      zIndex: 99999,
+      elevation: 99999,
+    },
     overlay: {
       flex: 1,
       width: '100%',

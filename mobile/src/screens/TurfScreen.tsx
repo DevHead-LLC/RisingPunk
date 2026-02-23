@@ -29,6 +29,13 @@ import {TaskGuideHighlightOverlay} from '../components/turf/TaskGuideHighlightOv
 import {useTaskGuideHighlight} from '../contexts/TaskGuideHighlightContext';
 import { WorldChatIconButton } from '../components/hackMap/WorldChatIconButton';
 import { WorldChatModal } from '../components/hackMap/WorldChatModal';
+import { MessagesIconButton } from '../components/messages/MessagesIconButton';
+import { MessagesModal } from '../components/messages/MessagesModal';
+import { SearchUserIconButton } from '../components/hackMap/SearchUserIconButton';
+import { SearchUserModal } from '../components/hackMap/SearchUserModal';
+import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
+import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
+import { SIZING } from '../styles/theme';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any, useAnimatedReaction: any;
@@ -168,7 +175,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
+  const [showMessagesModal, setShowMessagesModal] = useState(false);
+  const [showSearchUserModal, setShowSearchUserModal] = useState(false);
+  const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
+  const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
+  const [messagesOpenToUser, setMessagesOpenToUser] = useState<{ userId: string; username: string } | null>(null);
+  const visitingProfileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
+  const token = useAppSelector((state) => state.auth.token);
+  const { data: conversationsData } = useGetConversationsQuery(undefined, {
+    skip: !token,
+    pollingInterval: token ? 5000 : 0,
+  });
+  const messagesUnreadCount = (conversationsData?.conversations ?? []).reduce((s, c) => s + c.unreadCount, 0);
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
   const scrollWrapperRef = useRef<View>(null);
   const scrollWrapperOffsetY = useRef<number>(0);
@@ -914,6 +933,43 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     };
   }, [isInvestmentPropertyHighlight, currentScreen, offsetX, offsetY]);
 
+  const [blockUserMutation] = useBlockUserMutation();
+  const handleVisitingProfileClose = useCallback(() => {
+    setShowVisitingProfileModal(false);
+    if (visitingProfileCloseTimeoutRef.current) {
+      clearTimeout(visitingProfileCloseTimeoutRef.current);
+      visitingProfileCloseTimeoutRef.current = null;
+    }
+    visitingProfileCloseTimeoutRef.current = setTimeout(() => {
+      setVisitingProfileUserId(null);
+      visitingProfileCloseTimeoutRef.current = null;
+    }, 350);
+  }, []);
+  const handleBlockUser = useCallback((userId: string) => {
+    blockUserMutation(userId);
+    handleVisitingProfileClose();
+  }, [blockUserMutation, handleVisitingProfileClose]);
+  const handleVisitingProfileUserNotFound = useCallback((_userId: string) => {
+    handleVisitingProfileClose();
+    dispatch(refreshUserDataSilent());
+  }, [dispatch, handleVisitingProfileClose]);
+  const handleOpenMessagesFromProfile = useCallback((userId: string, username: string) => {
+    setShowVisitingProfileModal(false);
+    if (visitingProfileCloseTimeoutRef.current) {
+      clearTimeout(visitingProfileCloseTimeoutRef.current);
+      visitingProfileCloseTimeoutRef.current = null;
+    }
+    visitingProfileCloseTimeoutRef.current = setTimeout(() => {
+      setVisitingProfileUserId(null);
+      visitingProfileCloseTimeoutRef.current = null;
+      setMessagesOpenToUser({ userId, username });
+      setShowMessagesModal(true);
+    }, 350);
+  }, []);
+  const handleCloseMessagesModal = useCallback(() => {
+    setShowMessagesModal(false);
+    setMessagesOpenToUser(null);
+  }, []);
 
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
@@ -1412,18 +1468,51 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </View>
               </>
             )}
-            {hackRigUnlocked && (
-              <WorldChatIconButton onPress={() => setShowWorldChatModal(true)} />
-            )}
+            <View style={styles.topCenterIconsWrapper}>
+              {hackRigUnlocked && (
+                <WorldChatIconButton inline onPress={() => setShowWorldChatModal(true)} />
+              )}
+              <MessagesIconButton
+                inline
+                onPress={() => setShowMessagesModal(true)}
+                unreadCount={messagesUnreadCount}
+              />
+              <SearchUserIconButton inline onPress={() => setShowSearchUserModal(true)} />
+            </View>
             <WorldChatModal
               visible={showWorldChatModal}
               onClose={() => setShowWorldChatModal(false)}
               mapName="main"
             />
+            <MessagesModal
+              visible={showMessagesModal}
+              onClose={handleCloseMessagesModal}
+              openToUserId={messagesOpenToUser?.userId ?? null}
+              openToUsername={messagesOpenToUser?.username ?? null}
+            />
+            <SearchUserModal
+              visible={showSearchUserModal}
+              onClose={() => setShowSearchUserModal(false)}
+              onUserFound={(userId) => {
+                setShowSearchUserModal(false);
+                setVisitingProfileUserId(userId);
+                setShowVisitingProfileModal(true);
+              }}
+            />
+            {visitingProfileUserId && (
+              <VisitingProfileModal
+                visible={showVisitingProfileModal}
+                onClose={handleVisitingProfileClose}
+                userId={visitingProfileUserId}
+                onUserNotFound={handleVisitingProfileUserNotFound}
+                onOpenMessages={handleOpenMessagesFromProfile}
+                onBlockUser={handleBlockUser}
+              />
+            )}
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser]);
 
   return (
     <>
@@ -1450,6 +1539,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     zIndex: 1,
+  },
+  topCenterIconsWrapper: {
+    position: 'absolute',
+    top: SIZING.spacing.lg,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 10002,
   },
   turfGrid: {
     flex: 1,

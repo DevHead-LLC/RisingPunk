@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
 import { SIZING } from '../../styles/theme';
@@ -7,23 +7,30 @@ import { SIZING } from '../../styles/theme';
 /** Tappable area is smaller than the visible icon to avoid overlapping hits with adjacent icons. */
 const HIT_SLOP_SIZE = 28;
 
-/**
- * World Chat entry point. Shown only when user has unlocked the hack rig.
- * Use inline={true} inside a centered row; otherwise uses top-center absolute placement.
- * Hit area is intentionally smaller than the visible button so taps must be on the icon.
- */
-export const WorldChatIconButton: React.FC<{ onPress: () => void; inline?: boolean }> = ({ onPress, inline }) => {
+export const MessagesIconButton: React.FC<{ onPress: () => void; unreadCount?: number; inline?: boolean }> = ({
+  onPress,
+  unreadCount = 0,
+  inline,
+}) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const styles = createStyles(colors, !!inline, themeMode);
   return (
     <View style={styles.button}>
-      <Image source={require('../../assets/images/ui/worldChat.png')} style={styles.iconImage} resizeMode="contain" />
+      <Image source={require('../../assets/images/ui/mailbox.png')} style={styles.iconImage} resizeMode="contain" />
+      {unreadCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText} numberOfLines={1}>
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </Text>
+        </View>
+      )}
       <TouchableOpacity
         style={styles.hitArea}
         onPress={onPress}
         activeOpacity={0.7}
-        accessibilityLabel="World Chat"
+        accessibilityLabel="Messages"
+        accessibilityHint="Opens your private messages"
       />
     </View>
   );
@@ -37,8 +44,7 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
         : {
             position: 'absolute' as const,
             top: SIZING.spacing.lg,
-            left: '50%',
-            marginLeft: -18,
+            right: SIZING.spacing.md,
           }),
       width: 36,
       height: 36,
@@ -56,8 +62,8 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
       elevation: 100,
     },
     iconImage: {
-      width: 75,
-      height: 75,
+      width: 85,
+      height: 85,
     },
     hitArea: {
       position: 'absolute',
@@ -66,5 +72,22 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
       left: (36 - HIT_SLOP_SIZE) / 2,
       top: (36 - HIT_SLOP_SIZE) / 2,
       borderRadius: HIT_SLOP_SIZE / 2,
+    },
+    badge: {
+      position: 'absolute',
+      top: -4,
+      right: -4,
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: '#e74c3c',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+    },
+    badgeText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: '700',
     },
   });

@@ -30,6 +30,7 @@ export interface User {
   totalGuardiansBuilt?: number;
   isGuest?: boolean;
   hasPassword?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface AuthState {

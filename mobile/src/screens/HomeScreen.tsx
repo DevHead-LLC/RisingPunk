@@ -6,6 +6,7 @@ import { HackRigDisplay } from '../components/home/HackRigDisplay';
 import { BotAssembly } from '../components/home/BotAssembly';
 import { HomeFloorPlan } from '../components/home/HomeFloorPlan';
 import { useThemeColors } from '../hooks/useThemeColors';
+import { useTheme } from '../context/ThemeContext';
 import { useTrackHomeVisitMutation, useTrackHackmapVisitMutation } from '../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { useAppSelector } from '../store/hooks';
@@ -82,6 +83,7 @@ const TabButton = memo(({
   isActive, 
   isHighlighted,
   colors,
+  themeMode,
   onPress,
   advanceHighlightStep
 }: { 
@@ -90,6 +92,7 @@ const TabButton = memo(({
   isActive: boolean;
   isHighlighted: boolean;
   colors: any;
+  themeMode: 'light' | 'dark';
   onPress: (tab: TabType) => void;
   advanceHighlightStep: () => void;
 }) => {
@@ -135,10 +138,11 @@ const TabButton = memo(({
       <TouchableOpacity
         onPress={handlePress}
         style={[
-          styles.tabButton, 
-          isActive && styles.tabButtonActive, 
-          isHighlighted && { 
-            borderWidth: 3, 
+          styles.tabButton,
+          !isActive && themeMode === 'light' && styles.tabButtonInactiveLight,
+          isActive && styles.tabButtonActive,
+          isHighlighted && {
+            borderWidth: 3,
             borderColor: undefined,
             overflow: 'hidden',
           }
@@ -157,7 +161,11 @@ const TabButton = memo(({
             pointerEvents="none"
           />
         )}
-        <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{label}</Text>
+        <Text style={[
+          styles.tabText,
+          !isActive && themeMode === 'light' && styles.tabTextInactiveLight,
+          isActive && styles.tabTextActive
+        ]}>{label}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -170,6 +178,7 @@ export const HomeScreen = memo(function HomeScreen({
   onNavigateToBattle,
 }: HomeScreenProps): React.JSX.Element {
   const colors = useThemeColors();
+  const { themeMode } = useTheme();
   const token = useAppSelector((state) => state.auth.token);
   const [activeTab, setActiveTab] = useState<TabType>('floorPlan');
   const scrollViewRef = useRef<ScrollView>(null);
@@ -650,6 +659,7 @@ export const HomeScreen = memo(function HomeScreen({
           isActive={activeTab === 'floorPlan'}
           isHighlighted={false}
           colors={colors}
+          themeMode={themeMode}
           onPress={setActiveTab}
           advanceHighlightStep={advanceHighlightStep}
         />
@@ -659,6 +669,7 @@ export const HomeScreen = memo(function HomeScreen({
           isActive={activeTab === 'garage'}
           isHighlighted={isGarageTabHighlight}
           colors={colors}
+          themeMode={themeMode}
           onPress={setActiveTab}
           advanceHighlightStep={advanceHighlightStep}
         />
@@ -767,6 +778,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
+  tabButtonInactiveLight: {
+    backgroundColor: '#9E9E9E',
+    borderColor: '#757575',
+  },
   tabButtonActive: {
     backgroundColor: 'rgba(71,23,246,0.15)',
     borderColor: 'rgba(71,23,246,0.5)',
@@ -775,6 +790,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     fontSize: SIZING.font.body,
     fontWeight: 'bold',
+  },
+  tabTextInactiveLight: {
+    color: '#212121',
   },
   tabTextActive: {
     color: '#b39ddb',

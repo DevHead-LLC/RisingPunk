@@ -26,6 +26,7 @@ import testRoutes from './src/routes/test';
 import botsRoutes from './src/routes/bots';
 import crewRoutes from './src/routes/crew';
 import reportsRoutes from './src/routes/reports';
+import privateMessagesRoutes from './src/routes/privateMessages';
 import leaderboardRoutes from './src/routes/leaderboardRoutes';
 import userGuideRoutes from './src/routes/userGuideRoutes';
 import marketingRoutes from './src/routes/marketing';
@@ -576,6 +577,7 @@ app.use('/api/battle', battleRoutes);
 app.use('/api/research', researchRoutes);
 app.use('/api/crew', crewRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/private-messages', privateMessagesRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/documents', documentsRoutes);
 

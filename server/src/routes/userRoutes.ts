@@ -21,6 +21,38 @@ interface UpdatePreferencesRequest extends Request {
 
 const router = express.Router();
 
+/**
+ * Look up a user by handle (exact match, case-insensitive).
+ * Used by the app for "search user" to open a profile from any screen.
+ * Returns 404 if no user found.
+ */
+router.get('/lookup', auth, async (req: Request, res: Response) => {
+  try {
+    const handleParam = req.query.handle;
+    if (typeof handleParam !== 'string' || !handleParam.trim()) {
+      res.status(400).json({ error: 'Handle is required' });
+      return;
+    }
+    const trimmed = handleParam.trim();
+    const user = await User.findOne({
+      handle: { $regex: new RegExp(`^${trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+    })
+      .select('_id handle')
+      .lean();
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({
+      userId: String(user._id),
+      handle: (user as any).handle,
+    });
+  } catch (error) {
+    console.error('Server error in user lookup:', error);
+    res.status(500).json({ error: 'Error looking up user' });
+  }
+});
+
 const markResearchCenterTaskCompleted = async (userId: string | mongoose.Types.ObjectId) => {
   try {
     const taskList = getTaskList();
