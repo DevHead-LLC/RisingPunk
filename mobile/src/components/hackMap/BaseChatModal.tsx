@@ -32,6 +32,8 @@ export interface ChatMessageForModal {
   timestamp: Date;
   /** When true, show as "Admin" (or "You (Admin)" if current user). Set by server for world/crew/PM. */
   isFromAdmin?: boolean;
+  /** When true, message was sent via admin "message all"; replies are disabled for this conversation. */
+  isAdminBroadcast?: boolean;
 }
 
 export interface BaseChatModalProps {
@@ -46,6 +48,8 @@ export interface BaseChatModalProps {
   currentUser: { _id?: string; id?: string; handle?: string } | null;
   reportContext: string;
   getReportContextData: (reportedMessage: ChatMessageForModal) => Record<string, unknown>;
+  /** When false, input is hidden (e.g. admin broadcast conversation). Default true. */
+  canReply?: boolean;
 }
 
 export const BaseChatModal: React.FC<BaseChatModalProps> = ({
@@ -60,6 +64,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
   currentUser,
   reportContext,
   getReportContextData,
+  canReply = true,
 }) => {
   const colors = useThemeColors();
   const currentUserId = currentUser?._id || (currentUser as any)?.id;
@@ -309,48 +314,56 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
               )}
             </ScrollView>
 
-            <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
-                <FilteredTextInput
+            {canReply ? (
+              <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <FilteredTextInput
+                    style={[
+                      styles.messageInput,
+                      {
+                        borderColor:
+                          characterCount > maxCharacters ? colors.error : colors.secondary,
+                        backgroundColor: colors.inputBg || colors.surface,
+                        color: colors.text.primary,
+                      },
+                    ]}
+                    value={messageInput}
+                    onChangeText={setMessageInput}
+                    placeholder="Type a message..."
+                    placeholderTextColor={colors.text.placeholder}
+                    multiline
+                    maxLength={maxCharacters}
+                    textAlignVertical="top"
+                  />
+                  <Text style={styles.characterCount}>
+                    {characterCount} / {maxCharacters}
+                  </Text>
+                </View>
+                <TouchableOpacity
                   style={[
-                    styles.messageInput,
-                    {
-                      borderColor:
-                        characterCount > maxCharacters ? colors.error : colors.secondary,
-                      backgroundColor: colors.inputBg || colors.surface,
-                      color: colors.text.primary,
+                    styles.sendButton,
+                    { backgroundColor: colors.primary, borderColor: colors.primary },
+                    (characterCount > maxCharacters || !messageInput.trim()) && {
+                      backgroundColor: colors.buttonDisabled,
+                      borderColor: colors.buttonDisabled,
                     },
                   ]}
-                  value={messageInput}
-                  onChangeText={setMessageInput}
-                  placeholder="Type a message..."
-                  placeholderTextColor={colors.text.placeholder}
-                  multiline
-                  maxLength={maxCharacters}
-                  textAlignVertical="top"
-                />
-                <Text style={styles.characterCount}>
-                  {characterCount} / {maxCharacters}
+                  onPress={handleSendMessage}
+                  disabled={
+                    characterCount > maxCharacters || !messageInput.trim() || isSending
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.sendButtonText}>{isSending ? 'Sending...' : 'Send'}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.noReplyContainer}>
+                <Text style={[styles.noReplyText, { color: colors.text.secondary }]}>
+                  Admin message — replies are disabled.
                 </Text>
               </View>
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  { backgroundColor: colors.primary, borderColor: colors.primary },
-                  (characterCount > maxCharacters || !messageInput.trim()) && {
-                    backgroundColor: colors.buttonDisabled,
-                    borderColor: colors.buttonDisabled,
-                  },
-                ]}
-                onPress={handleSendMessage}
-                disabled={
-                  characterCount > maxCharacters || !messageInput.trim() || isSending
-                }
-                activeOpacity={0.7}
-              >
-                <Text style={styles.sendButtonText}>{isSending ? 'Sending...' : 'Send'}</Text>
-              </TouchableOpacity>
-            </View>
+            )}
           </SafeAreaView>
         </KeyboardAvoidingView>
 
@@ -517,6 +530,16 @@ const createStyles = (colors: any) =>
       borderTopColor: colors.secondary,
       gap: SIZING.spacing.md,
       paddingBottom: Platform.OS === 'ios' ? SIZING.spacing.lg : SIZING.spacing.md,
+    },
+    noReplyContainer: {
+      padding: SIZING.spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.secondary,
+      alignItems: 'center',
+    },
+    noReplyText: {
+      fontSize: SIZING.font.small,
+      fontStyle: 'italic',
     },
     inputWrapper: { flex: 1 },
     messageInput: {

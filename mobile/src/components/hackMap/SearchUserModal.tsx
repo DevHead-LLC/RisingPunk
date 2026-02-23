@@ -19,7 +19,10 @@ import {
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useLazyLookupUserByHandleQuery } from '../../store/api/authApi';
+import { useSendAdminMessageToAllMutation } from '../../store/api/privateMessagesApi';
 import { containsBadWordsForHandle } from '../../utils/contentModeration';
+
+const ADMIN_MESSAGE_MAX_LENGTH = 500;
 
 const HANDLE_VALID_CHARS = /^[a-zA-Z0-9!&%^*_]*$/;
 const MIN_LENGTH = 5;
@@ -33,22 +36,31 @@ export interface SearchUserModalProps {
   visible: boolean;
   onClose: () => void;
   onUserFound: (userId: string, handle: string) => void;
+  /** When true, show "Message all users" admin section (one-way broadcast). */
+  isAdmin?: boolean;
 }
 
 export const SearchUserModal: React.FC<SearchUserModalProps> = ({
   visible,
   onClose,
   onUserFound,
+  isAdmin = false,
 }) => {
   const colors = useThemeColors();
   const [handle, setHandle] = useState('');
   const [error, setError] = useState('');
+  const [adminMessage, setAdminMessage] = useState('');
+  const [adminStatus, setAdminStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [adminStatusText, setAdminStatusText] = useState('');
   const [trigger, { isLoading }] = useLazyLookupUserByHandleQuery();
+  const [sendToAll, { isLoading: isSendingToAll }] = useSendAdminMessageToAllMutation();
 
   useEffect(() => {
     if (visible) {
       setHandle('');
       setError('');
+      setAdminStatus('idle');
+      setAdminStatusText('');
     }
   }, [visible]);
 
@@ -95,9 +107,32 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
     onClose();
   }, [onClose]);
 
+  const handleSendToAll = useCallback(async () => {
+    const trimmed = adminMessage.trim();
+    if (!trimmed || isSendingToAll) return;
+    if (trimmed.length > ADMIN_MESSAGE_MAX_LENGTH) {
+      setAdminStatus('error');
+      setAdminStatusText(`Message must be ${ADMIN_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
+    setAdminStatus('idle');
+    setAdminStatusText('');
+    try {
+      const result = await sendToAll(trimmed).unwrap();
+      setAdminMessage('');
+      setAdminStatus('success');
+      setAdminStatusText(`Sent to ${result.sentCount} user${result.sentCount === 1 ? '' : 's'}.`);
+    } catch (err: any) {
+      const msg = err?.data?.error || err?.error || 'Failed to send. Try again.';
+      setAdminStatus('error');
+      setAdminStatusText(msg);
+    }
+  }, [adminMessage, isSendingToAll, sendToAll]);
+
   const styles = createStyles(colors);
   const validationErr = validateHandle(handle);
   const canSubmit = !validationErr && handle.trim().length >= MIN_LENGTH && !isLoading;
+  const canSendToAll = adminMessage.trim().length > 0 && adminMessage.trim().length <= ADMIN_MESSAGE_MAX_LENGTH && !isSendingToAll;
 
   return (
     <Modal
@@ -123,6 +158,58 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
                 <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
               </TouchableOpacity>
               <Text style={styles.title}>Search User</Text>
+              {isAdmin && (
+                <View style={styles.adminSection}>
+                  <Text style={[styles.adminSectionTitle, { color: colors.text.primary }]}>Message all users</Text>
+                  <Text style={[styles.adminSectionHint, { color: colors.text.secondary }]}>
+                    One-way admin message (replies disabled). 500 chars max.
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.adminInput,
+                      {
+                        color: colors.text.primary,
+                        borderColor: colors.matrix,
+                        backgroundColor: colors.inputBg || colors.background,
+                      },
+                    ]}
+                    value={adminMessage}
+                    onChangeText={(text) => {
+                      if (text.length <= ADMIN_MESSAGE_MAX_LENGTH) setAdminMessage(text);
+                      setAdminStatus('idle');
+                    }}
+                    placeholder="Type your message..."
+                    placeholderTextColor={colors.text.placeholder}
+                    multiline
+                    maxLength={ADMIN_MESSAGE_MAX_LENGTH}
+                    editable={!isSendingToAll}
+                  />
+                  <Text style={[styles.adminCharCount, { color: colors.text.secondary }]}>
+                    {adminMessage.length} / {ADMIN_MESSAGE_MAX_LENGTH}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.sendToAllButton,
+                      {
+                        backgroundColor: canSendToAll ? colors.primary : colors.buttonDisabled,
+                        borderColor: colors.matrix,
+                      },
+                    ]}
+                    onPress={handleSendToAll}
+                    disabled={!canSendToAll}
+                  >
+                    <Text style={styles.sendToAllButtonText}>
+                      {isSendingToAll ? 'Sending...' : 'Send to all users'}
+                    </Text>
+                  </TouchableOpacity>
+                  {adminStatus === 'success' && (
+                    <Text style={[styles.adminStatusText, { color: colors.primary }]}>{adminStatusText}</Text>
+                  )}
+                  {adminStatus === 'error' && (
+                    <Text style={[styles.adminStatusText, { color: colors.error }]}>{adminStatusText}</Text>
+                  )}
+                </View>
+              )}
               <Text style={styles.hint}>Enter the exact handle (case doesn't matter).</Text>
               <TextInput
                 style={[
@@ -217,6 +304,52 @@ const createStyles = (colors: any) =>
       fontSize: SIZING.font.small,
       textAlign: 'center',
       marginBottom: SIZING.spacing.md,
+    },
+    adminSection: {
+      marginBottom: SIZING.spacing.md,
+      paddingBottom: SIZING.spacing.md,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    },
+    adminSectionTitle: {
+      fontSize: SIZING.font.md,
+      fontWeight: '600',
+      marginBottom: SIZING.spacing.xs,
+    },
+    adminSectionHint: {
+      fontSize: SIZING.font.small,
+      marginBottom: SIZING.spacing.sm,
+    },
+    adminInput: {
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: SIZING.spacing.md,
+      paddingVertical: SIZING.spacing.sm,
+      fontSize: SIZING.font.body,
+      minHeight: 60,
+      maxHeight: 120,
+    },
+    adminCharCount: {
+      fontSize: SIZING.font.small,
+      textAlign: 'right',
+      marginTop: 2,
+      marginBottom: SIZING.spacing.sm,
+    },
+    sendToAllButton: {
+      paddingVertical: SIZING.spacing.sm,
+      borderRadius: 8,
+      borderWidth: 1,
+      alignItems: 'center',
+    },
+    sendToAllButtonText: {
+      color: '#FFFFFF',
+      fontSize: SIZING.font.body,
+      fontWeight: '600',
+    },
+    adminStatusText: {
+      fontSize: SIZING.font.small,
+      marginTop: SIZING.spacing.sm,
+      textAlign: 'center',
     },
     input: {
       borderWidth: 1,

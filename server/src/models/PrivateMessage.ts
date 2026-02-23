@@ -8,9 +8,15 @@ export interface IPrivateMessage extends Document {
   originalMessage?: string;
   readAt: Date | null;
   isFromAdmin: boolean;
+  /** When true, this message was sent via admin "message all"; replies are disabled. */
+  isAdminBroadcast?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** Appended to every admin broadcast message (one-way, no reply). */
+export const ADMIN_BROADCAST_FOOTER =
+  'Thank you for playing RisingPunk! Please contact support at support@risingpunk.com for help or feedback.';
 
 const privateMessageSchema = new Schema({
   senderId: {
@@ -33,7 +39,7 @@ const privateMessageSchema = new Schema({
   message: {
     type: String,
     required: true,
-    maxlength: 500,
+    maxlength: 600,
     trim: true,
   },
   originalMessage: {
@@ -47,6 +53,10 @@ const privateMessageSchema = new Schema({
     default: null,
   },
   isFromAdmin: {
+    type: Boolean,
+    default: false,
+  },
+  isAdminBroadcast: {
     type: Boolean,
     default: false,
   },

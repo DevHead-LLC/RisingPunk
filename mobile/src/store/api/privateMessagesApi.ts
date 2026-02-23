@@ -42,6 +42,8 @@ export interface PMConversation {
   lastMessage: string;
   lastAt: string;
   unreadCount: number;
+  /** True for "RisingPunk (Announcements)" thread; replies disabled. */
+  isBroadcast?: boolean;
 }
 
 export interface PMMessage {
@@ -53,6 +55,8 @@ export interface PMMessage {
   timestamp: string;
   readAt: string | null;
   isFromAdmin: boolean;
+  /** When true, this was sent via admin "message all"; replies are disabled. */
+  isAdminBroadcast?: boolean;
 }
 
 export const privateMessagesApi = createApi({
@@ -64,11 +68,16 @@ export const privateMessagesApi = createApi({
       query: () => ({ url: '/api/private-messages/conversations' }),
       providesTags: ['PrivateMessageConversations'],
     }),
-    getThread: builder.query<{ success: boolean; messages: PMMessage[] }, string>({
-      query: (otherUserId) => ({
-        url: `/api/private-messages/conversations/${encodeURIComponent(otherUserId)}/messages`,
+    getThread: builder.query<
+      { success: boolean; messages: PMMessage[] },
+      { otherUserId: string; broadcastOnly?: boolean }
+    >({
+      query: ({ otherUserId, broadcastOnly }) => ({
+        url: `/api/private-messages/conversations/${encodeURIComponent(otherUserId)}/messages${broadcastOnly ? '?broadcastOnly=true' : ''}`,
       }),
-      providesTags: (result, error, otherUserId) => [{ type: 'PrivateMessageThread', id: otherUserId }],
+      providesTags: (result, error, { otherUserId, broadcastOnly }) => [
+        { type: 'PrivateMessageThread', id: `${otherUserId}${broadcastOnly ? ':broadcast' : ''}` },
+      ],
     }),
     sendMessage: builder.mutation<
       { success: boolean; message: PMMessage },
@@ -84,14 +93,17 @@ export const privateMessagesApi = createApi({
         { type: 'PrivateMessageThread', id: recipientId },
       ],
     }),
-    markConversationRead: builder.mutation<{ success: boolean }, string>({
-      query: (otherUserId) => ({
-        url: `/api/private-messages/conversations/${encodeURIComponent(otherUserId)}/read`,
+    markConversationRead: builder.mutation<
+      { success: boolean },
+      { otherUserId: string; broadcastOnly?: boolean }
+    >({
+      query: ({ otherUserId, broadcastOnly }) => ({
+        url: `/api/private-messages/conversations/${encodeURIComponent(otherUserId)}/read${broadcastOnly ? '?broadcastOnly=true' : ''}`,
         method: 'POST',
       }),
-      invalidatesTags: (_result, error, otherUserId) => [
+      invalidatesTags: (_result, error, { otherUserId, broadcastOnly }) => [
         'PrivateMessageConversations',
-        { type: 'PrivateMessageThread', id: otherUserId },
+        { type: 'PrivateMessageThread', id: `${otherUserId}${broadcastOnly ? ':broadcast' : ''}` },
       ],
     }),
     blockUser: builder.mutation<{ success: boolean }, string>({
@@ -108,6 +120,14 @@ export const privateMessagesApi = createApi({
       }),
       invalidatesTags: ['PrivateMessageConversations'],
     }),
+    sendAdminMessageToAll: builder.mutation<{ success: boolean; sentCount: number }, string>({
+      query: (message) => ({
+        url: '/api/private-messages/admin/send-all',
+        method: 'POST',
+        body: { message },
+      }),
+      invalidatesTags: ['PrivateMessageConversations'],
+    }),
   }),
 });
 
@@ -118,4 +138,5 @@ export const {
   useMarkConversationReadMutation,
   useBlockUserMutation,
   useUnblockUserMutation,
+  useSendAdminMessageToAllMutation,
 } = privateMessagesApi;

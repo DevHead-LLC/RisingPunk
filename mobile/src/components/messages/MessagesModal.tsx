@@ -38,21 +38,27 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
 }) => {
   const colors = useThemeColors();
   const currentUser = useAppSelector((state) => state.auth.user);
-  const [view, setView] = useState<'inbox' | { otherUserId: string; otherUsername: string }>('inbox');
+  const [view, setView] = useState<
+    'inbox' | { otherUserId: string; otherUsername: string; isBroadcast?: boolean }
+  >('inbox');
 
-  const { data: conversationsData, isLoading: isLoadingConversations } = useGetConversationsQuery(undefined, {
+  const { data: conversationsData, isLoading: isLoadingConversations, error: conversationsError } = useGetConversationsQuery(undefined, {
     skip: !visible,
-    pollingInterval: visible ? 5000 : 0,
+    pollingInterval: visible ? 2000 : 0,
   });
   const conversations = conversationsData?.conversations ?? [];
 
   const otherUserId = view === 'inbox' ? (openToUserId ?? null) : view.otherUserId;
   const otherUsername = view === 'inbox' ? (openToUsername ?? null) : view.otherUsername;
+  const isBroadcast = view !== 'inbox' && view.isBroadcast === true;
 
-  const { data: threadData, isLoading: isLoadingThread } = useGetThreadQuery(otherUserId!, {
-    skip: !visible || !otherUserId,
-    pollingInterval: visible && otherUserId ? 5000 : 0,
-  });
+  const { data: threadData, isLoading: isLoadingThread } = useGetThreadQuery(
+    { otherUserId: otherUserId!, broadcastOnly: isBroadcast },
+    {
+      skip: !visible || !otherUserId,
+      pollingInterval: visible && otherUserId ? 2000 : 0,
+    },
+  );
   const [markRead] = useMarkConversationReadMutation();
   const [sendMessage, { isLoading: isSending }] = useSendMessageMutation();
 
@@ -63,7 +69,10 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
     message: msg.message,
     timestamp: new Date(msg.timestamp),
     isFromAdmin: msg.isFromAdmin,
+    isAdminBroadcast: msg.isAdminBroadcast,
   }));
+
+  const canReply = !isBroadcast;
 
   const onSendMessage = useCallback(
     async (trimmedMessage: string) => {
@@ -87,17 +96,23 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
     [otherUserId],
   );
 
-  const openConversation = useCallback((c: PMConversation) => {
-    setView({ otherUserId: c.otherUserId, otherUsername: c.otherUsername });
-    markRead(c.otherUserId);
-  }, [markRead]);
+  const openConversation = useCallback(
+    (c: PMConversation) => {
+      setView({
+        otherUserId: c.otherUserId,
+        otherUsername: c.otherUsername,
+        isBroadcast: c.isBroadcast === true,
+      });
+      markRead({ otherUserId: c.otherUserId, broadcastOnly: c.isBroadcast === true });
+    },
+    [markRead],
+  );
 
   const backToInbox = useCallback(() => {
     setView('inbox');
   }, []);
 
   const handleClose = useCallback(() => {
-    if (__DEV__) console.log('[MessagesModal] handleClose — dismissing');
     setView('inbox');
     onClose();
   }, [onClose]);
@@ -107,19 +122,14 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
       setView({
         otherUserId: openToUserId,
         otherUsername: openToUsername ?? 'Unknown',
+        isBroadcast: false,
       });
-      markRead(openToUserId);
+      markRead({ otherUserId: openToUserId, broadcastOnly: false });
     }
   }, [visible, openToUserId, openToUsername, markRead]);
 
   const showInbox = view === 'inbox' && !openToUserId;
   const showConversation = !showInbox && otherUserId;
-
-  React.useEffect(() => {
-    if (__DEV__ && visible && openToUserId) {
-      console.log('[MessagesModal] showing conversation for', openToUserId, openToUsername ?? 'Unknown');
-    }
-  }, [visible, openToUserId, openToUsername]);
 
   const styles = createStyles(colors);
 
@@ -155,7 +165,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
             ) : (
               <FlatList
                 data={conversations}
-                keyExtractor={(item) => item.otherUserId}
+                keyExtractor={(item) => `${item.otherUserId}${item.isBroadcast ? ':broadcast' : ''}`}
                 renderItem={({ item }) => (
                   <Pressable
                     style={styles.row}
@@ -198,6 +208,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
           currentUser={currentUser}
           reportContext="private-message"
           getReportContextData={getReportContextData}
+          canReply={canReply}
         />
       )}
     </>

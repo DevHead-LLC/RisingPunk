@@ -486,6 +486,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const loading = useAppSelector((state) => state.map.loading);
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
   const currentUserId = useAppSelector((state) => state.auth.user?._id);
+  const currentUserIsAdmin = useAppSelector((state) => state.auth.user?.isAdmin === true);
   const token = useAppSelector((state) => state.auth.token);
   const hackRigUnlocked = useAppSelector((state) => state.auth.user?.unlockedFeatures?.hackRig === true);
   const colors = useThemeColors();
@@ -763,7 +764,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [messagesOpenToUser, setMessagesOpenToUser] = useState<{ userId: string; username: string } | null>(null);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
-    pollingInterval: token ? 5000 : 0,
+    pollingInterval: token ? 2000 : 0,
   });
   const messagesUnreadCount = (conversationsData?.conversations ?? []).reduce((s, c) => s + c.unreadCount, 0);
   const handleOpenMessagesToUser = useCallback((userId: string, username: string) => {
@@ -3520,6 +3521,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           setVisitingProfileUserId(userId);
           setShowVisitingProfileModal(true);
         }}
+        isAdmin={currentUserIsAdmin}
       />
 
         <CollapsibleToolbar
