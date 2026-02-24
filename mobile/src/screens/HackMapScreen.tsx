@@ -764,7 +764,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [messagesOpenToUser, setMessagesOpenToUser] = useState<{ userId: string; username: string } | null>(null);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
-    pollingInterval: token ? 2000 : 0,
+    pollingInterval: token ? 10000 : 0, // 10s for badge; MessagesModal polls at 2s when open
   });
   const messagesUnreadCount = (conversationsData?.conversations ?? []).reduce((s, c) => s + c.unreadCount, 0);
   const handleOpenMessagesToUser = useCallback((userId: string, username: string) => {

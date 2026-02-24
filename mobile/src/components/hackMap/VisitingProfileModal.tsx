@@ -413,7 +413,7 @@ const createStyles = (colors: any, themeMode: 'light' | 'dark') => StyleSheet.cr
     right: -70,
     width: 115,
     height: 115,
-    borderRadius: 42.5,
+    borderRadius: 57.5, // 115/2 for circle
     borderWidth: 2,
     backgroundColor: themeMode === 'dark' ? 'transparent' : '#9E9E9E',
     borderColor: themeMode === 'dark' ? 'transparent' : '#757575',

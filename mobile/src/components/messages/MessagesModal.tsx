@@ -52,7 +52,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   const otherUsername = view === 'inbox' ? (openToUsername ?? null) : view.otherUsername;
   const isBroadcast = view !== 'inbox' && view.isBroadcast === true;
 
-  const { data: threadData, isLoading: isLoadingThread } = useGetThreadQuery(
+  const { data: threadData, isLoading: isLoadingThread, error: threadError } = useGetThreadQuery(
     { otherUserId: otherUserId!, broadcastOnly: isBroadcast },
     {
       skip: !visible || !otherUserId,
@@ -201,7 +201,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
           onClose={openToUserId ? handleClose : backToInbox}
           title={otherUsername ?? 'Conversation'}
           messages={messages}
-          fetchError={null}
+          fetchError={threadError ?? null}
           isLoadingMessages={isLoadingThread && messages.length === 0}
           onSendMessage={onSendMessage}
           isSending={isSending}
@@ -233,10 +233,6 @@ function formatTime(iso: string): string {
   }
 }
 
-// High-contrast text colors for Messages modal so title, close button, and list are always readable on dark background
-const MODAL_TEXT_PRIMARY = '#E8E4D9';
-const MODAL_TEXT_SECONDARY = '#B0A8C0';
-
 const createStyles = (colors: any) =>
   StyleSheet.create({
     overlay: {
@@ -255,12 +251,12 @@ const createStyles = (colors: any) =>
     title: {
       fontSize: SIZING.font.lg,
       fontWeight: '600',
-      color: MODAL_TEXT_PRIMARY,
+      color: colors.text.primary,
     },
     closeButtonText: {
       fontSize: 28,
       fontWeight: '600',
-      color: MODAL_TEXT_PRIMARY,
+      color: colors.text.primary,
     },
     centered: {
       flex: 1,
@@ -270,11 +266,11 @@ const createStyles = (colors: any) =>
     },
     emptyText: {
       fontSize: SIZING.font.md,
-      color: MODAL_TEXT_PRIMARY,
+      color: colors.text.primary,
     },
     emptySubtext: {
       fontSize: SIZING.font.small,
-      color: MODAL_TEXT_SECONDARY,
+      color: colors.text.secondary,
       marginTop: SIZING.spacing.xs,
     },
     row: {
@@ -292,11 +288,11 @@ const createStyles = (colors: any) =>
     rowUsername: {
       fontSize: SIZING.font.md,
       fontWeight: '600',
-      color: MODAL_TEXT_PRIMARY,
+      color: colors.text.primary,
     },
     rowPreview: {
       fontSize: SIZING.font.small,
-      color: MODAL_TEXT_SECONDARY,
+      color: colors.text.secondary,
       marginTop: 2,
     },
     rowRight: {
@@ -305,7 +301,7 @@ const createStyles = (colors: any) =>
     },
     rowTime: {
       fontSize: SIZING.font.small,
-      color: MODAL_TEXT_SECONDARY,
+      color: colors.text.secondary,
     },
     badge: {
       minWidth: 22,

@@ -185,7 +185,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const token = useAppSelector((state) => state.auth.token);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
-    pollingInterval: token ? 2000 : 0,
+    pollingInterval: token ? 10000 : 0, // 10s for badge; MessagesModal polls at 2s when open
   });
   const messagesUnreadCount = (conversationsData?.conversations ?? []).reduce((s, c) => s + c.unreadCount, 0);
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
