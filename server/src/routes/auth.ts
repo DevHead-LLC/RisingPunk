@@ -15,7 +15,15 @@ import { getAdminUserIds } from '../config/env';
 
 function isUserAdmin(user: { _id?: unknown }): boolean {
   if (!user?._id) return false;
-  return getAdminUserIds().some((id) => id.toString() === String(user._id));
+  let userHex: string;
+  try {
+    const idStr = String(user._id).trim();
+    if (!mongoose.Types.ObjectId.isValid(idStr)) return false;
+    userHex = new mongoose.Types.ObjectId(idStr).toString();
+  } catch {
+    return false;
+  }
+  return getAdminUserIds().some((id) => id.toString() === userHex);
 }
 
 // Helper function to safely escape regex special characters

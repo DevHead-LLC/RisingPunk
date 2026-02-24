@@ -25,12 +25,12 @@ import { containsBadWordsForHandle } from '../../utils/contentModeration';
 /** Max body length so body + "\n\n" (2) + server footer (~104) stays ≤ 600 (schema message maxlength). */
 const ADMIN_MESSAGE_MAX_LENGTH = 494;
 
-const HANDLE_VALID_CHARS = /^[a-zA-Z0-9!&%^*_]*$/;
+const HANDLE_VALID_CHARS = /^[a-zA-Z0-9!&%^*_;]*$/;
 const MIN_LENGTH = 5;
 const MAX_LENGTH = 15;
 
 function filterHandleInput(text: string): string {
-  return text.replace(/[^a-zA-Z0-9!&%^*_]/g, '');
+  return text.replace(/[^a-zA-Z0-9!&%^*_;]/g, '');
 }
 
 export interface SearchUserModalProps {
@@ -69,7 +69,7 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
     if (!value.trim()) return 'Enter a handle to search.';
     if (value.length < MIN_LENGTH) return `Handle must be at least ${MIN_LENGTH} characters.`;
     if (value.length > MAX_LENGTH) return `Handle must be ${MAX_LENGTH} characters or less.`;
-    if (!HANDLE_VALID_CHARS.test(value)) return 'Handle can only contain letters, numbers, and !&%^*_';
+    if (!HANDLE_VALID_CHARS.test(value)) return 'Handle can only contain letters, numbers, and !&%^*_;';
     if (containsBadWordsForHandle(value)) return 'Handle contains inappropriate language.';
     return '';
   }, []);
