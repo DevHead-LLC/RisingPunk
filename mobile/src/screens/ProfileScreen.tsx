@@ -792,7 +792,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       dispatch(balanceApi.util.resetApiState());
       dispatch(botsApi.util.resetApiState());
       dispatch(mapApi.util.resetApiState());
-      
+      dispatch(privateMessagesApi.util.resetApiState());
+
       dispatch(logout());
     } catch (error) {
       console.error('ProfileScreen: Failed to delete account:', error);

@@ -88,7 +88,7 @@ export const mapApi = createApi({
       invalidatesTags: ['Map'],
     }),
     getMapChatMessages: builder.query<
-      { success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; timestamp: string }> },
+      { success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; timestamp: string; isFromAdmin?: boolean }> },
       string
     >({
       query: (mapName) => ({
@@ -99,7 +99,7 @@ export const mapApi = createApi({
       keepUnusedDataFor: 30,
     }),
     sendMapChatMessage: builder.mutation<
-      { success: boolean; message: { id: string; userId: string; username: string; message: string; timestamp: string } },
+      { success: boolean; message: { id: string; userId: string; username: string; message: string; timestamp: string; isFromAdmin?: boolean } },
       { mapName: string; message: string }
     >({
       query: ({ mapName, message }) => ({

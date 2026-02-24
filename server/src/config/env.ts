@@ -1,4 +1,5 @@
 import dotenvFlow from 'dotenv-flow';
+import mongoose from 'mongoose';
 
 // Get NODE_ENV before loading env files
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -58,3 +59,19 @@ export const DESKTOP_LANDING_URL = process.env.DESKTOP_LANDING_URL || 'https://r
 // For rollout: set MIN_APP_VERSION=2.5.0 so 2.5.0 and higher are allowed; anything below is blocked.
 export const MIN_APP_VERSION: string | undefined = process.env.MIN_APP_VERSION;
 export const RECOMMENDED_APP_VERSION: string | undefined = process.env.RECOMMENDED_APP_VERSION;
+
+// Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
+export function getAdminUserIds(): mongoose.Types.ObjectId[] {
+  const raw = process.env.ADMIN_USER_IDS;
+  if (!raw || typeof raw !== 'string') return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .reduce<mongoose.Types.ObjectId[]>((acc, id) => {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        acc.push(new mongoose.Types.ObjectId(id));
+      }
+      return acc;
+    }, []);
+}

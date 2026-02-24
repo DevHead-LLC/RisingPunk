@@ -12,4 +12,5 @@ export const resetAllApiCaches = (api: any) => {
   api.dispatch({ type: 'antivirusApi/resetApiState' });
   api.dispatch({ type: 'rentalHousingApi/resetApiState' });
   api.dispatch({ type: 'researchFeaturesApi/resetApiState' });
+  api.dispatch({ type: 'privateMessagesApi/resetApiState' });
 };
