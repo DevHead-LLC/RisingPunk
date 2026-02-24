@@ -61,17 +61,32 @@ export const MIN_APP_VERSION: string | undefined = process.env.MIN_APP_VERSION;
 export const RECOMMENDED_APP_VERSION: string | undefined = process.env.RECOMMENDED_APP_VERSION;
 
 // Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
+let cachedAdminIds: mongoose.Types.ObjectId[] | null = null;
+
 export function getAdminUserIds(): mongoose.Types.ObjectId[] {
+  if (cachedAdminIds !== null) return cachedAdminIds;
   const raw = process.env.ADMIN_USER_IDS;
-  if (!raw || typeof raw !== 'string') return [];
-  return raw
+  if (!raw || typeof raw !== 'string') {
+    cachedAdminIds = [];
+    return cachedAdminIds;
+  }
+  const invalid: string[] = [];
+  const acc = raw
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean)
-    .reduce<mongoose.Types.ObjectId[]>((acc, id) => {
+    .reduce<mongoose.Types.ObjectId[]>((arr, id) => {
       if (mongoose.Types.ObjectId.isValid(id)) {
-        acc.push(new mongoose.Types.ObjectId(id));
+        arr.push(new mongoose.Types.ObjectId(id));
+      } else {
+        invalid.push(id);
       }
-      return acc;
+      return arr;
     }, []);
+  if (invalid.length > 0) {
+    console.warn(`[env] ADMIN_USER_IDS: skipped invalid entries (expected 24-char hex ObjectIds): ${invalid.join(', ')}`);
+  }
+  cachedAdminIds = acc;
+  return cachedAdminIds;
 }
+
