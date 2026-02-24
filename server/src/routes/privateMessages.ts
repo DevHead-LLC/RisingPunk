@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { User } from '../models/User';
-import { PrivateMessage, getConversationKey, ADMIN_BROADCAST_FOOTER } from '../models/PrivateMessage';
+import { PrivateMessage, ADMIN_BROADCAST_FOOTER } from '../models/PrivateMessage';
 import { filterBadWords } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 
@@ -300,6 +300,10 @@ router.post('/conversations/:recipientId/messages', auth, async (req: Request, r
     const recipientId = req.params.recipientId;
     if (!recipientId || !mongoose.Types.ObjectId.isValid(recipientId)) {
       res.status(400).json({ error: 'Valid recipient ID is required' });
+      return;
+    }
+    if (recipientId === String(userId)) {
+      res.status(400).json({ error: 'Cannot send a message to yourself' });
       return;
     }
 

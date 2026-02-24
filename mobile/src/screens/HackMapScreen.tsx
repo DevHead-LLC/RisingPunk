@@ -755,6 +755,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
   const visitingProfileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visitCrewCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (visitingProfileCloseTimeoutRef.current) {
+        clearTimeout(visitingProfileCloseTimeoutRef.current);
+        visitingProfileCloseTimeoutRef.current = null;
+      }
+      if (visitCrewCloseTimeoutRef.current) {
+        clearTimeout(visitCrewCloseTimeoutRef.current);
+        visitCrewCloseTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const [showVisitCrewModal, setShowVisitCrewModal] = useState(false);
   const [visitCrewId, setVisitCrewId] = useState<string | null>(null);
   const [visitCrewName, setVisitCrewName] = useState<string | null>(null);

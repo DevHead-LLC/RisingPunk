@@ -22,7 +22,8 @@ import { useLazyLookupUserByHandleQuery } from '../../store/api/authApi';
 import { useSendAdminMessageToAllMutation } from '../../store/api/privateMessagesApi';
 import { containsBadWordsForHandle } from '../../utils/contentModeration';
 
-const ADMIN_MESSAGE_MAX_LENGTH = 500;
+/** Max body length so body + "\n\n" + server footer stays ≤ 600 (schema message maxlength). */
+const ADMIN_MESSAGE_MAX_LENGTH = 512;
 
 const HANDLE_VALID_CHARS = /^[a-zA-Z0-9!&%^*_]*$/;
 const MIN_LENGTH = 5;
@@ -162,7 +163,7 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
                 <View style={styles.adminSection}>
                   <Text style={[styles.adminSectionTitle, { color: colors.text.primary }]}>Message all users</Text>
                   <Text style={[styles.adminSectionHint, { color: colors.text.secondary }]}>
-                    One-way admin message (replies disabled). 500 chars max.
+                    One-way admin message (replies disabled). {ADMIN_MESSAGE_MAX_LENGTH} chars max.
                   </Text>
                   <TextInput
                     style={[
