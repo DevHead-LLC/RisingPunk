@@ -45,7 +45,7 @@ export interface BaseChatModalProps {
   isLoadingMessages: boolean;
   onSendMessage: (trimmedMessage: string) => Promise<void>;
   isSending: boolean;
-  currentUser: { _id?: string; id?: string; handle?: string } | null;
+  currentUser: { _id?: string; id?: string; handle?: string; isAdmin?: boolean } | null;
   reportContext: string;
   getReportContextData: (reportedMessage: ChatMessageForModal) => Record<string, unknown>;
   /** When false, input is hidden (e.g. admin broadcast conversation). Default true. */
