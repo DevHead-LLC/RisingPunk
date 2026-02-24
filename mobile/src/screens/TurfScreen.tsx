@@ -35,6 +35,7 @@ import { SearchUserIconButton } from '../components/hackMap/SearchUserIconButton
 import { SearchUserModal } from '../components/hackMap/SearchUserModal';
 import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
 import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
+import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { SIZING } from '../styles/theme';
 
 // Platform-specific imports - available on both platforms but only used on Android
@@ -953,7 +954,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     visitingProfileCloseTimeoutRef.current = setTimeout(() => {
       setVisitingProfileUserId(null);
       visitingProfileCloseTimeoutRef.current = null;
-    }, 350);
+    }, VISITING_PROFILE_CLOSE_DELAY_MS);
   }, []);
   const handleBlockUser = useCallback((userId: string) => {
     blockUserMutation(userId);
@@ -974,7 +975,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       visitingProfileCloseTimeoutRef.current = null;
       setMessagesOpenToUser({ userId, username });
       setShowMessagesModal(true);
-    }, 350);
+    }, VISITING_PROFILE_CLOSE_DELAY_MS);
   }, []);
   const handleCloseMessagesModal = useCallback(() => {
     setShowMessagesModal(false);

@@ -69,10 +69,3 @@ privateMessageSchema.index({ senderId: 1, recipientId: 1, createdAt: -1 });
 privateMessageSchema.index({ recipientId: 1, readAt: 1 });
 
 export const PrivateMessage = mongoose.model<IPrivateMessage>('PrivateMessage', privateMessageSchema);
-
-/** Canonical conversation key (sorted user ids) so thread is unique regardless of who initiated. */
-export function getConversationKey(userId1: mongoose.Types.ObjectId, userId2: mongoose.Types.ObjectId): string {
-  const a = userId1.toString();
-  const b = userId2.toString();
-  return a < b ? `${a}_${b}` : `${b}_${a}`;
-}
