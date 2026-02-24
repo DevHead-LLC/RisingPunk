@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
 import { SIZING } from '../../styles/theme';
@@ -15,16 +15,13 @@ export const MessagesIconButton: React.FC<{ onPress: () => void; unreadCount?: n
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const styles = createStyles(colors, !!inline, themeMode);
+  const hasUnread = (unreadCount ?? 0) > 0;
+  const iconSource = hasUnread
+    ? require('../../assets/images/ui/activeMailbox.png')
+    : require('../../assets/images/ui/mailbox.png');
   return (
     <View style={styles.button}>
-      <Image source={require('../../assets/images/ui/mailbox.png')} style={styles.iconImage} resizeMode="contain" />
-      {unreadCount > 0 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText} numberOfLines={1}>
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </Text>
-        </View>
-      )}
+      <Image source={iconSource} style={styles.iconImage} resizeMode="contain" />
       <TouchableOpacity
         style={styles.hitArea}
         onPress={onPress}
@@ -72,22 +69,5 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
       left: (36 - HIT_SLOP_SIZE) / 2,
       top: (36 - HIT_SLOP_SIZE) / 2,
       borderRadius: HIT_SLOP_SIZE / 2,
-    },
-    badge: {
-      position: 'absolute',
-      top: -4,
-      right: -4,
-      minWidth: 18,
-      height: 18,
-      borderRadius: 9,
-      backgroundColor: '#e74c3c',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 4,
-    },
-    badgeText: {
-      color: '#fff',
-      fontSize: 10,
-      fontWeight: '700',
     },
   });

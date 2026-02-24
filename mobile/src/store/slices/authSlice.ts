@@ -90,8 +90,7 @@ export const loginUser = createAsyncThunk(
       // Do not clear GUEST_TOKEN_KEY: the device-linked (guest or linked) token is preserved so
       // after signing out, "Play as Guest" can resume that account on this device.
 
-      // Clear any existing RTK Query cache to ensure fresh data for new user
-      resetAllApiCaches({ dispatch } as any);
+      // Note: API caches are reset in authResetListener when this thunk's fulfilled runs.
 
       // Note: Preferences will be synced by AppContent useEffect after login completes
 
