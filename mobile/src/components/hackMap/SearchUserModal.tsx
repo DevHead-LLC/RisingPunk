@@ -60,6 +60,7 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
     if (visible) {
       setHandle('');
       setError('');
+      setAdminMessage('');
       setAdminStatus('idle');
       setAdminStatusText('');
     }
