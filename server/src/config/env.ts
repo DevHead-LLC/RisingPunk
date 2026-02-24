@@ -71,6 +71,8 @@ export function getAdminUserIds(): mongoose.Types.ObjectId[] {
     .reduce<mongoose.Types.ObjectId[]>((acc, id) => {
       if (mongoose.Types.ObjectId.isValid(id)) {
         acc.push(new mongoose.Types.ObjectId(id));
+      } else {
+        console.warn(`[env] ADMIN_USER_IDS: skipped invalid entry "${id}" (expected 24-char hex ObjectId)`);
       }
       return acc;
     }, []);

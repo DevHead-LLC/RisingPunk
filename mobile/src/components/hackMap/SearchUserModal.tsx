@@ -1,6 +1,6 @@
 /**
  * Modal to search for a user by handle (exact match, case-insensitive).
- * Uses same character rules as handle creation: letters, numbers, !&%^*_; 5–15 chars.
+ * Uses same character rules as handle creation: letters, numbers, and !&%^*_ (5–15 chars).
  * On success opens the visiting profile for that user; on not found shows an error.
  */
 import React, { useState, useEffect, useCallback } from 'react';
