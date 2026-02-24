@@ -118,7 +118,11 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   }, [onClose]);
 
   React.useEffect(() => {
-    if (visible && openToUserId) {
+    if (!visible) {
+      setView('inbox');
+      return;
+    }
+    if (openToUserId) {
       setView({
         otherUserId: openToUserId,
         otherUsername: openToUsername ?? 'Unknown',

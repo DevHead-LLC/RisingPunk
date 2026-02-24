@@ -52,9 +52,12 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
     });
 
     const user = await User.findById(userId).select('blockedUserIds').lean();
-    const blockedList = (user?.blockedUserIds || []).map((id: unknown) => new mongoose.Types.ObjectId(String(id)));
     const adminIds = getAdminUserIds();
     const adminIdSet = new Set(adminIds.map((id) => id.toString()));
+    // Exclude admins from block filter so admin broadcasts always appear
+    const blockedList = (user?.blockedUserIds || [])
+      .map((id: unknown) => new mongoose.Types.ObjectId(String(id)))
+      .filter((id) => !adminIdSet.has(id.toString()));
 
     const pipeline: any[] = [
       { $match: { $or: [{ senderId: userIdObj }, { recipientId: userIdObj }] } },
@@ -86,7 +89,10 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
           ],
         },
       } },
-      ...(blockedList.length > 0 ? [{ $match: { otherId: { $nin: blockedList } } }] : []),
+      // Admin broadcasts bypass block filter; other conversations respect blockedList
+      ...(blockedList.length > 0
+        ? [{ $match: { $or: [{ otherId: { $nin: blockedList } }, { isAdminBroadcast: true }] } }]
+        : []),
       { $sort: { createdAt: -1 } },
       { $group: {
         _id: { $toString: '$groupKey' },
@@ -121,7 +127,7 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
         const otherId =
           String(doc.senderId) === String(userId) ? doc.recipientId : doc.senderId;
         const otherIdStr = String(otherId);
-        if (blockedSet.has(otherIdStr)) continue;
+        if (blockedSet.has(otherIdStr) && doc.isAdminBroadcast !== true) continue; // admin broadcasts bypass block
         // Broadcast thread: either current user received broadcast from otherId, or current user (admin) sent broadcast to otherId
         const isBroadcast =
           doc.isAdminBroadcast === true &&
@@ -227,7 +233,12 @@ router.get('/conversations/:otherUserId/messages', auth, async (req: Request, re
     const broadcastOnly = req.query.broadcastOnly === 'true';
 
     const user = await User.findById(userId).select('blockedUserIds').lean();
-    const blockedSet = new Set((user?.blockedUserIds || []).map((id: unknown) => String(id)));
+    const adminIds = getAdminUserIds();
+    const adminIdSet = new Set(adminIds.map((id) => id.toString()));
+    // blockedSet excludes admins so announcements thread (otherUserId = admin) always allowed
+    const blockedSet = new Set(
+      (user?.blockedUserIds || []).map((id: unknown) => String(id)).filter((id) => !adminIdSet.has(id)),
+    );
     if (blockedSet.has(otherUserId)) {
       res.status(403).json({ error: 'Cannot view conversation with blocked user' });
       return;
@@ -412,8 +423,13 @@ router.post('/admin/send-all', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Message cannot be empty' });
       return;
     }
-    if (trimmed.length > 500) {
-      res.status(400).json({ error: 'Message must be 500 characters or less' });
+    const filteredBody = filterBadWords(trimmed);
+    const fullMessage = `${filteredBody}\n\n${ADMIN_BROADCAST_FOOTER}`;
+    const MESSAGE_MAX_LENGTH = 600; // PrivateMessage schema message maxlength
+    if (fullMessage.length > MESSAGE_MAX_LENGTH) {
+      res.status(400).json({
+        error: `Message with footer must be ${MESSAGE_MAX_LENGTH} characters or less. Please shorten your message.`,
+      });
       return;
     }
 
@@ -422,9 +438,6 @@ router.post('/admin/send-all', auth, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-
-    const filteredBody = filterBadWords(trimmed);
-    const fullMessage = `${filteredBody}\n\n${ADMIN_BROADCAST_FOOTER}`;
 
     const recipientUsers = await User.find({ _id: { $ne: userId } }).select('_id').lean();
     const userIdObj = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : (userId as mongoose.Types.ObjectId);
@@ -498,6 +511,11 @@ router.post('/block/:userId', auth, async (req: Request, res: Response) => {
     }
     if (blockUserId === String(currentUserId)) {
       res.status(400).json({ error: 'Cannot block yourself' });
+      return;
+    }
+    const adminIds = getAdminUserIds();
+    if (adminIds.some((id) => id.toString() === blockUserId)) {
+      res.status(403).json({ error: 'Cannot block admin users' });
       return;
     }
 

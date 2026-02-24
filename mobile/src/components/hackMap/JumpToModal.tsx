@@ -86,7 +86,7 @@ export const JumpToModal: React.FC<JumpToModalProps> = ({
       transparent
       animationType="fade"
       onRequestClose={handleClose}
-      supportedOrientations={['landscape']}
+      supportedOrientations={['landscape-left', 'landscape-right']}
     >
       <View style={styles.overlay}>
         <View style={styles.content}>

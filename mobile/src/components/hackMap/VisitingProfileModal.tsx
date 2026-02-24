@@ -108,8 +108,9 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
   };
 
   const handleMessageIconPress = () => {
+    if (!onOpenMessages) return;
     if (__DEV__) console.log('[VisitingProfileModal] message icon onPress — opening messages', userId, userProfile?.handle);
-    onOpenMessages!(userId, userProfile?.handle ?? 'Unknown');
+    onOpenMessages(userId, userProfile?.handle ?? 'Unknown');
   };
 
   const profileContent = (

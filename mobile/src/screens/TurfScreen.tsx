@@ -182,6 +182,16 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [messagesOpenToUser, setMessagesOpenToUser] = useState<{ userId: string; username: string } | null>(null);
   const visitingProfileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    return () => {
+      if (visitingProfileCloseTimeoutRef.current) {
+        clearTimeout(visitingProfileCloseTimeoutRef.current);
+        visitingProfileCloseTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const token = useAppSelector((state) => state.auth.token);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
