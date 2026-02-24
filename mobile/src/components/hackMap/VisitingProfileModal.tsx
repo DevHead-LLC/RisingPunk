@@ -173,7 +173,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               style={[styles.blockButton, { borderColor: colors.error }]}
               onPress={() => {
                 onBlockUser(userId);
-                onClose();
+                onClose(); // Modal always closes so callers that don't close in onBlockUser still get consistent UI
               }}
               activeOpacity={0.7}
             >
