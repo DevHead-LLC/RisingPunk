@@ -26,6 +26,7 @@ import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
 import { API_URL } from '../config';
+import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -797,7 +798,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       setMessagesOpenToUser({ userId, username });
       setShowMessagesModal(true);
       if (__DEV__) console.log('[HackMapScreen] Messages modal opened after profile closed', userId, username);
-    }, 350);
+    }, VISITING_PROFILE_CLOSE_DELAY_MS);
   }, []);
   const handleCloseMessagesModal = useCallback(() => {
     setShowMessagesModal(false);
@@ -3222,7 +3223,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     visitingProfileCloseTimeoutRef.current = setTimeout(() => {
       setVisitingProfileUserId(null);
       visitingProfileCloseTimeoutRef.current = null;
-    }, 300);
+    }, VISITING_PROFILE_CLOSE_DELAY_MS);
   }, []);
 
   const [blockUserMutation] = useBlockUserMutation();

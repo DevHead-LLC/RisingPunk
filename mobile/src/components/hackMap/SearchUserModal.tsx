@@ -22,8 +22,8 @@ import { useLazyLookupUserByHandleQuery } from '../../store/api/authApi';
 import { useSendAdminMessageToAllMutation } from '../../store/api/privateMessagesApi';
 import { containsBadWordsForHandle } from '../../utils/contentModeration';
 
-/** Max body length so body + "\n\n" + server footer stays ≤ 600 (schema message maxlength). */
-const ADMIN_MESSAGE_MAX_LENGTH = 512;
+/** Max body length so body + "\n\n" (2) + server footer (~104) stays ≤ 600 (schema message maxlength). */
+const ADMIN_MESSAGE_MAX_LENGTH = 494;
 
 const HANDLE_VALID_CHARS = /^[a-zA-Z0-9!&%^*_]*$/;
 const MIN_LENGTH = 5;

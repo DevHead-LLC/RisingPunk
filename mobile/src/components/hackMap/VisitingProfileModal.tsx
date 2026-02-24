@@ -171,10 +171,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
           {onBlockUser && currentUser && String(currentUser._id || (currentUser as any)?.id) !== String(userId) && (
             <TouchableOpacity
               style={[styles.blockButton, { borderColor: colors.error }]}
-              onPress={() => {
-                onBlockUser(userId);
-                onClose();
-              }}
+              onPress={() => onBlockUser(userId)}
               activeOpacity={0.7}
             >
               <Text style={[styles.blockButtonText, { color: colors.error }]}>Block user</Text>
