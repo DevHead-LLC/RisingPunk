@@ -5,6 +5,7 @@ import { ReportContext, ReportReason } from '../types/reports';
 import { Crew } from '../models/Crew';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 import { MapChatMessage } from '../models/MapChatMessage';
+import { PrivateMessage } from '../models/PrivateMessage';
 import { CrewStatus } from '../models/CrewStatus';
 import mongoose from 'mongoose';
 
@@ -91,6 +92,7 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       'crew-rules',
       'chat-message',
       'map-chat-message',
+      'private-message',
     ];
     if (!validContexts.includes(context)) {
       res.status(400).json({ error: 'Invalid context' });
@@ -140,6 +142,7 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
       'crew-rules': 'Crew Rules',
       'chat-message': 'Chat Message',
       'map-chat-message': 'Map Chat Message',
+      'private-message': 'Private Message',
     }[context];
 
     // Build context data string, enriching with original content from database when available
@@ -324,6 +327,25 @@ router.post('/submit', auth, async (req: SubmitReportRequest, res: Response) => 
         case 'crew-identifier':
           contextDataString = `Crew Identifier: ${contextData.crewIdentifier || 'N/A'}`;
           break;
+        case 'private-message': {
+          let messageContent = contextData.message || 'N/A';
+          let hasOriginalContent = false;
+          if (contextData.messageId && mongoose.Types.ObjectId.isValid(contextData.messageId)) {
+            try {
+              const pm = await PrivateMessage.findById(contextData.messageId).lean();
+              if (pm && pm.senderId && pm.senderId.toString() === reportedUserId && pm.originalMessage) {
+                messageContent = pm.originalMessage;
+                hasOriginalContent = true;
+              }
+            } catch (error) {
+              console.error('Error looking up original private message:', error);
+            }
+          }
+          const originalLabel = hasOriginalContent ? 'Message (Original)' : 'Message (Content)';
+          const filteredLabel = hasOriginalContent ? 'Message (Filtered)' : 'Message (Filtered - same as content above)';
+          contextDataString = `${originalLabel}: ${messageContent}\n${filteredLabel}: ${contextData.message || 'N/A'}\nMessage ID: ${contextData.messageId || 'N/A'}\nTimestamp: ${contextData.timestamp || 'N/A'}\nRecipient ID: ${contextData.recipientId || 'N/A'}\nSender ID: ${contextData.senderId || 'N/A'}`;
+          break;
+        }
         default:
           contextDataString = JSON.stringify(contextData);
       }

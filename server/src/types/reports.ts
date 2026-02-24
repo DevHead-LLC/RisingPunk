@@ -6,7 +6,8 @@ export type ReportContext =
   | 'external-message-board'
   | 'crew-rules'
   | 'chat-message'
-  | 'map-chat-message';
+  | 'map-chat-message'
+  | 'private-message';
 
 export type ReportReason = 
   | 'vulgar'
