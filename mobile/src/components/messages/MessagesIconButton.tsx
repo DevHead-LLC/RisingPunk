@@ -7,22 +7,27 @@ import { SIZING } from '../../styles/theme';
 /** Full button size; tappable area matches visible button. Row has gap between icons so hit areas do not overlap. */
 const BUTTON_SIZE = 36;
 
-/**
- * World Chat entry point. Shown only when user has unlocked the hack rig.
- * Use inline={true} inside a centered row; otherwise uses top-center absolute placement.
- */
-export const WorldChatIconButton: React.FC<{ onPress: () => void; inline?: boolean }> = ({ onPress, inline }) => {
+export const MessagesIconButton: React.FC<{ onPress: () => void; unreadCount?: number; inline?: boolean }> = ({
+  onPress,
+  unreadCount = 0,
+  inline,
+}) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const styles = createStyles(colors, !!inline, themeMode);
+  const hasUnread = (unreadCount ?? 0) > 0;
+  const iconSource = hasUnread
+    ? require('../../assets/images/ui/activeMailbox.png')
+    : require('../../assets/images/ui/mailbox.png');
   return (
     <View style={styles.button}>
-      <Image source={require('../../assets/images/ui/worldChat.png')} style={styles.iconImage} resizeMode="contain" />
+      <Image source={iconSource} style={styles.iconImage} resizeMode="contain" />
       <TouchableOpacity
         style={styles.hitArea}
         onPress={onPress}
         activeOpacity={0.7}
-        accessibilityLabel="World Chat"
+        accessibilityLabel="Messages"
+        accessibilityHint="Opens your private messages"
       />
     </View>
   );
@@ -36,8 +41,7 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
         : {
             position: 'absolute' as const,
             top: SIZING.spacing.lg,
-            left: '50%',
-            marginLeft: -BUTTON_SIZE / 2,
+            right: SIZING.spacing.md,
           }),
       width: BUTTON_SIZE,
       height: BUTTON_SIZE,
@@ -55,8 +59,8 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
       elevation: 100,
     },
     iconImage: {
-      width: 75,
-      height: 75,
+      width: 85,
+      height: 85,
     },
     hitArea: {
       position: 'absolute',

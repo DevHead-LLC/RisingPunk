@@ -678,6 +678,84 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-02-25 (merge dev → android_mergeDev)
+
+**Branch context:** Full merge flow per merge-flow.md: created `android_mergeDev` from `androidStaging`, pushed, merged `origin/dev`. Three conflicts: mobile/package.json (version + versionCode), mobile/package-lock.json (version + hasInstallScript), VisitingProfileModal.tsx (header close button + createStyles signature).
+
+### 1. `mobile/package.json`
+
+**Conflict:** version and versionCode.
+
+| Side | Content |
+|------|--------|
+| HEAD | "version": "2.5.1", "versionCode": 87 |
+| dev  | "version": "2.6.0" (no versionCode) |
+
+**Resolution:** Accepted **dev version** and **HEAD versionCode**. Final state: "version": "2.6.0", "versionCode": 87.
+
+**Rationale:** Android first. versionCode is required for Play Console; dev does not carry it. Take dev’s version (2.6.0) for consistency; keep versionCode 87 from Android branch.
+
+**Rejected from dev:** Omitting versionCode.
+
+**Failure-mode hints for later:** If Play Console rejects a build for version code, increment versionCode in mobile/package.json on the Android branch and keep it in sync with Android versioning.
+
+---
+
+### 2. `mobile/package-lock.json`
+
+**Conflict:** Root package version and hasInstallScript.
+
+| Side | Content |
+|------|--------|
+| HEAD | "version": "2.5.1", "hasInstallScript": true |
+| dev  | "version": "2.6.0" (no hasInstallScript in conflict) |
+
+**Resolution:** Combined **both**. Final state: "version": "2.6.0" (match package.json), "hasInstallScript": true.
+
+**Rationale:** Lockfile version should match package.json (2.6.0). hasInstallScript is npm metadata for postinstall; keeping it from HEAD does not affect Android deployment.
+
+**Rejected content:** None—version from dev, hasInstallScript from HEAD.
+
+**Failure-mode hints for later:** If package.json version and lockfile root version drift, align lockfile to package.json.
+
+---
+
+### 3. `mobile/src/components/hackMap/VisitingProfileModal.tsx`
+
+**Conflict A (header close button):**
+
+| Side | Content |
+|------|--------|
+| HEAD | No headerRight / no second close button in header |
+| dev  | headerRight with TouchableOpacity close button (×) |
+
+**Resolution:** Accepted **dev**. Final state: header includes headerRight with TouchableOpacity close button.
+
+**Rationale:** Not Android deployment–specific. Dev adds a close button in the header for consistency with other modals; does not break Android.
+
+**Rejected from HEAD:** No close in header (kept dev’s UX).
+
+**Conflict B (createStyles signature + Dimensions):**
+
+| Side | Content |
+|------|--------|
+| HEAD | `const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');` and `createStyles = (colors: any) => StyleSheet.create({` |
+| dev  | `createStyles = (colors: any, themeMode: 'light' | 'dark') => StyleSheet.create({` (no Dimensions) |
+
+**Resolution:** Combined **both**. Final state: keep Dimensions (SCREEN_WIDTH/SCREEN_HEIGHT used in overlay styles); createStyles signature from dev with themeMode parameter (call site already passes themeMode).
+
+**Rationale:** Component already calls createStyles(colors, themeMode); dev’s signature is correct. HEAD’s Dimensions are required for overlay width/height in styles. Both needed.
+
+**Rejected content:** None—Dimensions from HEAD, themeMode param from dev.
+
+**Failure-mode hints for later:** If overlay dimensions are wrong, confirm SCREEN_WIDTH/SCREEN_HEIGHT and Dimensions.get('window') are still present above createStyles.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – Android branch verified. Android path uses plain `View style={styles.inputContainer} pointerEvents="box-none"` and TextInput with `onTouchEnd` calling `textInputRef.current?.focus()`. No Pressable or TouchableWithoutFeedback wrapping the handle input on Android. No regression.
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.

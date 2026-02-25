@@ -42,6 +42,7 @@ type ThemeSizing = {
     sm: number;
     md: number;
     lg: number;
+    xl: number;
   };
   screen: {
     width: number;
@@ -120,6 +121,7 @@ export const SIZING: ThemeSizing = {
     sm: createResponsiveSize(8),
     md: createResponsiveSize(16),
     lg: createResponsiveSize(24),
+    xl: createResponsiveSize(32),
   },
   screen: {
     width: WINDOW_WIDTH,

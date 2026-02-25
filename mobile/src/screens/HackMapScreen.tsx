@@ -12,7 +12,13 @@ import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal
 import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
 import { WorldChatIconButton } from '../components/hackMap/WorldChatIconButton';
 import { WorldChatModal } from '../components/hackMap/WorldChatModal';
+import { MessagesIconButton } from '../components/messages/MessagesIconButton';
+import { MessagesModal } from '../components/messages/MessagesModal';
+import { JumpToModal } from '../components/hackMap/JumpToModal';
+import { SearchUserIconButton } from '../components/hackMap/SearchUserIconButton';
+import { SearchUserModal } from '../components/hackMap/SearchUserModal';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setMapGridSize, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
 import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery } from '../store/api/mapApi';
@@ -20,6 +26,7 @@ import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
 import { API_URL } from '../config';
+import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { computePanBounds } from '../utils/mapPanBounds';
 import { CellData, TerrainType, EntityType } from '../types/map';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -480,6 +487,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const loading = useAppSelector((state) => state.map.loading);
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
   const currentUserId = useAppSelector((state) => state.auth.user?._id);
+  const currentUserIsAdmin = useAppSelector((state) => state.auth.user?.isAdmin === true);
   const token = useAppSelector((state) => state.auth.token);
   const hackRigUnlocked = useAppSelector((state) => state.auth.user?.unlockedFeatures?.hackRig === true);
   const colors = useThemeColors();
@@ -586,7 +594,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 numberOfLines={1}
                 ellipsizeMode="tail"
               >
-                {((displayName ?? cell.name ?? '').trim() || (cell.owner === 'player' ? 'YOU' : 'NPC'))}
+                {(cell.owner === 'player' && (displayName ?? cell.name) === currentUserHandle ? 'YOU' : ((displayName ?? cell.name ?? '').trim() || (cell.owner === 'player' ? 'Player' : 'NPC')))}
               </Text>
             </View>
             {cell.owner !== 'player' && cell.npcLevel && (
@@ -740,17 +748,60 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
+  const [showJumpToModal, setShowJumpToModal] = useState(false);
+  const [showSearchUserModal, setShowSearchUserModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
   const visitingProfileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visitCrewCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (visitingProfileCloseTimeoutRef.current) {
+        clearTimeout(visitingProfileCloseTimeoutRef.current);
+        visitingProfileCloseTimeoutRef.current = null;
+      }
+      if (visitCrewCloseTimeoutRef.current) {
+        clearTimeout(visitCrewCloseTimeoutRef.current);
+        visitCrewCloseTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const [showVisitCrewModal, setShowVisitCrewModal] = useState(false);
   const [visitCrewId, setVisitCrewId] = useState<string | null>(null);
   const [visitCrewName, setVisitCrewName] = useState<string | null>(null);
   const [showCrewModalFromUser, setShowCrewModalFromUser] = useState(false);
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
+  const [showMessagesModal, setShowMessagesModal] = useState(false);
+  const [messagesOpenToUser, setMessagesOpenToUser] = useState<{ userId: string; username: string } | null>(null);
+  const { data: conversationsData } = useGetConversationsQuery(undefined, {
+    skip: !token,
+    pollingInterval: token ? 10000 : 0, // 10s for badge; MessagesModal polls at 2s when open
+  });
+  const messagesUnreadCount = (conversationsData?.conversations ?? []).reduce((s, c) => s + c.unreadCount, 0);
+  const handleOpenMessagesToUser = useCallback((userId: string, username: string) => {
+    setMessagesOpenToUser({ userId, username });
+    setShowMessagesModal(true);
+  }, []);
+  const handleOpenMessagesFromProfile = useCallback((userId: string, username: string) => {
+    setShowVisitingProfileModal(false);
+    if (visitingProfileCloseTimeoutRef.current) {
+      clearTimeout(visitingProfileCloseTimeoutRef.current);
+    }
+    visitingProfileCloseTimeoutRef.current = setTimeout(() => {
+      setVisitingProfileUserId(null);
+      visitingProfileCloseTimeoutRef.current = null;
+      setMessagesOpenToUser({ userId, username });
+      setShowMessagesModal(true);
+    }, VISITING_PROFILE_CLOSE_DELAY_MS);
+  }, []);
+  const handleCloseMessagesModal = useCallback(() => {
+    setShowMessagesModal(false);
+    setMessagesOpenToUser(null);
+  }, []);
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -3051,6 +3102,72 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       .catch(() => {});
   }, [currentUserHandle, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport, triggerGetMyMapPosition]);
 
+  // Jump To: pan map to grid coordinates (0–499)
+  const jumpToGridPosition = useCallback(
+    (gridX: number, gridY: number) => {
+      const gridSize = mapGridSize ?? getGridSize(grid);
+      if (!grid || gridX < 0 || gridX >= gridSize || gridY < 0 || gridY >= gridSize) return;
+      const { x: targetX, y: targetY } = gridToPanCoordinates(
+        gridX,
+        gridY,
+        containerSize.width,
+        containerSize.height
+      );
+      const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
+      const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
+      offsetX.value = cx;
+      offsetY.value = cy;
+      const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
+        cx,
+        cy,
+        containerSize.width,
+        containerSize.height,
+        gridSize,
+        PAN_BUFFER
+      );
+      calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
+      const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
+      windowRangeRef.current = newRange;
+      setWindowRange(newRange);
+      lastComputedPan.value = { x: cx, y: cy };
+      const vp = { startCol, endCol, startRow, endRow };
+      if (viewportRequestInFlightRef.current) {
+        pendingViewportParamsRef.current = {
+          x1: vp.startCol,
+          y1: vp.startRow,
+          x2: vp.endCol,
+          y2: vp.endRow,
+          minimal: false,
+        };
+      } else {
+        panningViewportMinimalRef.current = false;
+        viewportRequestInFlightRef.current = true;
+        setPanningViewportParams({
+          x1: vp.startCol,
+          y1: vp.startRow,
+          x2: vp.endCol,
+          y2: vp.endRow,
+          minimal: false,
+        });
+      }
+    },
+    [
+      containerSize.width,
+      containerSize.height,
+      grid,
+      mapGridSize,
+      minX,
+      maxX,
+      minY,
+      maxY,
+      offsetX,
+      offsetY,
+      calculateVirtualViewport,
+      setWindowRange,
+      setPanningViewportParams,
+    ]
+  );
+
   const handleAntivirusPress = useCallback(() => {
     // Only show modal if antivirus feature is unlocked (including timer-based unlock)
     if (isActuallyUnlocked) {
@@ -3105,8 +3222,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     visitingProfileCloseTimeoutRef.current = setTimeout(() => {
       setVisitingProfileUserId(null);
       visitingProfileCloseTimeoutRef.current = null;
-    }, 300);
+    }, VISITING_PROFILE_CLOSE_DELAY_MS);
   }, []);
+
+  const [blockUserMutation] = useBlockUserMutation();
+  const handleBlockUser = useCallback((userId: string) => {
+    blockUserMutation(userId);
+    handleVisitingProfileClose();
+  }, [blockUserMutation, handleVisitingProfileClose]);
 
   const handleVisitingProfileUserNotFound = useCallback((userId: string) => {
     const normalizedTarget = String(userId ?? '').trim();
@@ -3372,18 +3495,48 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     <View style={styles.container} onLayout={onContainerLayout}>
       <CloseButton onPress={onClose} />
 
-      {hackRigUnlocked && (
-        <WorldChatIconButton onPress={() => setShowWorldChatModal(true)} />
-      )}
+      <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
+        {hackRigUnlocked && (
+          <WorldChatIconButton inline onPress={() => setShowWorldChatModal(true)} />
+        )}
+        <MessagesIconButton
+          inline
+          onPress={() => setShowMessagesModal(true)}
+          unreadCount={messagesUnreadCount}
+        />
+        <SearchUserIconButton inline onPress={() => setShowSearchUserModal(true)} />
+      </View>
       <WorldChatModal
         visible={showWorldChatModal}
         onClose={() => setShowWorldChatModal(false)}
         mapName="main"
       />
 
-      <Pressable style={styles.navigationButton} onPress={centerOnUserHome}>
-        <Image source={require('../assets/images/navigationIcon.png')} style={styles.navigationIcon} resizeMode="contain" />
-      </Pressable>
+      <View style={styles.navigationButtonRow}>
+        <Pressable style={styles.navigationButton} onPress={centerOnUserHome}>
+          <Image source={require('../assets/images/navigationIcon.png')} style={styles.navigationIcon} resizeMode="contain" />
+        </Pressable>
+        <Pressable style={styles.navigationButton} onPress={() => setShowJumpToModal(true)}>
+          <Image source={require('../assets/images/hackMap/jumpTo.png')} style={styles.navigationIcon} resizeMode="contain" />
+        </Pressable>
+      </View>
+
+      <JumpToModal
+        visible={showJumpToModal}
+        onClose={() => setShowJumpToModal(false)}
+        onJump={jumpToGridPosition}
+      />
+
+      <SearchUserModal
+        visible={showSearchUserModal}
+        onClose={() => setShowSearchUserModal(false)}
+        onUserFound={(userId) => {
+          setShowSearchUserModal(false);
+          setVisitingProfileUserId(userId);
+          setShowVisitingProfileModal(true);
+        }}
+        isAdmin={currentUserIsAdmin}
+      />
 
         <CollapsibleToolbar
           onAntivirusPress={handleAntivirusPress}
@@ -3414,8 +3567,17 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           onClose={handleVisitingProfileClose}
           userId={visitingProfileUserId}
           onUserNotFound={handleVisitingProfileUserNotFound}
+          onOpenMessages={handleOpenMessagesFromProfile}
+          onBlockUser={handleBlockUser}
         />
       )}
+
+      <MessagesModal
+        visible={showMessagesModal}
+        onClose={handleCloseMessagesModal}
+        openToUserId={messagesOpenToUser?.userId ?? null}
+        openToUsername={messagesOpenToUser?.username ?? null}
+      />
 
       {visitCrewId && (
         <VisitCrewModal
@@ -3551,6 +3713,17 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  topCenterIconsWrapper: {
+    position: 'absolute',
+    top: SIZING.spacing.lg,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 10002,
   },
   dragContainer: {
     flex: 1,
@@ -3925,17 +4098,21 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
   scrollContainer: {
     // width/height are set dynamically on container View
   },
-  navigationButton: {
+  navigationButtonRow: {
     position: 'absolute',
     bottom: 20,
     left: 20,
+    flexDirection: 'row',
+    gap: 8,
+    zIndex: 1,
+  },
+  navigationButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: 'black',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1,
   },
   navigationIcon: {
     width: 24,

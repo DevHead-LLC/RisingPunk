@@ -8,21 +8,22 @@ import { SIZING } from '../../styles/theme';
 const BUTTON_SIZE = 36;
 
 /**
- * World Chat entry point. Shown only when user has unlocked the hack rig.
- * Use inline={true} inside a centered row; otherwise uses top-center absolute placement.
+ * Search User entry point for direct messaging (find a user by handle).
+ * Renders to the right of Messages in the top-center icon row.
  */
-export const WorldChatIconButton: React.FC<{ onPress: () => void; inline?: boolean }> = ({ onPress, inline }) => {
+export const SearchUserIconButton: React.FC<{ onPress: () => void; inline?: boolean }> = ({ onPress, inline }) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const styles = createStyles(colors, !!inline, themeMode);
   return (
     <View style={styles.button}>
-      <Image source={require('../../assets/images/ui/worldChat.png')} style={styles.iconImage} resizeMode="contain" />
+      <Image source={require('../../assets/images/ui/searchUsers.png')} style={styles.iconImage} resizeMode="contain" />
       <TouchableOpacity
         style={styles.hitArea}
         onPress={onPress}
         activeOpacity={0.7}
-        accessibilityLabel="World Chat"
+        accessibilityLabel="Search user"
+        accessibilityHint="Search for a user by handle to view profile or message"
       />
     </View>
   );
@@ -36,8 +37,7 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
         : {
             position: 'absolute' as const,
             top: SIZING.spacing.lg,
-            left: '50%',
-            marginLeft: -BUTTON_SIZE / 2,
+            right: SIZING.spacing.md,
           }),
       width: BUTTON_SIZE,
       height: BUTTON_SIZE,
@@ -55,8 +55,8 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
       elevation: 100,
     },
     iconImage: {
-      width: 75,
-      height: 75,
+      width: 40,
+      height: 40,
     },
     hitArea: {
       position: 'absolute',

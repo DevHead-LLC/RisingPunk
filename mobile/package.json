@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "versionCode": 87,
   "private": true,
   "scripts": {
@@ -13,6 +13,8 @@
     "android:prod": "node -e \"var env=Object.assign({},process.env);if(!env.ENVFILE)env.ENVFILE='.env.prod';var isWin=process.platform==='win32';var path=require('path');var reactNativeBin=isWin?path.join(process.cwd(),'node_modules','.bin','react-native.cmd'):path.join(process.cwd(),'node_modules','.bin','react-native');var cmd=isWin?['cmd.exe','/c',reactNativeBin,'run-android']:['sh','-c','ENVFILE=.env.prod react-native run-android'];var proc=require('child_process').spawnSync(cmd[0],cmd.slice(1),{stdio:'inherit',env:env,shell:false,cwd:process.cwd()});if(proc.error){console.error('Error:',proc.error.message);process.exit(1);}process.exit(proc.status||proc.signal||0)\"",
     "android:s25fe-prod": "lsof -ti:8081 | xargs kill -9 2>/dev/null || true && cd android && ./gradlew assembleDebug -DENVFILE=.env.prod && cd .. && adb -s R5GYC441Q1R install -r android/app/build/outputs/apk/debug/app-debug.apk && adb -s R5GYC441Q1R reverse tcp:8081 tcp:8081 && sleep 2 && ENVFILE=.env.prod react-native start --reset-cache",
     "ios:clean": "npm run ios:pod && npm run ios:dev",
+    "ios:clean:full": "npm run ios:clean:derived && npm run ios:pod",
+    "ios:clean:derived": "rm -rf ios/build && rm -rf ~/Library/Developer/Xcode/DerivedData/mobile-*",
     "ios:pod": "cd ios && pod install && cd ..",
     "ios:dev": "ENVFILE=.env.dev react-native run-ios --simulator='iPhone 17 Pro Max'",
     "ios:staging": "ENVFILE=.env.staging react-native run-ios --simulator='iPhone 17 Pro Max'",
