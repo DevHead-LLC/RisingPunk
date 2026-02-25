@@ -157,7 +157,12 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
                 <Text style={styles.closeButtonText}>×</Text>
               </Pressable>
             </View>
-            {isLoadingConversations && conversations.length === 0 ? (
+            {conversationsError && conversations.length === 0 ? (
+              <View style={styles.centered}>
+                <Text style={styles.emptyText}>Couldn't load conversations.</Text>
+                <Text style={styles.emptySubtext}>Please try again later.</Text>
+              </View>
+            ) : isLoadingConversations && conversations.length === 0 ? (
               <View style={styles.centered}>
                 <ActivityIndicator size="large" color={colors.primary} />
               </View>
