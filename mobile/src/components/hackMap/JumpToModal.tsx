@@ -1,6 +1,7 @@
 /**
  * Small modal to jump the map to grid coordinates (0–499).
  * Accepts digits only; X and Y must be in range 0–499 on submit.
+ * Layout: title "Jump To" above a bar (X input, Y input, Go, Cancel) positioned above the software keyboard.
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -10,7 +11,10 @@ import {
   Modal,
   TextInput,
   Pressable,
-  TouchableOpacity,
+  TouchableWithoutFeedback,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -88,46 +92,54 @@ export const JumpToModal: React.FC<JumpToModalProps> = ({
       onRequestClose={handleClose}
       supportedOrientations={['landscape-left', 'landscape-right']}
     >
-      <View style={styles.overlay}>
-        <View style={styles.content}>
-          <TouchableOpacity
-            style={[styles.closeButton, { backgroundColor: colors.primary, borderColor: colors.secondary }]}
-            onPress={handleClose}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Jump To</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>X</Text>
-            <TextInput
-              style={styles.input}
-              value={xInput}
-              onChangeText={handleXChange}
-              keyboardType="number-pad"
-              maxLength={MAX_DIGITS}
-              placeholder="0–499"
-              placeholderTextColor={colors.text.secondary}
-            />
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Y</Text>
-            <TextInput
-              style={styles.input}
-              value={yInput}
-              onChangeText={handleYChange}
-              keyboardType="number-pad"
-              maxLength={MAX_DIGITS}
-              placeholder="0–499"
-              placeholderTextColor={colors.text.secondary}
-            />
-          </View>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          <Pressable style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Go</Text>
-          </Pressable>
-        </View>
-      </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          style={styles.overlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.overlayInner}>
+              <View style={[styles.content, { backgroundColor: colors.background, borderColor: colors.secondary }]}>
+                <Text style={[styles.title, { color: colors.text.primary }]}>Jump To</Text>
+                <View style={styles.bar}>
+                  <TextInput
+                    style={[styles.input, { color: colors.text.primary, borderColor: colors.secondary }]}
+                    value={xInput}
+                    onChangeText={handleXChange}
+                    keyboardType="number-pad"
+                    maxLength={MAX_DIGITS}
+                    placeholder="X 0–499"
+                    placeholderTextColor={colors.text.secondary}
+                  />
+                  <TextInput
+                    style={[styles.input, { color: colors.text.primary, borderColor: colors.secondary }]}
+                    value={yInput}
+                    onChangeText={handleYChange}
+                    keyboardType="number-pad"
+                    maxLength={MAX_DIGITS}
+                    placeholder="Y 0–499"
+                    placeholderTextColor={colors.text.secondary}
+                  />
+                  <Pressable
+                    style={[styles.goButton, { backgroundColor: colors.primary }]}
+                    onPress={handleSubmit}
+                  >
+                    <Text style={[styles.goButtonText, { color: colors.background }]}>Go</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.cancelButton, { borderColor: colors.secondary }]}
+                    onPress={handleClose}
+                  >
+                    <Text style={[styles.cancelButtonText, { color: colors.text.primary }]}>Cancel</Text>
+                  </Pressable>
+                </View>
+                {error ? <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text> : null}
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -137,77 +149,65 @@ const createStyles = (colors: any) =>
     overlay: {
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.7)',
-      justifyContent: 'center',
+    },
+    overlayInner: {
+      flex: 1,
+      justifyContent: 'flex-end',
       alignItems: 'center',
     },
     content: {
-      backgroundColor: colors.background,
-      borderRadius: 12,
-      padding: SIZING.spacing.lg,
+      width: '100%',
+      borderTopLeftRadius: 12,
+      borderTopRightRadius: 12,
       borderWidth: 1,
-      borderColor: colors.secondary,
-      minWidth: 220,
-    },
-    closeButton: {
-      position: 'absolute',
-      top: 4,
-      right: 4,
-      width: 44,
-      height: 44,
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 22,
-      borderWidth: 2,
-      zIndex: 1000,
-    },
-    closeButtonText: {
-      fontSize: 28,
-      marginTop: -2,
+      padding: SIZING.spacing.lg,
+      paddingBottom: SIZING.spacing.xl,
     },
     title: {
-      color: colors.text.primary,
       fontSize: SIZING.font.h2,
       fontWeight: 'bold',
       textAlign: 'center',
       marginBottom: SIZING.spacing.md,
     },
-    row: {
+    bar: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: SIZING.spacing.sm,
-    },
-    label: {
-      color: colors.text.primary,
-      fontSize: SIZING.font.body,
-      width: 24,
-      marginRight: SIZING.spacing.sm,
+      gap: SIZING.spacing.sm,
     },
     input: {
       flex: 1,
+      minWidth: 0,
       borderWidth: 1,
-      borderColor: colors.secondary,
       borderRadius: 8,
       paddingHorizontal: SIZING.spacing.md,
       paddingVertical: SIZING.spacing.sm,
-      color: colors.text.primary,
+      fontSize: SIZING.font.body,
+    },
+    goButton: {
+      borderRadius: 8,
+      paddingVertical: SIZING.spacing.sm,
+      paddingHorizontal: SIZING.spacing.lg,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    goButtonText: {
+      fontSize: SIZING.font.body,
+      fontWeight: 'bold',
+    },
+    cancelButton: {
+      borderRadius: 8,
+      borderWidth: 1,
+      paddingVertical: SIZING.spacing.sm,
+      paddingHorizontal: SIZING.spacing.lg,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    cancelButtonText: {
       fontSize: SIZING.font.body,
     },
     errorText: {
-      color: colors.error,
       fontSize: SIZING.font.small,
-      marginBottom: SIZING.spacing.sm,
+      marginTop: SIZING.spacing.sm,
       textAlign: 'center',
-    },
-    submitButton: {
-      backgroundColor: colors.primary,
-      borderRadius: 8,
-      paddingVertical: SIZING.spacing.md,
-      alignItems: 'center',
-      marginTop: SIZING.spacing.xs,
-    },
-    submitButtonText: {
-      color: colors.background,
-      fontSize: SIZING.font.body,
-      fontWeight: 'bold',
     },
   });
