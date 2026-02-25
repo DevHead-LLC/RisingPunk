@@ -4,13 +4,12 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
 import { SIZING } from '../../styles/theme';
 
-/** Tappable area is smaller than the visible icon to avoid overlapping hits with adjacent icons. */
-const HIT_SLOP_SIZE = 28;
+/** Full button size; tappable area matches visible button. Row has gap between icons so hit areas do not overlap. */
+const BUTTON_SIZE = 36;
 
 /**
  * World Chat entry point. Shown only when user has unlocked the hack rig.
  * Use inline={true} inside a centered row; otherwise uses top-center absolute placement.
- * Hit area is intentionally smaller than the visible button so taps must be on the icon.
  */
 export const WorldChatIconButton: React.FC<{ onPress: () => void; inline?: boolean }> = ({ onPress, inline }) => {
   const colors = useThemeColors();
@@ -38,11 +37,11 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
             position: 'absolute' as const,
             top: SIZING.spacing.lg,
             left: '50%',
-            marginLeft: -18,
+            marginLeft: -BUTTON_SIZE / 2,
           }),
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: BUTTON_SIZE,
+      height: BUTTON_SIZE,
+      borderRadius: BUTTON_SIZE / 2,
       backgroundColor: themeMode === 'dark' ? 'transparent' : '#9E9E9E',
       borderWidth: 1,
       borderColor: themeMode === 'dark' ? 'transparent' : '#757575',
@@ -61,10 +60,10 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
     },
     hitArea: {
       position: 'absolute',
-      width: HIT_SLOP_SIZE,
-      height: HIT_SLOP_SIZE,
-      left: (36 - HIT_SLOP_SIZE) / 2,
-      top: (36 - HIT_SLOP_SIZE) / 2,
-      borderRadius: HIT_SLOP_SIZE / 2,
+      left: 0,
+      top: 0,
+      width: BUTTON_SIZE,
+      height: BUTTON_SIZE,
+      borderRadius: BUTTON_SIZE / 2,
     },
   });
