@@ -1479,7 +1479,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </View>
               </>
             )}
-            <View style={styles.topCenterIconsWrapper}>
+            <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
               {hackRigUnlocked && (
                 <WorldChatIconButton inline onPress={() => setShowWorldChatModal(true)} />
               )}
