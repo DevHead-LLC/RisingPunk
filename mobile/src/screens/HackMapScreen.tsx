@@ -782,10 +782,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     pollingInterval: token ? 10000 : 0, // 10s for badge; MessagesModal polls at 2s when open
   });
   const messagesUnreadCount = (conversationsData?.conversations ?? []).reduce((s, c) => s + c.unreadCount, 0);
-  const handleOpenMessagesToUser = useCallback((userId: string, username: string) => {
-    setMessagesOpenToUser({ userId, username });
-    setShowMessagesModal(true);
-  }, []);
   const handleOpenMessagesFromProfile = useCallback((userId: string, username: string) => {
     setShowVisitingProfileModal(false);
     if (visitingProfileCloseTimeoutRef.current) {

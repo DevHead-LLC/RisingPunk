@@ -306,15 +306,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               <Text style={[styles.title, { color: colors.text.primary }]}>
                 Profile
               </Text>
-              <View style={styles.headerRight}>
-                <TouchableOpacity
-                  style={[styles.closeButton, { backgroundColor: colors.primary, borderColor: colors.secondary }]}
-                  onPress={onClose}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.closeButtonText, { color: colors.background }]}>×</Text>
-                </TouchableOpacity>
-              </View>
+              <View style={styles.headerRight} />
             </View>
 
             {Platform.OS === 'ios' ? (
