@@ -16,7 +16,7 @@ interface VisitingProfileModalProps {
   onUserNotFound?: (userId: string) => void;
   /** When provided, shows a "Message" button that opens private messages to this user. Call with (userId, handle) then close. */
   onOpenMessages?: (userId: string, username: string) => void;
-  /** When provided, shows a "Block user" button. Call with userId then close. */
+  /** When provided, shows a "Block user" button. Call with userId. Caller should close the modal (e.g. handleVisitingProfileClose) to avoid double-close. */
   onBlockUser?: (userId: string) => void;
 }
 
@@ -171,10 +171,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
           {onBlockUser && currentUser && String(currentUser._id || (currentUser as any)?.id) !== String(userId) && (
             <TouchableOpacity
               style={[styles.blockButton, { borderColor: colors.error }]}
-              onPress={() => {
-                onBlockUser(userId);
-                onClose(); // Modal always closes so callers that don't close in onBlockUser still get consistent UI
-              }}
+              onPress={() => onBlockUser(userId)}
               activeOpacity={0.7}
             >
               <Text style={[styles.blockButtonText, { color: colors.error }]}>Block user</Text>
