@@ -4,8 +4,8 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
 import { SIZING } from '../../styles/theme';
 
-/** Tappable area is smaller than the visible icon to avoid overlapping hits with adjacent icons. */
-const HIT_SLOP_SIZE = 28;
+/** Full button size; tappable area matches visible button. Row has gap between icons so hit areas do not overlap. */
+const BUTTON_SIZE = 36;
 
 /**
  * Search User entry point for direct messaging (find a user by handle).
@@ -39,9 +39,9 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
             top: SIZING.spacing.lg,
             right: SIZING.spacing.md,
           }),
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: BUTTON_SIZE,
+      height: BUTTON_SIZE,
+      borderRadius: BUTTON_SIZE / 2,
       backgroundColor: themeMode === 'dark' ? 'transparent' : '#9E9E9E',
       borderWidth: 1,
       borderColor: themeMode === 'dark' ? 'transparent' : '#757575',
@@ -60,10 +60,10 @@ const createStyles = (colors: any, inline: boolean, themeMode: 'light' | 'dark')
     },
     hitArea: {
       position: 'absolute',
-      width: HIT_SLOP_SIZE,
-      height: HIT_SLOP_SIZE,
-      left: (36 - HIT_SLOP_SIZE) / 2,
-      top: (36 - HIT_SLOP_SIZE) / 2,
-      borderRadius: HIT_SLOP_SIZE / 2,
+      left: 0,
+      top: 0,
+      width: BUTTON_SIZE,
+      height: BUTTON_SIZE,
+      borderRadius: BUTTON_SIZE / 2,
     },
   });
