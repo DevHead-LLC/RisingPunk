@@ -24,6 +24,7 @@ import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMu
 import { useFetchBotStatsQuery, botsApi } from '../store/api/botsApi';
 import { balanceApi } from '../store/api/balanceApi';
 import { mapApi } from '../store/api/mapApi';
+import { privateMessagesApi } from '../store/api/privateMessagesApi';
 import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -792,7 +793,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       dispatch(balanceApi.util.resetApiState());
       dispatch(botsApi.util.resetApiState());
       dispatch(mapApi.util.resetApiState());
-      
+      dispatch(privateMessagesApi.util.resetApiState());
+
       dispatch(logout());
     } catch (error) {
       console.error('ProfileScreen: Failed to delete account:', error);

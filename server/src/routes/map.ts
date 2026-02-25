@@ -19,6 +19,7 @@ import {
 import { NPCService } from '../services/NPCService';
 import { MapChatMessage } from '../models/MapChatMessage';
 import { filterBadWords } from '../utils/contentModeration';
+import { getAdminUserIds } from '../config/env';
 import { dedupCellsByCoord } from '../utils/mapCellUtils';
 
 const router: Router = express.Router();
@@ -103,7 +104,7 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
     }
     const normalizedMapName = mapName.trim();
 
-    const user = await User.findById(userId).select('unlockedFeatures').lean();
+    const user = await User.findById(userId).select('unlockedFeatures blockedUserIds').lean();
     if (!user?.unlockedFeatures?.hackRig) {
       res.status(403).json({ error: 'Hack rig must be unlocked to access world chat' });
       return;
@@ -128,13 +129,18 @@ router.get('/:mapName/chat-messages', auth, async (req: Request, res: Response) 
 
     messages.reverse();
 
-    const formattedMessages = messages.map((msg: any) => ({
-      id: String(msg._id),
-      userId: String(msg.userId),
-      username: msg.username,
-      message: msg.message,
-      timestamp: msg.createdAt,
-    }));
+    const blockedSet = new Set((user.blockedUserIds || []).map((id: unknown) => String(id)));
+    const adminIds = getAdminUserIds();
+    const formattedMessages = messages
+      .filter((msg: any) => !blockedSet.has(String(msg.userId)))
+      .map((msg: any) => ({
+        id: String(msg._id),
+        userId: String(msg.userId),
+        username: msg.username,
+        message: msg.message,
+        timestamp: msg.createdAt,
+        isFromAdmin: adminIds.some((id) => id.toString() === String(msg.userId)),
+      }));
 
     res.json({
       success: true,
@@ -270,6 +276,8 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
       }
     }
 
+    const adminIds = getAdminUserIds();
+    const isFromAdmin = adminIds.some((id) => id.toString() === String(userId));
     res.json({
       success: true,
       message: {
@@ -278,6 +286,7 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
         username: chatMessage.username,
         message: chatMessage.message,
         timestamp: chatMessage.createdAt,
+        isFromAdmin,
       },
     });
   } catch (error: any) {
@@ -722,7 +731,10 @@ router.get('/:name', async (req: Request, res: Response) => {
       const colIdx = hasViewport ? x - viewportX1 : x;
       const entity = c.isOccupied ? 'house' : 'empty';
       const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
-      const name = c.entityName || undefined;
+      // Send actual handle for player cells so clients see "Splatrat" etc.; client shows "YOU" only when name === current user's handle.
+      const name = c.occupiedBy === 'player' && c.userId && userMap.get(String(c.userId))
+        ? (userMap.get(String(c.userId)) as any).handle
+        : (c.entityName || undefined);
       const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
       const npcInstanceId = c.occupiedBy === 'npc' && npcSlug ? (c.npcInstanceId || `${npcSlug}-${x}-${y}`) : undefined;
       // Bugbot: Set mutated when we synthesize npcInstanceId so MapCells path can persist it (was only when !hasViewport, making updateCell loop dead).

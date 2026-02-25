@@ -30,6 +30,7 @@ export interface User {
   totalGuardiansBuilt?: number;
   isGuest?: boolean;
   hasPassword?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface AuthState {
@@ -89,7 +90,7 @@ export const loginUser = createAsyncThunk(
       // Do not clear GUEST_TOKEN_KEY: the device-linked (guest or linked) token is preserved so
       // after signing out, "Play as Guest" can resume that account on this device.
 
-      // Clear any existing RTK Query cache to ensure fresh data for new user
+      // Clear RTK Query caches so new user does not see previous user's data (PM, profile, etc.)
       resetAllApiCaches({ dispatch } as any);
 
       // Note: Preferences will be synced by AppContent useEffect after login completes

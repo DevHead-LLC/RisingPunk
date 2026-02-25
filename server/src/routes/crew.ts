@@ -7,6 +7,7 @@ import { User } from '../models/User';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 import mongoose from 'mongoose';
 import { filterBadWords, containsBadWords, containsBadWordsAsSubstring } from '../utils/contentModeration';
+import { getAdminUserIds } from '../config/env';
 
 const router = express.Router();
 
@@ -437,6 +438,9 @@ router.get('/chat-messages', auth, async (req: Request, res: Response) => {
       return;
     }
 
+    const requestingUser = await User.findById(userId).select('blockedUserIds').lean();
+    const blockedSet = new Set((requestingUser?.blockedUserIds || []).map((id: unknown) => String(id)));
+
     // Fetch the most recent 100 messages for this crew
     // Sort descending to get newest first, then reverse for chronological display
     const messages = await CrewChatMessage.find({ crewId })
@@ -447,17 +451,20 @@ router.get('/chat-messages', auth, async (req: Request, res: Response) => {
     // Reverse to display oldest first (chronological order for chat)
     messages.reverse();
 
-    // Format messages for response
+    // Format messages for response; filter out messages from users the requester has blocked (global block)
     // Note: lean() returns plain objects, so _id is already a plain object, not ObjectId
     // Note: originalMessage is NOT exposed in API response to prevent bypassing content filters.
-    // Original content is only available server-side when processing reports.
-    const formattedMessages = messages.map((msg: any) => ({
-      id: String(msg._id),
-      userId: String(msg.userId),
-      username: msg.username,
-      message: msg.message,
-      timestamp: msg.createdAt,
-    }));
+    const adminIds = getAdminUserIds();
+    const formattedMessages = messages
+      .filter((msg: any) => !blockedSet.has(String(msg.userId)))
+      .map((msg: any) => ({
+        id: String(msg._id),
+        userId: String(msg.userId),
+        username: msg.username,
+        message: msg.message,
+        timestamp: msg.createdAt,
+        isFromAdmin: adminIds.some((id) => id.toString() === String(msg.userId)),
+      }));
 
     res.json({
       success: true,
@@ -562,6 +569,8 @@ router.post('/chat-messages', auth, async (req: SendChatMessageRequest, res: Res
       // If messages.length === 0, all messages were deleted in a race condition, skip pruning
     }
 
+    const adminIds = getAdminUserIds();
+    const isFromAdmin = adminIds.some((id) => id.toString() === String(userId));
     res.json({
       success: true,
       message: {
@@ -570,6 +579,7 @@ router.post('/chat-messages', auth, async (req: SendChatMessageRequest, res: Res
         username: chatMessage.username,
         message: chatMessage.message,
         timestamp: chatMessage.createdAt,
+        isFromAdmin,
       },
     });
   } catch (error: any) {

@@ -108,6 +108,8 @@ export interface IUser extends Document {
   totalPhreaksBuilt?: number;
   totalBreachersBuilt?: number;
   lifetimeHighNetWorth?: number;
+  /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
+  blockedUserIds?: mongoose.Types.ObjectId[];
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
   getDecryptedEmailVerificationNewEmail(): string;
@@ -460,6 +462,11 @@ const userSchema = new Schema({
   currentTokenId: {
     type: String,
     required: false
+  },
+  blockedUserIds: {
+    type: [Schema.Types.ObjectId],
+    ref: 'User',
+    default: []
   }
 }, { 
   collection: 'users',  // Explicitly name the collection
