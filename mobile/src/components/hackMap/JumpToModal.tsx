@@ -82,8 +82,6 @@ export const JumpToModal: React.FC<JumpToModalProps> = ({
     onClose();
   }, [onClose]);
 
-  const styles = createStyles(colors);
-
   return (
     <Modal
       visible={visible}
@@ -144,7 +142,7 @@ export const JumpToModal: React.FC<JumpToModalProps> = ({
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = () =>
   StyleSheet.create({
     overlay: {
       flex: 1,
@@ -211,3 +209,5 @@ const createStyles = (colors: any) =>
       textAlign: 'center',
     },
   });
+
+const styles = createStyles();
