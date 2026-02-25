@@ -3496,7 +3496,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     <View style={styles.container} onLayout={onContainerLayout}>
       <CloseButton onPress={onClose} />
 
-      <View style={styles.topCenterIconsWrapper}>
+      <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
         {hackRigUnlocked && (
           <WorldChatIconButton inline onPress={() => setShowWorldChatModal(true)} />
         )}
