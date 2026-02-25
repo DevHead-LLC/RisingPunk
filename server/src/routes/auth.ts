@@ -11,6 +11,20 @@ import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
 import { MapService } from '../services/MapService';
 import { filterBadWords, containsBadWords, containsBadWordsForHandle } from '../utils/contentModeration';
+import { getAdminUserIds } from '../config/env';
+
+function isUserAdmin(user: { _id?: unknown }): boolean {
+  if (!user?._id) return false;
+  let userHex: string;
+  try {
+    const idStr = String(user._id).trim();
+    if (!mongoose.Types.ObjectId.isValid(idStr)) return false;
+    userHex = new mongoose.Types.ObjectId(idStr).toString();
+  } catch {
+    return false;
+  }
+  return getAdminUserIds().some((id) => id.toString() === userHex);
+}
 
 // Helper function to safely escape regex special characters
 function escapeRegexString(str: string): string {
@@ -87,6 +101,7 @@ interface UserResponse {
     };
     isGuest?: boolean;
     hasPassword?: boolean;
+    isAdmin?: boolean;
   }
 }
 
@@ -251,7 +266,8 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
           },
           isGuest: false,
-          hasPassword: true
+          hasPassword: true,
+          isAdmin: isUserAdmin(user)
         }
       });
 
@@ -303,7 +319,8 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
         enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
       },
       isGuest: !!user.isGuest,
-      hasPassword: !!user.hashedAccessKey
+      hasPassword: !!user.hashedAccessKey,
+      isAdmin: isUserAdmin(user)
     }
   });
 }
@@ -528,7 +545,8 @@ router.post<{}, UserResponse | { error: string }, LoginRequest['body']>(
             enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
           },
           isGuest: user.isGuest || false,
-          hasPassword: !!(user as any).hashedAccessKey
+          hasPassword: !!(user as any).hashedAccessKey,
+          isAdmin: isUserAdmin(user)
         }
       });
 
@@ -600,7 +618,8 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
             },
             isGuest: user.isGuest || false,
-            hasPassword: !!(user as any).hashedAccessKey
+            hasPassword: !!(user as any).hashedAccessKey,
+            isAdmin: isUserAdmin(user)
           }
         });
         return;
@@ -651,7 +670,8 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
                 enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
               },
               isGuest: user.isGuest || false,
-              hasPassword: !!(user as any).hashedAccessKey
+              hasPassword: !!(user as any).hashedAccessKey,
+              isAdmin: isUserAdmin(user)
             }
           });
           return;
@@ -758,6 +778,7 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
           },
           isGuest: false,
           hasPassword: false
+          // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
         }
       });
 
@@ -826,7 +847,8 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
               enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
             },
             isGuest: user.isGuest || false,
-            hasPassword: !!(user as any).hashedAccessKey
+            hasPassword: !!(user as any).hashedAccessKey,
+            isAdmin: isUserAdmin(user)
           }
         });
         return;
@@ -877,6 +899,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                 },
                 isGuest: existingUser.isGuest || false,
                 hasPassword: !!(existingUser as any).hashedAccessKey
+                // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
               }
             });
             return;
@@ -976,6 +999,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   },
                   isGuest: existingUser.isGuest || false,
                   hasPassword: !!(existingUser as any).hashedAccessKey
+                  // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
                 }
               });
               return;
@@ -1018,13 +1042,14 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   },
                   isGuest: existingUser.isGuest || false,
                   hasPassword: !!(existingUser as any).hashedAccessKey
+                  // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
                 }
               });
               return;
             }
             // Account already has Apple ID or other conflicts
             else {
-              res.status(400).json({ 
+              res.status(400).json({
                 error: 'An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
               });
               return;
@@ -1090,6 +1115,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
           },
           isGuest: false,
           hasPassword: false
+          // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
         }
       });
 
@@ -1223,7 +1249,8 @@ router.post('/update-handle', async (req, res): Promise<void> => {
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
         },
         isGuest: user.isGuest || false,
-        hasPassword: !!(user as any).hashedAccessKey
+        hasPassword: !!(user as any).hashedAccessKey,
+        isAdmin: isUserAdmin(user)
       }
     });
   } catch (error: any) {
@@ -1498,7 +1525,8 @@ router.get('/verify-token', async (req, res): Promise<void> => {
           enableDebugLogs: user.debugFeatures?.enableDebugLogs || false
         },
         isGuest: user.isGuest || false,
-        hasPassword: !!(user as any).hashedAccessKey
+        hasPassword: !!(user as any).hashedAccessKey,
+        isAdmin: isUserAdmin(user)
       }
     });
   } catch (error: any) {

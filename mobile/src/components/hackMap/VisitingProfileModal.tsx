@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image, ScrollView, Platform, Pressable, Dimensions } from 'react-native';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useTheme } from '../../context/ThemeContext';
 import { SIZING } from '../../styles/theme';
 import { useGetUserProfileQuery } from '../../store/api/authApi';
 import { useAppSelector } from '../../store/hooks';
@@ -13,6 +14,10 @@ interface VisitingProfileModalProps {
   userId: string;
   /** Called when profile returns 404 (e.g. deleted account). Use to clear that user from map/UI. */
   onUserNotFound?: (userId: string) => void;
+  /** When provided, shows a "Message" button that opens private messages to this user. Call with (userId, handle) then close. */
+  onOpenMessages?: (userId: string, username: string) => void;
+  /** When provided, shows a "Block user" button. Call with userId. Caller should close the modal (e.g. handleVisitingProfileClose) to avoid double-close. */
+  onBlockUser?: (userId: string) => void;
 }
 
 export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
@@ -20,15 +25,18 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
   onClose,
   userId,
   onUserNotFound,
+  onOpenMessages,
+  onBlockUser,
 }) => {
   const colors = useThemeColors();
+  const { themeMode } = useTheme();
   const currentUser = useAppSelector((state) => state.auth.user);
   const { data: userProfile, isLoading, error, refetch } = useGetUserProfileQuery(userId, {
     skip: !visible || !userId,
   });
   const [trackAnotherUserProfileVisit] = useTrackAnotherUserProfileVisitMutation();
   const trackedUserIdRef = useRef<string | null>(null);
-  const styles = createStyles(colors);
+  const styles = createStyles(colors, themeMode);
 
   // Dev-only: log profile load failures for investigation (status, data, userId)
   useEffect(() => {
@@ -109,6 +117,11 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
     return `${Math.round((successful / total) * 100)}%`;
   };
 
+  const handleMessageIconPress = () => {
+    if (!onOpenMessages) return;
+    onOpenMessages(userId, userProfile?.handle ?? 'Unknown');
+  };
+
   const profileContent = (
     <View style={styles.profileContent}>
       {isLoading ? (
@@ -132,12 +145,25 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
         </View>
       ) : userProfile ? (
         <>
-          <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
-            <Image
-              source={profileImageSource}
-              style={styles.avatarImage}
-              resizeMode="contain"
-            />
+          <View style={styles.avatarWrapper}>
+            <View style={[styles.avatarContainer, { borderColor: colors.secondary }]}>
+              <Image
+                source={profileImageSource}
+                style={styles.avatarImage}
+                resizeMode="contain"
+              />
+            </View>
+            {onOpenMessages && currentUser && String(currentUser._id || (currentUser as any)?.id) !== String(userId) && (
+              <TouchableOpacity
+                style={styles.profileMessageCircle}
+                onPress={handleMessageIconPress}
+                activeOpacity={0.7}
+                accessibilityLabel="Message"
+                accessibilityHint="Open private conversation"
+              >
+                <Image source={require('../../assets/images/ui/mailbox.png')} style={styles.profileMessageIcon} resizeMode="contain" />
+              </TouchableOpacity>
+            )}
           </View>
           <Text style={[styles.username, { color: colors.text.primary }]}>
             {userProfile.handle}
@@ -150,6 +176,16 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               {userProfile.level}
             </Text>
           </View>
+
+          {onBlockUser && currentUser && String(currentUser._id || (currentUser as any)?.id) !== String(userId) && (
+            <TouchableOpacity
+              style={[styles.blockButton, { borderColor: colors.error }]}
+              onPress={() => onBlockUser(userId)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.blockButtonText, { color: colors.error }]}>Block user</Text>
+            </TouchableOpacity>
+          )}
 
           {userProfile.battleStats && (
             <View style={styles.battleStatsSection}>
@@ -266,9 +302,11 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
 
           <View style={styles.content}>
             <View style={styles.header}>
+              <View style={styles.headerLeft} />
               <Text style={[styles.title, { color: colors.text.primary }]}>
                 Profile
               </Text>
+              <View style={styles.headerRight} />
             </View>
 
             {Platform.OS === 'ios' ? (
@@ -305,7 +343,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const createStyles = (colors: any) => StyleSheet.create({
+const createStyles = (colors: any, themeMode: 'light' | 'dark') => StyleSheet.create({
   overlay: {
     position: 'absolute',
     top: 0,
@@ -347,6 +385,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.secondary,
   },
+  headerLeft: {
+    width: 44,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   title: {
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
@@ -377,6 +422,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SIZING.spacing.lg,
   },
+  avatarWrapper: {
+    position: 'relative',
+    marginBottom: SIZING.spacing.lg,
+  },
   avatarContainer: {
     width: 120,
     height: 120,
@@ -384,9 +433,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SIZING.spacing.lg,
     backgroundColor: colors.surface,
     overflow: 'hidden',
+  },
+  profileMessageCircle: {
+    position: 'absolute',
+    top: -30,
+    right: -70,
+    width: 115,
+    height: 115,
+    borderRadius: 57.5, // 115/2 for circle
+    borderWidth: 2,
+    backgroundColor: themeMode === 'dark' ? 'transparent' : '#9E9E9E',
+    borderColor: themeMode === 'dark' ? 'transparent' : '#757575',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileMessageIcon: {
+    width: 145,
+    height: 145,
   },
   avatarImage: {
     width: '100%',
@@ -414,6 +479,18 @@ const createStyles = (colors: any) => StyleSheet.create({
   levelValue: {
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
+  },
+  blockButton: {
+    marginTop: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.lg,
+    paddingVertical: SIZING.spacing.sm,
+    borderRadius: 8,
+    borderWidth: 2,
+    alignSelf: 'center',
+  },
+  blockButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '600',
   },
   loadingText: {
     fontSize: SIZING.font.body,

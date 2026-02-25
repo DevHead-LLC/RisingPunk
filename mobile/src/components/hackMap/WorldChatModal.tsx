@@ -30,6 +30,7 @@ export const WorldChatModal: React.FC<WorldChatModalProps> = ({
     username: msg.username,
     message: msg.message,
     timestamp: new Date(msg.timestamp),
+    isFromAdmin: msg.isFromAdmin,
   })) || []);
 
   const onSendMessage = useCallback(
