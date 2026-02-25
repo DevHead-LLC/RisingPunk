@@ -58,6 +58,11 @@ export interface ProfileResponse {
   totalGuardiansBuilt?: number;
 }
 
+export interface UserLookupResponse {
+  userId: string;
+  handle: string;
+}
+
 export interface UserProfileResponse {
   userId: string;
   handle: string;
@@ -295,6 +300,14 @@ export const authApi = createApi({
       providesTags: (result, error, userId) => [
         { type: 'User', id: `profile-${userId}` }
       ],
+    }),
+
+    /** Look up user by handle (exact match, case-insensitive). 404 if not found. */
+    lookupUserByHandle: builder.query<UserLookupResponse, string>({
+      query: (handle) => ({
+        url: '/api/users/lookup',
+        params: { handle: handle.trim() },
+      }),
     }),
 
     unlockHackRig: builder.mutation<void, void>({
@@ -750,7 +763,7 @@ export const authApi = createApi({
       invalidatesTags: ['User', 'Crew'],
     }),
 
-    getCrewChatMessages: builder.query<{ success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; timestamp: string }> }, string>({
+    getCrewChatMessages: builder.query<{ success: boolean; messages: Array<{ id: string; userId: string; username: string; message: string; timestamp: string; isFromAdmin?: boolean }> }, string>({
       query: (crewId) => ({
         url: `/api/crew/chat-messages?crewId=${crewId}`,
         method: 'GET',
@@ -760,7 +773,7 @@ export const authApi = createApi({
       keepUnusedDataFor: 30,
     }),
 
-    sendCrewChatMessage: builder.mutation<{ success: boolean; message: { id: string; userId: string; username: string; message: string; timestamp: string } }, { crewId: string; message: string }>({
+    sendCrewChatMessage: builder.mutation<{ success: boolean; message: { id: string; userId: string; username: string; message: string; timestamp: string; isFromAdmin?: boolean } }, { crewId: string; message: string }>({
       query: (data) => ({
         url: '/api/crew/chat-messages',
         method: 'POST',
@@ -777,6 +790,7 @@ export const {
   useGoogleSignInMutation,
   useGetProfileQuery,
   useGetUserProfileQuery,
+  useLazyLookupUserByHandleQuery,
   useUnlockHackRigMutation,
   useUnlockResearchCenterMutation,
   useGetResearchCenterStatusQuery,

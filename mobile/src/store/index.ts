@@ -19,6 +19,7 @@ import { rentalHousingApi } from './api/rentalHousingApi';
 import { researchFeaturesApi } from './api/researchFeaturesApi';
 import { leaderboardApi } from './api/leaderboardApi';
 import { userGuideApi } from './api/userGuideApi';
+import { privateMessagesApi } from './api/privateMessagesApi';
 
 export const store = configureStore({
   reducer: {
@@ -42,6 +43,7 @@ export const store = configureStore({
     [researchFeaturesApi.reducerPath]: researchFeaturesApi.reducer,
     [leaderboardApi.reducerPath]: leaderboardApi.reducer,
     [userGuideApi.reducerPath]: userGuideApi.reducer,
+    [privateMessagesApi.reducerPath]: privateMessagesApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -60,7 +62,8 @@ export const store = configureStore({
     .concat(rentalHousingApi.middleware)
     .concat(researchFeaturesApi.middleware)
     .concat(leaderboardApi.middleware)
-    .concat(userGuideApi.middleware),
+    .concat(userGuideApi.middleware)
+    .concat(privateMessagesApi.middleware),
   devTools: __DEV__,
 });
 

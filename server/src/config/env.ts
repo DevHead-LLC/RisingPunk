@@ -1,4 +1,5 @@
 import dotenvFlow from 'dotenv-flow';
+import mongoose from 'mongoose';
 
 // Get NODE_ENV before loading env files
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -58,3 +59,34 @@ export const DESKTOP_LANDING_URL = process.env.DESKTOP_LANDING_URL || 'https://r
 // For rollout: set MIN_APP_VERSION=2.5.0 so 2.5.0 and higher are allowed; anything below is blocked.
 export const MIN_APP_VERSION: string | undefined = process.env.MIN_APP_VERSION;
 export const RECOMMENDED_APP_VERSION: string | undefined = process.env.RECOMMENDED_APP_VERSION;
+
+// Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
+let cachedAdminIds: mongoose.Types.ObjectId[] | null = null;
+
+export function getAdminUserIds(): mongoose.Types.ObjectId[] {
+  if (cachedAdminIds !== null) return cachedAdminIds;
+  const raw = process.env.ADMIN_USER_IDS;
+  if (!raw || typeof raw !== 'string') {
+    cachedAdminIds = [];
+    return cachedAdminIds;
+  }
+  const invalid: string[] = [];
+  const acc = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .reduce<mongoose.Types.ObjectId[]>((arr, id) => {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        arr.push(new mongoose.Types.ObjectId(id));
+      } else {
+        invalid.push(id);
+      }
+      return arr;
+    }, []);
+  if (invalid.length > 0) {
+    console.warn(`[env] ADMIN_USER_IDS: skipped invalid entries (expected 24-char hex ObjectIds): ${invalid.join(', ')}`);
+  }
+  cachedAdminIds = acc;
+  return cachedAdminIds;
+}
+

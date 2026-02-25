@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "scripts": {
     "android": "cd android && ./gradlew clean && cd ..",
@@ -17,6 +17,8 @@
     "android:prod:setup": "powershell -ExecutionPolicy Bypass -File android-prod.ps1",
     "ios": "cd ios && pod install && cd .. && react-native run-ios --simulator='iPhone 17 Pro Max'",
     "ios:clean": "npm run ios:pod && npm run ios:dev",
+    "ios:clean:full": "npm run ios:clean:derived && npm run ios:pod",
+    "ios:clean:derived": "rm -rf ios/build && rm -rf ~/Library/Developer/Xcode/DerivedData/mobile-*",
     "ios:pod": "cd ios && pod install && cd ..",
     "ios:dev": "ENVFILE=.env.dev react-native run-ios --simulator='iPhone 17 Pro Max'",
     "ios:staging": "ENVFILE=.env.staging react-native run-ios --simulator='iPhone 17 Pro Max'",
@@ -44,7 +46,6 @@
     "react-native-config": "^1.5.9",
     "react-native-gesture-handler": "^2.28.0",
     "react-native-reanimated": "^4.2.1",
-    "react-native-svg": "^15.11.1",
     "react-native-worklets": "^0.7.3",
     "react-redux": "^9.2.0",
     "semver": "^7.7.4"

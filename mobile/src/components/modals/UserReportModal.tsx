@@ -52,6 +52,7 @@ const CONTEXT_LABELS: Record<ReportContext, string> = {
   'crew-rules': 'Crew Rules',
   'chat-message': 'Chat Message',
   'map-chat-message': 'Map Chat Message',
+  'private-message': 'Private Message',
 };
 
 export const UserReportModal: React.FC<UserReportModalProps> = ({
@@ -115,6 +116,7 @@ export const UserReportModal: React.FC<UserReportModalProps> = ({
     switch (context) {
       case 'chat-message':
       case 'map-chat-message':
+      case 'private-message':
         return contextData.message || '';
       case 'internal-message-board':
       case 'external-message-board':
