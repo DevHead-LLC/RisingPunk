@@ -14,6 +14,8 @@ export class GlobalErrorHandler {
   /** In-flight health check: abort and clear when server is marked reachable so we don't show modal after a success. */
   private healthCheckAbortController: AbortController | null = null;
   private healthCheckTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  /** Set true when we abort the health check from markServerReachable; catch uses this to skip showModalAndCleanup. 5s timeout abort leaves it false. */
+  private healthCheckAbortedByReachable = false;
 
   private constructor(dispatch?: (action: any) => void, getState?: () => any) {
     this.dispatchCallback = dispatch || null;
@@ -46,6 +48,7 @@ export class GlobalErrorHandler {
 
   private clearServerDownRetryTimeouts(): void {
     if (this.healthCheckAbortController) {
+      this.healthCheckAbortedByReachable = true;
       this.healthCheckAbortController.abort();
       this.healthCheckAbortController = null;
     }
@@ -104,6 +107,7 @@ export class GlobalErrorHandler {
 
     const recheckAfter30s = (): void => {
       if (!this.getStateCallback()?.auth?.token) return;
+      this.healthCheckAbortedByReachable = false;
       const controller = new AbortController();
       this.healthCheckAbortController = controller;
       this.healthCheckTimeoutId = setTimeout(() => controller.abort(), SERVER_DOWN_HEALTH_FETCH_TIMEOUT_MS);
@@ -127,7 +131,16 @@ export class GlobalErrorHandler {
             this.healthCheckTimeoutId = null;
           }
           this.healthCheckAbortController = null;
-          if (err?.name === 'AbortError') return; // Cancelled by markServerReachable; do not show modal
+          if (err?.name === 'AbortError') {
+            if (this.healthCheckAbortedByReachable) {
+              this.healthCheckAbortedByReachable = false;
+              return; // Cancelled by markServerReachable; do not show modal
+            }
+            // Abort from 5s timeout = server hung; show modal and reset window
+            showModalAndCleanup();
+            return;
+          }
+          this.healthCheckAbortedByReachable = false;
           showModalAndCleanup();
         });
     };
