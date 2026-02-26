@@ -211,9 +211,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     return () => { cancelled = true; };
   }, []);
 
-  // Persist nav state when screen or turf position changes (debounced)
+  // Persist nav state when screen or turf position changes (debounced). Only after restore attempted so we don't overwrite stored state with defaults on slow devices.
   const persistNavStateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
+    if (!navRestoreAttempted) return;
     if (persistNavStateTimeoutRef.current) clearTimeout(persistNavStateTimeoutRef.current);
     persistNavStateTimeoutRef.current = setTimeout(() => {
       persistNavStateTimeoutRef.current = null;
@@ -222,7 +223,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     return () => {
       if (persistNavStateTimeoutRef.current) clearTimeout(persistNavStateTimeoutRef.current);
     };
-  }, [currentScreen, turfViewPosition]);
+  }, [navRestoreAttempted, currentScreen, turfViewPosition]);
 
   // Phase 4: When app returns from background and we're on battle screen, refetch battle state so UI shows current progress
   const appStateRef = useRef(AppState.currentState);
