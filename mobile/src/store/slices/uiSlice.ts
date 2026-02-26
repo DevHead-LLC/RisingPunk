@@ -17,6 +17,8 @@ interface UIState {
     botSelector: boolean;
     financialStatements: boolean;
     globalError: boolean;
+    /** When globalError is true, variant controls modal copy: 'server_down' shows server-down message. */
+    globalErrorVariant: 'generic' | 'server_down' | null;
   };
   // Screen navigation state (for future use)
   screens: {
@@ -35,6 +37,7 @@ const initialState: UIState = {
     botSelector: false,
     financialStatements: false,
     globalError: false,
+    globalErrorVariant: null,
   },
   screens: {
     currentTurfScreen: 'home',
@@ -70,6 +73,10 @@ export const uiSlice = createSlice({
 
     setGlobalErrorModal: (state, action: PayloadAction<boolean>) => {
       state.modals.globalError = action.payload;
+      if (!action.payload) state.modals.globalErrorVariant = null;
+    },
+    setGlobalErrorVariant: (state, action: PayloadAction<'generic' | 'server_down' | null>) => {
+      state.modals.globalErrorVariant = action.payload;
     },
 
     /** Sticky on failure: set updateRequired true when true; clear when updateRequired false and (minAppVersion set or success from health). */
@@ -95,6 +102,7 @@ export const {
   setBotSelector,
   setFinancialStatements,
   setGlobalErrorModal,
+  setGlobalErrorVariant,
   setForceUpdateRequired,
   setCurrentTurfScreen,
 } = uiSlice.actions;

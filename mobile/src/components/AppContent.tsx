@@ -11,7 +11,7 @@ import { useGetProfileQuery } from '../store/api/authApi';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
 import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
-import { setFinancialStatements, setGlobalErrorModal, setForceUpdateRequired } from '../store/slices/uiSlice';
+import { setFinancialStatements, setGlobalErrorModal, setGlobalErrorVariant, setForceUpdateRequired } from '../store/slices/uiSlice';
 import { useNetworkConnectivity } from '../providers/NetworkConnectivityProvider';
 import { ConnectivityOverlay } from './common/ConnectivityOverlay';
 import { HandleSelectionModal } from './modals/HandleSelectionModal';
@@ -31,6 +31,7 @@ const AppContent = memo(() => {
   const { updateRequired, minAppVersion } = useAppSelector((state) => state.ui.forceUpdate);
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
+  const globalErrorVariant = useAppSelector((state) => state.ui.modals.globalErrorVariant);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
@@ -306,9 +307,10 @@ const AppContent = memo(() => {
     }
   }, [dispatch]);
 
-  // Handle global error modal log out
+  // Handle global error modal log out (server down or generic)
   const handleGlobalErrorLogOut = useCallback(() => {
     dispatch(setGlobalErrorModal(false));
+    dispatch(setGlobalErrorVariant(null));
     dispatch(logoutUser());
   }, [dispatch]);
 
@@ -394,6 +396,7 @@ const AppContent = memo(() => {
       <GlobalErrorModal
         visible={showGlobalError && !!token}
         onLogOut={handleGlobalErrorLogOut}
+        variant={globalErrorVariant ?? 'generic'}
       />
       <AccountSwitchedModal
         visible={showAccountSwitched}
