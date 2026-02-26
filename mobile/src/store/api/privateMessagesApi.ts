@@ -32,6 +32,8 @@ const privateMessagesBaseQuery = async (args: any, api: any, extraOptions: any) 
     if (!is404) {
       globalErrorHandler.handleDatabaseError(result.error);
     }
+  } else {
+    globalErrorHandler.markServerReachable();
   }
   return result;
 };
