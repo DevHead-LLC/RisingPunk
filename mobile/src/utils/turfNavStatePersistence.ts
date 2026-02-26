@@ -33,6 +33,9 @@ const VALID_SCREENS: TurfScreenName[] = [
   'investmentProperty',
 ];
 
+/** Screens that depend on transient state (battleId, pendingDefenderUserId, pendingNpcSlug) not persisted. We do not persist these and fall back to 'turf' on restore to avoid restoring into a broken battle context. */
+const TRANSIENT_SCREENS: TurfScreenName[] = ['battlePrep', 'battle'];
+
 export interface TurfNavState {
   currentScreen: TurfScreenName;
   turfViewPosition: { x: number; y: number } | null;
@@ -68,7 +71,8 @@ export async function getPersistedTurfNavState(): Promise<TurfNavState | null> {
         : isValidPosition(position)
           ? { x: position.x, y: position.y }
           : null;
-    return { currentScreen: screen, turfViewPosition };
+    const currentScreen = TRANSIENT_SCREENS.includes(screen) ? 'turf' : screen;
+    return { currentScreen, turfViewPosition };
   } catch {
     return null;
   }
@@ -76,7 +80,17 @@ export async function getPersistedTurfNavState(): Promise<TurfNavState | null> {
 
 export async function setPersistedTurfNavState(state: TurfNavState): Promise<void> {
   try {
-    await AsyncStorage.setItem(NAV_STATE_KEY, JSON.stringify(state));
+    const currentScreen = TRANSIENT_SCREENS.includes(state.currentScreen) ? 'turf' : state.currentScreen;
+    await AsyncStorage.setItem(NAV_STATE_KEY, JSON.stringify({ ...state, currentScreen }));
+  } catch {
+    // Non-fatal; ignore
+  }
+}
+
+/** Clear persisted turf nav state. Call on logout or account switch so the next user does not restore the previous user's screen/position. */
+export async function clearPersistedTurfNavState(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(NAV_STATE_KEY);
   } catch {
     // Non-fatal; ignore
   }

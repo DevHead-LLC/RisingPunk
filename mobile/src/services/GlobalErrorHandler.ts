@@ -9,7 +9,6 @@ export class GlobalErrorHandler {
   private isHandlingError = false;
   private dispatchCallback: ((action: any) => void) | null = null;
   private getStateCallback: (() => any) | null = null;
-  private hasHadSuccessfulRequestSinceAuth = false;
   private serverDownRetryWindowStarted = false;
   private serverDownRetryTimeouts: ReturnType<typeof setTimeout>[] = [];
 
@@ -38,7 +37,6 @@ export class GlobalErrorHandler {
 
   /** Call when any API request succeeds. Clears any pending "server down" 30s recheck so we only show the modal if the server stays down for 30s. */
   markServerReachable(): void {
-    this.hasHadSuccessfulRequestSinceAuth = true;
     this.clearServerDownRetryTimeouts();
     this.serverDownRetryWindowStarted = false;
   }
@@ -64,7 +62,6 @@ export class GlobalErrorHandler {
 
     const state = this.getStateCallback();
     if (!state.auth?.token) {
-      this.hasHadSuccessfulRequestSinceAuth = false;
       this.clearServerDownRetryTimeouts();
       this.serverDownRetryWindowStarted = false;
       this.isHandlingError = false;
@@ -136,52 +133,6 @@ export class GlobalErrorHandler {
     ) {
       return true;
     }
-    return false;
-  }
-
-  private isDatabaseError(error: any, status?: number): boolean {
-    if (!error) return false;
-
-    if (status === 401) {
-      // Don't treat ACCOUNT_SWITCHED as a database error - let it be handled by the account switched flow
-      if (error?.data?.error === 'ACCOUNT_SWITCHED') {
-        return false;
-      }
-      return true;
-    }
-
-    if (status && status >= 500) {
-      return true;
-    }
-
-    if (error.status === 'TIMEOUT_ERROR' || status === 'TIMEOUT_ERROR') {
-      return true;
-    }
-
-    if (error.message && typeof error.message === 'string') {
-      const message = error.message.toLowerCase();
-      return (
-        message.includes('database') ||
-        message.includes('connection') ||
-        message.includes('timeout') ||
-        message.includes('network') ||
-        message.includes('fetch') ||
-        message.includes('abort')
-      );
-    }
-
-    if (error.error && typeof error.error === 'string') {
-      const errorText = error.error.toLowerCase();
-      return (
-        errorText.includes('database') ||
-        errorText.includes('connection') ||
-        errorText.includes('timeout') ||
-        errorText.includes('network') ||
-        errorText.includes('fetch') ||
-        errorText.includes('abort')
-      );
-    }
-
     return false;
   }
 
