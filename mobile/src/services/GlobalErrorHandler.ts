@@ -11,6 +11,9 @@ export class GlobalErrorHandler {
   private getStateCallback: (() => any) | null = null;
   private serverDownRetryWindowStarted = false;
   private serverDownRetryTimeouts: ReturnType<typeof setTimeout>[] = [];
+  /** In-flight health check: abort and clear when server is marked reachable so we don't show modal after a success. */
+  private healthCheckAbortController: AbortController | null = null;
+  private healthCheckTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   private constructor(dispatch?: (action: any) => void, getState?: () => any) {
     this.dispatchCallback = dispatch || null;
@@ -42,6 +45,14 @@ export class GlobalErrorHandler {
   }
 
   private clearServerDownRetryTimeouts(): void {
+    if (this.healthCheckAbortController) {
+      this.healthCheckAbortController.abort();
+      this.healthCheckAbortController = null;
+    }
+    if (this.healthCheckTimeoutId) {
+      clearTimeout(this.healthCheckTimeoutId);
+      this.healthCheckTimeoutId = null;
+    }
     this.serverDownRetryTimeouts.forEach((id) => clearTimeout(id));
     this.serverDownRetryTimeouts = [];
   }
@@ -94,19 +105,29 @@ export class GlobalErrorHandler {
     const recheckAfter30s = (): void => {
       if (!this.getStateCallback()?.auth?.token) return;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), SERVER_DOWN_HEALTH_FETCH_TIMEOUT_MS);
+      this.healthCheckAbortController = controller;
+      this.healthCheckTimeoutId = setTimeout(() => controller.abort(), SERVER_DOWN_HEALTH_FETCH_TIMEOUT_MS);
       fetch(`${API_URL}/health`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
       })
         .then((res) => {
-          clearTimeout(timeoutId);
+          if (this.healthCheckTimeoutId) {
+            clearTimeout(this.healthCheckTimeoutId);
+            this.healthCheckTimeoutId = null;
+          }
+          this.healthCheckAbortController = null;
           if (res.ok) this.markServerReachable();
           else showModalAndCleanup();
         })
-        .catch(() => {
-          clearTimeout(timeoutId);
+        .catch((err) => {
+          if (this.healthCheckTimeoutId) {
+            clearTimeout(this.healthCheckTimeoutId);
+            this.healthCheckTimeoutId = null;
+          }
+          this.healthCheckAbortController = null;
+          if (err?.name === 'AbortError') return; // Cancelled by markServerReachable; do not show modal
           showModalAndCleanup();
         });
     };
