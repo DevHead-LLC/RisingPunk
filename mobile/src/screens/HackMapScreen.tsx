@@ -787,7 +787,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     setShowMessagesModal(true);
   }, []);
   const handleOpenMessagesFromProfile = useCallback((userId: string, username: string) => {
-    if (__DEV__) console.log('[HackMapScreen] handleOpenMessagesFromProfile — closing profile, will open Messages after delay', userId, username);
     setShowVisitingProfileModal(false);
     if (visitingProfileCloseTimeoutRef.current) {
       clearTimeout(visitingProfileCloseTimeoutRef.current);
@@ -797,7 +796,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       visitingProfileCloseTimeoutRef.current = null;
       setMessagesOpenToUser({ userId, username });
       setShowMessagesModal(true);
-      if (__DEV__) console.log('[HackMapScreen] Messages modal opened after profile closed', userId, username);
     }, VISITING_PROFILE_CLOSE_DELAY_MS);
   }, []);
   const handleCloseMessagesModal = useCallback(() => {

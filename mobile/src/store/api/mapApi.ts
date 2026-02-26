@@ -54,6 +54,8 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
     if (!isMyPositionRequest && !isViewportRequest) {
       globalErrorHandler.handleDatabaseError(result.error);
     }
+  } else {
+    globalErrorHandler.markServerReachable();
   }
 
   return result;

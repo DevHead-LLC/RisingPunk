@@ -1,8 +1,21 @@
+import { API_URL } from '../config';
+
+/** Wait this long after first "server down" recognition before rechecking; only then show modal if still down. */
+const SERVER_DOWN_RECHECK_AFTER_MS = 30000;
+const SERVER_DOWN_HEALTH_FETCH_TIMEOUT_MS = 5000;
+
 export class GlobalErrorHandler {
   private static instance: GlobalErrorHandler;
   private isHandlingError = false;
   private dispatchCallback: ((action: any) => void) | null = null;
   private getStateCallback: (() => any) | null = null;
+  private serverDownRetryWindowStarted = false;
+  private serverDownRetryTimeouts: ReturnType<typeof setTimeout>[] = [];
+  /** In-flight health check: abort and clear when server is marked reachable so we don't show modal after a success. */
+  private healthCheckAbortController: AbortController | null = null;
+  private healthCheckTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  /** Set true when we abort the health check from markServerReachable; catch uses this to skip showModalAndCleanup. 5s timeout abort leaves it false. */
+  private healthCheckAbortedByReachable = false;
 
   private constructor(dispatch?: (action: any) => void, getState?: () => any) {
     this.dispatchCallback = dispatch || null;
@@ -27,6 +40,26 @@ export class GlobalErrorHandler {
     this.updateCallbacks(dispatch, getState);
   }
 
+  /** Call when any API request succeeds. Clears any pending "server down" 30s recheck so we only show the modal if the server stays down for 30s. */
+  markServerReachable(): void {
+    this.clearServerDownRetryTimeouts();
+    this.serverDownRetryWindowStarted = false;
+  }
+
+  private clearServerDownRetryTimeouts(): void {
+    if (this.healthCheckAbortController) {
+      this.healthCheckAbortedByReachable = true;
+      this.healthCheckAbortController.abort();
+      this.healthCheckAbortController = null;
+    }
+    if (this.healthCheckTimeoutId) {
+      clearTimeout(this.healthCheckTimeoutId);
+      this.healthCheckTimeoutId = null;
+    }
+    this.serverDownRetryTimeouts.forEach((id) => clearTimeout(id));
+    this.serverDownRetryTimeouts = [];
+  }
+
   handleDatabaseError(error: any): void {
     if (this.isHandlingError) {
       return;
@@ -41,12 +74,10 @@ export class GlobalErrorHandler {
       return;
     }
 
-    // Get current state to check if user is authenticated
     const state = this.getStateCallback();
-    
-    // Only show modal and log errors if user is authenticated (has token)
-    // This prevents logging "User not found" errors after account deletion/logout
     if (!state.auth?.token) {
+      this.clearServerDownRetryTimeouts();
+      this.serverDownRetryWindowStarted = false;
       this.isHandlingError = false;
       return;
     }
@@ -54,59 +85,92 @@ export class GlobalErrorHandler {
     console.error('🔴 GLOBAL ERROR HANDLER: Database fetch error detected:', error);
 
     const errorStatus = error?.status || error?.statusCode;
-    const isDatabaseError = this.isDatabaseError(error, errorStatus);
 
-    if (isDatabaseError) {      
-      this.dispatchCallback({ type: 'ui/setGlobalErrorModal', payload: true });
-      this.isHandlingError = false;
-    } else {
-      this.isHandlingError = false;
+    if (this.isServerDownError(error, errorStatus)) {
+      this.handleServerDownInInitialPhase();
     }
+    this.isHandlingError = false;
   }
 
-  private isDatabaseError(error: any, status?: number): boolean {
-    if (!error) return false;
+  /** On server-down error: start 30s recheck window if not already started. After 30s we recheck once; if still down, show modal. Any success clears the window. */
+  private handleServerDownInInitialPhase(): void {
+    if (this.serverDownRetryWindowStarted) return;
+    this.serverDownRetryWindowStarted = true;
 
-    if (status === 401) {
-      // Don't treat ACCOUNT_SWITCHED as a database error - let it be handled by the account switched flow
-      if (error?.data?.error === 'ACCOUNT_SWITCHED') {
-        return false;
+    const showModalAndCleanup = (): void => {
+      this.clearServerDownRetryTimeouts();
+      this.serverDownRetryWindowStarted = false;
+      if (!this.dispatchCallback || !this.getStateCallback()?.auth?.token) return;
+      this.dispatchCallback({ type: 'ui/setGlobalErrorModal', payload: true });
+      this.dispatchCallback({ type: 'ui/setGlobalErrorVariant', payload: 'server_down' });
+    };
+
+    const recheckAfter30s = (): void => {
+      if (!this.getStateCallback()?.auth?.token) {
+        this.clearServerDownRetryTimeouts();
+        this.serverDownRetryWindowStarted = false;
+        return;
       }
+      this.healthCheckAbortedByReachable = false;
+      const controller = new AbortController();
+      this.healthCheckAbortController = controller;
+      this.healthCheckTimeoutId = setTimeout(() => controller.abort(), SERVER_DOWN_HEALTH_FETCH_TIMEOUT_MS);
+      fetch(`${API_URL}/health`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      })
+        .then((res) => {
+          if (this.healthCheckTimeoutId) {
+            clearTimeout(this.healthCheckTimeoutId);
+            this.healthCheckTimeoutId = null;
+          }
+          this.healthCheckAbortController = null;
+          if (res.ok) this.markServerReachable();
+          else showModalAndCleanup();
+        })
+        .catch((err) => {
+          if (this.healthCheckTimeoutId) {
+            clearTimeout(this.healthCheckTimeoutId);
+            this.healthCheckTimeoutId = null;
+          }
+          this.healthCheckAbortController = null;
+          if (err?.name === 'AbortError') {
+            if (this.healthCheckAbortedByReachable) {
+              this.healthCheckAbortedByReachable = false;
+              return; // Cancelled by markServerReachable; do not show modal
+            }
+            // Abort from 5s timeout = server hung; show modal and reset window
+            showModalAndCleanup();
+            return;
+          }
+          this.healthCheckAbortedByReachable = false;
+          showModalAndCleanup();
+        });
+    };
+
+    const timeoutId = setTimeout(() => {
+      recheckAfter30s();
+    }, SERVER_DOWN_RECHECK_AFTER_MS);
+    this.serverDownRetryTimeouts.push(timeoutId);
+  }
+
+  /** True only when the server is down or unreachable (502, 503, 504, or connection/fetch failure to API). */
+  private isServerDownError(error: any, status?: number): boolean {
+    if (!error) return false;
+    const s = status ?? error?.status ?? error?.statusCode;
+    if (s === 502 || s === 503 || s === 504) return true;
+    if (error?.status === 'FETCH_ERROR' || error?.error === 'FETCH_ERROR') return true;
+    const msg = (error?.message ?? error?.error ?? '').toString().toLowerCase();
+    if (
+      msg.includes('failed to fetch') ||
+      msg.includes('network request failed') ||
+      msg.includes('connection refused') ||
+      msg.includes('could not connect') ||
+      msg.includes('server is not responding')
+    ) {
       return true;
     }
-
-    if (status && status >= 500) {
-      return true;
-    }
-
-    if (error.status === 'TIMEOUT_ERROR' || status === 'TIMEOUT_ERROR') {
-      return true;
-    }
-
-    if (error.message && typeof error.message === 'string') {
-      const message = error.message.toLowerCase();
-      return (
-        message.includes('database') ||
-        message.includes('connection') ||
-        message.includes('timeout') ||
-        message.includes('network') ||
-        message.includes('fetch') ||
-        message.includes('abort')
-      );
-    }
-
-    if (error.error && typeof error.error === 'string') {
-      const errorText = error.error.toLowerCase();
-      return (
-        errorText.includes('database') ||
-        errorText.includes('connection') ||
-        errorText.includes('timeout') ||
-        errorText.includes('network') ||
-        errorText.includes('fetch') ||
-        errorText.includes('abort')
-      );
-    }
-
     return false;
   }
 
