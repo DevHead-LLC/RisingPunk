@@ -11,7 +11,7 @@ import { useGetProfileQuery } from '../store/api/authApi';
 import { LoginScreen } from '../screens/LoginScreen';
 import { TurfScreen } from '../screens/TurfScreen';
 import { FinancialStatementsScreen } from '../screens/FinancialStatementsScreen';
-import { setFinancialStatements, setGlobalErrorModal, setGlobalErrorVariant, setForceUpdateRequired } from '../store/slices/uiSlice';
+import { setFinancialStatements, setGlobalErrorModal, setForceUpdateRequired } from '../store/slices/uiSlice';
 import { useNetworkConnectivity } from '../providers/NetworkConnectivityProvider';
 import { ConnectivityOverlay } from './common/ConnectivityOverlay';
 import { HandleSelectionModal } from './modals/HandleSelectionModal';
@@ -309,8 +309,7 @@ const AppContent = memo(() => {
 
   // Handle global error modal log out (server down or generic)
   const handleGlobalErrorLogOut = useCallback(() => {
-    dispatch(setGlobalErrorModal(false));
-    dispatch(setGlobalErrorVariant(null));
+    dispatch(setGlobalErrorModal(false)); // reducer also clears globalErrorVariant when payload is false
     dispatch(logoutUser());
   }, [dispatch]);
 
