@@ -106,7 +106,11 @@ export class GlobalErrorHandler {
     };
 
     const recheckAfter30s = (): void => {
-      if (!this.getStateCallback()?.auth?.token) return;
+      if (!this.getStateCallback()?.auth?.token) {
+        this.clearServerDownRetryTimeouts();
+        this.serverDownRetryWindowStarted = false;
+        return;
+      }
       this.healthCheckAbortedByReachable = false;
       const controller = new AbortController();
       this.healthCheckAbortController = controller;
