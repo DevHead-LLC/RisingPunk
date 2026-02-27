@@ -101,8 +101,8 @@ export class GlobalErrorHandler {
       this.clearServerDownRetryTimeouts();
       this.serverDownRetryWindowStarted = false;
       if (!this.dispatchCallback || !this.getStateCallback()?.auth?.token) return;
-      this.dispatchCallback({ type: 'ui/setGlobalErrorModal', payload: true });
       this.dispatchCallback({ type: 'ui/setGlobalErrorVariant', payload: 'server_down' });
+      this.dispatchCallback({ type: 'ui/setGlobalErrorModal', payload: true });
     };
 
     const recheckAfter30s = (): void => {
