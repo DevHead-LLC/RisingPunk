@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, unstable_batchedUpdates } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, Alert, unstable_batchedUpdates } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
@@ -21,7 +21,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setMapGridSize, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
-import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
@@ -777,6 +777,32 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
   const [messagesOpenToUser, setMessagesOpenToUser] = useState<{ userId: string; username: string } | null>(null);
+  /** When set, probe was requested to this target; Phase 3+ will use it for path/animation. */
+  const [probeTarget, setProbeTarget] = useState<{
+    targetX: number;
+    targetY: number;
+    targetOwner: 'player' | 'npc';
+    targetUserId?: string;
+    targetNpcSlug?: string;
+    targetNpcInstanceId?: string;
+  } | null>(null);
+  /** 0 = at user, 1 = at target. Used for outbound and return. */
+  const [probeProgress, setProbeProgress] = useState(0);
+  /** 'outbound' | 'returning' | null */
+  const [probePhase, setProbePhase] = useState<'outbound' | 'returning' | null>(null);
+  const [showProbeFollowModal, setShowProbeFollowModal] = useState(false);
+  const [probeRemainingSec, setProbeRemainingSec] = useState(0);
+  const probeStartTimeRef = useRef<number>(0);
+  const probeDurationSecRef = useRef<number>(0);
+  const probeAnimationFrameRef = useRef<number | null>(null);
+  const probePhaseRef = useRef<'outbound' | 'returning' | null>(null);
+  const lastProbeProgressRef = useRef<number>(0);
+  const probeReturnStartTimeRef = useRef<number>(0);
+  const probeReturnStartProgressRef = useRef<number>(0);
+  const probeReturnDurationRef = useRef<number>(0);
+  const probeFollowModeRef = useRef<boolean>(false);
+  const probeCompletingRef = useRef<boolean>(false);
+  const [completeProbeMutation] = useCompleteProbeMutation();
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
     pollingInterval: token ? 10000 : 0, // 10s for badge; MessagesModal polls at 2s when open
@@ -813,6 +839,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const boundsReady = useSharedValue(false);
   const initialDims = Dimensions.get('window');
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: initialDims.width, height: initialDims.height });
+  const containerSizeRef = useRef(containerSize);
+  containerSizeRef.current = containerSize;
   const authoritativeGridSize = mapGridSize ?? getGridSize(grid);
   const [windowRange, setWindowRange] = useState<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>({ rowStart: 0, rowEnd: Math.min(14, authoritativeGridSize - 1), colStart: 0, colEnd: Math.min(14, authoritativeGridSize - 1) });
   
@@ -991,6 +1019,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       rafId.value = null;
     });
   };
+  const scheduleComputeRef = useRef(scheduleCompute);
+  scheduleComputeRef.current = scheduleCompute;
 
   // Pan-end deferred compute: run in rAF so we can cancel on unmount (Bugbot).
   const panEndSchedule = useCallback((finalX: number, finalY: number) => {
@@ -1356,6 +1386,148 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   // Get research features data (same as ResearchFeaturesList)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
+
+  // Probe animation: when probeTarget and myPositionData are set, run outbound then optional return (Phase 3+4)
+  const probeTargetStartedRef = useRef(false);
+  useEffect(() => {
+    if (!probeTarget) {
+      probeTargetStartedRef.current = false;
+      probePhaseRef.current = null;
+      return;
+    }
+    if (!myPositionData || probeTargetStartedRef.current) return;
+    probeTargetStartedRef.current = true;
+    const ux = myPositionData.x;
+    const uy = myPositionData.y;
+    const tx = probeTarget.targetX;
+    const ty = probeTarget.targetY;
+    const distanceTiles = Math.sqrt((tx - ux) ** 2 + (ty - uy) ** 2);
+    const durationSec = Math.max(2, distanceTiles * 2);
+    const startX = MARGIN_SIZE + (ux + 0.5) * CELL_SIZE;
+    const startY = MARGIN_SIZE + (uy + 0.5) * CELL_SIZE;
+    const endX = MARGIN_SIZE + (tx + 0.5) * CELL_SIZE;
+    const endY = MARGIN_SIZE + (ty + 0.5) * CELL_SIZE;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    probeStartTimeRef.current = Date.now();
+    probeDurationSecRef.current = durationSec;
+    probePhaseRef.current = 'outbound';
+    setProbePhase('outbound');
+    setProbeProgress(0);
+    setProbeRemainingSec(durationSec);
+
+    const tick = () => {
+      const now = Date.now();
+      let progress: number;
+      let remainingSec: number;
+      const phase = probePhaseRef.current;
+      if (phase === 'returning') {
+        const returnElapsed = (now - probeReturnStartTimeRef.current) / 1000;
+        const t = Math.min(1, returnElapsed / probeReturnDurationRef.current);
+        progress = probeReturnStartProgressRef.current * (1 - t);
+        remainingSec = Math.max(0, probeReturnDurationRef.current - returnElapsed);
+      } else {
+        const elapsed = (now - probeStartTimeRef.current) / 1000;
+        progress = Math.min(1, elapsed / probeDurationSecRef.current);
+        remainingSec = Math.max(0, probeDurationSecRef.current * (1 - progress));
+      }
+      lastProbeProgressRef.current = progress;
+      setProbeProgress(progress);
+      setProbeRemainingSec(remainingSec);
+      // Outbound: progress 0→1 → user to target. Return: progress 1→0 → target back to user
+      const lineProgress = progress;
+      const probeContentX = startX + dx * lineProgress;
+      const probeContentY = startY + dy * lineProgress;
+      const container = containerSizeRef.current;
+      if (probeFollowModeRef.current && container.width > 0 && container.height > 0) {
+        let tx = container.width / 2 - probeContentX;
+        let ty = container.height / 2 - probeContentY;
+        if (boundsReady.value) {
+          tx = Math.min(maxX.value, Math.max(minX.value, tx));
+          ty = Math.min(maxY.value, Math.max(minY.value, ty));
+        }
+        offsetX.value = tx;
+        offsetY.value = ty;
+        scheduleComputeRef.current(tx, ty, 0, 0);
+      }
+      if (phase === 'returning') {
+        if (progress <= 0) {
+          probeAnimationFrameRef.current = null;
+          probePhaseRef.current = null;
+          setProbeTarget(null);
+          setProbePhase(null);
+          setProbeProgress(0);
+          setProbeRemainingSec(0);
+          setShowProbeFollowModal(false);
+          probeFollowModeRef.current = false;
+        } else {
+          probeAnimationFrameRef.current = requestAnimationFrame(tick);
+        }
+      } else if (progress >= 1) {
+        probeAnimationFrameRef.current = null;
+        if (probeCompletingRef.current) return;
+        probeCompletingRef.current = true;
+        completeProbeMutation({
+          targetOwner: probeTarget.targetOwner,
+          targetUserId: probeTarget.targetUserId,
+          targetNpcSlug: probeTarget.targetNpcSlug,
+          targetX: probeTarget.targetX,
+          targetY: probeTarget.targetY,
+        })
+          .unwrap()
+          .then(() => {
+            probeReturnStartProgressRef.current = 1;
+            probeReturnStartTimeRef.current = Date.now();
+            probeReturnDurationRef.current = probeDurationSecRef.current;
+            probePhaseRef.current = 'returning';
+            setProbePhase('returning');
+            setProbeRemainingSec(probeDurationSecRef.current);
+            probeCompletingRef.current = false;
+            probeAnimationFrameRef.current = requestAnimationFrame(tick);
+          })
+          .catch((err: any) => {
+            probeCompletingRef.current = false;
+            probePhaseRef.current = null;
+            setProbeTarget(null);
+            setProbePhase(null);
+            setProbeProgress(0);
+            setProbeRemainingSec(0);
+            setShowProbeFollowModal(false);
+            probeFollowModeRef.current = false;
+            const msg = err?.data?.error ?? err?.message ?? 'Probe report could not be sent.';
+            Alert.alert('Probe Report', msg);
+          });
+      } else {
+        probeAnimationFrameRef.current = requestAnimationFrame(tick);
+      }
+    };
+    probeAnimationFrameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (probeAnimationFrameRef.current != null) {
+        cancelAnimationFrame(probeAnimationFrameRef.current);
+        probeAnimationFrameRef.current = null;
+      }
+    };
+  }, [probeTarget, myPositionData, completeProbeMutation]);
+
+  const handleProbeFollow = useCallback(() => {
+    setShowProbeFollowModal(true);
+    probeFollowModeRef.current = true;
+  }, []);
+
+  const handleProbeFollowModalClose = useCallback(() => {
+    setShowProbeFollowModal(false);
+    probeFollowModeRef.current = false;
+  }, []);
+
+  const handleProbeCancel = useCallback(() => {
+    probeReturnStartProgressRef.current = lastProbeProgressRef.current;
+    probeReturnStartTimeRef.current = Date.now();
+    probeReturnDurationRef.current = lastProbeProgressRef.current * probeDurationSecRef.current;
+    probePhaseRef.current = 'returning';
+    setProbePhase('returning');
+  }, []);
+
   const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
   
   const { data: crewDetails, isLoading: isLoadingCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId || '', {
@@ -3470,6 +3642,34 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                       </Text>
                     </TouchableOpacity>
                   )}
+                  {(() => {
+                    const probeUnlocked = (researchFeatures as any[] | undefined)?.some((f: any) => f.id === 'probe' && f.isUnlocked);
+                    const isTargetSelf = selectedCell.info.owner === 'player' && selectedCell.info.name === currentUserHandle;
+                    const canProbePlayer = selectedCell.info.owner === 'player' && selectedCell.info.userId && !isTargetSelf && !selectedCell.info.isShielded;
+                    const canProbeNpc = selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug;
+                    const showProbe = probeUnlocked && (canProbePlayer || canProbeNpc);
+                    if (!showProbe) return null;
+                    return (
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                        onPress={() => {
+                          setProbeTarget({
+                            targetX: selectedCell.x,
+                            targetY: selectedCell.y,
+                            targetOwner: selectedCell.info.owner === 'player' ? 'player' : 'npc',
+                            targetUserId: selectedCell.info.userId != null ? String(selectedCell.info.userId) : undefined,
+                            targetNpcSlug: selectedCell.info.npcSlug ?? undefined,
+                            targetNpcInstanceId: selectedCell.info.npcInstanceId ?? undefined,
+                          });
+                          setSelectedCell(null);
+                        }}
+                      >
+                        <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                          Probe
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })()}
                 </View>
               </>
             )}
@@ -3484,7 +3684,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -3589,21 +3789,22 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
       {renderInfoPanel()}
 
-      <GestureDetector gesture={combinedMapGesture}>
-        <Animated.View
-          ref={mapViewRef}
-          style={[
-            styles.marginWrapper,
-            { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
-            animatedMapStyle as any,
-          ]}
-          onLayout={() => {
-            mapViewRef.current?.measureInWindow((x, y) => {
-              mapViewWindowRef.current = { x, y };
-            });
-          }}
-        >
-          <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
+      <View style={{ width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) }}>
+        <GestureDetector style={StyleSheet.absoluteFill} gesture={combinedMapGesture}>
+          <Animated.View
+            ref={mapViewRef}
+            style={[
+              styles.marginWrapper,
+              { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
+              animatedMapStyle as any,
+            ]}
+            onLayout={() => {
+              mapViewRef.current?.measureInWindow((x, y) => {
+                mapViewWindowRef.current = { x, y };
+              });
+            }}
+          >
+            <View style={[styles.gridArea, { width: totalSize, height: totalSize }]}>
             {visibleCells.map((assignment) => {
               const { x, y, cell } = assignment;
               const selected = !!(selectedCell && selectedCell.x === x && selectedCell.y === y);
@@ -3654,8 +3855,110 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
               );
             })}
           </View>
-        </Animated.View>
-      </GestureDetector>
+          </Animated.View>
+        </GestureDetector>
+        {probeTarget && myPositionData && probePhase && (
+          <Animated.View
+            style={[StyleSheet.absoluteFill, animatedMapStyle as any]}
+            pointerEvents="box-none"
+          >
+            {(() => {
+              const ux = myPositionData.x;
+              const uy = myPositionData.y;
+              const tx = probeTarget.targetX;
+              const ty = probeTarget.targetY;
+              const startX = MARGIN_SIZE + (ux + 0.5) * CELL_SIZE;
+              const startY = MARGIN_SIZE + (uy + 0.5) * CELL_SIZE;
+              const endX = MARGIN_SIZE + (tx + 0.5) * CELL_SIZE;
+              const endY = MARGIN_SIZE + (ty + 0.5) * CELL_SIZE;
+              const dx = endX - startX;
+              const dy = endY - startY;
+              const length = Math.sqrt(dx * dx + dy * dy) || 1;
+              const angle = Math.atan2(dy, dx);
+              const PROBE_SIZE = 100;
+              const PROBE_HIT_PADDING = 24;
+              // Outbound: progress 0→1 → user to target. Return: progress 1→0 → target back to user
+              const lineProgress = probeProgress;
+              const px = startX + dx * lineProgress - PROBE_SIZE / 2;
+              const py = startY + dy * lineProgress - PROBE_SIZE / 2;
+              const hitSize = PROBE_SIZE + PROBE_HIT_PADDING * 2;
+              const hitLeft = px - PROBE_HIT_PADDING;
+              const hitTop = py - PROBE_HIT_PADDING;
+              return (
+                <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { left: 0, top: 0, right: 0, bottom: 0 }]}>
+                  <View
+                    style={{
+                      position: 'absolute',
+                      left: startX,
+                      top: startY,
+                      width: length,
+                      height: 1,
+                      borderWidth: 1,
+                      borderStyle: 'dashed',
+                      borderColor: colors.matrix ?? '#00ff00',
+                      borderRadius: 0.5,
+                      opacity: 0.8,
+                      transform: [{ translateX: -length / 2 }, { rotate: `${angle}rad` }, { translateX: length / 2 }],
+                    }}
+                  />
+                  <Pressable
+                    style={{
+                      position: 'absolute',
+                      left: hitLeft,
+                      top: hitTop,
+                      width: hitSize,
+                      height: hitSize,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    onPress={handleProbeFollow}
+                  >
+                    <Image
+                      source={require('../assets/images/hackMap/probe.png')}
+                      style={{ width: PROBE_SIZE, height: PROBE_SIZE }}
+                      resizeMode="contain"
+                    />
+                  </Pressable>
+                </View>
+              );
+            })()}
+          </Animated.View>
+        )}
+      </View>
+
+      {showProbeFollowModal && (
+        <View
+          style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }]}
+          pointerEvents="box-none"
+        >
+          <Pressable style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }} onPress={handleProbeFollowModalClose}>
+            <Pressable
+              style={{
+                padding: 12,
+                borderRadius: 8,
+                maxWidth: 200,
+                backgroundColor: colors.surface ? `${colors.surface}E6` : 'rgba(28,28,30,0.92)',
+              }}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <Text style={[styles.npcLevelModalText, { color: colors.text, fontSize: 14 }]}>
+                {probePhase === 'returning' ? 'Returning to base' : 'Probe en route'}
+              </Text>
+              <Text style={[styles.npcLevelModalText, { color: colors.secondary, marginTop: 6, fontSize: 13 }]}>
+                {probePhase === 'returning' ? 'Time to base' : 'Time to target'}: {Math.ceil(probeRemainingSec)}s
+              </Text>
+              {probePhase === 'outbound' && (
+                <TouchableOpacity style={[styles.actionButton, { marginTop: 8, paddingVertical: 6, backgroundColor: colors.error ?? '#c00' }]} onPress={handleProbeCancel}>
+                  <Text style={[styles.actionButtonText, { color: colors.background, fontSize: 13 }]}>Cancel</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[styles.closeButton, { marginTop: 8, paddingVertical: 6 }]} onPress={handleProbeFollowModalClose}>
+                <Text style={[styles.closeButtonText, { color: colors.secondary, fontSize: 13 }]}>Close</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 };

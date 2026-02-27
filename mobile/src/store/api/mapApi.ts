@@ -47,11 +47,13 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
     // Optional map requests: do not trigger global error modal so user can keep using the app (panning-load.md)
     // - my-position: 404 (no house) or other failures (user-position-and-locator.md)
     // - viewport (x1,y1,x2,y2): timeouts/500s on staging would otherwise show "Something went wrong... Log out"
+    // - probe/complete: HackMapScreen shows Alert with server error (e.g. Probe Report not configured)
     const url = typeof args === 'string' ? args : args?.url;
     const path = typeof url === 'string' ? url.split('?')[0] : '';
     const isMyPositionRequest = path.endsWith('/my-position');
     const isViewportRequest = args?.params && typeof args.params === 'object' && 'x1' in args.params && 'x2' in args.params;
-    if (!isMyPositionRequest && !isViewportRequest) {
+    const isProbeCompleteRequest = path.endsWith('/probe/complete');
+    if (!isMyPositionRequest && !isViewportRequest && !isProbeCompleteRequest) {
       globalErrorHandler.handleDatabaseError(result.error);
     }
   } else {
@@ -64,7 +66,7 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const mapApi = createApi({
   reducerPath: 'mapApi',
   baseQuery: mapBaseQuery,
-  tagTypes: ['Map', 'MapChat'],
+  tagTypes: ['Map', 'MapChat', 'PrivateMessageConversations'],
   endpoints: (builder) => ({
     fetchMap: builder.query<MapResponse, void>({
       query: () => '/api/map/main',
@@ -111,6 +113,17 @@ export const mapApi = createApi({
       }),
       invalidatesTags: (result, error, { mapName }) => [{ type: 'MapChat', id: mapName }],
     }),
+    completeProbe: builder.mutation<
+      { success: boolean; message: any },
+      { targetOwner: 'player' | 'npc'; targetUserId?: string; targetNpcSlug?: string; targetX: number; targetY: number }
+    >({
+      query: (body) => ({
+        url: '/api/probe/complete',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['PrivateMessageConversations'],
+    }),
   }),
 });
 
@@ -122,4 +135,5 @@ export const {
   useUpdatePlayerPositionMutation,
   useGetMapChatMessagesQuery,
   useSendMapChatMessageMutation,
+  useCompleteProbeMutation,
 } = mapApi;
