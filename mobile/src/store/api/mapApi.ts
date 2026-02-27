@@ -5,6 +5,7 @@ import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
 import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
+import { privateMessagesApi } from './privateMessagesApi';
 
 // Custom base query with error handling for mapApi
 const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -66,7 +67,7 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const mapApi = createApi({
   reducerPath: 'mapApi',
   baseQuery: mapBaseQuery,
-  tagTypes: ['Map', 'MapChat', 'PrivateMessageConversations'],
+  tagTypes: ['Map', 'MapChat'],
   endpoints: (builder) => ({
     fetchMap: builder.query<MapResponse, void>({
       query: () => '/api/map/main',
@@ -122,7 +123,14 @@ export const mapApi = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['PrivateMessageConversations'],
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(privateMessagesApi.util.invalidateTags(['PrivateMessageConversations']));
+        } catch {
+          // Invalidation only on success; no-op on error
+        }
+      },
     }),
   }),
 });
