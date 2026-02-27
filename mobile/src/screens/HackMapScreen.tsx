@@ -1468,6 +1468,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         const phase = probe.phase;
 
         if (phase === 'returning') {
+          data.completing = false; // Clear so we don't leave ref stuck; only clear when tick sees returning (avoids race with setProbes)
           const returnStartTime = data.returnStartTime ?? now;
           const returnDuration = data.returnDuration ?? data.durationSec;
           const returnStartProgress = data.returnStartProgress ?? 1;
@@ -1551,21 +1552,23 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
             })
               .unwrap()
               .then(() => {
-                data.completing = false;
+                // Do not set data.completing = false here: setProbes is async and probesRef syncs in useEffect.
+                // Next tick may still see phase 'outbound'; keeping completing true prevents duplicate completeProbeMutation.
+                // completing is cleared in tick when we see phase === 'returning'.
                 data.returnStartTime = Date.now();
                 data.returnStartProgress = 1;
                 data.returnDuration = data.durationSec;
                 setProbes((prev) =>
                   prev.map((p) => (p.id === probe.id ? { ...p, phase: 'returning' as const, remainingSec: data.durationSec } : p))
                 );
-                probeAnimationFrameRef.current = requestAnimationFrame(tick);
+                // Do not schedule requestAnimationFrame here; main loop already schedules at end of tick (single loop).
               })
               .catch((err: any) => {
                 data.completing = false;
                 probeDataRef.current.delete(probe.id);
                 startedAnimationRef.current.delete(probe.id);
                 setProbes((prev) => prev.filter((p) => p.id !== probe.id));
-                if (followProbeId === probe.id) {
+                if (followProbeIdRef.current === probe.id) {
                   setFollowProbeId(null);
                   setShowProbeFollowModal(false);
                   probeFollowModeRef.current = false;
