@@ -155,11 +155,11 @@ export class GlobalErrorHandler {
     this.serverDownRetryTimeouts.push(timeoutId);
   }
 
-  /** True only when the server is down or unreachable (502, 503, 504, or connection/fetch failure to API). */
+  /** True when the server is down, unreachable, or returned a server error (500, 501, 502, 503, 504, or connection/fetch failure). */
   private isServerDownError(error: any, status?: number): boolean {
     if (!error) return false;
     const s = status ?? error?.status ?? error?.statusCode;
-    if (s === 502 || s === 503 || s === 504) return true;
+    if (s >= 500 && s <= 504) return true;
     if (error?.status === 'FETCH_ERROR' || error?.error === 'FETCH_ERROR') return true;
     const msg = (error?.message ?? error?.error ?? '').toString().toLowerCase();
     if (
