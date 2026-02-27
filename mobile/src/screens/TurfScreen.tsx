@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -35,8 +35,10 @@ import { SearchUserIconButton } from '../components/hackMap/SearchUserIconButton
 import { SearchUserModal } from '../components/hackMap/SearchUserModal';
 import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
 import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
+import { battleApi } from '../store/api/battleApi';
 import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { SIZING } from '../styles/theme';
+import { getPersistedTurfNavState, setPersistedTurfNavState, type TurfScreenName } from '../utils/turfNavStatePersistence';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any, useAnimatedReaction: any;
@@ -161,7 +163,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const isResearchCenterHighlight = isBuildResearchCenter;
   const isInvestmentPropertyHighlight = isBuildInvestmentProperty;
 
-  const [currentScreen, setCurrentScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
+  const [currentScreen, setCurrentScreen] = useState<TurfScreenName>('turf');
+  const [navRestoreAttempted, setNavRestoreAttempted] = useState(false);
   const [battleId, setBattleId] = useState<string | null>(null);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const isAutoPanningRef = useRef(false);
@@ -172,7 +175,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
-  const [previousScreen, setPreviousScreen] = useState<'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty'>('turf');
+  const [previousScreen, setPreviousScreen] = useState<TurfScreenName>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
@@ -192,6 +195,48 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       }
     };
   }, []);
+
+  // Restore persisted nav state on mount (Phase 2: refresh — stay on current screen and position).
+  // We do not paint the main content until restore is attempted so we avoid flashing turf centered then jumping to the restored screen.
+  useEffect(() => {
+    let cancelled = false;
+    getPersistedTurfNavState().then((state) => {
+      if (cancelled) return;
+      if (state) {
+        setCurrentScreen(state.currentScreen);
+        setTurfViewPosition(state.turfViewPosition);
+      }
+      setNavRestoreAttempted(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Persist nav state when screen or turf position changes (debounced). Only after restore attempted so we don't overwrite stored state with defaults on slow devices.
+  const persistNavStateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!navRestoreAttempted) return;
+    if (persistNavStateTimeoutRef.current) clearTimeout(persistNavStateTimeoutRef.current);
+    persistNavStateTimeoutRef.current = setTimeout(() => {
+      persistNavStateTimeoutRef.current = null;
+      setPersistedTurfNavState({ currentScreen, turfViewPosition });
+    }, 400);
+    return () => {
+      if (persistNavStateTimeoutRef.current) clearTimeout(persistNavStateTimeoutRef.current);
+    };
+  }, [navRestoreAttempted, currentScreen, turfViewPosition]);
+
+  // Phase 4: When app returns from background and we're on battle screen, refetch battle state so UI shows current progress
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      const wasBackgroundOrInactive = appStateRef.current.match(/inactive|background/);
+      appStateRef.current = nextState;
+      if (wasBackgroundOrInactive && nextState === 'active' && currentScreen === 'battle' && battleId) {
+        dispatch(battleApi.util.invalidateTags(['Battle']));
+      }
+    });
+    return () => sub?.remove();
+  }, [dispatch, currentScreen, battleId]);
 
   const token = useAppSelector((state) => state.auth.token);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
@@ -755,9 +800,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   }, [turfViewPosition, currentScreen, centerAndroidView]);
 
   useEffect(() => {
-    // Center the view immediately when the screen mounts
-    centerView();
-  }, [centerView]); // Include centerView in dependencies
+    // Center the view only after nav restore has been attempted, so we don't flash turf centered then jump to restored screen
+    if (navRestoreAttempted) centerView();
+  }, [centerView, navRestoreAttempted]);
 
   useEffect(() => {
     // Clean up pending data when navigating away from battlePrep
@@ -1525,6 +1570,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         );
     }
   }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user]);
+
+  // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
+  if (!navRestoreAttempted) {
+    return <View style={[styles.container, { backgroundColor: colors.background }]} />;
+  }
 
   return (
     <>
