@@ -537,6 +537,7 @@ type ProbeAnimationLayerProps = {
   scheduleComputeRef: React.MutableRefObject<(tx: number, ty: number, vx: number, vy: number) => void>;
   onFollowProbe: (probeId: string) => void;
   onCloseModal: () => void;
+  onProbeCompleteFailed: (probeId: string) => void;
   onFollowProbeDisplayUpdate: (data: { remainingSec: number; phase: 'outbound' | 'returning' }) => void;
   cancelProbeRef: React.MutableRefObject<(() => void) | null>;
   cancelProbeMutation: (args: { probeId: string }) => void;
@@ -601,6 +602,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   scheduleComputeRef,
   onFollowProbe,
   onCloseModal,
+  onProbeCompleteFailed,
   onFollowProbeDisplayUpdate,
   cancelProbeRef,
   cancelProbeMutation,
@@ -812,6 +814,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
                 probeDataRef.current.delete(probe.id);
                 startedAnimationRef.current.delete(probe.id);
                 setProbes((prev) => prev.filter((p) => p.id !== probe.id));
+                onProbeCompleteFailed(probe.id);
                 if (followProbeIdRef.current === probe.id) {
                   onCloseModal();
                 }
@@ -843,7 +846,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         probeAnimationFrameRef.current = null;
       }
     };
-  }, [probes, myPositionData, currentUserId, completeProbeMutation, setProbes, onFollowProbeDisplayUpdate, onCloseModal]);
+  }, [probes, myPositionData, currentUserId, completeProbeMutation, setProbes, onFollowProbeDisplayUpdate, onCloseModal, onProbeCompleteFailed]);
 
   const handleProbeCancel = useCallback(() => {
     const fid = followProbeIdRef.current;
@@ -1252,9 +1255,25 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const { data: activeProbesData } = useGetActiveProbesQuery(undefined, {
     pollingInterval: 3000,
   });
+  /** Probe ids for which /complete failed; exclude from display so we don't re-init and retry in a loop until server TTL. */
+  const [failedProbeIds, setFailedProbeIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    const serverIds = new Set((activeProbesData?.probes ?? []).map((p) => p.id));
+    setFailedProbeIds((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      next.forEach((id) => {
+        if (!serverIds.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [activeProbesData?.probes]);
   const displayProbes = useMemo((): ProbeEntry[] => {
     const ours = probes;
-    const serverProbes = activeProbesData?.probes ?? [];
+    const serverProbes = (activeProbesData?.probes ?? []).filter((sp) => !failedProbeIds.has(sp.id));
     const ourIds = new Set(ours.map((p) => p.id));
     const others = serverProbes
       .filter((sp) => !ourIds.has(sp.id))
@@ -1279,7 +1298,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         })
       );
     return [...ours, ...others];
-  }, [probes, activeProbesData?.probes]);
+  }, [probes, activeProbesData?.probes, failedProbeIds]);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
     pollingInterval: token ? 10000 : 0, // 10s for badge; MessagesModal polls at 2s when open
@@ -1895,6 +1914,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     setFollowProbeDisplay(null);
     probeFollowModeRef.current = false;
     followProbeIdRef.current = null;
+  }, []);
+
+  const onProbeCompleteFailed = useCallback((probeId: string) => {
+    setFailedProbeIds((prev) => {
+      const next = new Set(prev);
+      next.add(probeId);
+      return next;
+    });
   }, []);
 
   const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
@@ -4287,6 +4314,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           scheduleComputeRef={scheduleComputeRef}
           onFollowProbe={handleProbeFollow}
           onCloseModal={handleProbeFollowModalClose}
+          onProbeCompleteFailed={onProbeCompleteFailed}
           onFollowProbeDisplayUpdate={setFollowProbeDisplay}
           cancelProbeRef={cancelProbeRef}
           cancelProbeMutation={(args) => cancelProbeMutation(args).catch(() => {})}
