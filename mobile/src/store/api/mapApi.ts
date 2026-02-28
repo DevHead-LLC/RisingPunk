@@ -53,8 +53,8 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
     const path = typeof url === 'string' ? url.split('?')[0] : '';
     const isMyPositionRequest = path.endsWith('/my-position');
     const isViewportRequest = args?.params && typeof args.params === 'object' && 'x1' in args.params && 'x2' in args.params;
-    const isProbeCompleteRequest = path.endsWith('/probe/complete');
-    if (!isMyPositionRequest && !isViewportRequest && !isProbeCompleteRequest) {
+    const isProbeRequest = path.includes('/probe/');
+    if (!isMyPositionRequest && !isViewportRequest && !isProbeRequest) {
       globalErrorHandler.handleDatabaseError(result.error);
     }
   } else {
@@ -114,9 +114,62 @@ export const mapApi = createApi({
       }),
       invalidatesTags: (result, error, { mapName }) => [{ type: 'MapChat', id: mapName }],
     }),
+    launchProbe: builder.mutation<
+      { success: boolean },
+      {
+        probeId: string;
+        fromX: number;
+        fromY: number;
+        targetX: number;
+        targetY: number;
+        targetOwner: 'player' | 'npc';
+        targetUserId?: string;
+        targetNpcSlug?: string;
+        targetNpcInstanceId?: string;
+      }
+    >({
+      query: (body) => ({
+        url: '/api/probe/launch',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Map'],
+    }),
+    getActiveProbes: builder.query<
+      {
+        probes: Array<{
+          id: string;
+          sentByUserId: string;
+          fromX: number;
+          fromY: number;
+          targetX: number;
+          targetY: number;
+          targetOwner: 'player' | 'npc';
+          targetUserId?: string;
+          targetNpcSlug?: string;
+          targetNpcInstanceId?: string;
+          launchedAt: number;
+          phase?: 'outbound' | 'returning';
+          returnEndAt?: number;
+          returnDurationSec?: number;
+        }>;
+      },
+      void
+    >({
+      query: () => ({ url: '/api/probe/active' }),
+      providesTags: ['Map'],
+    }),
+    cancelProbe: builder.mutation<{ success: boolean }, { probeId: string }>({
+      query: ({ probeId }) => ({
+        url: '/api/probe/cancel',
+        method: 'POST',
+        body: { probeId },
+      }),
+      invalidatesTags: ['Map'],
+    }),
     completeProbe: builder.mutation<
       { success: boolean; message: any },
-      { targetOwner: 'player' | 'npc'; targetUserId?: string; targetNpcSlug?: string; targetX: number; targetY: number }
+      { probeId?: string; targetOwner: 'player' | 'npc'; targetUserId?: string; targetNpcSlug?: string; targetX: number; targetY: number }
     >({
       query: (body) => ({
         url: '/api/probe/complete',
@@ -143,5 +196,8 @@ export const {
   useUpdatePlayerPositionMutation,
   useGetMapChatMessagesQuery,
   useSendMapChatMessageMutation,
+  useLaunchProbeMutation,
+  useGetActiveProbesQuery,
+  useCancelProbeMutation,
   useCompleteProbeMutation,
 } = mapApi;

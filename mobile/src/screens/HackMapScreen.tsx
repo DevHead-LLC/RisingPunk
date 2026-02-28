@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, Alert, unstable_batchedUpdates } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, Alert, unstable_batchedUpdates, Modal } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
@@ -21,7 +21,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setMapGridSize, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
-import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation, useLaunchProbeMutation, useGetActiveProbesQuery, useCancelProbeMutation } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
@@ -50,12 +50,22 @@ type ProbeTarget = {
   targetNpcInstanceId?: string;
 };
 
-/** One probe in flight: target + animation state. */
+/** One probe in flight: target + animation state. sentByUserId = owner (sending user); modal/cancel only for owner. */
 type ProbeEntry = ProbeTarget & {
   id: string;
+  /** User id of the sender; modal with time + cancel only shown when this equals current user. */
+  sentByUserId?: string;
+  /** Start position for other users' probes (from server); our probes use myPositionData. */
+  fromX?: number;
+  fromY?: number;
+  /** Server-provided launch time for other users' probes; our probes use probeDataRef.startTime. */
+  launchedAt?: number;
   phase: 'outbound' | 'returning';
   progress: number;
   remainingSec: number;
+  /** Server-provided when phase is 'returning'; used by layer to animate return. */
+  returnEndAt?: number;
+  returnDurationSec?: number;
 };
 
 // Constants for viewport fetching and panning
@@ -501,6 +511,421 @@ const panningTileMemoComparison = <T extends {
   );
 };
 
+/** Probe animation updates (per frame); stored in ref to avoid 60fps parent re-renders. */
+type ProbeUpdate = { id: string; progress: number; remainingSec: number; phase: 'outbound' | 'returning' };
+
+type ProbeAnimationLayerProps = {
+  probes: ProbeEntry[];
+  setProbes: React.Dispatch<React.SetStateAction<ProbeEntry[]>>;
+  myPositionData: { x: number; y: number } | undefined;
+  currentUserId: string | null | undefined;
+  completeProbeMutation: ReturnType<typeof useCompleteProbeMutation>[0];
+  followProbeId: string | null;
+  setFollowProbeId: (id: string | null) => void;
+  showProbeFollowModal: boolean;
+  setShowProbeFollowModal: (v: boolean) => void;
+  probeFollowModeRef: React.MutableRefObject<boolean>;
+  followProbeIdRef: React.MutableRefObject<string | null>;
+  containerSizeRef: React.MutableRefObject<{ width: number; height: number }>;
+  offsetX: Animated.SharedValue<number>;
+  offsetY: Animated.SharedValue<number>;
+  boundsReady: Animated.SharedValue<boolean>;
+  minX: Animated.SharedValue<number>;
+  maxX: Animated.SharedValue<number>;
+  minY: Animated.SharedValue<number>;
+  maxY: Animated.SharedValue<number>;
+  scheduleComputeRef: React.MutableRefObject<(tx: number, ty: number, vx: number, vy: number) => void>;
+  onFollowProbe: (probeId: string) => void;
+  onCloseModal: () => void;
+  onFollowProbeDisplayUpdate: (data: { remainingSec: number; phase: 'outbound' | 'returning' }) => void;
+  cancelProbeRef: React.MutableRefObject<(() => void) | null>;
+  cancelProbeMutation: (args: { probeId: string }) => void;
+  colors: ReturnType<typeof useThemeColors>;
+  styles: ReturnType<typeof getStyles>;
+  animatedMapStyle: Record<string, unknown>;
+};
+
+/** Tappable wrapper for the probe icon; large hit area + hitSlop for reliable follow tap (sender and viewer). */
+const ProbeTapTarget: React.FC<{
+  probeId: string;
+  onFollowProbe: (probeId: string) => void;
+  hitLeft: number;
+  hitTop: number;
+  hitSize: number;
+  children: React.ReactNode;
+}> = ({ probeId, onFollowProbe, hitLeft, hitTop, hitSize, children }) => (
+  <View
+    pointerEvents="box-none"
+    style={{
+      position: 'absolute',
+      left: hitLeft,
+      top: hitTop,
+      width: hitSize,
+      height: hitSize,
+      justifyContent: 'center',
+      alignItems: 'center',
+    }}
+  >
+    <Pressable
+      style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+      hitSlop={24}
+      onPress={() => onFollowProbe(probeId)}
+    >
+      {children}
+    </Pressable>
+  </View>
+);
+
+/**
+ * Owns the probe animation loop and renders probe overlay + follow modal.
+ * Updates only this layer at 60fps (probeUpdatesRef + setFrame), so HackMapScreen does not re-render every frame.
+ */
+const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
+  probes,
+  setProbes,
+  myPositionData,
+  currentUserId,
+  completeProbeMutation,
+  followProbeId,
+  setFollowProbeId,
+  setShowProbeFollowModal,
+  probeFollowModeRef,
+  followProbeIdRef,
+  containerSizeRef,
+  offsetX,
+  offsetY,
+  boundsReady,
+  minX,
+  maxX,
+  minY,
+  maxY,
+  scheduleComputeRef,
+  onFollowProbe,
+  onCloseModal,
+  onFollowProbeDisplayUpdate,
+  cancelProbeRef,
+  cancelProbeMutation,
+  colors,
+  styles,
+  animatedMapStyle,
+}) => {
+  const probesRef = useRef<ProbeEntry[]>([]);
+  const probeDataRef = useRef<Map<string, {
+    startTime: number;
+    durationSec: number;
+    returnStartTime?: number;
+    returnStartProgress?: number;
+    returnDuration?: number;
+    completing: boolean;
+  }>>(new Map());
+  const startedAnimationRef = useRef<Set<string>>(new Set());
+  const probeAnimationFrameRef = useRef<number | null>(null);
+  const probeUpdatesRef = useRef<ProbeUpdate[]>([]);
+  const [, setFrame] = useState(0);
+
+  useEffect(() => {
+    probesRef.current = probes;
+  }, [probes]);
+
+  useEffect(() => {
+    if (probes.length === 0) {
+      probeDataRef.current.clear();
+      startedAnimationRef.current.clear();
+      return;
+    }
+
+    const current = probesRef.current;
+    const ux = myPositionData?.x ?? 0;
+    const uy = myPositionData?.y ?? 0;
+
+    current.forEach((probe) => {
+      const tx = probe.targetX;
+      const ty = probe.targetY;
+      const isServerProbe = probe.launchedAt != null && probe.fromX != null && probe.fromY != null;
+      const startX = isServerProbe ? probe.fromX! : ux;
+      const startY = isServerProbe ? probe.fromY! : uy;
+      if (!startedAnimationRef.current.has(probe.id)) {
+        if (!isServerProbe && !myPositionData) return;
+        startedAnimationRef.current.add(probe.id);
+        const distanceTiles = Math.sqrt((tx - startX) ** 2 + (ty - startY) ** 2);
+        const durationSec = Math.max(2, distanceTiles * 2);
+        const data: {
+          startTime: number;
+          durationSec: number;
+          completing: boolean;
+          returnStartTime?: number;
+          returnDuration?: number;
+        } = {
+          startTime: isServerProbe ? probe.launchedAt! : Date.now(),
+          durationSec,
+          completing: false,
+        };
+        if (probe.phase === 'returning' && probe.returnEndAt != null && probe.returnDurationSec != null) {
+          data.returnStartTime = probe.returnEndAt - probe.returnDurationSec * 1000;
+          data.returnDuration = probe.returnDurationSec;
+        }
+        probeDataRef.current.set(probe.id, data);
+      } else if (probe.phase === 'returning' && probe.returnEndAt != null && probe.returnDurationSec != null) {
+        const data = probeDataRef.current.get(probe.id);
+        if (data && data.returnStartTime == null) {
+          data.returnStartTime = probe.returnEndAt - probe.returnDurationSec * 1000;
+          data.returnDuration = probe.returnDurationSec;
+        }
+      }
+    });
+
+    const tick = () => {
+      const now = Date.now();
+      const currentProbes = probesRef.current;
+      if (currentProbes.length === 0) {
+        probeAnimationFrameRef.current = null;
+        return;
+      }
+
+      const updates: ProbeUpdate[] = [];
+      let followProbeContentX: number | null = null;
+      let followProbeContentY: number | null = null;
+
+      for (const probe of currentProbes) {
+        const data = probeDataRef.current.get(probe.id);
+        if (!data) continue;
+
+        let progress: number;
+        let remainingSec: number;
+        const phase = probe.phase;
+
+        if (phase === 'returning') {
+          data.completing = false;
+          const returnStartTime = data.returnStartTime ?? now;
+          const returnDuration = data.returnDuration ?? data.durationSec;
+          const returnStartProgress = data.returnStartProgress ?? 1;
+          const returnElapsed = (now - returnStartTime) / 1000;
+          const t = Math.min(1, returnDuration > 0 ? returnElapsed / returnDuration : 1);
+          progress = returnStartProgress * (1 - t);
+          remainingSec = Math.max(0, returnDuration - returnElapsed);
+        } else {
+          const elapsed = (now - data.startTime) / 1000;
+          progress = Math.min(1, elapsed / data.durationSec);
+          remainingSec = Math.max(0, data.durationSec * (1 - progress));
+        }
+
+        updates.push({ id: probe.id, progress, remainingSec, phase });
+
+        const isServerProbe = probe.launchedAt != null && probe.fromX != null && probe.fromY != null;
+        const originX = isServerProbe ? probe.fromX! : ux;
+        const originY = isServerProbe ? probe.fromY! : uy;
+        const startX = MARGIN_SIZE + (originX + 0.5) * CELL_SIZE;
+        const startY = MARGIN_SIZE + (originY + 0.5) * CELL_SIZE;
+        const endX = MARGIN_SIZE + (probe.targetX + 0.5) * CELL_SIZE;
+        const endY = MARGIN_SIZE + (probe.targetY + 0.5) * CELL_SIZE;
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const lineProgress = progress;
+        const probeContentX = startX + dx * lineProgress;
+        const probeContentY = startY + dy * lineProgress;
+        if (followProbeIdRef.current === probe.id) {
+          followProbeContentX = probeContentX;
+          followProbeContentY = probeContentY;
+        }
+      }
+
+      probeUpdatesRef.current = updates;
+      setFrame((f) => f + 1);
+
+      const fid = followProbeIdRef.current;
+      if (fid) {
+        const followed = currentProbes.find((p) => p.id === fid);
+        if (followed?.sentByUserId === currentUserId) {
+          const fu = updates.find((x) => x.id === fid);
+          if (fu) onFollowProbeDisplayUpdate({ remainingSec: fu.remainingSec, phase: fu.phase });
+        }
+      }
+
+      const container = containerSizeRef.current;
+      if (probeFollowModeRef.current && followProbeContentX != null && followProbeContentY != null && container.width > 0 && container.height > 0) {
+        let tx = container.width / 2 - followProbeContentX;
+        let ty = container.height / 2 - followProbeContentY;
+        if (boundsReady.value) {
+          tx = Math.min(maxX.value, Math.max(minX.value, tx));
+          ty = Math.min(maxY.value, Math.max(minY.value, ty));
+        }
+        offsetX.value = tx;
+        offsetY.value = ty;
+        scheduleComputeRef.current(tx, ty, 0, 0);
+      }
+
+      const toRemove: string[] = [];
+
+      for (const probe of currentProbes) {
+        const data = probeDataRef.current.get(probe.id);
+        if (!data) continue;
+        const u = updates.find((x) => x.id === probe.id);
+        if (!u) continue;
+        const { progress, phase } = u;
+
+        if (phase === 'returning') {
+          if (progress <= 0) {
+            toRemove.push(probe.id);
+            if (followProbeIdRef.current === probe.id) {
+              setFollowProbeId(null);
+              setShowProbeFollowModal(false);
+              probeFollowModeRef.current = false;
+            }
+          }
+        } else if (progress >= 1) {
+          const isOwner = probe.sentByUserId === currentUserId;
+          if (isOwner && !data.completing) {
+            data.completing = true;
+            completeProbeMutation({
+              probeId: probe.id,
+              targetOwner: probe.targetOwner,
+              targetUserId: probe.targetUserId,
+              targetNpcSlug: probe.targetNpcSlug,
+              targetX: probe.targetX,
+              targetY: probe.targetY,
+            })
+              .unwrap()
+              .then(() => {
+                data.returnStartTime = Date.now();
+                data.returnStartProgress = 1;
+                data.returnDuration = data.durationSec;
+                setProbes((prev) =>
+                  prev.map((p) => (p.id === probe.id ? { ...p, phase: 'returning' as const, remainingSec: data.durationSec } : p))
+                );
+              })
+              .catch((err: any) => {
+                data.completing = false;
+                probeDataRef.current.delete(probe.id);
+                startedAnimationRef.current.delete(probe.id);
+                setProbes((prev) => prev.filter((p) => p.id !== probe.id));
+                if (followProbeIdRef.current === probe.id) {
+                  setFollowProbeId(null);
+                  setShowProbeFollowModal(false);
+                  probeFollowModeRef.current = false;
+                }
+                const msg = err?.data?.error ?? err?.message ?? 'Probe report could not be sent.';
+                Alert.alert('Probe Report', msg);
+              });
+          }
+        }
+      }
+
+      if (toRemove.length > 0) {
+        toRemove.forEach((id) => {
+          probeDataRef.current.delete(id);
+          startedAnimationRef.current.delete(id);
+        });
+        setProbes((prev) => prev.filter((p) => !toRemove.includes(p.id)));
+      }
+
+      probeAnimationFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    probeAnimationFrameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (probeAnimationFrameRef.current != null) {
+        cancelAnimationFrame(probeAnimationFrameRef.current);
+        probeAnimationFrameRef.current = null;
+      }
+    };
+  }, [probes, myPositionData, currentUserId, completeProbeMutation, setFollowProbeId, setShowProbeFollowModal, setProbes, onFollowProbeDisplayUpdate]);
+
+  const handleProbeCancel = useCallback(() => {
+    const fid = followProbeIdRef.current;
+    if (fid == null) return;
+    const probe = probesRef.current.find((p) => p.id === fid);
+    if (!probe || probe.sentByUserId !== currentUserId) return;
+    const data = probeDataRef.current.get(probe.id);
+    if (!data) return;
+    cancelProbeMutation({ probeId: fid });
+    const u = probeUpdatesRef.current.find((x) => x.id === probe.id);
+    const returnStartProgress = u ? u.progress : probe.progress;
+    const returnDuration = returnStartProgress * data.durationSec;
+    data.returnStartTime = Date.now();
+    data.returnStartProgress = returnStartProgress;
+    data.returnDuration = returnDuration;
+    setProbes((prev) =>
+      prev.map((p) => (p.id === fid ? { ...p, phase: 'returning' as const, remainingSec: returnDuration } : p))
+    );
+  }, [currentUserId, setProbes, cancelProbeMutation]);
+
+  useEffect(() => {
+    cancelProbeRef.current = handleProbeCancel;
+    return () => {
+      cancelProbeRef.current = null;
+    };
+  }, [handleProbeCancel, cancelProbeRef]);
+
+  if (probes.length === 0) {
+    return null;
+  }
+
+  const updates = probeUpdatesRef.current;
+  const ux = myPositionData?.x ?? 0;
+  const uy = myPositionData?.y ?? 0;
+
+  return (
+    <>
+      <Animated.View
+        style={[StyleSheet.absoluteFill, animatedMapStyle as any, { zIndex: 10, elevation: 10 }]}
+        pointerEvents="box-none"
+      >
+        {probes.map((probe) => {
+          const upd = updates.find((x) => x.id === probe.id);
+          const progress = upd ? upd.progress : probe.progress;
+          const tx = probe.targetX;
+          const ty = probe.targetY;
+          const originX = probe.fromX != null && probe.fromY != null ? probe.fromX : ux;
+          const originY = probe.fromX != null && probe.fromY != null ? probe.fromY : uy;
+          const startX = MARGIN_SIZE + (originX + 0.5) * CELL_SIZE;
+          const startY = MARGIN_SIZE + (originY + 0.5) * CELL_SIZE;
+          const endX = MARGIN_SIZE + (tx + 0.5) * CELL_SIZE;
+          const endY = MARGIN_SIZE + (ty + 0.5) * CELL_SIZE;
+          const dx = endX - startX;
+          const dy = endY - startY;
+          const length = Math.sqrt(dx * dx + dy * dy) || 1;
+          const angle = Math.atan2(dy, dx);
+          const PROBE_SIZE = 100;
+          const PROBE_HIT_PADDING = 48;
+          const PROBE_HIT_SLOP = 24;
+          const lineProgress = progress;
+          const px = startX + dx * lineProgress - PROBE_SIZE / 2;
+          const py = startY + dy * lineProgress - PROBE_SIZE / 2;
+          const hitSize = PROBE_SIZE + PROBE_HIT_PADDING * 2 + PROBE_HIT_SLOP * 2;
+          const hitLeft = px - PROBE_HIT_PADDING - PROBE_HIT_SLOP;
+          const hitTop = py - PROBE_HIT_PADDING - PROBE_HIT_SLOP;
+          return (
+            <View key={probe.id} pointerEvents="box-none" style={[StyleSheet.absoluteFill, { left: 0, top: 0, right: 0, bottom: 0 }]}>
+              <View
+                style={{
+                  position: 'absolute',
+                  left: startX,
+                  top: startY,
+                  width: length,
+                  height: 1,
+                  borderWidth: 1,
+                  borderStyle: 'dashed',
+                  borderColor: colors.matrix ?? '#00ff00',
+                  borderRadius: 0.5,
+                  opacity: 0.8,
+                  transform: [{ translateX: -length / 2 }, { rotate: `${angle}rad` }, { translateX: length / 2 }],
+                }}
+              />
+              <ProbeTapTarget probeId={probe.id} onFollowProbe={onFollowProbe} hitLeft={hitLeft} hitTop={hitTop} hitSize={hitSize}>
+                <Image
+                  source={require('../assets/images/hackMap/probe.png')}
+                  style={{ width: PROBE_SIZE, height: PROBE_SIZE }}
+                  resizeMode="contain"
+                />
+              </ProbeTapTarget>
+            </View>
+          );
+        })}
+      </Animated.View>
+    </>
+  );
+};
+
 export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
@@ -803,20 +1228,45 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   /** Which probe (id) is shown in the follow modal and centered when in follow mode. */
   const [followProbeId, setFollowProbeId] = useState<string | null>(null);
   const [showProbeFollowModal, setShowProbeFollowModal] = useState(false);
-  const probesRef = useRef<ProbeEntry[]>([]);
-  const probeDataRef = useRef<Map<string, {
-    startTime: number;
-    durationSec: number;
-    returnStartTime?: number;
-    returnStartProgress?: number;
-    returnDuration?: number;
-    completing: boolean;
-  }>>(new Map());
-  const startedAnimationRef = useRef<Set<string>>(new Set());
-  const probeAnimationFrameRef = useRef<number | null>(null);
+  /** Live remainingSec/phase for the followed probe (updated by ProbeAnimationLayer each tick when modal open). */
+  const [followProbeDisplay, setFollowProbeDisplay] = useState<{ remainingSec: number; phase: 'outbound' | 'returning' } | null>(null);
   const probeFollowModeRef = useRef<boolean>(false);
   const followProbeIdRef = useRef<string | null>(null);
+  const cancelProbeRef = useRef<(() => void) | null>(null);
   const [completeProbeMutation] = useCompleteProbeMutation();
+  const [launchProbeMutation] = useLaunchProbeMutation();
+  const [cancelProbeMutation] = useCancelProbeMutation();
+  const { data: activeProbesData } = useGetActiveProbesQuery(undefined, {
+    pollingInterval: 3000,
+  });
+  const displayProbes = useMemo((): ProbeEntry[] => {
+    const ours = probes;
+    const serverProbes = activeProbesData?.probes ?? [];
+    const ourIds = new Set(ours.map((p) => p.id));
+    const others = serverProbes
+      .filter((sp) => !ourIds.has(sp.id))
+      .map(
+        (sp): ProbeEntry => ({
+          id: sp.id,
+          sentByUserId: sp.sentByUserId,
+          fromX: sp.fromX,
+          fromY: sp.fromY,
+          launchedAt: sp.launchedAt,
+          targetX: sp.targetX,
+          targetY: sp.targetY,
+          targetOwner: sp.targetOwner,
+          targetUserId: sp.targetUserId,
+          targetNpcSlug: sp.targetNpcSlug,
+          targetNpcInstanceId: sp.targetNpcInstanceId,
+          phase: sp.phase ?? 'outbound',
+          progress: 0,
+          remainingSec: 0,
+          returnEndAt: sp.returnEndAt,
+          returnDurationSec: sp.returnDurationSec,
+        })
+      );
+    return [...ours, ...others];
+  }, [probes, activeProbesData?.probes]);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
     pollingInterval: token ? 10000 : 0, // 10s for badge; MessagesModal polls at 2s when open
@@ -1401,204 +1851,21 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
 
-  // Keep refs in sync for animation tick (avoids effect depending on probes/followProbeId reference)
-  useEffect(() => {
-    probesRef.current = probes;
-  }, [probes]);
   useEffect(() => {
     followProbeIdRef.current = followProbeId;
   }, [followProbeId]);
 
-  // Close follow modal if the followed probe was removed (e.g. returned home)
+  // Close follow modal if the followed probe was removed (e.g. returned home).
+  // Use displayProbes (merged local + server) so viewers' follow isn't cleared: their probe is in displayProbes, not in local probes.
   useEffect(() => {
-    if (followProbeId && showProbeFollowModal && !probes.some((p) => p.id === followProbeId)) {
+    if (followProbeId && showProbeFollowModal && !displayProbes.some((p) => p.id === followProbeId)) {
       setShowProbeFollowModal(false);
       setFollowProbeId(null);
+      setFollowProbeDisplay(null);
       probeFollowModeRef.current = false;
       followProbeIdRef.current = null;
     }
-  }, [followProbeId, showProbeFollowModal, probes]);
-
-  // Probe animation: single loop for all probes (up to MAX_PROBES)
-  useEffect(() => {
-    if (probes.length === 0) {
-      probeDataRef.current.clear();
-      startedAnimationRef.current.clear();
-      return;
-    }
-    if (!myPositionData) return;
-
-    const ux = myPositionData.x;
-    const uy = myPositionData.y;
-
-    // Initialize any new probes (not yet in startedAnimationRef)
-    const current = probesRef.current;
-    current.forEach((probe) => {
-      if (startedAnimationRef.current.has(probe.id)) return;
-      startedAnimationRef.current.add(probe.id);
-      const tx = probe.targetX;
-      const ty = probe.targetY;
-      const distanceTiles = Math.sqrt((tx - ux) ** 2 + (ty - uy) ** 2);
-      const durationSec = Math.max(2, distanceTiles * 2);
-      probeDataRef.current.set(probe.id, {
-        startTime: Date.now(),
-        durationSec,
-        completing: false,
-      });
-    });
-
-    const tick = () => {
-      const now = Date.now();
-      const currentProbes = probesRef.current;
-      if (currentProbes.length === 0) {
-        probeAnimationFrameRef.current = null;
-        return;
-      }
-
-      const updates: Array<{ id: string; progress: number; remainingSec: number; phase: 'outbound' | 'returning' }> = [];
-      let followProbeContentX: number | null = null;
-      let followProbeContentY: number | null = null;
-
-      for (const probe of currentProbes) {
-        const data = probeDataRef.current.get(probe.id);
-        if (!data) continue;
-
-        let progress: number;
-        let remainingSec: number;
-        const phase = probe.phase;
-
-        if (phase === 'returning') {
-          data.completing = false; // Clear so we don't leave ref stuck; only clear when tick sees returning (avoids race with setProbes)
-          const returnStartTime = data.returnStartTime ?? now;
-          const returnDuration = data.returnDuration ?? data.durationSec;
-          const returnStartProgress = data.returnStartProgress ?? 1;
-          const returnElapsed = (now - returnStartTime) / 1000;
-          const t = Math.min(1, returnDuration > 0 ? returnElapsed / returnDuration : 1);
-          progress = returnStartProgress * (1 - t);
-          remainingSec = Math.max(0, returnDuration - returnElapsed);
-        } else {
-          const elapsed = (now - data.startTime) / 1000;
-          progress = Math.min(1, elapsed / data.durationSec);
-          remainingSec = Math.max(0, data.durationSec * (1 - progress));
-        }
-
-        updates.push({ id: probe.id, progress, remainingSec, phase });
-
-        const startX = MARGIN_SIZE + (ux + 0.5) * CELL_SIZE;
-        const startY = MARGIN_SIZE + (uy + 0.5) * CELL_SIZE;
-        const endX = MARGIN_SIZE + (probe.targetX + 0.5) * CELL_SIZE;
-        const endY = MARGIN_SIZE + (probe.targetY + 0.5) * CELL_SIZE;
-        const dx = endX - startX;
-        const dy = endY - startY;
-        const lineProgress = progress;
-        const probeContentX = startX + dx * lineProgress;
-        const probeContentY = startY + dy * lineProgress;
-        if (followProbeIdRef.current === probe.id) {
-          followProbeContentX = probeContentX;
-          followProbeContentY = probeContentY;
-        }
-      }
-
-      setProbes((prev) =>
-        prev.map((p) => {
-          const u = updates.find((x) => x.id === p.id);
-          if (!u) return p;
-          return { ...p, progress: u.progress, remainingSec: u.remainingSec };
-        })
-      );
-
-      // Follow mode: pan to keep followed probe centered
-      const container = containerSizeRef.current;
-      if (probeFollowModeRef.current && followProbeContentX != null && followProbeContentY != null && container.width > 0 && container.height > 0) {
-        let tx = container.width / 2 - followProbeContentX;
-        let ty = container.height / 2 - followProbeContentY;
-        if (boundsReady.value) {
-          tx = Math.min(maxX.value, Math.max(minX.value, tx));
-          ty = Math.min(maxY.value, Math.max(minY.value, ty));
-        }
-        offsetX.value = tx;
-        offsetY.value = ty;
-        scheduleComputeRef.current(tx, ty, 0, 0);
-      }
-
-      // Handle completion, return end, and schedule next frame
-      const toRemove: string[] = [];
-
-      for (const probe of currentProbes) {
-        const data = probeDataRef.current.get(probe.id);
-        if (!data) continue;
-        const u = updates.find((x) => x.id === probe.id);
-        if (!u) continue;
-        const { progress, phase } = u;
-
-        if (phase === 'returning') {
-          if (progress <= 0) {
-            toRemove.push(probe.id);
-            if (followProbeIdRef.current === probe.id) {
-              setFollowProbeId(null);
-              setShowProbeFollowModal(false);
-              probeFollowModeRef.current = false;
-            }
-          }
-        } else if (progress >= 1) {
-          if (!data.completing) {
-            data.completing = true;
-            completeProbeMutation({
-              targetOwner: probe.targetOwner,
-              targetUserId: probe.targetUserId,
-              targetNpcSlug: probe.targetNpcSlug,
-              targetX: probe.targetX,
-              targetY: probe.targetY,
-            })
-              .unwrap()
-              .then(() => {
-                // Do not set data.completing = false here: setProbes is async and probesRef syncs in useEffect.
-                // Next tick may still see phase 'outbound'; keeping completing true prevents duplicate completeProbeMutation.
-                // completing is cleared in tick when we see phase === 'returning'.
-                data.returnStartTime = Date.now();
-                data.returnStartProgress = 1;
-                data.returnDuration = data.durationSec;
-                setProbes((prev) =>
-                  prev.map((p) => (p.id === probe.id ? { ...p, phase: 'returning' as const, remainingSec: data.durationSec } : p))
-                );
-                // Do not schedule requestAnimationFrame here; main loop already schedules at end of tick (single loop).
-              })
-              .catch((err: any) => {
-                data.completing = false;
-                probeDataRef.current.delete(probe.id);
-                startedAnimationRef.current.delete(probe.id);
-                setProbes((prev) => prev.filter((p) => p.id !== probe.id));
-                if (followProbeIdRef.current === probe.id) {
-                  setFollowProbeId(null);
-                  setShowProbeFollowModal(false);
-                  probeFollowModeRef.current = false;
-                }
-                const msg = err?.data?.error ?? err?.message ?? 'Probe report could not be sent.';
-                Alert.alert('Probe Report', msg);
-              });
-          }
-        }
-      }
-
-      if (toRemove.length > 0) {
-        toRemove.forEach((id) => {
-          probeDataRef.current.delete(id);
-          startedAnimationRef.current.delete(id);
-        });
-        setProbes((prev) => prev.filter((p) => !toRemove.includes(p.id)));
-      }
-
-      probeAnimationFrameRef.current = requestAnimationFrame(tick);
-    };
-
-    probeAnimationFrameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (probeAnimationFrameRef.current != null) {
-        cancelAnimationFrame(probeAnimationFrameRef.current);
-        probeAnimationFrameRef.current = null;
-      }
-    };
-  }, [probes.length, myPositionData, completeProbeMutation, followProbeId]);
+  }, [followProbeId, showProbeFollowModal, displayProbes]);
 
   const handleProbeFollow = useCallback((probeId: string) => {
     setFollowProbeId(probeId);
@@ -1610,25 +1877,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const handleProbeFollowModalClose = useCallback(() => {
     setShowProbeFollowModal(false);
     setFollowProbeId(null);
+    setFollowProbeDisplay(null);
     probeFollowModeRef.current = false;
     followProbeIdRef.current = null;
   }, []);
-
-  const handleProbeCancel = useCallback(() => {
-    if (followProbeId == null) return;
-    const probe = probes.find((p) => p.id === followProbeId);
-    if (!probe) return;
-    const data = probeDataRef.current.get(probe.id);
-    if (!data) return;
-    const returnStartProgress = probe.progress;
-    const returnDuration = returnStartProgress * data.durationSec;
-    data.returnStartTime = Date.now();
-    data.returnStartProgress = returnStartProgress;
-    data.returnDuration = returnDuration;
-    setProbes((prev) =>
-      prev.map((p) => (p.id === followProbeId ? { ...p, phase: 'returning' as const, remainingSec: returnDuration } : p))
-    );
-  }, [followProbeId, probes]);
 
   const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
   
@@ -3295,6 +3547,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   // Tap-at-view coords: use absolute tap position + map view's window position so we get correct cell (e.x/e.y are unreliable when the view has transform). See tile-tap-reliability.md.
   // Measure map in window at tap time so we don't rely on stale onLayout; Reanimated transform can move the view without firing onLayout.
+  // Tap off-probe (on map/cell) cancels follow mode so the map stops following the probe.
   const handleTapAtViewCoords = useCallback((absoluteX: number, absoluteY: number) => {
     const viewRef = mapViewRef.current;
     if (!viewRef) return;
@@ -3315,11 +3568,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       const cell = rowData[col] as CellData;
       if (!cell) return;
       if (!isMountedRef.current) return;
+      // Tapping on the map (off the probe) cancels follow so the map stops following the probe.
+      if (followProbeIdRef.current) {
+        handleProbeFollowModalClose();
+      }
       const handler = handleCellPressRef.current;
       if (!handler) return;
       handler(col, row, cell);
     });
-  }, [grid]);
+  }, [grid, handleProbeFollowModalClose]);
 
   const tapGesture = useMemo(
     () =>
@@ -3759,24 +4016,35 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                             Alert.alert('Probes', 'Maximum 2 probes at a time.');
                             return;
                           }
+                          if (!myPositionData) return;
                           const id = `probe-${Date.now()}-${selectedCell.x}-${selectedCell.y}`;
                           const targetOwner = selectedCell.info.owner === 'player' ? 'player' : 'npc';
-                          setProbes((prev) => [
-                            ...prev,
-                            {
-                              id,
-                              targetX: selectedCell.x,
-                              targetY: selectedCell.y,
-                              targetOwner,
-                              targetUserId: selectedCell.info.userId != null ? String(selectedCell.info.userId) : undefined,
-                              targetNpcSlug: selectedCell.info.npcSlug ?? undefined,
-                              targetNpcInstanceId: selectedCell.info.npcInstanceId ?? undefined,
-                              phase: 'outbound',
-                              progress: 0,
-                              remainingSec: 0,
-                            },
-                          ]);
+                          const entry: ProbeEntry = {
+                            id,
+                            sentByUserId: currentUserId ?? undefined,
+                            targetX: selectedCell.x,
+                            targetY: selectedCell.y,
+                            targetOwner,
+                            targetUserId: selectedCell.info.userId != null ? String(selectedCell.info.userId) : undefined,
+                            targetNpcSlug: selectedCell.info.npcSlug ?? undefined,
+                            targetNpcInstanceId: selectedCell.info.npcInstanceId ?? undefined,
+                            phase: 'outbound',
+                            progress: 0,
+                            remainingSec: 0,
+                          };
+                          setProbes((prev) => [...prev, entry]);
                           setSelectedCell(null);
+                          launchProbeMutation({
+                            probeId: id,
+                            fromX: myPositionData.x,
+                            fromY: myPositionData.y,
+                            targetX: selectedCell.x,
+                            targetY: selectedCell.y,
+                            targetOwner,
+                            targetUserId: entry.targetUserId,
+                            targetNpcSlug: entry.targetNpcSlug,
+                            targetNpcInstanceId: entry.targetNpcInstanceId,
+                          }).catch(() => {});
                         }}
                       >
                         <Text style={[styles.actionButtonText, { color: colors.background }]}>
@@ -3799,7 +4067,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, myPositionData, currentUserId, launchProbeMutation]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -3905,7 +4173,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       {renderInfoPanel()}
 
       <View style={{ width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) }}>
-        <GestureDetector style={StyleSheet.absoluteFill} gesture={combinedMapGesture}>
+        <View style={StyleSheet.absoluteFill}>
+          <GestureDetector gesture={combinedMapGesture}>
           <Animated.View
             ref={mapViewRef}
             style={[
@@ -3972,109 +4241,79 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           </View>
           </Animated.View>
         </GestureDetector>
-        {probes.length > 0 && myPositionData && (
-          <Animated.View
-            style={[StyleSheet.absoluteFill, animatedMapStyle as any]}
-            pointerEvents="box-none"
-          >
-            {probes.map((probe) => {
-              const ux = myPositionData.x;
-              const uy = myPositionData.y;
-              const tx = probe.targetX;
-              const ty = probe.targetY;
-              const startX = MARGIN_SIZE + (ux + 0.5) * CELL_SIZE;
-              const startY = MARGIN_SIZE + (uy + 0.5) * CELL_SIZE;
-              const endX = MARGIN_SIZE + (tx + 0.5) * CELL_SIZE;
-              const endY = MARGIN_SIZE + (ty + 0.5) * CELL_SIZE;
-              const dx = endX - startX;
-              const dy = endY - startY;
-              const length = Math.sqrt(dx * dx + dy * dy) || 1;
-              const angle = Math.atan2(dy, dx);
-              const PROBE_SIZE = 100;
-              const PROBE_HIT_PADDING = 24;
-              const lineProgress = probe.progress;
-              const px = startX + dx * lineProgress - PROBE_SIZE / 2;
-              const py = startY + dy * lineProgress - PROBE_SIZE / 2;
-              const hitSize = PROBE_SIZE + PROBE_HIT_PADDING * 2;
-              const hitLeft = px - PROBE_HIT_PADDING;
-              const hitTop = py - PROBE_HIT_PADDING;
-              return (
-                <View key={probe.id} pointerEvents="box-none" style={[StyleSheet.absoluteFill, { left: 0, top: 0, right: 0, bottom: 0 }]}>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      left: startX,
-                      top: startY,
-                      width: length,
-                      height: 1,
-                      borderWidth: 1,
-                      borderStyle: 'dashed',
-                      borderColor: colors.matrix ?? '#00ff00',
-                      borderRadius: 0.5,
-                      opacity: 0.8,
-                      transform: [{ translateX: -length / 2 }, { rotate: `${angle}rad` }, { translateX: length / 2 }],
-                    }}
-                  />
-                  <Pressable
-                    style={{
-                      position: 'absolute',
-                      left: hitLeft,
-                      top: hitTop,
-                      width: hitSize,
-                      height: hitSize,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                    onPress={() => handleProbeFollow(probe.id)}
-                  >
-                    <Image
-                      source={require('../assets/images/hackMap/probe.png')}
-                      style={{ width: PROBE_SIZE, height: PROBE_SIZE }}
-                      resizeMode="contain"
-                    />
-                  </Pressable>
-                </View>
-              );
-            })}
-          </Animated.View>
-        )}
+        </View>
+        <ProbeAnimationLayer
+          probes={displayProbes}
+          setProbes={setProbes}
+          myPositionData={myPositionData}
+          currentUserId={currentUserId}
+          completeProbeMutation={completeProbeMutation}
+          followProbeId={followProbeId}
+          setFollowProbeId={setFollowProbeId}
+          showProbeFollowModal={showProbeFollowModal}
+          setShowProbeFollowModal={setShowProbeFollowModal}
+          probeFollowModeRef={probeFollowModeRef}
+          followProbeIdRef={followProbeIdRef}
+          containerSizeRef={containerSizeRef}
+          offsetX={offsetX}
+          offsetY={offsetY}
+          boundsReady={boundsReady}
+          minX={minX}
+          maxX={maxX}
+          minY={minY}
+          maxY={maxY}
+          scheduleComputeRef={scheduleComputeRef}
+          onFollowProbe={handleProbeFollow}
+          onCloseModal={handleProbeFollowModalClose}
+          onFollowProbeDisplayUpdate={setFollowProbeDisplay}
+          cancelProbeRef={cancelProbeRef}
+          cancelProbeMutation={(args) => cancelProbeMutation(args).catch(() => {})}
+          colors={colors}
+          styles={styles}
+          animatedMapStyle={animatedMapStyle}
+        />
       </View>
 
       {showProbeFollowModal && followProbeId && (() => {
         const followedProbe = probes.find((p) => p.id === followProbeId);
         if (!followedProbe) return null;
+        const isOwner = followedProbe.sentByUserId === currentUserId;
+        if (!isOwner) return null;
+        const display = followProbeDisplay ?? { remainingSec: followedProbe.remainingSec, phase: followedProbe.phase };
         return (
-          <View
-            style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }]}
-            pointerEvents="box-none"
-          >
-            <Pressable style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }} onPress={handleProbeFollowModalClose}>
-              <Pressable
-                style={{
-                  padding: 12,
-                  borderRadius: 8,
-                  maxWidth: 200,
-                  backgroundColor: colors.surface ? `${colors.surface}E6` : 'rgba(28,28,30,0.92)',
-                }}
-                onPress={(e) => e.stopPropagation()}
-              >
-                <Text style={[styles.npcLevelModalText, { color: colors.text.primary, fontSize: 14 }]}>
-                  {followedProbe.phase === 'returning' ? 'Returning to base' : 'Probe en route'}
-                </Text>
-                <Text style={[styles.npcLevelModalText, { color: colors.secondary, marginTop: 6, fontSize: 13 }]}>
-                  {followedProbe.phase === 'returning' ? 'Time to base' : 'Time to target'}: {Math.ceil(followedProbe.remainingSec)}s
-                </Text>
-                {followedProbe.phase === 'outbound' && (
-                  <TouchableOpacity style={[styles.actionButton, { marginTop: 8, paddingVertical: 6, backgroundColor: colors.error ?? '#c00' }]} onPress={handleProbeCancel}>
-                    <Text style={[styles.actionButtonText, { color: colors.background, fontSize: 13 }]}>Cancel</Text>
+          <Modal visible transparent animationType="fade" onRequestClose={handleProbeFollowModalClose} supportedOrientations={['landscape-left', 'landscape-right']}>
+            <View
+              style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)' }]}
+              pointerEvents="box-none"
+            >
+              <Pressable style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }} onPress={handleProbeFollowModalClose}>
+                <Pressable
+                  style={{
+                    padding: 12,
+                    borderRadius: 8,
+                    maxWidth: 200,
+                    backgroundColor: colors.surface ? `${colors.surface}E6` : 'rgba(28,28,30,0.92)',
+                  }}
+                  onPress={(e) => e.stopPropagation()}
+                >
+                  <Text style={[styles.npcLevelModalText, { color: colors.text.primary, fontSize: 14 }]}>
+                    {display.phase === 'returning' ? 'Returning to base' : 'Probe en route'}
+                  </Text>
+                  <Text style={[styles.npcLevelModalText, { color: colors.secondary, marginTop: 6, fontSize: 13 }]}>
+                    {display.phase === 'returning' ? 'Time to base' : 'Time to target'}: {Math.ceil(display.remainingSec)}s
+                  </Text>
+                  {display.phase === 'outbound' && (
+                    <TouchableOpacity style={[styles.actionButton, { marginTop: 8, paddingVertical: 6, backgroundColor: colors.error ?? '#c00' }]} onPress={() => cancelProbeRef.current?.()}>
+                      <Text style={[styles.actionButtonText, { color: colors.background, fontSize: 13 }]}>Cancel</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={[styles.closeButton, { marginTop: 8, paddingVertical: 6 }]} onPress={handleProbeFollowModalClose}>
+                    <Text style={[styles.closeButtonText, { color: colors.secondary, fontSize: 13 }]}>Close</Text>
                   </TouchableOpacity>
-                )}
-                <TouchableOpacity style={[styles.closeButton, { marginTop: 8, paddingVertical: 6 }]} onPress={handleProbeFollowModalClose}>
-                  <Text style={[styles.closeButtonText, { color: colors.secondary, fontSize: 13 }]}>Close</Text>
-                </TouchableOpacity>
+                </Pressable>
               </Pressable>
-            </Pressable>
-          </View>
+            </View>
+          </Modal>
         );
       })()}
     </View>

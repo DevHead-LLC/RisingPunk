@@ -13,6 +13,144 @@ const router = express.Router();
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 
+/** In-memory store of active probes so other clients can see them. Entries removed on cancel, after return ends, or TTL. */
+interface ActiveProbe {
+  id: string;
+  sentByUserId: string;
+  fromX: number;
+  fromY: number;
+  targetX: number;
+  targetY: number;
+  targetOwner: 'player' | 'npc';
+  targetUserId?: string;
+  targetNpcSlug?: string;
+  targetNpcInstanceId?: string;
+  launchedAt: number;
+  /** Set when probe reaches target; probe stays in store until returnEndAt so viewers see return trip. */
+  phase?: 'outbound' | 'returning';
+  returnEndAt?: number;
+  returnDurationSec?: number;
+}
+const activeProbesStore = new Map<string, ActiveProbe>();
+const PROBE_TTL_MS = 10 * 60 * 1000;
+
+function pruneStaleProbes(): void {
+  const now = Date.now();
+  for (const [id, p] of activeProbesStore.entries()) {
+    if (p.phase === 'returning' && p.returnEndAt != null && now >= p.returnEndAt) {
+      activeProbesStore.delete(id);
+    } else if ((p.phase !== 'returning' || !p.returnEndAt) && now - p.launchedAt > PROBE_TTL_MS) {
+      activeProbesStore.delete(id);
+    }
+  }
+}
+
+// POST /launch — register probe so other users can see it
+router.post('/launch', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const { probeId, fromX, fromY, targetX, targetY, targetOwner, targetUserId, targetNpcSlug, targetNpcInstanceId } = req.body;
+    if (!probeId || typeof probeId !== 'string' || probeId.length > 120) {
+      res.status(400).json({ error: 'probeId required' });
+      return;
+    }
+    if (targetOwner !== 'player' && targetOwner !== 'npc') {
+      res.status(400).json({ error: 'targetOwner must be "player" or "npc"' });
+      return;
+    }
+    const fromXNum = typeof fromX === 'number' ? fromX : parseInt(String(fromX), 10);
+    const fromYNum = typeof fromY === 'number' ? fromY : parseInt(String(fromY), 10);
+    const x = typeof targetX === 'number' ? targetX : parseInt(String(targetX), 10);
+    const y = typeof targetY === 'number' ? targetY : parseInt(String(targetY), 10);
+    if (Number.isNaN(fromXNum) || Number.isNaN(fromYNum) || Number.isNaN(x) || Number.isNaN(y)) {
+      res.status(400).json({ error: 'fromX, fromY, targetX, targetY required' });
+      return;
+    }
+
+    const homeDefenseFeatures = await ResearchFeatureService.getUserFeatures(String(userId), 'home-defense');
+    const probeUnlocked = homeDefenseFeatures.some((f: any) => f.id === 'probe' && f.isUnlocked);
+    if (!probeUnlocked) {
+      res.status(403).json({ error: 'Probe research is not unlocked' });
+      return;
+    }
+
+    const entry: ActiveProbe = {
+      id: probeId,
+      sentByUserId: String(userId),
+      fromX: fromXNum,
+      fromY: fromYNum,
+      targetX: x,
+      targetY: y,
+      targetOwner,
+      targetUserId: targetUserId != null ? String(targetUserId) : undefined,
+      targetNpcSlug: targetNpcSlug != null ? String(targetNpcSlug) : undefined,
+      targetNpcInstanceId: targetNpcInstanceId != null ? String(targetNpcInstanceId) : undefined,
+      launchedAt: Date.now(),
+    };
+    activeProbesStore.set(probeId, entry);
+    pruneStaleProbes();
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('Probe launch error:', err);
+    res.status(500).json({ error: err?.message || 'Internal server error' });
+  }
+});
+
+// GET /active — list active probes for map visibility (all users see all probes)
+router.get('/active', auth, (req: Request, res: Response) => {
+  try {
+    pruneStaleProbes();
+    const probes = Array.from(activeProbesStore.values()).map((p) => ({
+      id: p.id,
+      sentByUserId: p.sentByUserId,
+      fromX: p.fromX,
+      fromY: p.fromY,
+      targetX: p.targetX,
+      targetY: p.targetY,
+      targetOwner: p.targetOwner,
+      targetUserId: p.targetUserId,
+      targetNpcSlug: p.targetNpcSlug,
+      targetNpcInstanceId: p.targetNpcInstanceId,
+      launchedAt: p.launchedAt,
+      phase: p.phase ?? 'outbound',
+      returnEndAt: p.returnEndAt,
+      returnDurationSec: p.returnDurationSec,
+    }));
+    res.json({ probes });
+  } catch (err: any) {
+    console.error('Probe active list error:', err);
+    res.status(500).json({ error: err?.message || 'Internal server error' });
+  }
+});
+
+// POST /cancel — remove probe from active store (sender only)
+router.post('/cancel', auth, (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const { probeId } = req.body;
+    if (!probeId || typeof probeId !== 'string') {
+      res.status(400).json({ error: 'probeId required' });
+      return;
+    }
+    const entry = activeProbesStore.get(probeId);
+    if (entry && String(entry.sentByUserId) === String(userId)) {
+      activeProbesStore.delete(probeId);
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    console.error('Probe cancel error:', err);
+    res.status(500).json({ error: err?.message || 'Internal server error' });
+  }
+});
+
 /** Structured payload for Probe Report DMs; client parses when message starts with PRB| */
 export interface ProbeReportPayload {
   pr: 1;
@@ -32,7 +170,7 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
       res.status(401).json({ error: 'Not authenticated' });
       return;
     }
-    const { targetOwner, targetUserId, targetNpcSlug, targetX, targetY } = req.body;
+    const { probeId, targetOwner, targetUserId, targetNpcSlug, targetX, targetY } = req.body;
     if (targetOwner !== 'player' && targetOwner !== 'npc') {
       res.status(400).json({ error: 'targetOwner must be "player" or "npc"' });
       return;
@@ -123,6 +261,17 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
       isFromAdmin: false,
     });
     await doc.save();
+
+    if (probeId && typeof probeId === 'string') {
+      const entry = activeProbesStore.get(probeId);
+      if (entry) {
+        const distance = Math.sqrt((entry.targetX - entry.fromX) ** 2 + (entry.targetY - entry.fromY) ** 2);
+        const returnDurationSec = Math.max(2, distance * 2);
+        entry.phase = 'returning';
+        entry.returnDurationSec = returnDurationSec;
+        entry.returnEndAt = Date.now() + returnDurationSec * 1000;
+      }
+    }
 
     res.json({
       success: true,
