@@ -623,6 +623,8 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   const probeAnimationFrameRef = useRef<number | null>(null);
   const probeUpdatesRef = useRef<ProbeUpdate[]>([]);
   const [, setFrame] = useState(0);
+  /** Last display values sent to parent; only notify when ceil(remainingSec) or phase changes so parent does not re-render at 60fps. */
+  const lastFollowDisplayRef = useRef<{ ceilSec: number; phase: 'outbound' | 'returning' } | null>(null);
 
   useEffect(() => {
     probesRef.current = probes;
@@ -738,8 +740,17 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         const followed = currentProbes.find((p) => p.id === fid);
         if (followed?.sentByUserId === currentUserId) {
           const fu = updates.find((x) => x.id === fid);
-          if (fu) onFollowProbeDisplayUpdate({ remainingSec: fu.remainingSec, phase: fu.phase });
+          if (fu) {
+            const ceilSec = Math.ceil(fu.remainingSec);
+            const last = lastFollowDisplayRef.current;
+            if (last == null || last.ceilSec !== ceilSec || last.phase !== fu.phase) {
+              lastFollowDisplayRef.current = { ceilSec, phase: fu.phase };
+              onFollowProbeDisplayUpdate({ remainingSec: fu.remainingSec, phase: fu.phase });
+            }
+          }
         }
+      } else {
+        lastFollowDisplayRef.current = null;
       }
 
       const container = containerSizeRef.current;

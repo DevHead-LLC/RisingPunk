@@ -30,6 +30,8 @@ interface ActiveProbe {
   phase?: 'outbound' | 'returning';
   returnEndAt?: number;
   returnDurationSec?: number;
+  /** True while /complete is doing DB work; blocks concurrent completion, cleared on success or failure. */
+  completing?: boolean;
 }
 const activeProbesStore = new Map<string, ActiveProbe>();
 const PROBE_TTL_MS = 10 * 60 * 1000;
@@ -239,6 +241,10 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Probe already completed' });
       return;
     }
+    if (entry.completing) {
+      res.status(409).json({ error: 'Probe completion already in progress' });
+      return;
+    }
     const distance = Math.sqrt((entry.targetX - entry.fromX) ** 2 + (entry.targetY - entry.fromY) ** 2);
     const outboundDurationSec = Math.max(2, distance * 2);
     const elapsedMs = Date.now() - entry.launchedAt;
@@ -249,95 +255,105 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
     }
 
     const returnDurationSec = Math.max(2, distance * 2);
-    entry.phase = 'returning';
-    entry.returnDurationSec = returnDurationSec;
-    entry.returnEndAt = Date.now() + returnDurationSec * 1000;
+    entry.completing = true;
+    try {
+      let targetName: string;
+      let targetLevel: number;
+      let bots: { breacher: number; guardian: number; phreak: number };
 
-    let targetName: string;
-    let targetLevel: number;
-    let bots: { breacher: number; guardian: number; phreak: number };
+      if (targetOwner === 'player') {
+        const targetId = targetUserId;
+        if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) {
+          res.status(400).json({ error: 'targetUserId required for player target' });
+          return;
+        }
+        if (String(targetId) === String(userId)) {
+          res.status(400).json({ error: 'Cannot probe yourself' });
+          return;
+        }
+        const targetUserForShield = await User.findById(targetId);
+        if (!targetUserForShield) {
+          res.status(404).json({ error: 'Target user not found' });
+          return;
+        }
+        const shielded = await ShieldService.checkAndUpdateShieldStatus(targetUserForShield);
+        if (shielded) {
+          res.status(400).json({ error: 'Target is shielded and cannot be probed' });
+          return;
+        }
+        targetName = (targetUserForShield as any).handle || 'Unknown';
+        targetLevel = (targetUserForShield as any).level ?? 1;
+        const counts = await BattleRewardService.getUserBotCounts(String(targetId));
+        bots = counts
+          ? { breacher: counts.breacher, guardian: counts.guardian, phreak: counts.phreak }
+          : { breacher: 0, guardian: 0, phreak: 0 };
+      } else {
+        if (!targetNpcSlug || typeof targetNpcSlug !== 'string') {
+          res.status(400).json({ error: 'targetNpcSlug required for NPC target' });
+          return;
+        }
+        const npc = await NPCService.getNPCBySlug(targetNpcSlug);
+        if (!npc) {
+          res.status(404).json({ error: 'NPC not found' });
+          return;
+        }
+        targetName = npc.name;
+        targetLevel = npc.userLevelAssociation;
+        const breacher = npc.battalions.filter((b) => b.type === 'breacher').reduce((s, b) => s + b.quantity, 0);
+        const guardian = npc.battalions.filter((b) => b.type === 'guardian').reduce((s, b) => s + b.quantity, 0);
+        const phreak = npc.battalions.filter((b) => b.type === 'phreak').reduce((s, b) => s + b.quantity, 0);
+        bots = { breacher, guardian, phreak };
+      }
 
-    if (targetOwner === 'player') {
-      const targetId = targetUserId;
-      if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) {
-        res.status(400).json({ error: 'targetUserId required for player target' });
+      const payload: ProbeReportPayload = {
+        pr: 1,
+        n: targetName,
+        t: targetOwner,
+        l: targetLevel,
+        x,
+        y,
+        b: bots,
+      };
+      const messageBody = PROBE_REPORT_PREFIX + JSON.stringify(payload);
+      if (messageBody.length > 600) {
+        res.status(500).json({ error: 'Probe report too long' });
         return;
       }
-      if (String(targetId) === String(userId)) {
-        res.status(400).json({ error: 'Cannot probe yourself' });
-        return;
+
+      const doc = new PrivateMessage({
+        senderId: PROBE_REPORT_SENDER_ID,
+        recipientId: userId,
+        senderUsername: PROBE_REPORT_SENDER_USERNAME,
+        message: messageBody,
+        readAt: null,
+        isFromAdmin: false,
+      });
+      await doc.save();
+
+      entry.phase = 'returning';
+      entry.returnDurationSec = returnDurationSec;
+      entry.returnEndAt = Date.now() + returnDurationSec * 1000;
+
+      res.json({
+        success: true,
+        message: {
+          id: String(doc._id),
+          senderId: String(doc.senderId),
+          recipientId: String(doc.recipientId),
+          senderUsername: doc.senderUsername,
+          message: doc.message,
+          timestamp: doc.createdAt,
+          readAt: doc.readAt,
+        },
+      });
+    } catch (err: any) {
+      console.error('Probe complete error:', err);
+      res.status(500).json({ error: err?.message || 'Internal server error' });
+    } finally {
+      if (entry.phase !== 'returning') {
+        entry.completing = false;
       }
-      const targetUserForShield = await User.findById(targetId);
-      if (!targetUserForShield) {
-        res.status(404).json({ error: 'Target user not found' });
-        return;
-      }
-      const shielded = await ShieldService.checkAndUpdateShieldStatus(targetUserForShield);
-      if (shielded) {
-        res.status(400).json({ error: 'Target is shielded and cannot be probed' });
-        return;
-      }
-      targetName = (targetUserForShield as any).handle || 'Unknown';
-      targetLevel = (targetUserForShield as any).level ?? 1;
-      const counts = await BattleRewardService.getUserBotCounts(String(targetId));
-      bots = counts
-        ? { breacher: counts.breacher, guardian: counts.guardian, phreak: counts.phreak }
-        : { breacher: 0, guardian: 0, phreak: 0 };
-    } else {
-      if (!targetNpcSlug || typeof targetNpcSlug !== 'string') {
-        res.status(400).json({ error: 'targetNpcSlug required for NPC target' });
-        return;
-      }
-      const npc = await NPCService.getNPCBySlug(targetNpcSlug);
-      if (!npc) {
-        res.status(404).json({ error: 'NPC not found' });
-        return;
-      }
-      targetName = npc.name;
-      targetLevel = npc.userLevelAssociation;
-      const breacher = npc.battalions.filter((b) => b.type === 'breacher').reduce((s, b) => s + b.quantity, 0);
-      const guardian = npc.battalions.filter((b) => b.type === 'guardian').reduce((s, b) => s + b.quantity, 0);
-      const phreak = npc.battalions.filter((b) => b.type === 'phreak').reduce((s, b) => s + b.quantity, 0);
-      bots = { breacher, guardian, phreak };
     }
-
-    const payload: ProbeReportPayload = {
-      pr: 1,
-      n: targetName,
-      t: targetOwner,
-      l: targetLevel,
-      x,
-      y,
-      b: bots,
-    };
-    const messageBody = PROBE_REPORT_PREFIX + JSON.stringify(payload);
-    if (messageBody.length > 600) {
-      res.status(500).json({ error: 'Probe report too long' });
-      return;
-    }
-
-    const doc = new PrivateMessage({
-      senderId: PROBE_REPORT_SENDER_ID,
-      recipientId: userId,
-      senderUsername: PROBE_REPORT_SENDER_USERNAME,
-      message: messageBody,
-      readAt: null,
-      isFromAdmin: false,
-    });
-    await doc.save();
-
-    res.json({
-      success: true,
-      message: {
-        id: String(doc._id),
-        senderId: String(doc.senderId),
-        recipientId: String(doc.recipientId),
-        senderUsername: doc.senderUsername,
-        message: doc.message,
-        timestamp: doc.createdAt,
-        readAt: doc.readAt,
-      },
-    });
   } catch (err: any) {
     console.error('Probe complete error:', err);
     res.status(500).json({ error: err?.message || 'Internal server error' });
