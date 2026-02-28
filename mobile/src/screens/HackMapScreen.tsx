@@ -4022,7 +4022,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                       <TouchableOpacity
                         style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
                         onPress={() => {
-                          if (probes.length >= MAX_PROBES) {
+                          const ourProbeCount = displayProbes.filter((p) => p.sentByUserId === currentUserId).length;
+                          if (ourProbeCount >= MAX_PROBES) {
                             Alert.alert('Probes', 'Maximum 2 probes at a time.');
                             return;
                           }
@@ -4054,7 +4055,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                             targetUserId: entry.targetUserId,
                             targetNpcSlug: entry.targetNpcSlug,
                             targetNpcInstanceId: entry.targetNpcInstanceId,
-                          }).catch(() => {});
+                          })
+                            .unwrap()
+                            .catch((err: any) => {
+                              setProbes((prev) => prev.filter((p) => p.id !== id));
+                              const msg = err?.data?.error ?? err?.message ?? 'Probe launch failed.';
+                              Alert.alert('Probe', msg);
+                            });
                         }}
                       >
                         <Text style={[styles.actionButtonText, { color: colors.background }]}>
@@ -4077,7 +4084,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, myPositionData, currentUserId, launchProbeMutation]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, myPositionData, currentUserId, launchProbeMutation]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
