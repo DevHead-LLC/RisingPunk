@@ -827,7 +827,10 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
           probeDataRef.current.delete(id);
           startedAnimationRef.current.delete(id);
         });
-        setProbes((prev) => prev.filter((p) => !toRemove.includes(p.id)));
+        setProbes((prev) => {
+          const next = prev.filter((p) => !toRemove.includes(p.id));
+          return next.length === prev.length ? prev : next;
+        });
       }
 
       probeAnimationFrameRef.current = requestAnimationFrame(tick);
@@ -1877,6 +1880,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   }, [followProbeId, showProbeFollowModal, displayProbes]);
 
+  // Activate follow mode for any probe (owner or viewer). Modal/cancel only render for owner (IIFE below).
+  // Viewers: map pans to probe; to exit follow, tap on the map (handleTapAtViewCoords → handleProbeFollowModalClose).
   const handleProbeFollow = useCallback((probeId: string) => {
     setFollowProbeId(probeId);
     setShowProbeFollowModal(true);
