@@ -162,7 +162,8 @@ export interface ProbeReportPayload {
   b: { breacher: number; guardian: number; phreak: number };
 }
 
-// POST /complete — probe reached target; send Probe Report DM to probing user
+// POST /complete — probe reached target; send Probe Report DM to probing user.
+// Requires a probe previously launched via /launch and sufficient outbound travel time elapsed.
 router.post('/complete', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -171,6 +172,10 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
       return;
     }
     const { probeId, targetOwner, targetUserId, targetNpcSlug, targetX, targetY } = req.body;
+    if (!probeId || typeof probeId !== 'string' || probeId.length > 120) {
+      res.status(400).json({ error: 'probeId required' });
+      return;
+    }
     if (targetOwner !== 'player' && targetOwner !== 'npc') {
       res.status(400).json({ error: 'targetOwner must be "player" or "npc"' });
       return;
@@ -186,6 +191,35 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
     const probeUnlocked = homeDefenseFeatures.some((f: any) => f.id === 'probe' && f.isUnlocked);
     if (!probeUnlocked) {
       res.status(403).json({ error: 'Probe research is not unlocked' });
+      return;
+    }
+
+    const entry = activeProbesStore.get(probeId);
+    if (!entry) {
+      res.status(400).json({ error: 'Probe not found or not launched; launch via /launch first' });
+      return;
+    }
+    if (String(entry.sentByUserId) !== String(userId)) {
+      res.status(403).json({ error: 'Not your probe' });
+      return;
+    }
+    if (entry.targetOwner !== targetOwner || entry.targetX !== x || entry.targetY !== y) {
+      res.status(400).json({ error: 'Probe target does not match' });
+      return;
+    }
+    if (targetOwner === 'player' && String(entry.targetUserId ?? '') !== String(targetUserId ?? '')) {
+      res.status(400).json({ error: 'Probe target does not match' });
+      return;
+    }
+    if (targetOwner === 'npc' && (entry.targetNpcSlug ?? '') !== (targetNpcSlug ?? '')) {
+      res.status(400).json({ error: 'Probe target does not match' });
+      return;
+    }
+    const distance = Math.sqrt((entry.targetX - entry.fromX) ** 2 + (entry.targetY - entry.fromY) ** 2);
+    const outboundDurationSec = Math.max(2, distance * 2);
+    const elapsedMs = Date.now() - entry.launchedAt;
+    if (elapsedMs < outboundDurationSec * 1000) {
+      res.status(400).json({ error: 'Probe has not reached target yet' });
       return;
     }
 
@@ -262,16 +296,10 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
     });
     await doc.save();
 
-    if (probeId && typeof probeId === 'string') {
-      const entry = activeProbesStore.get(probeId);
-      if (entry) {
-        const distance = Math.sqrt((entry.targetX - entry.fromX) ** 2 + (entry.targetY - entry.fromY) ** 2);
-        const returnDurationSec = Math.max(2, distance * 2);
-        entry.phase = 'returning';
-        entry.returnDurationSec = returnDurationSec;
-        entry.returnEndAt = Date.now() + returnDurationSec * 1000;
-      }
-    }
+    const returnDurationSec = Math.max(2, distance * 2);
+    entry.phase = 'returning';
+    entry.returnDurationSec = returnDurationSec;
+    entry.returnEndAt = Date.now() + returnDurationSec * 1000;
 
     res.json({
       success: true,

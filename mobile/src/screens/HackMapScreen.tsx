@@ -767,9 +767,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
           if (progress <= 0) {
             toRemove.push(probe.id);
             if (followProbeIdRef.current === probe.id) {
-              setFollowProbeId(null);
-              setShowProbeFollowModal(false);
-              probeFollowModeRef.current = false;
+              onCloseModal();
             }
           }
         } else if (progress >= 1) {
@@ -799,9 +797,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
                 startedAnimationRef.current.delete(probe.id);
                 setProbes((prev) => prev.filter((p) => p.id !== probe.id));
                 if (followProbeIdRef.current === probe.id) {
-                  setFollowProbeId(null);
-                  setShowProbeFollowModal(false);
-                  probeFollowModeRef.current = false;
+                  onCloseModal();
                 }
                 const msg = err?.data?.error ?? err?.message ?? 'Probe report could not be sent.';
                 Alert.alert('Probe Report', msg);
@@ -828,7 +824,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         probeAnimationFrameRef.current = null;
       }
     };
-  }, [probes, myPositionData, currentUserId, completeProbeMutation, setFollowProbeId, setShowProbeFollowModal, setProbes, onFollowProbeDisplayUpdate]);
+  }, [probes, myPositionData, currentUserId, completeProbeMutation, setProbes, onFollowProbeDisplayUpdate, onCloseModal]);
 
   const handleProbeCancel = useCallback(() => {
     const fid = followProbeIdRef.current;
