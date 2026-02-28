@@ -33,6 +33,10 @@ interface ActiveProbe {
 }
 const activeProbesStore = new Map<string, ActiveProbe>();
 const PROBE_TTL_MS = 10 * 60 * 1000;
+/** Max active probes per user (enforced server-side; client uses same limit). */
+const MAX_PROBES_PER_USER = 2;
+/** Allow completion up to this many ms before strict travel time (absorbs RTT + client animation start after /launch response). */
+const TRAVEL_TIME_TOLERANCE_MS = 1000;
 
 function pruneStaleProbes(): void {
   const now = Date.now();
@@ -76,6 +80,22 @@ router.post('/launch', auth, async (req: Request, res: Response) => {
     if (!probeUnlocked) {
       res.status(403).json({ error: 'Probe research is not unlocked' });
       return;
+    }
+
+    pruneStaleProbes();
+    const existing = activeProbesStore.get(probeId);
+    if (existing && String(existing.sentByUserId) !== String(userId)) {
+      res.status(400).json({ error: 'Probe ID already in use' });
+      return;
+    }
+    if (!existing) {
+      const userProbeCount = Array.from(activeProbesStore.values()).filter(
+        (p) => String(p.sentByUserId) === String(userId)
+      ).length;
+      if (userProbeCount >= MAX_PROBES_PER_USER) {
+        res.status(400).json({ error: 'Maximum probes in flight reached' });
+        return;
+      }
     }
 
     const entry: ActiveProbe = {
@@ -215,13 +235,23 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Probe target does not match' });
       return;
     }
+    if (entry.phase === 'returning') {
+      res.status(400).json({ error: 'Probe already completed' });
+      return;
+    }
     const distance = Math.sqrt((entry.targetX - entry.fromX) ** 2 + (entry.targetY - entry.fromY) ** 2);
     const outboundDurationSec = Math.max(2, distance * 2);
     const elapsedMs = Date.now() - entry.launchedAt;
-    if (elapsedMs < outboundDurationSec * 1000) {
+    const requiredMs = outboundDurationSec * 1000 - TRAVEL_TIME_TOLERANCE_MS;
+    if (elapsedMs < requiredMs) {
       res.status(400).json({ error: 'Probe has not reached target yet' });
       return;
     }
+
+    const returnDurationSec = Math.max(2, distance * 2);
+    entry.phase = 'returning';
+    entry.returnDurationSec = returnDurationSec;
+    entry.returnEndAt = Date.now() + returnDurationSec * 1000;
 
     let targetName: string;
     let targetLevel: number;
@@ -295,11 +325,6 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
       isFromAdmin: false,
     });
     await doc.save();
-
-    const returnDurationSec = Math.max(2, distance * 2);
-    entry.phase = 'returning';
-    entry.returnDurationSec = returnDurationSec;
-    entry.returnEndAt = Date.now() + returnDurationSec * 1000;
 
     res.json({
       success: true,

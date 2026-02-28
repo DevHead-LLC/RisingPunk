@@ -545,7 +545,7 @@ type ProbeAnimationLayerProps = {
   animatedMapStyle: Record<string, unknown>;
 };
 
-/** Tappable wrapper for the probe icon; large hit area + hitSlop for reliable follow tap (sender and viewer). */
+/** Tappable wrapper for the probe icon; hit area matches probe image size. */
 const ProbeTapTarget: React.FC<{
   probeId: string;
   onFollowProbe: (probeId: string) => void;
@@ -568,7 +568,6 @@ const ProbeTapTarget: React.FC<{
   >
     <Pressable
       style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
-      hitSlop={24}
       onPress={() => onFollowProbe(probeId)}
     >
       {children}
@@ -617,6 +616,8 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
     returnStartProgress?: number;
     returnDuration?: number;
     completing: boolean;
+    /** When progress first reached 1; we delay /complete by a short buffer so server travel-time check passes. */
+    reachedTargetAt?: number;
   }>>(new Map());
   const startedAnimationRef = useRef<Set<string>>(new Set());
   const probeAnimationFrameRef = useRef<number | null>(null);
@@ -773,6 +774,10 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         } else if (progress >= 1) {
           const isOwner = probe.sentByUserId === currentUserId;
           if (isOwner && !data.completing) {
+            const reachedAt = data.reachedTargetAt ?? now;
+            if (data.reachedTargetAt == null) data.reachedTargetAt = reachedAt;
+            const bufferMs = 400;
+            if (now - reachedAt < bufferMs) continue;
             data.completing = true;
             completeProbeMutation({
               probeId: probe.id,
@@ -882,14 +887,12 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
           const length = Math.sqrt(dx * dx + dy * dy) || 1;
           const angle = Math.atan2(dy, dx);
           const PROBE_SIZE = 100;
-          const PROBE_HIT_PADDING = 48;
-          const PROBE_HIT_SLOP = 24;
           const lineProgress = progress;
           const px = startX + dx * lineProgress - PROBE_SIZE / 2;
           const py = startY + dy * lineProgress - PROBE_SIZE / 2;
-          const hitSize = PROBE_SIZE + PROBE_HIT_PADDING * 2 + PROBE_HIT_SLOP * 2;
-          const hitLeft = px - PROBE_HIT_PADDING - PROBE_HIT_SLOP;
-          const hitTop = py - PROBE_HIT_PADDING - PROBE_HIT_SLOP;
+          const hitSize = PROBE_SIZE;
+          const hitLeft = px;
+          const hitTop = py;
           return (
             <View key={probe.id} pointerEvents="box-none" style={[StyleSheet.absoluteFill, { left: 0, top: 0, right: 0, bottom: 0 }]}>
               <View
