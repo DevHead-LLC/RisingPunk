@@ -21,9 +21,7 @@ import {
 } from '../../store/api/privateMessagesApi';
 import { BaseChatModal, ChatMessageForModal } from '../hackMap/BaseChatModal';
 import { useAppSelector } from '../../store/hooks';
-
-/** System sender ID for Probe Report; replies to this ID always fail (no User document). Must match server PROBE_REPORT_SENDER_ID. */
-const PROBE_REPORT_SENDER_ID = '000000000000000000000001';
+import { PROBE_REPORT_SENDER_ID } from '../../constants/systemSenders';
 
 interface MessagesModalProps {
   visible: boolean;

@@ -23,10 +23,9 @@ import { SIZING } from '../../styles/theme';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
 import { UserReportModal } from '../modals/UserReportModal';
+import { PROBE_REPORT_SENDER_ID } from '../../constants/systemSenders';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
-/** System sender ID for Probe Report DMs (must match server PROBE_REPORT_SENDER_ID). Key on this, not username, so a user whose handle is "Probe Report" cannot spoof formatted probe reports. */
-const PROBE_REPORT_SENDER_ID = '000000000000000000000001';
 
 export interface ProbeReportPayload {
   pr: 1;
