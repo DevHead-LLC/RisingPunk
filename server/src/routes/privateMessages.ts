@@ -9,6 +9,22 @@ import { PROBE_REPORT_SENDER_ID, PROBE_REPORT_SENDER_USERNAME } from '../constan
 
 const router = express.Router();
 
+const PROBE_REPORT_PREFIX = 'PRB|';
+
+/** Return a human-readable inbox preview for probe report messages; otherwise return the raw message. */
+function conversationListLastMessagePreview(raw: string | undefined, isProbeReport: boolean): string {
+  if (!isProbeReport || typeof raw !== 'string' || !raw.startsWith(PROBE_REPORT_PREFIX)) {
+    return raw ?? '';
+  }
+  try {
+    const payload = JSON.parse(raw.slice(PROBE_REPORT_PREFIX.length)) as { n?: string };
+    if (payload?.n != null) return `Probe Report: ${payload.n}`;
+  } catch (_) {
+    // ignore
+  }
+  return 'Probe Report';
+}
+
 const PM_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const PM_RATE_LIMIT_MAX = 10;
 const pmRateLimit = new Map<string, { count: number; windowStartMs: number }>();
@@ -210,10 +226,10 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
               : isProbeReport
                 ? PROBE_REPORT_SENDER_USERNAME
                 : (other?.handle ?? 'Unknown'),
-            lastMessage: row.lastMessage,
+            lastMessage: conversationListLastMessagePreview(row.lastMessage, isProbeReport),
             lastAt: row.lastAt,
             unreadCount: row.unreadCount ?? 0,
-            isBroadcast: !!isBroadcast,
+            isBroadcast: !!isBroadcast || isProbeReport,
           };
         }),
     );

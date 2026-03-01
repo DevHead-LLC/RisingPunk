@@ -1249,6 +1249,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const probeFollowModeRef = useRef<boolean>(false);
   const followProbeIdRef = useRef<string | null>(null);
   const cancelProbeRef = useRef<(() => void) | null>(null);
+  const handleProbeFollowModalCloseRef = useRef<(() => void) | null>(null);
   const [completeProbeMutation] = useCompleteProbeMutation();
   const [launchProbeMutation] = useLaunchProbeMutation();
   const [cancelProbeMutation] = useCancelProbeMutation();
@@ -1643,9 +1644,15 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
   );
 
+  const clearProbeFollowOnPanStart = useCallback(() => {
+    handleProbeFollowModalCloseRef.current?.();
+  }, []);
+
   const panGesture = Gesture.Pan()
     .minDistance(10)
     .onStart(() => {
+      'worklet';
+      runOnJS(clearProbeFollowOnPanStart)();
       startX.value = offsetX.value;
       startY.value = offsetY.value;
       isPanning.value = true;
@@ -1915,6 +1922,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     probeFollowModeRef.current = false;
     followProbeIdRef.current = null;
   }, []);
+
+  useEffect(() => {
+    handleProbeFollowModalCloseRef.current = handleProbeFollowModalClose;
+    return () => {
+      handleProbeFollowModalCloseRef.current = null;
+    };
+  }, [handleProbeFollowModalClose]);
 
   const onProbeCompleteFailed = useCallback((probeId: string) => {
     setFailedProbeIds((prev) => {
@@ -4325,7 +4339,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       </View>
 
       {showProbeFollowModal && followProbeId && (() => {
-        const followedProbe = probes.find((p) => p.id === followProbeId);
+        const followedProbe = displayProbes.find((p) => p.id === followProbeId);
         if (!followedProbe) return null;
         const isOwner = followedProbe.sentByUserId === currentUserId;
         if (!isOwner) return null;
