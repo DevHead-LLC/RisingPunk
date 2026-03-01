@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, Alert, unstable_batchedUpdates, Modal } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, Alert, unstable_batchedUpdates, Modal, AppState } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
@@ -1838,9 +1838,41 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     return false;
   }, [grid, currentUserHandle]);
+  /** When user's house is in grid, derive (x,y) from grid so probe/locator work without calling my-position API (API is skipped in that case). */
+  const gridDerivedUserPosition = useMemo((): { x: number; y: number } | null => {
+    if (!grid?.length || !currentUserHandle) return null;
+    for (let y = 0; y < grid.length; y++) {
+      const row = grid[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x] as any;
+        if (cell?.entity === 'house' && cell?.name === currentUserHandle) return { x, y };
+      }
+    }
+    return null;
+  }, [grid, currentUserHandle]);
   const shouldFetchMyPosition = !restorePan && !!currentUserHandle && terrainDataLoaded && !userHouseInGrid;
   const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(undefined, { skip: !shouldFetchMyPosition });
   const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
+  /** Single source for "current user position": API when fetched, else grid when house in grid, else last known (e.g. after background). Probe and animation use this. */
+  const effectiveMyPosition = myPositionData ?? gridDerivedUserPosition ?? null;
+  const lastKnownPositionRef = useRef<{ x: number; y: number } | null>(null);
+  if (effectiveMyPosition) lastKnownPositionRef.current = effectiveMyPosition;
+  /** For probe and animation: always have position when we have grid (from API or grid-derived); fallback to last known after resume. */
+  const positionForProbe = effectiveMyPosition ?? lastKnownPositionRef.current;
+
+  // Refetch my-position when app returns to foreground so we have fresh position after background.
+  const appStateRef = useRef(AppState.currentState);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      const wasBackgroundOrInactive = appStateRef.current.match(/inactive|background/);
+      appStateRef.current = nextState;
+      if (wasBackgroundOrInactive && nextState === 'active' && shouldFetchMyPosition) {
+        triggerGetMyMapPosition();
+      }
+    });
+    return () => sub?.remove();
+  }, [shouldFetchMyPosition, triggerGetMyMapPosition]);
 
   // Phase 6: Viewport fetching during panning with minimal data
   // Track the last viewport we fetched to avoid duplicate requests
@@ -4096,15 +4128,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                             Alert.alert('Probes', 'Maximum 2 probes at a time.');
                             return;
                           }
-                          if (!myPositionData) return;
+                          const position = positionForProbe;
+                          if (!position) return;
                           const id = `probe-${currentUserId ?? ''}-${Date.now()}-${selectedCell.x}-${selectedCell.y}`;
                           const targetOwner = selectedCell.info.owner === 'player' ? 'player' : 'npc';
                           const now = Date.now();
                           const entry: ProbeEntry = {
                             id,
                             sentByUserId: currentUserId ?? undefined,
-                            fromX: myPositionData.x,
-                            fromY: myPositionData.y,
+                            fromX: position.x,
+                            fromY: position.y,
                             launchedAt: now,
                             targetX: selectedCell.x,
                             targetY: selectedCell.y,
@@ -4120,8 +4153,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                           setSelectedCell(null);
                           launchProbeMutation({
                             probeId: id,
-                            fromX: myPositionData.x,
-                            fromY: myPositionData.y,
+                            fromX: position.x,
+                            fromY: position.y,
                             targetX: selectedCell.x,
                             targetY: selectedCell.y,
                             targetOwner,
@@ -4157,7 +4190,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, myPositionData, currentUserId, launchProbeMutation]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -4335,7 +4368,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         <ProbeAnimationLayer
           probes={displayProbes}
           setProbes={setProbes}
-          myPositionData={myPositionData}
+          myPositionData={positionForProbe ?? undefined}
           currentUserId={currentUserId}
           completeProbeMutation={completeProbeMutation}
           probeFollowModeRef={probeFollowModeRef}
