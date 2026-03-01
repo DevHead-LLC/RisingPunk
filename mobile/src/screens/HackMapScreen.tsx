@@ -1327,15 +1327,18 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const serverProbes = (activeProbesData?.probes ?? []).filter((sp) => !failedProbeIds.has(sp.id));
     const ourIds = new Set(ours.map((p) => p.id));
     const serverById = new Map(serverProbes.map((sp) => [sp.id, sp]));
-    // Merge server phase/return into our probes so when app returns from background we show correct state (Android: rAF pauses so client stays at target; server has already auto-completed and set returning).
+    // Merge server phase/return into our probes. Prefer the more advanced phase so we never overwrite local 'returning' with stale poll 'outbound' (avoids probe stuck at target + wrong Cancel button; Bugbot).
     const mergedOurs = ours.map((p) => {
       const server = serverById.get(p.id);
       if (server) {
+        const phase = p.phase === 'returning' || server.phase === 'returning' ? 'returning' : (server.phase ?? p.phase);
+        const returnEndAt = phase === 'returning' ? (server.returnEndAt ?? p.returnEndAt) : (p.returnEndAt ?? server.returnEndAt);
+        const returnDurationSec = phase === 'returning' ? (server.returnDurationSec ?? p.returnDurationSec) : (p.returnDurationSec ?? server.returnDurationSec);
         return {
           ...p,
-          phase: server.phase ?? p.phase,
-          returnEndAt: server.returnEndAt ?? p.returnEndAt,
-          returnDurationSec: server.returnDurationSec ?? p.returnDurationSec,
+          phase,
+          returnEndAt,
+          returnDurationSec,
         };
       }
       return p;
