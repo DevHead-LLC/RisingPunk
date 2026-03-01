@@ -56,11 +56,13 @@ const baseQueryWithErrorHandling = async (args: any, api: any, extraOptions: any
       
       return result; // Return early to prevent other error handling
     } else if (result.error?.status === 401 && (result.error?.data as any)?.error === 'Token expired') {
-      api.dispatch(logoutUser());
+      api.dispatch({ type: 'auth/logout' });
       return result;
     } else {
       handleApiError(result.error);
     }
+  } else {
+    globalErrorHandler.markServerReachable();
   }
 
   return result;

@@ -23,6 +23,31 @@ import { SIZING } from '../../styles/theme';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
 import { UserReportModal } from '../modals/UserReportModal';
+import { PROBE_REPORT_SENDER_ID } from '../../constants/systemSenders';
+
+const PROBE_REPORT_PREFIX = 'PRB|';
+
+export interface ProbeReportPayload {
+  pr: 1;
+  n: string;
+  t: 'player' | 'npc';
+  l: number;
+  x: number;
+  y: number;
+  b: { breacher: number; guardian: number; phreak: number };
+}
+
+function parseProbeReportMessage(message: string): ProbeReportPayload | null {
+  if (!message.startsWith(PROBE_REPORT_PREFIX)) return null;
+  try {
+    const json = message.slice(PROBE_REPORT_PREFIX.length);
+    const payload = JSON.parse(json) as ProbeReportPayload;
+    if (payload?.pr === 1 && payload.n != null && payload.b) return payload;
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
 
 export interface ChatMessageForModal {
   id: string;
@@ -276,14 +301,43 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                             isOwnMessage ? styles.messageBubbleRight : styles.messageBubbleLeft,
                           ]}
                         >
-                          <FilteredText
-                            style={[
-                              styles.messageText,
-                              isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
-                            ]}
-                          >
-                            {message.message}
-                          </FilteredText>
+                          {message.userId === PROBE_REPORT_SENDER_ID ? (() => {
+                            const report = parseProbeReportMessage(message.message);
+                            if (!report) {
+                              return (
+                                <FilteredText
+                                  style={[
+                                    styles.messageText,
+                                    isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
+                                  ]}
+                                >
+                                  {message.message}
+                                </FilteredText>
+                              );
+                            }
+                            return (
+                              <View style={styles.probeReportBlock}>
+                                <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
+                                  Probe Report
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  Target: {report.n} ({report.t === 'npc' ? 'NPC' : 'Player'}) | Level: {report.l} | Map: ({report.x}, {report.y})
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  Breacher: {report.b.breacher} · Guardian: {report.b.guardian} · Phreak: {report.b.phreak}
+                                </Text>
+                              </View>
+                            );
+                          })() : (
+                            <FilteredText
+                              style={[
+                                styles.messageText,
+                                isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
+                              ]}
+                            >
+                              {message.message}
+                            </FilteredText>
+                          )}
                         </View>
                         {!isOwnMessage && (
                           <TouchableOpacity
@@ -503,6 +557,9 @@ const createStyles = (colors: any) =>
       elevation: 3,
     },
     messageText: { fontSize: SIZING.font.body, lineHeight: SIZING.font.body + 4 },
+    probeReportBlock: { gap: 4 },
+    probeReportTitle: { fontSize: SIZING.font.body, fontWeight: '600', marginBottom: 2 },
+    probeReportLine: { fontSize: SIZING.font.body, lineHeight: SIZING.font.body + 4 },
     reportButton: {
       position: 'absolute',
       bottom: -3,
