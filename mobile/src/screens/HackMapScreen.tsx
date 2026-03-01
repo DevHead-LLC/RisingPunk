@@ -4090,9 +4090,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                           if (!myPositionData) return;
                           const id = `probe-${Date.now()}-${selectedCell.x}-${selectedCell.y}`;
                           const targetOwner = selectedCell.info.owner === 'player' ? 'player' : 'npc';
+                          const now = Date.now();
                           const entry: ProbeEntry = {
                             id,
                             sentByUserId: currentUserId ?? undefined,
+                            fromX: myPositionData.x,
+                            fromY: myPositionData.y,
+                            launchedAt: now,
                             targetX: selectedCell.x,
                             targetY: selectedCell.y,
                             targetOwner,
