@@ -810,6 +810,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
                 startedAnimationRef.current.delete(probe.id);
                 setProbes((prev) => prev.filter((p) => p.id !== probe.id));
                 onProbeCompleteFailed(probe.id);
+                cancelProbeMutation({ probeId: probe.id });
                 if (followProbeIdRef.current === probe.id) {
                   onCloseModal();
                 }
@@ -842,7 +843,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         probeAnimationFrameRef.current = null;
       }
     };
-  }, [probes, myPositionData, currentUserId, completeProbeMutation, setProbes, onFollowProbeDisplayUpdate, onCloseModal, onProbeCompleteFailed, onProbeRemovedAfterReturn]);
+  }, [probes, myPositionData, currentUserId, completeProbeMutation, setProbes, onFollowProbeDisplayUpdate, onCloseModal, onProbeCompleteFailed, onProbeRemovedAfterReturn, cancelProbeMutation]);
 
   const handleProbeCancel = useCallback(() => {
     const fid = followProbeIdRef.current;
