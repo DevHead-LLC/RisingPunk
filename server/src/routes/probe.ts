@@ -51,6 +51,84 @@ function pruneStaleProbes(): void {
   }
 }
 
+/** Outbound duration in seconds (must match client formula). */
+function getOutboundDurationSec(entry: ActiveProbe): number {
+  const distance = Math.sqrt((entry.targetX - entry.fromX) ** 2 + (entry.targetY - entry.fromY) ** 2);
+  return Math.max(2, distance * 2);
+}
+
+/** Run completion logic for a probe (report DM + set phase returning). Caller must set entry.completing = true before calling. Returns saved doc for POST /complete response, or null. */
+async function completeProbeEntry(entry: ActiveProbe): Promise<InstanceType<typeof PrivateMessage> | null> {
+  const userId = entry.sentByUserId;
+  const { targetOwner, targetUserId, targetNpcSlug, targetX: x, targetY: y } = entry;
+  try {
+    let targetName: string;
+    let targetLevel: number;
+    let bots: { breacher: number; guardian: number; phreak: number };
+
+    if (targetOwner === 'player') {
+      const targetId = targetUserId;
+      if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) return null;
+      if (String(targetId) === String(userId)) return null;
+      const targetUserForShield = await User.findById(targetId);
+      if (!targetUserForShield) return null;
+      const shielded = await ShieldService.checkAndUpdateShieldStatus(targetUserForShield);
+      if (shielded) return null;
+      targetName = (targetUserForShield as any).handle || 'Unknown';
+      targetLevel = (targetUserForShield as any).level ?? 1;
+      const counts = await BattleRewardService.getUserBotCounts(String(targetId));
+      bots = counts
+        ? { breacher: counts.breacher, guardian: counts.guardian, phreak: counts.phreak }
+        : { breacher: 0, guardian: 0, phreak: 0 };
+    } else {
+      if (!targetNpcSlug || typeof targetNpcSlug !== 'string') return null;
+      const npc = await NPCService.getNPCBySlug(targetNpcSlug);
+      if (!npc) return null;
+      targetName = npc.name;
+      targetLevel = npc.userLevelAssociation;
+      const breacher = npc.battalions.filter((b) => b.type === 'breacher').reduce((s, b) => s + b.quantity, 0);
+      const guardian = npc.battalions.filter((b) => b.type === 'guardian').reduce((s, b) => s + b.quantity, 0);
+      const phreak = npc.battalions.filter((b) => b.type === 'phreak').reduce((s, b) => s + b.quantity, 0);
+      bots = { breacher, guardian, phreak };
+    }
+
+    const payload: ProbeReportPayload = {
+      pr: 1,
+      n: targetName,
+      t: targetOwner,
+      l: targetLevel,
+      x,
+      y,
+      b: bots,
+    };
+    const messageBody = PROBE_REPORT_PREFIX + JSON.stringify(payload);
+    if (messageBody.length > 600) return null;
+
+    const doc = new PrivateMessage({
+      senderId: PROBE_REPORT_SENDER_ID,
+      recipientId: userId,
+      senderUsername: PROBE_REPORT_SENDER_USERNAME,
+      message: messageBody,
+      readAt: null,
+      isFromAdmin: false,
+    });
+    await doc.save();
+
+    const returnDurationSec = getOutboundDurationSec(entry);
+    entry.phase = 'returning';
+    entry.returnDurationSec = returnDurationSec;
+    entry.returnEndAt = Date.now() + returnDurationSec * 1000;
+    return doc;
+  } catch (err) {
+    console.error('Probe completeProbeEntry error:', err);
+    return null;
+  } finally {
+    if (entry.phase !== 'returning') {
+      entry.completing = false;
+    }
+  }
+}
+
 // POST /launch — register probe so other users can see it
 router.post('/launch', auth, async (req: Request, res: Response) => {
   try {
@@ -123,9 +201,20 @@ router.post('/launch', auth, async (req: Request, res: Response) => {
 });
 
 // GET /active — list active probes for map visibility (all users see all probes)
+// When outbound travel time has elapsed (e.g. sender backgrounded), auto-complete so observers see return phase.
 router.get('/active', auth, (req: Request, res: Response) => {
   try {
     pruneStaleProbes();
+    const now = Date.now();
+    for (const p of activeProbesStore.values()) {
+      if (p.phase === 'returning' || p.completing) continue;
+      const outboundDurationSec = getOutboundDurationSec(p);
+      const requiredMs = outboundDurationSec * 1000 - TRAVEL_TIME_TOLERANCE_MS;
+      if (now - p.launchedAt >= requiredMs) {
+        p.completing = true;
+        void completeProbeEntry(p);
+      }
+    }
     const probes = Array.from(activeProbesStore.values()).map((p) => ({
       id: p.id,
       sentByUserId: p.sentByUserId,
@@ -245,8 +334,7 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
       res.status(409).json({ error: 'Probe completion already in progress' });
       return;
     }
-    const distance = Math.sqrt((entry.targetX - entry.fromX) ** 2 + (entry.targetY - entry.fromY) ** 2);
-    const outboundDurationSec = Math.max(2, distance * 2);
+    const outboundDurationSec = getOutboundDurationSec(entry);
     const elapsedMs = Date.now() - entry.launchedAt;
     const requiredMs = outboundDurationSec * 1000 - TRAVEL_TIME_TOLERANCE_MS;
     if (elapsedMs < requiredMs) {
@@ -254,106 +342,24 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    const returnDurationSec = Math.max(2, distance * 2);
     entry.completing = true;
-    try {
-      let targetName: string;
-      let targetLevel: number;
-      let bots: { breacher: number; guardian: number; phreak: number };
-
-      if (targetOwner === 'player') {
-        const targetId = targetUserId;
-        if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) {
-          res.status(400).json({ error: 'targetUserId required for player target' });
-          return;
-        }
-        if (String(targetId) === String(userId)) {
-          res.status(400).json({ error: 'Cannot probe yourself' });
-          return;
-        }
-        const targetUserForShield = await User.findById(targetId);
-        if (!targetUserForShield) {
-          res.status(404).json({ error: 'Target user not found' });
-          return;
-        }
-        const shielded = await ShieldService.checkAndUpdateShieldStatus(targetUserForShield);
-        if (shielded) {
-          res.status(400).json({ error: 'Target is shielded and cannot be probed' });
-          return;
-        }
-        targetName = (targetUserForShield as any).handle || 'Unknown';
-        targetLevel = (targetUserForShield as any).level ?? 1;
-        const counts = await BattleRewardService.getUserBotCounts(String(targetId));
-        bots = counts
-          ? { breacher: counts.breacher, guardian: counts.guardian, phreak: counts.phreak }
-          : { breacher: 0, guardian: 0, phreak: 0 };
-      } else {
-        if (!targetNpcSlug || typeof targetNpcSlug !== 'string') {
-          res.status(400).json({ error: 'targetNpcSlug required for NPC target' });
-          return;
-        }
-        const npc = await NPCService.getNPCBySlug(targetNpcSlug);
-        if (!npc) {
-          res.status(404).json({ error: 'NPC not found' });
-          return;
-        }
-        targetName = npc.name;
-        targetLevel = npc.userLevelAssociation;
-        const breacher = npc.battalions.filter((b) => b.type === 'breacher').reduce((s, b) => s + b.quantity, 0);
-        const guardian = npc.battalions.filter((b) => b.type === 'guardian').reduce((s, b) => s + b.quantity, 0);
-        const phreak = npc.battalions.filter((b) => b.type === 'phreak').reduce((s, b) => s + b.quantity, 0);
-        bots = { breacher, guardian, phreak };
-      }
-
-      const payload: ProbeReportPayload = {
-        pr: 1,
-        n: targetName,
-        t: targetOwner,
-        l: targetLevel,
-        x,
-        y,
-        b: bots,
-      };
-      const messageBody = PROBE_REPORT_PREFIX + JSON.stringify(payload);
-      if (messageBody.length > 600) {
-        res.status(500).json({ error: 'Probe report too long' });
-        return;
-      }
-
-      const doc = new PrivateMessage({
-        senderId: PROBE_REPORT_SENDER_ID,
-        recipientId: userId,
-        senderUsername: PROBE_REPORT_SENDER_USERNAME,
-        message: messageBody,
-        readAt: null,
-        isFromAdmin: false,
-      });
-      await doc.save();
-
-      entry.phase = 'returning';
-      entry.returnDurationSec = returnDurationSec;
-      entry.returnEndAt = Date.now() + returnDurationSec * 1000;
-
-      res.json({
-        success: true,
-        message: {
-          id: String(doc._id),
-          senderId: String(doc.senderId),
-          recipientId: String(doc.recipientId),
-          senderUsername: doc.senderUsername,
-          message: doc.message,
-          timestamp: doc.createdAt,
-          readAt: doc.readAt,
-        },
-      });
-    } catch (err: any) {
-      console.error('Probe complete error:', err);
-      res.status(500).json({ error: err?.message || 'Internal server error' });
-    } finally {
-      if (entry.phase !== 'returning') {
-        entry.completing = false;
-      }
+    const doc = await completeProbeEntry(entry);
+    if (!doc) {
+      res.status(500).json({ error: 'Probe report could not be sent' });
+      return;
     }
+    res.json({
+      success: true,
+      message: {
+        id: String(doc._id),
+        senderId: String(doc.senderId),
+        recipientId: String(doc.recipientId),
+        senderUsername: doc.senderUsername,
+        message: doc.message,
+        timestamp: doc.createdAt,
+        readAt: doc.readAt,
+      },
+    });
   } catch (err: any) {
     console.error('Probe complete error:', err);
     res.status(500).json({ error: err?.message || 'Internal server error' });

@@ -619,6 +619,8 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   const startedAnimationRef = useRef<Set<string>>(new Set());
   const probeAnimationFrameRef = useRef<number | null>(null);
   const probeUpdatesRef = useRef<ProbeUpdate[]>([]);
+  /** Ref to the tick function so we can restart the loop when app returns from background (rAF pauses when app is backgrounded). */
+  const tickRef = useRef<(() => void) | null>(null);
   const [, setFrame] = useState(0);
   /** Last display values sent to parent; only notify when ceil(remainingSec) or phase changes so parent does not re-render at 60fps. */
   const lastFollowDisplayRef = useRef<{ ceilSec: number; phase: 'outbound' | 'returning' } | null>(null);
@@ -626,6 +628,18 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   useEffect(() => {
     probesRef.current = probes;
   }, [probes]);
+
+  // When app returns to foreground, restart the animation loop (requestAnimationFrame does not run while app is backgrounded).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+      if (probesRef.current.length === 0) return;
+      const tick = tickRef.current;
+      if (!tick) return;
+      probeAnimationFrameRef.current = requestAnimationFrame(tick);
+    });
+    return () => sub?.remove();
+  }, []);
 
   useEffect(() => {
     if (probes.length === 0) {
@@ -814,8 +828,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
                 if (followProbeIdRef.current === probe.id) {
                   onCloseModal();
                 }
-                const msg = err?.data?.error ?? err?.message ?? 'Probe report could not be sent.';
-                Alert.alert('Probe Report', msg);
+                // No alert; cleanup only. Expected when server already completed probe (e.g. GET /active auto-complete while sender was backgrounded).
               });
           }
         }
@@ -836,6 +849,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
       probeAnimationFrameRef.current = requestAnimationFrame(tick);
     };
 
+    tickRef.current = tick;
     probeAnimationFrameRef.current = requestAnimationFrame(tick);
     return () => {
       if (probeAnimationFrameRef.current != null) {
@@ -1825,20 +1839,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
 
   // My-position API: reliable (x,y) for user's house for initial center and locator (user-position-and-locator.md)
-  // Skip query when user's house is already in grid (grid-scan will center); only fetch when we need it (Bugbot).
-  const userHouseInGrid = useMemo(() => {
-    if (!grid?.length || !currentUserHandle) return false;
-    for (let y = 0; y < grid.length; y++) {
-      const row = grid[y];
-      if (!row) continue;
-      for (let x = 0; x < row.length; x++) {
-        const cell = row[x] as any;
-        if (cell?.entity === 'house' && cell?.name === currentUserHandle) return true;
-      }
-    }
-    return false;
-  }, [grid, currentUserHandle]);
-  /** When user's house is in grid, derive (x,y) from grid so probe/locator work without calling my-position API (API is skipped in that case). */
+  // Single grid scan: when user's house is in grid we get (x,y) for probe/locator and skip my-position API (Bugbot: avoid duplicate scan).
   const gridDerivedUserPosition = useMemo((): { x: number; y: number } | null => {
     if (!grid?.length || !currentUserHandle) return null;
     for (let y = 0; y < grid.length; y++) {
@@ -1851,6 +1852,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     }
     return null;
   }, [grid, currentUserHandle]);
+  const userHouseInGrid = gridDerivedUserPosition !== null;
   const shouldFetchMyPosition = !restorePan && !!currentUserHandle && terrainDataLoaded && !userHouseInGrid;
   const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(undefined, { skip: !shouldFetchMyPosition });
   const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
