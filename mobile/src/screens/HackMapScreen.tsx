@@ -1954,6 +1954,13 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     setReturnCompletedProbeIds((prev) => new Set(prev).add(probeId));
   }, []);
 
+  const cancelProbeMutationSafe = useCallback(
+    (args: { probeId: string }) => {
+      cancelProbeMutation(args).catch(() => {});
+    },
+    [cancelProbeMutation]
+  );
+
   const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
   
   const { data: crewDetails, isLoading: isLoadingCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId || '', {
@@ -4348,7 +4355,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           onProbeRemovedAfterReturn={onProbeRemovedAfterReturn}
           onFollowProbeDisplayUpdate={setFollowProbeDisplay}
           cancelProbeRef={cancelProbeRef}
-          cancelProbeMutation={(args) => cancelProbeMutation(args).catch(() => {})}
+          cancelProbeMutation={cancelProbeMutationSafe}
           colors={colors}
           styles={styles}
           animatedMapStyle={animatedMapStyle}
