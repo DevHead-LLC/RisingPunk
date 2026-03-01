@@ -1256,6 +1256,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [failedProbeIds, setFailedProbeIds] = useState<Set<string>>(() => new Set());
   /** Probe ids we removed from local state because return finished; server may still have them for one poll cycle. Exclude from displayProbes so ghost doesn't render or count toward MAX_PROBES. */
   const [returnCompletedProbeIds, setReturnCompletedProbeIds] = useState<Set<string>>(() => new Set());
+  /** Prune failedProbeIds and returnCompletedProbeIds when server no longer has those probes (single effect, single serverIds). */
   useEffect(() => {
     const serverIds = new Set((activeProbesData?.probes ?? []).map((p) => p.id));
     setFailedProbeIds((prev) => {
@@ -1269,9 +1270,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       });
       return changed ? next : prev;
     });
-  }, [activeProbesData?.probes]);
-  useEffect(() => {
-    const serverIds = new Set((activeProbesData?.probes ?? []).map((p) => p.id));
     setReturnCompletedProbeIds((prev) => {
       let changed = false;
       const next = new Set(prev);
@@ -1948,6 +1946,10 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       next.add(probeId);
       return next;
     });
+  }, []);
+
+  const onProbeRemovedAfterReturn = useCallback((probeId: string) => {
+    setReturnCompletedProbeIds((prev) => new Set(prev).add(probeId));
   }, []);
 
   const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
@@ -4337,7 +4339,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           onFollowProbe={handleProbeFollow}
           onCloseModal={handleProbeFollowModalClose}
           onProbeCompleteFailed={onProbeCompleteFailed}
-          onProbeRemovedAfterReturn={(id) => setReturnCompletedProbeIds((prev) => new Set(prev).add(id))}
+          onProbeRemovedAfterReturn={onProbeRemovedAfterReturn}
           onFollowProbeDisplayUpdate={setFollowProbeDisplay}
           cancelProbeRef={cancelProbeRef}
           cancelProbeMutation={(args) => cancelProbeMutation(args).catch(() => {})}
