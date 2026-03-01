@@ -14,17 +14,26 @@ import { SIZING, styleGuide } from '../../styles/theme';
 interface GlobalErrorModalProps {
   visible: boolean;
   onLogOut: () => void;
+  /** When 'server_down', shows server-down message and asks user to sign in again when server is back. */
+  variant?: 'generic' | 'server_down' | null;
 }
 
 export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   visible,
   onLogOut,
+  variant = 'generic',
 }) => {
   const colors = useThemeColors();
 
   const handleButtonPress = () => {
     onLogOut();
   };
+
+  const isServerDown = variant === 'server_down';
+  const title = isServerDown ? 'The server is down' : 'Something went wrong';
+  const message = isServerDown
+    ? 'Please try again later. Sign in again when the server is back.'
+    : 'Please Sign In';
 
   return (
     <Modal
@@ -41,11 +50,11 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
           <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
             <View style={[styles.modalContent, { borderColor: colors.matrix }]}>
               <Text style={[styles.title, { color: colors.text.accent }]}>
-                Something went wrong
+                {title}
               </Text>
               
               <Text style={[styles.message, { color: colors.text.secondary }]}>
-                Please Sign In
+                {message}
               </Text>
 
               <Pressable

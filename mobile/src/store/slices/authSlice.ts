@@ -4,6 +4,7 @@ import { API_URL } from '../../config';
 import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
+import { clearPersistedTurfNavState } from '../../utils/turfNavStatePersistence';
 import { authApi } from '../api/authApi';
 import { mapApi } from '../api/mapApi';
 import { trackAccountCreated, markAccountExists } from '../../services/analyticsService';
@@ -662,7 +663,8 @@ export const logoutUser = createAsyncThunk(
     //   so "Play as Guest" can resume the guest (or linked) account after signing out.
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
-    
+    await clearPersistedTurfNavState();
+
     // Note: We do NOT clear first-time tracking flags on logout.
     // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
     // persist across sessions so the same user doesn't get duplicate first-time events.

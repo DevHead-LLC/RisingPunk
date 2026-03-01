@@ -31,6 +31,7 @@ const AppContent = memo(() => {
   const { updateRequired, minAppVersion } = useAppSelector((state) => state.ui.forceUpdate);
   const showFinancials = useAppSelector((state) => state.ui.modals.financialStatements);
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
+  const globalErrorVariant = useAppSelector((state) => state.ui.modals.globalErrorVariant);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
@@ -306,9 +307,9 @@ const AppContent = memo(() => {
     }
   }, [dispatch]);
 
-  // Handle global error modal log out
+  // Handle global error modal log out (server down or generic)
   const handleGlobalErrorLogOut = useCallback(() => {
-    dispatch(setGlobalErrorModal(false));
+    dispatch(setGlobalErrorModal(false)); // reducer also clears globalErrorVariant when payload is false
     dispatch(logoutUser());
   }, [dispatch]);
 
@@ -394,6 +395,7 @@ const AppContent = memo(() => {
       <GlobalErrorModal
         visible={showGlobalError && !!token}
         onLogOut={handleGlobalErrorLogOut}
+        variant={globalErrorVariant ?? 'generic'}
       />
       <AccountSwitchedModal
         visible={showAccountSwitched}

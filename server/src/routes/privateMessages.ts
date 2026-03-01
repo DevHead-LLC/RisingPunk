@@ -5,8 +5,25 @@ import { User } from '../models/User';
 import { PrivateMessage, ADMIN_BROADCAST_FOOTER } from '../models/PrivateMessage';
 import { filterBadWords } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
+import { PROBE_REPORT_SENDER_ID, PROBE_REPORT_SENDER_USERNAME } from '../constants/systemSenders';
 
 const router = express.Router();
+
+const PROBE_REPORT_PREFIX = 'PRB|';
+
+/** Return a human-readable inbox preview for probe report messages; otherwise return the raw message. */
+function conversationListLastMessagePreview(raw: string | undefined, isProbeReport: boolean): string {
+  if (!isProbeReport || typeof raw !== 'string' || !raw.startsWith(PROBE_REPORT_PREFIX)) {
+    return raw ?? '';
+  }
+  try {
+    const payload = JSON.parse(raw.slice(PROBE_REPORT_PREFIX.length)) as { n?: string };
+    if (payload?.n != null) return `Probe Report: ${payload.n}`;
+  } catch (_) {
+    // ignore
+  }
+  return 'Probe Report';
+}
 
 const PM_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const PM_RATE_LIMIT_MAX = 10;
@@ -189,6 +206,7 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
       });
     }
 
+    const probeReportSenderIdStr = PROBE_REPORT_SENDER_ID.toString();
     const withUsernames = await Promise.all(
       filtered
         .map(async (row: any) => {
@@ -197,15 +215,21 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
           const otherUserIdFromKey = keyIsBroadcast ? key.slice(0, -':broadcast'.length) : key;
           const isBroadcast =
             keyIsBroadcast || (row.lastIsAdminBroadcast === true && adminIdSet.has(otherUserIdFromKey));
-          const otherId = new mongoose.Types.ObjectId(otherUserIdFromKey);
-          const other = await User.findById(otherId).select('handle').lean();
+          const isProbeReport = otherUserIdFromKey === probeReportSenderIdStr;
+          const other = isProbeReport
+            ? null
+            : await User.findById(new mongoose.Types.ObjectId(otherUserIdFromKey)).select('handle').lean();
           return {
             otherUserId: otherUserIdFromKey,
-            otherUsername: isBroadcast ? 'RisingPunk (Announcements)' : (other?.handle ?? 'Unknown'),
-            lastMessage: row.lastMessage,
+            otherUsername: isBroadcast
+              ? 'RisingPunk (Announcements)'
+              : isProbeReport
+                ? PROBE_REPORT_SENDER_USERNAME
+                : (other?.handle ?? 'Unknown'),
+            lastMessage: conversationListLastMessagePreview(row.lastMessage, isProbeReport),
             lastAt: row.lastAt,
             unreadCount: row.unreadCount ?? 0,
-            isBroadcast: !!isBroadcast,
+            isBroadcast: !!isBroadcast || isProbeReport,
           };
         }),
     );
