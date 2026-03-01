@@ -22,6 +22,9 @@ import {
 import { BaseChatModal, ChatMessageForModal } from '../hackMap/BaseChatModal';
 import { useAppSelector } from '../../store/hooks';
 
+/** System sender ID for Probe Report; replies to this ID always fail (no User document). Must match server PROBE_REPORT_SENDER_ID. */
+const PROBE_REPORT_SENDER_ID = '000000000000000000000001';
+
 interface MessagesModalProps {
   visible: boolean;
   onClose: () => void;
@@ -51,9 +54,11 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   const otherUserId = view === 'inbox' ? (openToUserId ?? null) : view.otherUserId;
   const otherUsername = view === 'inbox' ? (openToUsername ?? null) : view.otherUsername;
   const isBroadcast = view !== 'inbox' && view.isBroadcast === true;
+  /** Only use broadcastOnly for real admin announcements; Probe Report thread must fetch normal PMs so messages display. */
+  const threadBroadcastOnly = isBroadcast && otherUserId !== PROBE_REPORT_SENDER_ID;
 
   const { data: threadData, isLoading: isLoadingThread, error: threadError } = useGetThreadQuery(
-    { otherUserId: otherUserId!, broadcastOnly: isBroadcast },
+    { otherUserId: otherUserId!, broadcastOnly: threadBroadcastOnly },
     {
       skip: !visible || !otherUserId,
       pollingInterval: visible && otherUserId ? 2000 : 0,
@@ -72,7 +77,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
     isAdminBroadcast: msg.isAdminBroadcast,
   }));
 
-  const canReply = !isBroadcast;
+  const canReply = !isBroadcast && otherUserId !== PROBE_REPORT_SENDER_ID;
 
   const onSendMessage = useCallback(
     async (trimmedMessage: string) => {
@@ -103,7 +108,10 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
         otherUsername: c.otherUsername,
         isBroadcast: c.isBroadcast === true,
       });
-      markRead({ otherUserId: c.otherUserId, broadcastOnly: c.isBroadcast === true });
+      markRead({
+        otherUserId: c.otherUserId,
+        broadcastOnly: c.isBroadcast === true && c.otherUserId !== PROBE_REPORT_SENDER_ID,
+      });
     },
     [markRead],
   );
