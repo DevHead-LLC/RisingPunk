@@ -39,6 +39,8 @@ const PROBE_TTL_MS = 10 * 60 * 1000;
 const MAX_PROBES_PER_USER = 2;
 /** Allow completion up to this many ms before strict travel time (absorbs RTT + client animation start after /launch response). */
 const TRAVEL_TIME_TOLERANCE_MS = 1000;
+/** Delay after nominal outbound end before GET /active auto-complete runs. Client reaches progress 1 at outbound end then waits 400ms before POST /complete; this must be larger so active senders complete first. */
+const AUTO_COMPLETE_DELAY_AFTER_OUTBOUND_MS = 2000;
 
 function pruneStaleProbes(): void {
   const now = Date.now();
@@ -207,7 +209,7 @@ router.post('/launch', auth, async (req: Request, res: Response) => {
 });
 
 // GET /active — list active probes for map visibility (all users see all probes)
-// When outbound travel time has elapsed (e.g. sender backgrounded), auto-complete so observers see return phase.
+// When outbound + delay has elapsed (e.g. sender backgrounded), auto-complete so observers see return phase. Threshold is after client would POST /complete (outbound end + 400ms buffer).
 router.get('/active', auth, (req: Request, res: Response) => {
   try {
     pruneStaleProbes();
@@ -215,8 +217,8 @@ router.get('/active', auth, (req: Request, res: Response) => {
     for (const p of activeProbesStore.values()) {
       if (p.phase === 'returning' || p.completing) continue;
       const outboundDurationSec = getOutboundDurationSec(p);
-      const requiredMs = outboundDurationSec * 1000 - TRAVEL_TIME_TOLERANCE_MS;
-      if (now - p.launchedAt >= requiredMs) {
+      const autoCompleteThresholdMs = outboundDurationSec * 1000 + AUTO_COMPLETE_DELAY_AFTER_OUTBOUND_MS;
+      if (now - p.launchedAt >= autoCompleteThresholdMs) {
         p.completing = true;
         const probeId = p.id;
         void completeProbeEntry(p).then((result) => {
