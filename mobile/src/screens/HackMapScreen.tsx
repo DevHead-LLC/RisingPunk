@@ -636,6 +636,10 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
       if (probesRef.current.length === 0) return;
       const tick = tickRef.current;
       if (!tick) return;
+      if (probeAnimationFrameRef.current != null) {
+        cancelAnimationFrame(probeAnimationFrameRef.current);
+        probeAnimationFrameRef.current = null;
+      }
       probeAnimationFrameRef.current = requestAnimationFrame(tick);
     });
     return () => sub?.remove();

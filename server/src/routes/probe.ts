@@ -57,8 +57,14 @@ function getOutboundDurationSec(entry: ActiveProbe): number {
   return Math.max(2, distance * 2);
 }
 
-/** Run completion logic for a probe (report DM + set phase returning). Caller must set entry.completing = true before calling. Returns saved doc for POST /complete response, or null. */
-async function completeProbeEntry(entry: ActiveProbe): Promise<InstanceType<typeof PrivateMessage> | null> {
+/** Result of completeProbeEntry: success with doc, client error (4xx) with statusCode/message, or null for server error. */
+type CompleteProbeResult =
+  | { success: true; doc: InstanceType<typeof PrivateMessage> }
+  | { success: false; statusCode: number; message: string }
+  | null;
+
+/** Run completion logic for a probe (report DM + set phase returning). Caller must set entry.completing = true before calling. */
+async function completeProbeEntry(entry: ActiveProbe): Promise<CompleteProbeResult> {
   const userId = entry.sentByUserId;
   const { targetOwner, targetUserId, targetNpcSlug, targetX: x, targetY: y } = entry;
   try {
@@ -68,12 +74,12 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<InstanceType<type
 
     if (targetOwner === 'player') {
       const targetId = targetUserId;
-      if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) return null;
-      if (String(targetId) === String(userId)) return null;
+      if (!targetId || !mongoose.Types.ObjectId.isValid(targetId)) return { success: false, statusCode: 400, message: 'Invalid target' };
+      if (String(targetId) === String(userId)) return { success: false, statusCode: 400, message: 'Cannot probe yourself' };
       const targetUserForShield = await User.findById(targetId);
-      if (!targetUserForShield) return null;
+      if (!targetUserForShield) return { success: false, statusCode: 404, message: 'Target user not found' };
       const shielded = await ShieldService.checkAndUpdateShieldStatus(targetUserForShield);
-      if (shielded) return null;
+      if (shielded) return { success: false, statusCode: 403, message: 'Target is shielded' };
       targetName = (targetUserForShield as any).handle || 'Unknown';
       targetLevel = (targetUserForShield as any).level ?? 1;
       const counts = await BattleRewardService.getUserBotCounts(String(targetId));
@@ -81,9 +87,9 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<InstanceType<type
         ? { breacher: counts.breacher, guardian: counts.guardian, phreak: counts.phreak }
         : { breacher: 0, guardian: 0, phreak: 0 };
     } else {
-      if (!targetNpcSlug || typeof targetNpcSlug !== 'string') return null;
+      if (!targetNpcSlug || typeof targetNpcSlug !== 'string') return { success: false, statusCode: 400, message: 'Invalid NPC target' };
       const npc = await NPCService.getNPCBySlug(targetNpcSlug);
-      if (!npc) return null;
+      if (!npc) return { success: false, statusCode: 404, message: 'Target NPC not found' };
       targetName = npc.name;
       targetLevel = npc.userLevelAssociation;
       const breacher = npc.battalions.filter((b) => b.type === 'breacher').reduce((s, b) => s + b.quantity, 0);
@@ -102,7 +108,7 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<InstanceType<type
       b: bots,
     };
     const messageBody = PROBE_REPORT_PREFIX + JSON.stringify(payload);
-    if (messageBody.length > 600) return null;
+    if (messageBody.length > 600) return { success: false, statusCode: 400, message: 'Probe report payload too large' };
 
     const doc = new PrivateMessage({
       senderId: PROBE_REPORT_SENDER_ID,
@@ -118,7 +124,7 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<InstanceType<type
     entry.phase = 'returning';
     entry.returnDurationSec = returnDurationSec;
     entry.returnEndAt = Date.now() + returnDurationSec * 1000;
-    return doc;
+    return { success: true, doc };
   } catch (err) {
     console.error('Probe completeProbeEntry error:', err);
     return null;
@@ -212,7 +218,10 @@ router.get('/active', auth, (req: Request, res: Response) => {
       const requiredMs = outboundDurationSec * 1000 - TRAVEL_TIME_TOLERANCE_MS;
       if (now - p.launchedAt >= requiredMs) {
         p.completing = true;
-        void completeProbeEntry(p);
+        const probeId = p.id;
+        void completeProbeEntry(p).then((result) => {
+          if (!result?.success) activeProbesStore.delete(probeId);
+        });
       }
     }
     const probes = Array.from(activeProbesStore.values()).map((p) => ({
@@ -343,23 +352,28 @@ router.post('/complete', auth, async (req: Request, res: Response) => {
     }
 
     entry.completing = true;
-    const doc = await completeProbeEntry(entry);
-    if (!doc) {
-      res.status(500).json({ error: 'Probe report could not be sent' });
+    const result = await completeProbeEntry(entry);
+    if (result?.success) {
+      const doc = result.doc;
+      res.json({
+        success: true,
+        message: {
+          id: String(doc._id),
+          senderId: String(doc.senderId),
+          recipientId: String(doc.recipientId),
+          senderUsername: doc.senderUsername,
+          message: doc.message,
+          timestamp: doc.createdAt,
+          readAt: doc.readAt,
+        },
+      });
       return;
     }
-    res.json({
-      success: true,
-      message: {
-        id: String(doc._id),
-        senderId: String(doc.senderId),
-        recipientId: String(doc.recipientId),
-        senderUsername: doc.senderUsername,
-        message: doc.message,
-        timestamp: doc.createdAt,
-        readAt: doc.readAt,
-      },
-    });
+    if (result && !result.success) {
+      res.status(result.statusCode).json({ error: result.message });
+      return;
+    }
+    res.status(500).json({ error: 'Probe report could not be sent' });
   } catch (err: any) {
     console.error('Probe complete error:', err);
     res.status(500).json({ error: err?.message || 'Internal server error' });
