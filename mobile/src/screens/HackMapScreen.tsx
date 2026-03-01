@@ -520,10 +520,6 @@ type ProbeAnimationLayerProps = {
   myPositionData: { x: number; y: number } | undefined;
   currentUserId: string | null | undefined;
   completeProbeMutation: ReturnType<typeof useCompleteProbeMutation>[0];
-  followProbeId: string | null;
-  setFollowProbeId: (id: string | null) => void;
-  showProbeFollowModal: boolean;
-  setShowProbeFollowModal: (v: boolean) => void;
   probeFollowModeRef: React.MutableRefObject<boolean>;
   followProbeIdRef: React.MutableRefObject<string | null>;
   containerSizeRef: React.MutableRefObject<{ width: number; height: number }>;
@@ -586,9 +582,6 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   myPositionData,
   currentUserId,
   completeProbeMutation,
-  followProbeId,
-  setFollowProbeId,
-  setShowProbeFollowModal,
   probeFollowModeRef,
   followProbeIdRef,
   containerSizeRef,
@@ -4311,10 +4304,6 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           myPositionData={myPositionData}
           currentUserId={currentUserId}
           completeProbeMutation={completeProbeMutation}
-          followProbeId={followProbeId}
-          setFollowProbeId={setFollowProbeId}
-          showProbeFollowModal={showProbeFollowModal}
-          setShowProbeFollowModal={setShowProbeFollowModal}
           probeFollowModeRef={probeFollowModeRef}
           followProbeIdRef={followProbeIdRef}
           containerSizeRef={containerSizeRef}
