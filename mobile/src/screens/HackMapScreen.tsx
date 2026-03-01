@@ -909,6 +909,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
           return (
             <View key={probe.id} pointerEvents="box-none" style={[StyleSheet.absoluteFill, { left: 0, top: 0, right: 0, bottom: 0 }]}>
               <View
+                pointerEvents="none"
                 style={{
                   position: 'absolute',
                   left: startX,
@@ -4088,7 +4089,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                             return;
                           }
                           if (!myPositionData) return;
-                          const id = `probe-${Date.now()}-${selectedCell.x}-${selectedCell.y}`;
+                          const id = `probe-${currentUserId ?? ''}-${Date.now()}-${selectedCell.x}-${selectedCell.y}`;
                           const targetOwner = selectedCell.info.owner === 'player' ? 'player' : 'npc';
                           const now = Date.now();
                           const entry: ProbeEntry = {
