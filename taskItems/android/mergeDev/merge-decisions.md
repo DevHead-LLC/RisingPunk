@@ -812,6 +812,22 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Post-merge regression fix: 2025-03-01 (HackMapScreen researchFeatures.some)
+
+**Context:** After merge (Session 2025-03-01), Android crashed in HackMapScreen with `TypeError: researchFeatures.some is not a function (it is undefined)`.
+
+**Cause:** In the selected-cell panel (probe button visibility), code called `(researchFeatures as any[] | undefined)?.some(...)`. `researchFeatures` is the **query result object** from `useGetUserFeaturesQuery('home-defense')`, which has shape `{ features, insuranceReduction?, taxReduction? }` (researchFeaturesApi: getUserFeatures returns that shape). The array is `researchFeatures.features`, not `researchFeatures` itself. Calling `.some()` on the object is undefined and throws.
+
+**Fix:** Use the features array: `researchFeatures?.features?.some((f: any) => f.id === 'probe' && f.isUnlocked)` instead of `(researchFeatures as any[] | undefined)?.some(...)`.
+
+**File:** `mobile/src/screens/HackMapScreen.tsx` (line ~4119, selected cell panel probe-unlocked check).
+
+**Consistency:** Same file already uses `researchFeatures?.features?.find(...)` for antivirusFeature (line ~2213); this fix aligns the probe-unlocked check with the API shape.
+
+**Status:** Fixed. Use `researchFeatures?.features` whenever checking feature list from getUserFeatures in HackMapScreen (or elsewhere).
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.

@@ -624,6 +624,15 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   const [, setFrame] = useState(0);
   /** Last display values sent to parent; only notify when ceil(remainingSec) or phase changes so parent does not re-render at 60fps. */
   const lastFollowDisplayRef = useRef<{ ceilSec: number; phase: 'outbound' | 'returning' } | null>(null);
+  /** Refs for callbacks so effect only depends on probes/position; avoids re-running effect when parent re-renders (e.g. follow modal updates on Android) which would cancel rAF and drop return transition. */
+  const onCloseModalRef = useRef(onCloseModal);
+  const onFollowProbeDisplayUpdateRef = useRef(onFollowProbeDisplayUpdate);
+  const onProbeCompleteFailedRef = useRef(onProbeCompleteFailed);
+  const onProbeRemovedAfterReturnRef = useRef(onProbeRemovedAfterReturn);
+  onCloseModalRef.current = onCloseModal;
+  onFollowProbeDisplayUpdateRef.current = onFollowProbeDisplayUpdate;
+  onProbeCompleteFailedRef.current = onProbeCompleteFailed;
+  onProbeRemovedAfterReturnRef.current = onProbeRemovedAfterReturn;
 
   useEffect(() => {
     probesRef.current = probes;
@@ -760,7 +769,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
             const last = lastFollowDisplayRef.current;
             if (last == null || last.ceilSec !== ceilSec || last.phase !== fu.phase) {
               lastFollowDisplayRef.current = { ceilSec, phase: fu.phase };
-              onFollowProbeDisplayUpdate({ remainingSec: fu.remainingSec, phase: fu.phase });
+              onFollowProbeDisplayUpdateRef.current({ remainingSec: fu.remainingSec, phase: fu.phase });
             }
           }
         }
@@ -791,10 +800,10 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         const { progress, phase } = u;
 
         if (phase === 'returning') {
-          if (progress <= 0) {
+            if (progress <= 0) {
             toRemove.push(probe.id);
             if (followProbeIdRef.current === probe.id) {
-              onCloseModal();
+              onCloseModalRef.current();
             }
           }
         } else if (progress >= 1) {
@@ -815,11 +824,18 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
             })
               .unwrap()
               .then(() => {
-                data.returnStartTime = Date.now();
+                const now = Date.now();
+                const returnDurationSec = data.durationSec;
+                const returnEndAt = now + returnDurationSec * 1000;
+                data.returnStartTime = now;
                 data.returnStartProgress = 1;
-                data.returnDuration = data.durationSec;
+                data.returnDuration = returnDurationSec;
                 setProbes((prev) =>
-                  prev.map((p) => (p.id === probe.id ? { ...p, phase: 'returning' as const, remainingSec: data.durationSec } : p))
+                  prev.map((p) =>
+                    p.id === probe.id
+                      ? { ...p, phase: 'returning' as const, remainingSec: returnDurationSec, returnEndAt, returnDurationSec }
+                      : p
+                  )
                 );
               })
               .catch((err: any) => {
@@ -827,10 +843,10 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
                 probeDataRef.current.delete(probe.id);
                 startedAnimationRef.current.delete(probe.id);
                 setProbes((prev) => prev.filter((p) => p.id !== probe.id));
-                onProbeCompleteFailed(probe.id);
+                onProbeCompleteFailedRef.current(probe.id);
                 cancelProbeMutation({ probeId: probe.id });
                 if (followProbeIdRef.current === probe.id) {
-                  onCloseModal();
+                  onCloseModalRef.current();
                 }
                 // No alert; cleanup only. Expected when server already completed probe (e.g. GET /active auto-complete while sender was backgrounded).
               });
@@ -842,7 +858,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         toRemove.forEach((id) => {
           probeDataRef.current.delete(id);
           startedAnimationRef.current.delete(id);
-          onProbeRemovedAfterReturn(id);
+          onProbeRemovedAfterReturnRef.current(id);
         });
         setProbes((prev) => {
           const next = prev.filter((p) => !toRemove.includes(p.id));
@@ -861,7 +877,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         probeAnimationFrameRef.current = null;
       }
     };
-  }, [probes, myPositionData, currentUserId, completeProbeMutation, setProbes, onFollowProbeDisplayUpdate, onCloseModal, onProbeCompleteFailed, onProbeRemovedAfterReturn, cancelProbeMutation]);
+  }, [probes, myPositionData, currentUserId, completeProbeMutation, setProbes, cancelProbeMutation]);
 
   const handleProbeCancel = useCallback(() => {
     const fid = followProbeIdRef.current;
@@ -1269,7 +1285,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [completeProbeMutation] = useCompleteProbeMutation();
   const [launchProbeMutation] = useLaunchProbeMutation();
   const [cancelProbeMutation] = useCancelProbeMutation();
-  const { data: activeProbesData } = useGetActiveProbesQuery(undefined, {
+  const { data: activeProbesData, refetch: refetchActiveProbes } = useGetActiveProbesQuery(undefined, {
     pollingInterval: 3000,
   });
   /** Probe ids for which /complete failed; exclude from display so we don't re-init and retry in a loop until server TTL. */
@@ -1306,6 +1322,20 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     const ours = probes;
     const serverProbes = (activeProbesData?.probes ?? []).filter((sp) => !failedProbeIds.has(sp.id));
     const ourIds = new Set(ours.map((p) => p.id));
+    const serverById = new Map(serverProbes.map((sp) => [sp.id, sp]));
+    // Merge server phase/return into our probes so when app returns from background we show correct state (Android: rAF pauses so client stays at target; server has already auto-completed and set returning).
+    const mergedOurs = ours.map((p) => {
+      const server = serverById.get(p.id);
+      if (server) {
+        return {
+          ...p,
+          phase: server.phase ?? p.phase,
+          returnEndAt: server.returnEndAt ?? p.returnEndAt,
+          returnDurationSec: server.returnDurationSec ?? p.returnDurationSec,
+        };
+      }
+      return p;
+    });
     const others = serverProbes
       .filter((sp) => !ourIds.has(sp.id) && !returnCompletedProbeIds.has(sp.id))
       .map(
@@ -1328,7 +1358,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
           returnDurationSec: sp.returnDurationSec,
         })
       );
-    return [...ours, ...others];
+    return [...mergedOurs, ...others];
   }, [probes, activeProbesData?.probes, failedProbeIds, returnCompletedProbeIds]);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
@@ -1876,6 +1906,16 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     });
     return () => sub?.remove();
   }, [shouldFetchMyPosition, triggerGetMyMapPosition]);
+
+  // When app returns from background, refetch active probes so we get server phase (returning/completed) immediately. Android: rAF pauses when backgrounded so probe appears stuck at target; server has already auto-completed — refetch + displayProbes merge shows correct state.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+      if (probes.length === 0) return;
+      refetchActiveProbes();
+    });
+    return () => sub?.remove();
+  }, [probes.length, refetchActiveProbes]);
 
   // Phase 6: Viewport fetching during panning with minimal data
   // Track the last viewport we fetched to avoid duplicate requests
@@ -4116,7 +4156,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                     </TouchableOpacity>
                   )}
                   {(() => {
-                    const probeUnlocked = (researchFeatures as any[] | undefined)?.some((f: any) => f.id === 'probe' && f.isUnlocked);
+                    const probeUnlocked = researchFeatures?.features?.some((f: any) => f.id === 'probe' && f.isUnlocked);
                     const isTargetSelf = selectedCell.info.owner === 'player' && selectedCell.info.name === currentUserHandle;
                     const canProbePlayer = selectedCell.info.owner === 'player' && selectedCell.info.userId && !isTargetSelf && !selectedCell.info.isShielded;
                     const canProbeNpc = selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug;
