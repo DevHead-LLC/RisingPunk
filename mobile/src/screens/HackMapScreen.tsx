@@ -729,10 +729,14 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
           const returnElapsed = (now - returnStartTime) / 1000;
           const t = Math.min(1, returnDuration > 0 ? returnElapsed / returnDuration : 1);
           progress = returnStartProgress * (1 - t);
+          // Clamp to [0,1] so observer (using local clock) never draws probe off the line when clocks differ from server.
+          progress = Math.max(0, Math.min(1, progress));
           remainingSec = Math.max(0, returnDuration - returnElapsed);
         } else {
           const elapsed = (now - data.startTime) / 1000;
-          progress = Math.min(1, elapsed / data.durationSec);
+          progress = elapsed / data.durationSec;
+          // Clamp to [0,1] so observer never draws probe off the line (e.g. north of sender) due to clock skew.
+          progress = Math.max(0, Math.min(1, progress));
           remainingSec = Math.max(0, data.durationSec * (1 - progress));
         }
 
@@ -1907,15 +1911,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     return () => sub?.remove();
   }, [shouldFetchMyPosition, triggerGetMyMapPosition]);
 
-  // When app returns from background, refetch active probes so we get server phase (returning/completed) immediately. Android: rAF pauses when backgrounded so probe appears stuck at target; server has already auto-completed — refetch + displayProbes merge shows correct state.
+  // When app returns from background, refetch active probes so we get server phase (returning/completed) immediately. Sender: merge updates our probe; observer: gets others' probes with correct phase. Refetch for everyone (not only when probes.length > 0) so observers also get fresh data after background/idle.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active') return;
-      if (probes.length === 0) return;
       refetchActiveProbes();
     });
     return () => sub?.remove();
-  }, [probes.length, refetchActiveProbes]);
+  }, [refetchActiveProbes]);
 
   // Phase 6: Viewport fetching during panning with minimal data
   // Track the last viewport we fetched to avoid duplicate requests
