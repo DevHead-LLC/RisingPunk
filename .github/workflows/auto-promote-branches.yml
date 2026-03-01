@@ -108,24 +108,39 @@ jobs:
         if: steps.context.outputs.skipped != 'true'
         run: |
           PR_NUMBER="${{ steps.context.outputs.pr_number }}"
-          CHECK_RUN_ID="${{ steps.context.outputs.check_run_id }}"
+          HEAD_SHA="${{ steps.context.outputs.head_sha }}"
           
-          echo "🔍 Checking for actual bug reports in check run output and PR comments..."
+          echo "🔍 Checking ALL Cursor/Bugbot check runs for this commit (not just the one that triggered this workflow)..."
           BUGS_REPORTED=0
           
-          if [ -n "$CHECK_RUN_ID" ]; then
-            CHECK_OUTPUT=$(gh api repos/${{ github.repository }}/check-runs/$CHECK_RUN_ID 2>/dev/null || echo "{}")
+          # List all check runs for this commit; inspect every Cursor/Bugbot run (Bugbot reports issues, Autofix does not - we must not rely on which run triggered the event)
+          CHECK_RUNS_JSON=$(gh api "repos/${{ github.repository }}/commits/${HEAD_SHA}/check-runs?per_page=100" 2>/dev/null | jq -c '.check_runs // []' 2>/dev/null || echo "[]")
+          if [ -z "$CHECK_RUNS_JSON" ] || [ "$CHECK_RUNS_JSON" = "null" ]; then
+            CHECK_RUNS_JSON="[]"
+          fi
+          CURSOR_RUN_IDS=$(echo "$CHECK_RUNS_JSON" | jq -r '.[] | select(.name | ascii_downcase | test("cursor|bugbot")) | .id' 2>/dev/null || true)
+          
+          for RUN_ID in $CURSOR_RUN_IDS; do
+            [ -z "$RUN_ID" ] && continue
+            CHECK_OUTPUT=$(gh api "repos/${{ github.repository }}/check-runs/${RUN_ID}" 2>/dev/null || echo "{}")
             CHECK_TEXT=$(echo "$CHECK_OUTPUT" | jq -r '.output.summary // .output.text // ""' 2>/dev/null || echo "")
+            RUN_NAME=$(echo "$CHECK_OUTPUT" | jq -r '.name // "unknown"' 2>/dev/null)
             if echo "$CHECK_TEXT" | grep -qiE "(posted analysis results.*[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|[0-9]+[[:space:]]+bug(s?)[[:space:]]+reported|found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?)"; then
-              BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
-              if [ "$BUGS_REPORTED" = "0" ]; then
-                BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
+              N=$(echo "$CHECK_TEXT" | grep -oE "([0-9]+)[[:space:]]+bug(s?)[[:space:]]+reported" | head -1 | grep -oE "[0-9]+" || echo "0")
+              if [ "$N" = "0" ]; then
+                N=$(echo "$CHECK_TEXT" | grep -oE "posted analysis results.*([0-9]+)[[:space:]]+bug" | grep -oE "[0-9]+" | head -1 || echo "0")
               fi
-              if [ -z "$BUGS_REPORTED" ] || [ "$BUGS_REPORTED" = "0" ]; then
-                BUGS_REPORTED=$(echo "$CHECK_TEXT" | grep -oE "found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?" | grep -oE "[0-9]+" | head -1 || echo "0")
+              if [ -z "$N" ] || [ "$N" = "0" ]; then
+                N=$(echo "$CHECK_TEXT" | grep -oE "found[[:space:]]+[0-9]+[[:space:]]+potential[[:space:]]+issues?" | grep -oE "[0-9]+" | head -1 || echo "0")
+              fi
+              if [ -n "$N" ] && [ "$N" -gt 0 ] 2>/dev/null; then
+                echo "   Run '$RUN_NAME' (id $RUN_ID): reported $N bug(s) / potential issues"
+                if [ "$N" -gt "$BUGS_REPORTED" ] 2>/dev/null; then
+                  BUGS_REPORTED=$N
+                fi
               fi
             fi
-          fi
+          done
           
           ISSUE_COMMENTS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments 2>/dev/null || echo "[]")
           CURSOR_COMMENTS=$(echo "$ISSUE_COMMENTS" | jq -r '.[] | select(.user.login | ascii_downcase | contains("cursor")) | .body' 2>/dev/null || echo "")
