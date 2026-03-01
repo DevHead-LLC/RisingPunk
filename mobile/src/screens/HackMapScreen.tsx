@@ -1836,7 +1836,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
 
   // My-position API: reliable (x,y) for user's house for initial center and locator (user-position-and-locator.md)
-  // Single grid scan: when user's house is in grid we get (x,y) for probe/locator and skip my-position API (Bugbot: avoid duplicate scan).
+  // Single grid scan: one useMemo returns (x,y) or null; userHouseInGrid derived from it (Bugbot: no duplicate full-grid scan).
   const gridDerivedUserPosition = useMemo((): { x: number; y: number } | null => {
     if (!grid?.length || !currentUserHandle) return null;
     for (let y = 0; y < grid.length; y++) {

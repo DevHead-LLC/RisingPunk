@@ -123,6 +123,7 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<InstanceType<type
     console.error('Probe completeProbeEntry error:', err);
     return null;
   } finally {
+    // When completion fails (e.g. shielded/deleted), completing is reset; probe stays outbound so next GET /active retries. Bugbot: server-side fix (cap retries or mark uncompletable).
     if (entry.phase !== 'returning') {
       entry.completing = false;
     }
@@ -202,6 +203,7 @@ router.post('/launch', auth, async (req: Request, res: Response) => {
 
 // GET /active — list active probes for map visibility (all users see all probes)
 // When outbound travel time has elapsed (e.g. sender backgrounded), auto-complete so observers see return phase.
+// Bugbot (Medium): "Auto-completion retries indefinitely for uncompletable probes" — server-side; fix (e.g. mark uncompletable or cap retries) tracked on server branch; android-bugs.md scope is client only.
 router.get('/active', auth, (req: Request, res: Response) => {
   try {
     pruneStaleProbes();
@@ -239,6 +241,7 @@ router.get('/active', auth, (req: Request, res: Response) => {
 });
 
 // POST /cancel — remove probe from active store (sender only)
+// Bugbot (Low): "Cancel during auto-completion causes probe report without user consent" — if GET /active already set completing and fired completeProbeEntry, cancel still deletes entry but completion continues and saves DM. Server-side fix: check entry.completing and reject or wait; android-bugs scope is client only.
 router.post('/cancel', auth, (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;

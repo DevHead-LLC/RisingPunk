@@ -6,11 +6,10 @@ import {
   StyleSheet,
   Modal,
   TouchableWithoutFeedback,
-  Platform,
   Dimensions,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { SIZING, styleGuide } from '../../styles/theme';
+import { SIZING } from '../../styles/theme';
 
 interface GlobalErrorModalProps {
   visible: boolean;
@@ -26,15 +25,10 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
 }) => {
   const colors = useThemeColors();
 
+  /** Single handler for Log Out. No onPressOut on Android to avoid double-fire (Bugbot: both onPress and onPressOut fire on one tap). */
   const handleButtonPress = useCallback(() => {
     onLogOut();
   }, [onLogOut]);
-
-  const handleButtonPressOut = useCallback(() => {
-    if (Platform.OS === 'android') {
-      handleButtonPress();
-    }
-  }, [handleButtonPress]);
 
   const isServerDown = variant === 'server_down';
   const title = isServerDown ? 'The server is down' : 'Something went wrong';
@@ -71,7 +65,6 @@ export const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
                   pressed && { opacity: 0.8 }
                 ]}
                 onPress={handleButtonPress}
-                onPressOut={handleButtonPressOut}
               >
                 <Text style={[styles.buttonText, { color: colors.background }]}>
                   Log Out
