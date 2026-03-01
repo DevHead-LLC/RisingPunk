@@ -5,6 +5,7 @@ import { globalErrorHandler } from '../../services/GlobalErrorHandler';
 import { resetAllApiCaches } from './resetApiCaches';
 import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
+import { privateMessagesApi } from './privateMessagesApi';
 
 // Custom base query with error handling for mapApi
 const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
@@ -47,11 +48,13 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
     // Optional map requests: do not trigger global error modal so user can keep using the app (panning-load.md)
     // - my-position: 404 (no house) or other failures (user-position-and-locator.md)
     // - viewport (x1,y1,x2,y2): timeouts/500s on staging would otherwise show "Something went wrong... Log out"
+    // - probe/complete: HackMapScreen shows Alert with server error (e.g. Probe Report not configured)
     const url = typeof args === 'string' ? args : args?.url;
     const path = typeof url === 'string' ? url.split('?')[0] : '';
     const isMyPositionRequest = path.endsWith('/my-position');
     const isViewportRequest = args?.params && typeof args.params === 'object' && 'x1' in args.params && 'x2' in args.params;
-    if (!isMyPositionRequest && !isViewportRequest) {
+    const isProbeRequest = path.includes('/probe/');
+    if (!isMyPositionRequest && !isViewportRequest && !isProbeRequest) {
       globalErrorHandler.handleDatabaseError(result.error);
     }
   } else {
@@ -111,6 +114,77 @@ export const mapApi = createApi({
       }),
       invalidatesTags: (result, error, { mapName }) => [{ type: 'MapChat', id: mapName }],
     }),
+    launchProbe: builder.mutation<
+      { success: boolean },
+      {
+        probeId: string;
+        fromX: number;
+        fromY: number;
+        targetX: number;
+        targetY: number;
+        targetOwner: 'player' | 'npc';
+        targetUserId?: string;
+        targetNpcSlug?: string;
+        targetNpcInstanceId?: string;
+      }
+    >({
+      query: (body) => ({
+        url: '/api/probe/launch',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Map'],
+    }),
+    getActiveProbes: builder.query<
+      {
+        probes: Array<{
+          id: string;
+          sentByUserId: string;
+          fromX: number;
+          fromY: number;
+          targetX: number;
+          targetY: number;
+          targetOwner: 'player' | 'npc';
+          targetUserId?: string;
+          targetNpcSlug?: string;
+          targetNpcInstanceId?: string;
+          launchedAt: number;
+          phase?: 'outbound' | 'returning';
+          returnEndAt?: number;
+          returnDurationSec?: number;
+        }>;
+      },
+      void
+    >({
+      query: () => ({ url: '/api/probe/active' }),
+      providesTags: ['Map'],
+    }),
+    cancelProbe: builder.mutation<{ success: boolean }, { probeId: string }>({
+      query: ({ probeId }) => ({
+        url: '/api/probe/cancel',
+        method: 'POST',
+        body: { probeId },
+      }),
+      invalidatesTags: ['Map'],
+    }),
+    completeProbe: builder.mutation<
+      { success: boolean; message: any },
+      { probeId?: string; targetOwner: 'player' | 'npc'; targetUserId?: string; targetNpcSlug?: string; targetX: number; targetY: number }
+    >({
+      query: (body) => ({
+        url: '/api/probe/complete',
+        method: 'POST',
+        body,
+      }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(privateMessagesApi.util.invalidateTags(['PrivateMessageConversations']));
+        } catch {
+          // Invalidation only on success; no-op on error
+        }
+      },
+    }),
   }),
 });
 
@@ -122,4 +196,8 @@ export const {
   useUpdatePlayerPositionMutation,
   useGetMapChatMessagesQuery,
   useSendMapChatMessageMutation,
+  useLaunchProbeMutation,
+  useGetActiveProbesQuery,
+  useCancelProbeMutation,
+  useCompleteProbeMutation,
 } = mapApi;

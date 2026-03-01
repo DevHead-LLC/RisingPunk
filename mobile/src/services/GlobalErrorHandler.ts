@@ -84,7 +84,14 @@ export class GlobalErrorHandler {
 
     console.error('🔴 GLOBAL ERROR HANDLER: Database fetch error detected:', error);
 
-    const errorStatus = error?.status || error?.statusCode;
+    const errorStatus = error?.status ?? error?.statusCode;
+
+    if (errorStatus === 401) {
+      this.dispatchCallback({ type: 'ui/setGlobalErrorVariant', payload: 'generic' });
+      this.dispatchCallback({ type: 'ui/setGlobalErrorModal', payload: true });
+      this.isHandlingError = false;
+      return;
+    }
 
     if (this.isServerDownError(error, errorStatus)) {
       this.handleServerDownInInitialPhase();
