@@ -3,8 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useGetRentalHousingIncomeQuery } from '../../store/api/rentalHousingApi';
 import { formatCurrencyThousandths } from '../../utils/currencyUtils';
-import { MAX_ROOM_LEVEL, minPropertyLevelForNextRoomLevel } from '../../utils/rentalPropertyConfig';
 import type { RemodelRoomType } from '../../store/api/authApi';
+
+export type RoomRemodelTier = {
+  roomLevel: number;
+  cost: number;
+  constructionTimeMinutes: number;
+  minPropertyLevel: number;
+};
 
 interface FloorPlanProps {
   propertyId: number;
@@ -18,6 +24,10 @@ interface FloorPlanProps {
   activeRemodelCompletesAt?: string | null;
   /** When true, render only the Garage room (for Garage tab). When false, render Main Floor rooms only. */
   showGarage?: boolean;
+  /** Max room remodel level from server. When provided with roomRemodelLevels, used for gating. */
+  maxRoomLevel?: number;
+  /** Room remodel tiers from server. When provided with maxRoomLevel, used for min-property-level gating. */
+  roomRemodelLevels?: RoomRemodelTier[];
 }
 
 function formatRemodelTimeLeft(remainingSec: number): string {
@@ -26,7 +36,16 @@ function formatRemodelTimeLeft(remainingSec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel = 0, onRemodel, activeRemodelRoom, activeRemodelCompletesAt, showGarage = false }) => {
+export const FloorPlan: React.FC<FloorPlanProps> = ({
+  propertyId,
+  propertyLevel = 0,
+  onRemodel,
+  activeRemodelRoom,
+  activeRemodelCompletesAt,
+  showGarage = false,
+  maxRoomLevel,
+  roomRemodelLevels,
+}) => {
   const colors = useThemeColors();
   const { data: rentalIncome, isLoading } = useGetRentalHousingIncomeQuery();
   const [now, setNow] = useState(() => Date.now());
@@ -48,10 +67,14 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
   const roomValues = propertyData?.roomValues;
   const roomLevels = propertyData?.roomLevels;
   const hasRemodelCallback = Boolean(onRemodel);
+  const hasRemodelConfig = maxRoomLevel != null && roomRemodelLevels?.length;
   const canShowRemodelForRoom = (roomLevel: number, isGarage: boolean) => {
-    if (!hasRemodelCallback || roomLevel >= MAX_ROOM_LEVEL) return false;
+    if (!hasRemodelCallback || !hasRemodelConfig || maxRoomLevel == null || roomLevel >= maxRoomLevel) return false;
     if (isGarage && propertyLevel < 7) return false;
-    return propertyLevel >= minPropertyLevelForNextRoomLevel(roomLevel + 1);
+    const nextLevel = roomLevel + 1;
+    const tier = roomRemodelLevels!.find((r) => r.roomLevel === nextLevel);
+    const minProp = tier?.minPropertyLevel;
+    return minProp != null && propertyLevel >= minProp;
   };
 
   if (showGarage) {

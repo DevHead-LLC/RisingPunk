@@ -30,23 +30,20 @@ export interface RentalHousingIncome {
   }[];
 }
 
-const PROPERTY_LEVEL_CAP = 9;
-const ROOM_LEVEL_CAP = 8;
-
 export class RentalHousingIncomeService {
-  /** Effective property level (1-9). Uses rentalHousingLevels; if legacy unlocked with no level, returns 1. Capped at 9. */
-  static getPropertyLevel(user: IUser, propertyId: number): number {
+  /** Effective property level. Uses rentalHousingLevels; if legacy unlocked with no level, returns 1. Capped at maxPropertyLevel (from config). */
+  static getPropertyLevel(user: IUser, propertyId: number, maxPropertyLevel: number): number {
     const levels = user.rentalHousingLevels;
     const level = levels?.[`property${propertyId}` as keyof typeof levels];
-    if (typeof level === 'number' && level >= 1 && level <= PROPERTY_LEVEL_CAP) return Math.min(PROPERTY_LEVEL_CAP, level);
+    if (typeof level === 'number' && level >= 1 && level <= maxPropertyLevel) return Math.min(maxPropertyLevel, level);
     const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
     const isUnlocked = user.unlockedFeatures[rentalHousingKey];
     if (isUnlocked) return 1;
     return 0;
   }
 
-  /** Room levels 1-8 for a property. Garage default 1. Capped at 8. */
-  static getRoomLevels(user: IUser, propertyId: number): {
+  /** Room levels for a property. Garage default 1. Clamped to 1..maxRoomLevel (from config). */
+  static getRoomLevels(user: IUser, propertyId: number, maxRoomLevel: number): {
     bathroom: number;
     kitchen: number;
     bedroom: number;
@@ -55,7 +52,7 @@ export class RentalHousingIncomeService {
   } {
     const rooms = user.rentalHousingRooms?.[`property${propertyId}` as keyof typeof user.rentalHousingRooms];
     if (!rooms) return { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1, garage: 1 };
-    const clamp = (n: number) => Math.min(ROOM_LEVEL_CAP, Math.max(1, n));
+    const clamp = (n: number) => Math.min(maxRoomLevel, Math.max(1, n));
     return {
       bathroom: clamp(rooms.bathroom ?? 1),
       kitchen: clamp(rooms.kitchen ?? 1),
@@ -148,9 +145,9 @@ export class RentalHousingIncomeService {
           : 0;
 
     for (let propertyId = 1; propertyId <= 4; propertyId++) {
-      const propertyLevel = this.getPropertyLevel(user, propertyId);
+      const propertyLevel = this.getPropertyLevel(user, propertyId, config.maxPropertyLevel);
       const isUnlocked = propertyLevel >= 1;
-      const roomLevels = this.getRoomLevels(user, propertyId);
+      const roomLevels = this.getRoomLevels(user, propertyId, config.maxRoomLevel);
 
       const bathroomRate = this.getRoomIncomeFromConfig(config, propertyLevel, roomLevels.bathroom, 'bathroom');
       const kitchenRate = this.getRoomIncomeFromConfig(config, propertyLevel, roomLevels.kitchen, 'kitchen');

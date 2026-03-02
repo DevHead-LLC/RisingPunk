@@ -14,20 +14,6 @@ import {
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
-import { MAX_ROOM_LEVEL, minPropertyLevelForNextRoomLevel } from '../utils/rentalPropertyConfig';
-
-/**
- * Remodel tier cost/time. Matches server construction_config rental_property roomRemodelLevels (levels 2–8, +5 min per level).
- */
-const ROOM_REMODEL_CONFIG: { level: number; cost: number; timeMinutes: number }[] = [
-  { level: 2, cost: 5000, timeMinutes: 5 },
-  { level: 3, cost: 10000, timeMinutes: 10 },
-  { level: 4, cost: 15000, timeMinutes: 15 },
-  { level: 5, cost: 20000, timeMinutes: 20 },
-  { level: 6, cost: 25000, timeMinutes: 25 },
-  { level: 7, cost: 30000, timeMinutes: 30 },
-  { level: 8, cost: 35000, timeMinutes: 35 },
-];
 
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 
@@ -130,6 +116,9 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const activeRemodel = status?.activeRemodel?.propertyId === propertyId ? status.activeRemodel : null;
   const activeRemodelRoom = activeRemodel?.room ?? null;
   const showGarageTab = propertyLevel >= 7;
+  const maxRoomLevel = status?.maxRoomLevel;
+  const roomRemodelLevels = status?.roomRemodelLevels;
+  const hasRemodelConfig = Boolean(maxRoomLevel != null && roomRemodelLevels?.length);
 
   const isModalShowingInProgress = Boolean(remodelRoom && activeRemodel?.room === remodelRoom && activeRemodel?.completesAt);
   useEffect(() => {
@@ -277,29 +266,14 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={onBack} />
       
-      {/* Fixed Property pill at top center; show Main Floor | Garage when level >= 7 */}
-      <View style={[styles.fixedPropertyPill, { backgroundColor: colors.primary }]}>
-        <Text style={styles.fixedPropertyText}>
-          {showGarageTab ? (activeTab === 'mainFloor' ? 'Main Floor' : 'Garage') : `Property ${propertyId}`}
-        </Text>
-      </View>
-      
-      {showGarageTab && (
-        <View style={[styles.tabRow, { borderColor: colors.matrix }]}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'mainFloor' && { backgroundColor: colors.primary }]}
-            onPress={() => setActiveTab('mainFloor')}
-          >
-            <Text style={[styles.tabButtonText, { color: activeTab === 'mainFloor' ? '#fff' : colors.text?.secondary ?? '#999' }]}>Main Floor</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'garage' && { backgroundColor: colors.primary }]}
-            onPress={() => setActiveTab('garage')}
-          >
-            <Text style={[styles.tabButtonText, { color: activeTab === 'garage' ? '#fff' : colors.text?.secondary ?? '#999' }]}>Garage</Text>
-          </TouchableOpacity>
+      {/* Fixed Property pill at top center (same position as HomeScreen fixedHomePill) */}
+      <View style={[styles.fixedPropertyPillWrapper, { zIndex: 1000 }]}>
+        <View style={[styles.fixedPropertyPill, { backgroundColor: colors.primary }]}>
+          <Text style={styles.fixedPropertyText}>
+            {showGarageTab ? (activeTab === 'mainFloor' ? 'Main Floor' : 'Garage') : `Property ${propertyId}`}
+          </Text>
         </View>
-      )}
+      </View>
       
       <View style={styles.scrollView}>
         {(!showGarageTab || activeTab === 'mainFloor') ? (
@@ -312,10 +286,12 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
               <FloorPlan
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
-                onRemodel={propertyLevel >= 3 ? setRemodelRoom : undefined}
+                onRemodel={propertyLevel >= 3 && hasRemodelConfig ? setRemodelRoom : undefined}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showGarage={false}
+                maxRoomLevel={maxRoomLevel}
+                roomRemodelLevels={roomRemodelLevels}
               />
             </View>
           </GesturePanView>
@@ -324,14 +300,50 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
             <FloorPlan
               propertyId={propertyId}
               propertyLevel={propertyLevel}
-              onRemodel={propertyLevel >= 7 ? setRemodelRoom : undefined}
+              onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
               activeRemodelRoom={activeRemodelRoom}
               activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
               showGarage={true}
+              maxRoomLevel={maxRoomLevel}
+              roomRemodelLevels={roomRemodelLevels}
             />
           </View>
         )}
       </View>
+
+      {/* Tab navigation at bottom (same position and styling as HomeScreen) */}
+      {showGarageTab && (
+        <View style={[styles.tabContainer, { zIndex: 1000 }]}>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab !== 'mainFloor' && themeMode === 'light' && styles.tabButtonInactiveLight,
+              activeTab === 'mainFloor' && styles.tabButtonActive,
+            ]}
+            onPress={() => setActiveTab('mainFloor')}
+          >
+            <Text style={[
+              styles.tabButtonText,
+              activeTab !== 'mainFloor' && themeMode === 'light' && styles.tabTextInactiveLight,
+              activeTab === 'mainFloor' && styles.tabTextActive,
+            ]}>Main Floor</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.tabButton,
+              activeTab !== 'garage' && themeMode === 'light' && styles.tabButtonInactiveLight,
+              activeTab === 'garage' && styles.tabButtonActive,
+            ]}
+            onPress={() => setActiveTab('garage')}
+          >
+            <Text style={[
+              styles.tabButtonText,
+              activeTab !== 'garage' && themeMode === 'light' && styles.tabTextInactiveLight,
+              activeTab === 'garage' && styles.tabTextActive,
+            ]}>Garage</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Remodel modal */}
       {remodelRoom && (
@@ -410,11 +422,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
               ) : (
                 (() => {
                   const currentLevel = roomLevels[remodelRoom] ?? 1;
-                  if (currentLevel >= MAX_ROOM_LEVEL) {
+                  if (!hasRemodelConfig || maxRoomLevel == null) {
                     return (
                       <>
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
-                          This room is already at max level ({MAX_ROOM_LEVEL}).
+                          Loading remodel options…
                         </Text>
                         <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
                           <Text style={styles.modalButtonText}>Close</Text>
@@ -422,14 +434,26 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                       </>
                     );
                   }
-                  const nextLevel = Math.min(MAX_ROOM_LEVEL, currentLevel + 1);
-                  const config = ROOM_REMODEL_CONFIG[nextLevel - 2];
-                  const minProp = minPropertyLevelForNextRoomLevel(nextLevel);
-                  if (!config || propertyLevel < minProp) {
+                  if (currentLevel >= maxRoomLevel) {
                     return (
                       <>
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
-                          Property level too low for next remodel (need level {minProp}).
+                          This room is already at max level ({maxRoomLevel}).
+                        </Text>
+                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
+                          <Text style={styles.modalButtonText}>Close</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  }
+                  const nextLevel = Math.min(maxRoomLevel, currentLevel + 1);
+                  const tier = roomRemodelLevels!.find((r) => r.roomLevel === nextLevel);
+                  const minProp = tier?.minPropertyLevel;
+                  if (!tier || minProp == null || propertyLevel < minProp) {
+                    return (
+                      <>
+                        <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
+                          Property level too low for next remodel (need level {minProp ?? '?'}).
                         </Text>
                         <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
                           <Text style={styles.modalButtonText}>Close</Text>
@@ -449,11 +473,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                       </>
                     );
                   }
-                  const hasFunds = (balanceState.total ?? 0) >= config.cost;
+                  const hasFunds = (balanceState.total ?? 0) >= tier.cost;
                   return (
                     <>
                       <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
-                        Level {currentLevel} → {nextLevel}: ${config.cost.toLocaleString()}, {config.timeMinutes} min
+                        Level {currentLevel} → {nextLevel}: ${tier.cost.toLocaleString()}, {tier.constructionTimeMinutes} min
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                         <TouchableOpacity
@@ -517,34 +541,58 @@ const styles = StyleSheet.create({
     minHeight: 950,
     minWidth: 1250,
   },
-  fixedPropertyPill: {
+  fixedPropertyPillWrapper: {
     position: 'absolute',
     top: 15,
-    left: '50%',
-    transform: [{ translateX: -70 }],
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    alignItems: 'center',
+    pointerEvents: 'box-none',
+  },
+  fixedPropertyPill: {
     paddingHorizontal: 25,
     paddingVertical: 12,
-    borderRadius: 25,
-    minWidth: 140,
-    zIndex: 1000,
+    borderRadius: 20,
+    minWidth: 80,
   },
-  tabRow: {
+  tabContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    zIndex: 999,
+    paddingTop: SIZING.spacing.md,
+    paddingBottom: SIZING.spacing.lg,
+    gap: SIZING.spacing.sm,
   },
   tabButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.lg,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  tabButtonInactiveLight: {
+    backgroundColor: '#9E9E9E',
+    borderColor: '#757575',
+  },
+  tabButtonActive: {
+    backgroundColor: 'rgba(71,23,246,0.15)',
+    borderColor: 'rgba(71,23,246,0.5)',
   },
   tabButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: SIZING.font.body,
+    fontWeight: 'bold',
+  },
+  tabTextInactiveLight: {
+    color: '#212121',
+  },
+  tabTextActive: {
+    color: '#b39ddb',
   },
   garageContainer: {
     padding: SIZING.spacing.lg,
