@@ -828,11 +828,14 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
                 startedAnimationRef.current.delete(probe.id);
                 setProbes((prev) => prev.filter((p) => p.id !== probe.id));
                 onProbeCompleteFailed(probe.id);
-                cancelProbeMutation({ probeId: probe.id });
+                const serverMsg = err?.data?.error ?? '';
+                const serverAlreadyHandled =
+                  serverMsg === 'Probe already completed' || serverMsg === 'Probe completion already in progress';
+                if (!serverAlreadyHandled) cancelProbeMutation({ probeId: probe.id });
                 if (followProbeIdRef.current === probe.id) {
                   onCloseModal();
                 }
-                // No alert; cleanup only. Expected when server already completed probe (e.g. GET /active auto-complete while sender was backgrounded).
+                // No alert; cleanup only. When serverAlreadyHandled, do not cancel — observers keep return phase.
               });
           }
         }
