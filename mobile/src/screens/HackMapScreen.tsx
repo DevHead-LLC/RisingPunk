@@ -827,11 +827,13 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
                 probeDataRef.current.delete(probe.id);
                 startedAnimationRef.current.delete(probe.id);
                 setProbes((prev) => prev.filter((p) => p.id !== probe.id));
-                onProbeCompleteFailed(probe.id);
                 const serverMsg = err?.data?.error ?? '';
                 const serverAlreadyHandled =
                   serverMsg === 'Probe already completed' || serverMsg === 'Probe completion already in progress';
-                if (!serverAlreadyHandled) cancelProbeMutation({ probeId: probe.id });
+                if (!serverAlreadyHandled) {
+                  onProbeCompleteFailed(probe.id);
+                  cancelProbeMutation({ probeId: probe.id });
+                }
                 if (followProbeIdRef.current === probe.id) {
                   onCloseModal();
                 }
