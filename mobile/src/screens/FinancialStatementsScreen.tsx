@@ -20,14 +20,16 @@ type Props = {
 type TabKey = 'income' | 'balance' | 'cashflow';
 
 /**
- * Cumulative build cost by property level (0–5). Source of truth: server/src/config/rentalPropertyConfig.ts
- * PROPERTY_BUILD_LEVELS — cumulative = sum of cost for levels 1..level. When server config changes, update here
- * and in any docs that reference this (see taskItems/ios/turf/rental-property-level-remodel-system.md § Client–server config sync).
+ * Cumulative build cost by property level (0–9). Matches server construction_config rental_property propertyLevels.
+ * Cumulative = sum of cost for levels 1..level. Update if server config changes.
  */
-const CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL: number[] = [0, 10000, 40000, 90000, 165000, 265000];
+const CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL: number[] = [
+  0, 10_000, 40_000, 90_000, 165_000, 265_000, 465_000, 965_000, 1_965_000, 3_465_000,
+];
 
 function getPropertyCumulativeValue(level: number): number {
-  return CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL[Math.min(5, Math.max(0, level))] ?? 100000;
+  const idx = Math.min(9, Math.max(0, level));
+  return CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL[idx] ?? CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL[9];
 }
 
 export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element {

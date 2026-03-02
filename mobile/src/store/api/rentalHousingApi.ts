@@ -16,12 +16,14 @@ export interface RentalHousingIncome {
       kitchen: number;
       bedroom: number;
       livingRoom: number;
+      garage?: number;
     };
     roomLevels?: {
       bathroom: number;
       kitchen: number;
       bedroom: number;
       livingRoom: number;
+      garage?: number;
     };
   }[];
 }
