@@ -16,15 +16,24 @@ import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
 
 /**
- * Remodel tier cost/time. Source of truth: server/src/config/rentalPropertyConfig.ts ROOM_REMODEL_LEVELS.
- * Min property level per next room level (2→3, 3→4, 4→5) is in FloorPlan.minPropertyLevelForNextRoomLevel
- * and in the modal's propertyLevel check — must match server ROOM_REMODEL_MIN_PROPERTY_LEVEL. See task doc § Client–server config sync.
+ * Remodel tier cost/time. Matches server construction_config rental_property roomRemodelLevels (levels 2–8, +5 min per level).
+ * Min property level for next room level = nextLevel + 1 (2→3, 3→4, … 8→9).
  */
 const ROOM_REMODEL_CONFIG: { level: number; cost: number; timeMinutes: number }[] = [
   { level: 2, cost: 5000, timeMinutes: 5 },
   { level: 3, cost: 10000, timeMinutes: 10 },
   { level: 4, cost: 15000, timeMinutes: 15 },
+  { level: 5, cost: 20000, timeMinutes: 20 },
+  { level: 6, cost: 25000, timeMinutes: 25 },
+  { level: 7, cost: 30000, timeMinutes: 30 },
+  { level: 8, cost: 35000, timeMinutes: 35 },
 ];
+
+const MAX_ROOM_LEVEL = 8;
+
+function minPropertyLevelForNextRoomLevel(nextLevel: number): number {
+  return nextLevel + 1;
+}
 
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 
@@ -52,6 +61,7 @@ function getRemodelRoomDisplayName(room: RemodelRoomType): string {
     kitchen: 'Kitchen',
     bedroom: 'Bedroom',
     livingRoom: 'Living Room',
+    garage: 'Garage',
   };
   return labels[room] ?? room;
 }
@@ -106,6 +116,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const [remodelRoom, setRemodelRoom] = useState<RemodelRoomType | null>(null);
   const [modalCountdownNow, setModalCountdownNow] = useState(() => Date.now());
   const [hasActiveRemodelHere, setHasActiveRemodelHere] = useState(false);
+  const [activeTab, setActiveTab] = useState<'mainFloor' | 'garage'>('mainFloor');
 
   const { data: status } = useGetRentalHousingStatusQuery(propertyId, {
     pollingInterval: remodelRoom || hasActiveRemodelHere ? 5000 : 0
@@ -121,9 +132,10 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const dispatch = useAppDispatch();
   const balanceState = useAppSelector(state => state.balance);
   const propertyLevel = status?.propertyLevel ?? 0;
-  const roomLevels = status?.roomLevels ?? { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1 };
+  const roomLevels = status?.roomLevels ?? { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1, garage: 1 };
   const activeRemodel = status?.activeRemodel?.propertyId === propertyId ? status.activeRemodel : null;
   const activeRemodelRoom = activeRemodel?.room ?? null;
+  const showGarageTab = propertyLevel >= 7;
 
   const isModalShowingInProgress = Boolean(remodelRoom && activeRemodel?.room === remodelRoom && activeRemodel?.completesAt);
   useEffect(() => {
@@ -271,27 +283,60 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={onBack} />
       
-      {/* Fixed Property pill at top center of screen */}
+      {/* Fixed Property pill at top center; show Main Floor | Garage when level >= 7 */}
       <View style={[styles.fixedPropertyPill, { backgroundColor: colors.primary }]}>
-        <Text style={styles.fixedPropertyText}>Property {propertyId}</Text>
+        <Text style={styles.fixedPropertyText}>
+          {showGarageTab ? (activeTab === 'mainFloor' ? 'Main Floor' : 'Garage') : `Property ${propertyId}`}
+        </Text>
       </View>
       
+      {showGarageTab && (
+        <View style={[styles.tabRow, { borderColor: colors.matrix }]}>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'mainFloor' && { backgroundColor: colors.primary }]}
+            onPress={() => setActiveTab('mainFloor')}
+          >
+            <Text style={[styles.tabButtonText, { color: activeTab === 'mainFloor' ? '#fff' : colors.text?.secondary ?? '#999' }]}>Main Floor</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabButton, activeTab === 'garage' && { backgroundColor: colors.primary }]}
+            onPress={() => setActiveTab('garage')}
+          >
+            <Text style={[styles.tabButtonText, { color: activeTab === 'garage' ? '#fff' : colors.text?.secondary ?? '#999' }]}>Garage</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
       <View style={styles.scrollView}>
-        <GesturePanView 
-          offsetX={offsetX}
-          offsetY={offsetY}
-          panGesture={panGesture}
-        >
-          <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
+        {(!showGarageTab || activeTab === 'mainFloor') ? (
+          <GesturePanView 
+            offsetX={offsetX}
+            offsetY={offsetY}
+            panGesture={panGesture}
+          >
+            <View style={[styles.floorPlanContainer, { borderColor: colors.matrix }]}>
+              <FloorPlan
+                propertyId={propertyId}
+                propertyLevel={propertyLevel}
+                onRemodel={propertyLevel >= 3 ? setRemodelRoom : undefined}
+                activeRemodelRoom={activeRemodelRoom}
+                activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
+                showGarage={false}
+              />
+            </View>
+          </GesturePanView>
+        ) : (
+          <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
             <FloorPlan
               propertyId={propertyId}
               propertyLevel={propertyLevel}
-              onRemodel={propertyLevel >= 3 ? setRemodelRoom : undefined}
+              onRemodel={propertyLevel >= 7 ? setRemodelRoom : undefined}
               activeRemodelRoom={activeRemodelRoom}
               activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
+              showGarage={true}
             />
           </View>
-        </GesturePanView>
+        )}
       </View>
 
       {/* Remodel modal */}
@@ -371,11 +416,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
               ) : (
                 (() => {
                   const currentLevel = roomLevels[remodelRoom] ?? 1;
-                  if (currentLevel >= 4) {
+                  if (currentLevel >= MAX_ROOM_LEVEL) {
                     return (
                       <>
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
-                          This room is already at max level (4).
+                          This room is already at max level ({MAX_ROOM_LEVEL}).
                         </Text>
                         <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
                           <Text style={styles.modalButtonText}>Close</Text>
@@ -383,13 +428,26 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                       </>
                     );
                   }
-                  const nextLevel = Math.min(4, currentLevel + 1);
+                  const nextLevel = Math.min(MAX_ROOM_LEVEL, currentLevel + 1);
                   const config = ROOM_REMODEL_CONFIG[nextLevel - 2];
-                  if (!config || propertyLevel < (nextLevel === 2 ? 3 : nextLevel === 3 ? 4 : 5)) {
+                  const minProp = minPropertyLevelForNextRoomLevel(nextLevel);
+                  if (!config || propertyLevel < minProp) {
                     return (
                       <>
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
-                          Property level too low for next remodel.
+                          Property level too low for next remodel (need level {minProp}).
+                        </Text>
+                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
+                          <Text style={styles.modalButtonText}>Close</Text>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  }
+                  if (remodelRoom === 'garage' && propertyLevel < 7) {
+                    return (
+                      <>
+                        <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
+                          Property must be level 7 or higher to remodel garage.
                         </Text>
                         <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
                           <Text style={styles.modalButtonText}>Close</Text>
@@ -467,14 +525,41 @@ const styles = StyleSheet.create({
   },
   fixedPropertyPill: {
     position: 'absolute',
-    top: 15, // Moved up slightly from 20px
+    top: 15,
     left: '50%',
-    transform: [{ translateX: -70 }], // Adjusted for smaller width
-    paddingHorizontal: 25, // Reduced from 30px
-    paddingVertical: 12, // Reduced from 15px
+    transform: [{ translateX: -70 }],
+    paddingHorizontal: 25,
+    paddingVertical: 12,
     borderRadius: 25,
-    minWidth: 140, // Reduced from 160px
-    zIndex: 1000, // Ensure it's above everything
+    minWidth: 140,
+    zIndex: 1000,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    zIndex: 999,
+  },
+  tabButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  tabButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  garageContainer: {
+    padding: SIZING.spacing.lg,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 200,
   },
   fixedPropertyText: {
     fontSize: 20,

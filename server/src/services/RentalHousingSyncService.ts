@@ -1,5 +1,6 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
+import { getPropertyMaxLevel } from './RentalPropertyConfigService';
 import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getRentalProfitBonusPerRoom, getRentalProfitBonusPerRoomAsOf, getResearchFeaturesForBonusSync, type BonusPrefetch } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
@@ -151,7 +152,9 @@ export class RentalHousingSyncService {
    */
   static async ensureLegacyRentalLevels(user: IUser): Promise<boolean> {
     let updated = false;
+    const maxPropertyLevel = await getPropertyMaxLevel();
     const levelSetByBuild = (user.rentalHousingLevelSetByBuild as Record<string, boolean>) || {};
+    (user.rentalHousingLevels as any) = user.rentalHousingLevels || {};
     for (let i = 1; i <= 4; i++) {
       const ufKey = `rentalHousing${i}` as keyof typeof user.unlockedFeatures;
       const isUnlocked = user.unlockedFeatures[ufKey];
@@ -159,8 +162,10 @@ export class RentalHousingSyncService {
       const setByBuild = levelSetByBuild[`property${i}`];
       const shouldGrandfather = isUnlocked && (typeof level !== 'number' || level < 1 || (level === 1 && !setByBuild));
       if (shouldGrandfather) {
-        (user.rentalHousingLevels as any) = user.rentalHousingLevels || {};
-        (user.rentalHousingLevels as any)[`property${i}`] = 5;
+        (user.rentalHousingLevels as any)[`property${i}`] = Math.min(5, maxPropertyLevel);
+        updated = true;
+      } else if (typeof level === 'number' && level > maxPropertyLevel) {
+        (user.rentalHousingLevels as any)[`property${i}`] = maxPropertyLevel;
         updated = true;
       }
     }

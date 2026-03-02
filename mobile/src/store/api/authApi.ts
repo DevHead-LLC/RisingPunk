@@ -131,6 +131,7 @@ export interface RentalHousingStatusResponse {
     kitchen: number;
     bedroom: number;
     livingRoom: number;
+    garage?: number;
   };
   activeRemodel?: {
     propertyId: number;
@@ -139,6 +140,8 @@ export interface RentalHousingStatusResponse {
     completesAt: string | null;
     targetRoomLevel: number;
   } | null;
+  /** Max property build level (9). UI stops offering upgrades at this level. */
+  maxPropertyLevel?: number;
 }
 
 export interface UnlockRentalHousingResponse {
@@ -171,7 +174,7 @@ export interface SpeedupPropertyConstructionResponse {
   ratePerSecond?: number;
 }
 
-export type RemodelRoomType = 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom';
+export type RemodelRoomType = 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom' | 'garage';
 
 export interface StartRemodelRequest {
   propertyId: number;
