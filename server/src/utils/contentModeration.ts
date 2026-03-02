@@ -26,6 +26,17 @@ const BAD_WORDS = [
   'retard', 'retarded', 'dyke', 'tranny', 'shemale',
 ];
 
+/**
+ * Handles reserved for system/official use. Users cannot create or change to these.
+ * Case-insensitive exact match (after trim). Single source of truth for handle validation.
+ * See: taskItems/featuresAndBugs/bug-fixes-and-updates.md § Disallowed username/handle list
+ */
+const DISALLOWED_HANDLES = [
+  'admin', 'administrator', 'reports', 'probe reports', 'probe reporter',
+  'moderator', 'mod', 'system', 'game', 'support', 'official', 'staff',
+  'devhead', 'risingpunk',
+];
+
 // Character substitution map for leetspeak detection
 const CHAR_SUBSTITUTIONS: { [key: string]: string } = {
   '@': 'a',
@@ -197,4 +208,19 @@ export function containsBadWordsAsSubstring(text: string): boolean {
   }
 
   return false;
+}
+
+/**
+ * Returns true if the handle is reserved for system/official use (disallowed for users).
+ * Uses case-insensitive exact match after trim. Call on both handle creation/update and check-handle.
+ * @param handle - The handle to check
+ * @returns true if the handle is disallowed
+ */
+export function isDisallowedHandle(handle: string): boolean {
+  if (!handle || typeof handle !== 'string') {
+    return false;
+  }
+  const normalized = handle.trim().toLowerCase();
+  if (!normalized) return false;
+  return DISALLOWED_HANDLES.includes(normalized);
 }
