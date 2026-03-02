@@ -140,8 +140,17 @@ export interface RentalHousingStatusResponse {
     completesAt: string | null;
     targetRoomLevel: number;
   } | null;
-  /** Max property build level (9). UI stops offering upgrades at this level. */
+  /** Max property build level. UI stops offering upgrades at this level. */
   maxPropertyLevel?: number;
+  /** Max room remodel level. From server construction_config. */
+  maxRoomLevel?: number;
+  /** Room remodel tiers from server (cost, time, minPropertyLevel). Use for modal and gating. */
+  roomRemodelLevels?: Array<{
+    roomLevel: number;
+    cost: number;
+    constructionTimeMinutes: number;
+    minPropertyLevel: number;
+  }>;
 }
 
 export interface UnlockRentalHousingResponse {

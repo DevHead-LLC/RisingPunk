@@ -26,6 +26,8 @@ export interface RentalHousingIncome {
       garage?: number;
     };
   }[];
+  /** Cumulative build cost by property level (index = level). From server construction_config. Use for balance sheet valuations. */
+  cumulativeBuildValueByLevel?: number[];
 }
 
 const rentalHousingBaseQuery = async (args: any, api: any, extraOptions: any) => {

@@ -1,12 +1,5 @@
 /**
- * Client-side rental property room-level constants. Single source of truth for room upgrade cap
- * and min-property-level rule; must stay in sync with server construction_config rental_property.
+ * @deprecated Remodel rules (max room level, min property level per tier, cost, time) now come from
+ * the server: rental-housing-status returns maxRoomLevel and roomRemodelLevels from construction_config.
+ * Use those in InvestmentPropertyScreen and FloorPlan instead of local constants.
  */
-
-/** Max room remodel level (2–8). Server roomRemodelLevels go up to 8. */
-export const MAX_ROOM_LEVEL = 8;
-
-/** Min property level required to remodel to this room level. Matches server (nextLevel+1 for 2..8). */
-export function minPropertyLevelForNextRoomLevel(nextLevel: number): number {
-  return nextLevel + 1;
-}
