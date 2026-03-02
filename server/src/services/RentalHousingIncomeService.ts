@@ -83,7 +83,8 @@ export class RentalHousingIncomeService {
       const garageRate = levelConfig.rates.garage ?? 0;
       if (propertyLevel < 7 || garageRate === 0) return 0;
       const remodelConfig = config.roomRemodelLevels.find((r) => r.roomLevel === roomLevel);
-      const add = roomLevel >= 5 && remodelConfig?.addRates.garage != null ? remodelConfig.addRates.garage : 0;
+      const minProp = remodelConfig?.minPropertyLevel ?? 999;
+      const add = roomLevel >= 5 && propertyLevel >= minProp && remodelConfig?.addRates.garage != null ? remodelConfig.addRates.garage : 0;
       return garageRate + add;
     }
 
