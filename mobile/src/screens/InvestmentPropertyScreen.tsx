@@ -14,10 +14,10 @@ import {
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
+import { MAX_ROOM_LEVEL, minPropertyLevelForNextRoomLevel } from '../utils/rentalPropertyConfig';
 
 /**
  * Remodel tier cost/time. Matches server construction_config rental_property roomRemodelLevels (levels 2–8, +5 min per level).
- * Min property level for next room level = nextLevel + 1 (2→3, 3→4, … 8→9).
  */
 const ROOM_REMODEL_CONFIG: { level: number; cost: number; timeMinutes: number }[] = [
   { level: 2, cost: 5000, timeMinutes: 5 },
@@ -28,12 +28,6 @@ const ROOM_REMODEL_CONFIG: { level: number; cost: number; timeMinutes: number }[
   { level: 7, cost: 30000, timeMinutes: 30 },
   { level: 8, cost: 35000, timeMinutes: 35 },
 ];
-
-const MAX_ROOM_LEVEL = 8;
-
-function minPropertyLevelForNextRoomLevel(nextLevel: number): number {
-  return nextLevel + 1;
-}
 
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 

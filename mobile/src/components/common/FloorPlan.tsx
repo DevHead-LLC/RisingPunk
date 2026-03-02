@@ -3,9 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useGetRentalHousingIncomeQuery } from '../../store/api/rentalHousingApi';
 import { formatCurrencyThousandths } from '../../utils/currencyUtils';
+import { MAX_ROOM_LEVEL, minPropertyLevelForNextRoomLevel } from '../../utils/rentalPropertyConfig';
 import type { RemodelRoomType } from '../../store/api/authApi';
-
-const MAX_ROOM_LEVEL = 8;
 
 interface FloorPlanProps {
   propertyId: number;
@@ -25,11 +24,6 @@ function formatRemodelTimeLeft(remainingSec: number): string {
   const m = Math.floor(remainingSec / 60);
   const s = Math.floor(remainingSec % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-/** Min property level required to remodel to this room level. Matches server (nextLevel+1 for 2..8). */
-function minPropertyLevelForNextRoomLevel(nextLevel: number): number {
-  return nextLevel + 1;
 }
 
 export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel = 0, onRemodel, activeRemodelRoom, activeRemodelCompletesAt, showGarage = false }) => {

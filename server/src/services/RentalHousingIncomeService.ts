@@ -117,6 +117,7 @@ export class RentalHousingIncomeService {
     return getRentalProfitUnlockTimes(userId, prefetch);
   }
 
+  /** Research bonus is applied per room. Garage only earns bonus when it has a base rate (property level >= 7). */
   static getRoomValuesWithResearch(
     baseRoomValues: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number; garage: number },
     bonusPerRoom: number
@@ -126,7 +127,7 @@ export class RentalHousingIncomeService {
       kitchen: baseRoomValues.kitchen + bonusPerRoom,
       bedroom: baseRoomValues.bedroom + bonusPerRoom,
       livingRoom: baseRoomValues.livingRoom + bonusPerRoom,
-      garage: baseRoomValues.garage + bonusPerRoom,
+      garage: baseRoomValues.garage > 0 ? baseRoomValues.garage + bonusPerRoom : 0,
     };
   }
 
