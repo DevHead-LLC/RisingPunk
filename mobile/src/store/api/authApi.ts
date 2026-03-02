@@ -100,6 +100,7 @@ export interface UnlockResearchCenterResponse {
 export interface ResearchCenterStatusResponse {
   isUnlocked: boolean;
   level: number;
+  maxLevel: number;
   canBuild: boolean;
   nextBuildCost: number | null;
   nextBuildTimeMinutes: number | null;

@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { getTaskList } from '../config/taskListData';
 import { getPropertyBuildConfig, getRoomRemodelConfig } from '../config/rentalPropertyConfig';
-import { getResearchCenterLevelConfig, type ResearchCenterLevel } from '../config/researchCenterConfig';
+import { getResearchCenterLevelConfig, getResearchCenterMaxLevel, type ResearchCenterLevel } from '../config/researchCenterConfig';
 import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
 import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
 
@@ -292,12 +292,13 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
       return;
     }
 
+    const maxLevel = await getResearchCenterMaxLevel();
     const now = new Date();
     let buildStatus: { startedAt: string; completesAt: string; timeRemaining: number; targetLevel?: number } | null = null;
     let isUnlocked = user.unlockedFeatures?.researchCenter || false;
     let level: number = user.researchCenterLevel ?? 0;
 
-    // Migration: existing users who already have Research Center get level 3
+    // Migration: existing users who already have Research Center get level 3 (legacy cap)
     if (isUnlocked && (!level || level < 1)) {
       level = 3;
       user.researchCenterLevel = 3;
@@ -335,20 +336,21 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
       level = user.researchCenterLevel ?? 3;
     }
 
-    const nextLevel = level < 3 ? (level + 1) as ResearchCenterLevel : null;
+    const nextLevel = level < maxLevel ? (level + 1) as ResearchCenterLevel : null;
     let nextBuildCost: number | null = null;
     let nextBuildTimeMinutes: number | null = null;
     if (nextLevel) {
-      const config = getResearchCenterLevelConfig(nextLevel);
+      const config = await getResearchCenterLevelConfig(nextLevel);
       nextBuildCost = config.cost;
       nextBuildTimeMinutes = config.constructionTimeMinutes;
     }
     const isBuilding = Boolean(user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt && now < user.researchCenterBuild.completesAt);
-    const canBuild = isUnlocked && level < 3 && !isBuilding;
+    const canBuild = isUnlocked && level < maxLevel && !isBuilding;
 
     res.json({
       isUnlocked,
       level,
+      maxLevel,
       canBuild,
       nextBuildCost,
       nextBuildTimeMinutes,
@@ -368,6 +370,7 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
       return;
     }
 
+    const maxLevel = await getResearchCenterMaxLevel();
     const now = new Date();
 
     // Auto-complete expired builds before charging (same as research-center-status)
@@ -388,7 +391,7 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
     // Effective level: 0 if not unlocked; else researchCenterLevel or 3 for legacy
     const isUnlocked = user.unlockedFeatures?.researchCenter || false;
     let currentLevel: number = user.researchCenterLevel ?? (isUnlocked ? 3 : 0);
-    if (currentLevel >= 3) {
+    if (currentLevel >= maxLevel) {
       res.status(400).json({ message: 'Research Center is already at max level.' });
       return;
     }
@@ -400,7 +403,7 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
     }
 
     const nextLevel = (currentLevel + 1) as ResearchCenterLevel;
-    const config = getResearchCenterLevelConfig(nextLevel);
+    const config = await getResearchCenterLevelConfig(nextLevel);
     const buildCost = config.cost;
     const buildTimeMinutes = config.constructionTimeMinutes;
 
