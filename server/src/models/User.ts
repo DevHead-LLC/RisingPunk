@@ -47,12 +47,12 @@ export interface IUser extends Document {
   };
   guestDeviceId?: string;
   currentTokenId?: string;
-  /** Research Center building level 1–3. Missing or 0 = not built (or legacy, resolved on read). */
+  /** Research Center building level 1–20 (max from construction_config). Missing or 0 = not built (or legacy, resolved on read). */
   researchCenterLevel?: number;
   researchCenterBuild?: {
     startedAt: Date | null;
     completesAt: Date | null;
-    /** Target level (1–3) for this build. */
+    /** Target level (1–20) for this build. */
     targetLevel?: number | null;
   };
   rentalHousingBuilds?: {
