@@ -541,37 +541,53 @@ type ProbeAnimationLayerProps = {
   colors: ReturnType<typeof useThemeColors>;
   styles: ReturnType<typeof getStyles>;
   animatedMapStyle: Record<string, unknown>;
+  /** When true, layer is rendered inside the map's Animated.View so it shares the transform; omit animatedMapStyle to avoid two layers drifting (Bugbot). */
+  nestedInMapView?: boolean;
+  /** Map tap gesture; when provided, probe tap blocks it so only the probe modal opens (no passthrough to tile). */
+  mapTapGesture?: ReturnType<typeof Gesture.Tap>;
 };
 
-/** Tappable wrapper for the probe icon; hit area matches probe image size. */
+/** Tappable wrapper for the probe icon; hit area matches probe image size. Uses RNGH Tap + blocksExternalGesture so only probe receives the tap (no passthrough to map/tile). */
 const ProbeTapTarget: React.FC<{
   probeId: string;
   onFollowProbe: (probeId: string) => void;
   hitLeft: number;
   hitTop: number;
   hitSize: number;
+  mapTapGesture?: ReturnType<typeof Gesture.Tap>;
   children: React.ReactNode;
-}> = ({ probeId, onFollowProbe, hitLeft, hitTop, hitSize, children }) => (
-  <View
-    pointerEvents="box-none"
-    style={{
-      position: 'absolute',
-      left: hitLeft,
-      top: hitTop,
-      width: hitSize,
-      height: hitSize,
-      justifyContent: 'center',
-      alignItems: 'center',
-    }}
-  >
-    <Pressable
-      style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
-      onPress={() => onFollowProbe(probeId)}
+}> = ({ probeId, onFollowProbe, hitLeft, hitTop, hitSize, mapTapGesture, children }) => {
+  const probeTapGesture = useMemo(() => {
+    const tap = Gesture.Tap()
+      .maxDistance(9)
+      .maxDuration(400)
+      .onEnd(() => {
+        'worklet';
+        runOnJS(onFollowProbe)(probeId);
+      });
+    return mapTapGesture != null ? tap.blocksExternalGesture(mapTapGesture) : tap;
+  }, [probeId, onFollowProbe, mapTapGesture]);
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        left: hitLeft,
+        top: hitTop,
+        width: hitSize,
+        height: hitSize,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
     >
-      {children}
-    </Pressable>
-  </View>
-);
+      <GestureDetector gesture={probeTapGesture}>
+        <View style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+          {children}
+        </View>
+      </GestureDetector>
+    </View>
+  );
+};
 
 /**
  * Owns the probe animation loop and renders probe overlay + follow modal.
@@ -604,6 +620,8 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   colors,
   styles,
   animatedMapStyle,
+  nestedInMapView = false,
+  mapTapGesture,
 }) => {
   const probesRef = useRef<ProbeEntry[]>([]);
   const probeDataRef = useRef<Map<string, {
@@ -917,10 +935,15 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   const ux = myPositionData?.x ?? 0;
   const uy = myPositionData?.y ?? 0;
 
+  const wrapperStyle = nestedInMapView
+    ? [StyleSheet.absoluteFill, { zIndex: 10, elevation: 10 }]
+    : [StyleSheet.absoluteFill, animatedMapStyle as any, { zIndex: 10, elevation: 10 }];
+  const Wrapper = nestedInMapView ? View : Animated.View;
+
   return (
     <>
-      <Animated.View
-        style={[StyleSheet.absoluteFill, animatedMapStyle as any, { zIndex: 10, elevation: 10 }]}
+      <Wrapper
+        style={wrapperStyle}
         pointerEvents="box-none"
       >
         {probes.map((probe) => {
@@ -963,7 +986,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
                   transform: [{ translateX: -length / 2 }, { rotate: `${angle}rad` }, { translateX: length / 2 }],
                 }}
               />
-              <ProbeTapTarget probeId={probe.id} onFollowProbe={onFollowProbe} hitLeft={hitLeft} hitTop={hitTop} hitSize={hitSize}>
+              <ProbeTapTarget probeId={probe.id} onFollowProbe={onFollowProbe} hitLeft={hitLeft} hitTop={hitTop} hitSize={hitSize} mapTapGesture={mapTapGesture}>
                 <Image
                   source={require('../assets/images/hackMap/probe.png')}
                   style={{ width: PROBE_SIZE, height: PROBE_SIZE }}
@@ -973,7 +996,7 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
             </View>
           );
         })}
-      </Animated.View>
+      </Wrapper>
     </>
   );
 };
@@ -4413,37 +4436,39 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
               );
             })}
           </View>
+          <ProbeAnimationLayer
+            probes={displayProbes}
+            setProbes={setProbes}
+            myPositionData={positionForProbe ?? undefined}
+            currentUserId={currentUserId}
+            completeProbeMutation={completeProbeMutation}
+            probeFollowModeRef={probeFollowModeRef}
+            followProbeIdRef={followProbeIdRef}
+            containerSizeRef={containerSizeRef}
+            offsetX={offsetX}
+            offsetY={offsetY}
+            boundsReady={boundsReady}
+            minX={minX}
+            maxX={maxX}
+            minY={minY}
+            maxY={maxY}
+            scheduleComputeRef={scheduleComputeRef}
+            onFollowProbe={handleProbeFollow}
+            onCloseModal={handleProbeFollowModalClose}
+            onProbeCompleteFailed={onProbeCompleteFailed}
+            onProbeRemovedAfterReturn={onProbeRemovedAfterReturn}
+            onFollowProbeDisplayUpdate={setFollowProbeDisplay}
+            cancelProbeRef={cancelProbeRef}
+            cancelProbeMutation={cancelProbeMutationSafe}
+            colors={colors}
+            styles={styles}
+            animatedMapStyle={animatedMapStyle}
+            nestedInMapView
+            mapTapGesture={tapGesture}
+          />
           </Animated.View>
         </GestureDetector>
         </View>
-        <ProbeAnimationLayer
-          probes={displayProbes}
-          setProbes={setProbes}
-          myPositionData={positionForProbe ?? undefined}
-          currentUserId={currentUserId}
-          completeProbeMutation={completeProbeMutation}
-          probeFollowModeRef={probeFollowModeRef}
-          followProbeIdRef={followProbeIdRef}
-          containerSizeRef={containerSizeRef}
-          offsetX={offsetX}
-          offsetY={offsetY}
-          boundsReady={boundsReady}
-          minX={minX}
-          maxX={maxX}
-          minY={minY}
-          maxY={maxY}
-          scheduleComputeRef={scheduleComputeRef}
-          onFollowProbe={handleProbeFollow}
-          onCloseModal={handleProbeFollowModalClose}
-          onProbeCompleteFailed={onProbeCompleteFailed}
-          onProbeRemovedAfterReturn={onProbeRemovedAfterReturn}
-          onFollowProbeDisplayUpdate={setFollowProbeDisplay}
-          cancelProbeRef={cancelProbeRef}
-          cancelProbeMutation={cancelProbeMutationSafe}
-          colors={colors}
-          styles={styles}
-          animatedMapStyle={animatedMapStyle}
-        />
       </View>
       ) : null}
 
