@@ -28,12 +28,15 @@ const BAD_WORDS = [
 
 /**
  * Handles reserved for system/official use. Users cannot create or change to these.
- * Case-insensitive exact match (after trim). Single source of truth for handle validation.
+ * Case-insensitive exact match (after trim). Only characters allowed in handles
+ * (a-zA-Z0-9!&%^*_) can appear — no spaces, so use concatenated/underscore forms
+ * for multi-word phrases (e.g. probereports, probe_reporter).
  * See: taskItems/featuresAndBugs/bug-fixes-and-updates.md § Disallowed username/handle list
  */
 const DISALLOWED_HANDLES = [
-  'admin', 'administrator', 'reports', 'probe reports', 'probe reporter',
-  'moderator', 'mod', 'system', 'game', 'support', 'official', 'staff',
+  'admin', 'administrator', 'reports', 'probereports', 'probereporter',
+  'probe_reports', 'probe_reporter',
+  'moderator', 'mod', 'system', 'support', 'official', 'staff',
   'devhead', 'risingpunk',
 ];
 
