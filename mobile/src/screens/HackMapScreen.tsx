@@ -4188,7 +4188,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                     const probeUnlocked = researchFeatures?.features?.some((f: any) => f.id === 'probe' && f.isUnlocked);
                     const isTargetSelf = selectedCell.info.owner === 'player' && selectedCell.info.name === currentUserHandle;
                     const canProbePlayer = selectedCell.info.owner === 'player' && selectedCell.info.userId && !isTargetSelf && !selectedCell.info.isShielded;
-                    const canProbeNpc = selectedCell.info.owner !== 'player' && selectedCell.info.npcSlug;
+                    const canProbeNpc = selectedCell.info.owner === 'enemy' && selectedCell.info.npcSlug;
                     const showProbe = probeUnlocked && (canProbePlayer || canProbeNpc);
                     if (!showProbe) return null;
                     return (
@@ -4262,7 +4262,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, displayProbes, positionForProbe, currentUserId, launchProbeMutation]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
