@@ -129,7 +129,7 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<CompleteProbeResu
     console.error('Probe completeProbeEntry error:', err);
     return null;
   } finally {
-    // When completion fails (e.g. shielded/deleted), completing is reset; probe stays outbound so next GET /active retries. Bugbot: server-side fix (cap retries or mark uncompletable).
+    // On failure, GET /active's .then() deletes the probe (no retry), so we never retry uncompletable probes. Clear completing only when entry is still present so we don't leave it stuck before .then() runs.
     if (entry.phase !== 'returning') {
       entry.completing = false;
     }
@@ -209,7 +209,7 @@ router.post('/launch', auth, async (req: Request, res: Response) => {
 
 // GET /active — list active probes for map visibility (all users see all probes)
 // When outbound travel time has elapsed (e.g. sender backgrounded), auto-complete so observers see return phase.
-// Bugbot (Medium): "Auto-completion retries indefinitely for uncompletable probes" — server-side; fix (e.g. mark uncompletable or cap retries) tracked on server branch; android-bugs.md scope is client only.
+// On completion failure we delete the probe (see .then() below) so uncompletable probes are not retried.
 router.get('/active', auth, (req: Request, res: Response) => {
   try {
     pruneStaleProbes();
@@ -222,6 +222,7 @@ router.get('/active', auth, (req: Request, res: Response) => {
         p.completing = true;
         const probeId = p.id;
         void completeProbeEntry(p).then((result) => {
+          // Delete on failure so uncompletable probes (e.g. shielded) are not retried every GET /active until TTL.
           if (!result?.success) activeProbesStore.delete(probeId);
         });
       }
