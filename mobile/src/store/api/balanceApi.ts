@@ -36,6 +36,8 @@ const balanceBaseQuery = async (args: any, api: any, extraOptions: any) => {
     } else {
       globalErrorHandler.handleDatabaseError(result.error);
     }
+  } else {
+    globalErrorHandler.markServerReachable();
   }
 
   return result;

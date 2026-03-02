@@ -4,6 +4,7 @@ import authSlice from './slices/authSlice';
 import { baseApi } from './api/baseApi';
 import { authApi } from './api/authApi';
 import { storageListener } from './middleware/storage';
+import { authLogoutListener } from './middleware/authLogoutListener';
 import balanceSlice from './slices/balanceSlice';
 import { balanceApi } from './api/balanceApi';
 import botsSlice from './slices/botsSlice';
@@ -51,6 +52,7 @@ export const store = configureStore({
       serializableCheck: false,
     })
     .prepend(storageListener.middleware)
+    .prepend(authLogoutListener.middleware)
     .concat(baseApi.middleware)
     .concat(authApi.middleware)
     .concat(balanceApi.middleware)

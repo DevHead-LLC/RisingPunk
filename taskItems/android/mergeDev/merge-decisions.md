@@ -756,6 +756,78 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-03-01 (merge dev → android_mergeDev)
+
+**Branch context:** Full merge flow per merge-flow.md: created `android_mergeDev` from `androidStaging`, pushed, merged `origin/dev`. Two conflicts: mobile/package.json (version + versionCode), mobile/src/screens/HackMapScreen.tsx (conditional map vs always-on map + ProbeAnimationLayer).
+
+### 1. `mobile/package.json`
+
+**Conflict:** version and versionCode.
+
+| Side | Content |
+|------|--------|
+| HEAD | "version": "2.6.0", "versionCode": 89 |
+| dev  | "version": "2.7.0" (no versionCode) |
+
+**Resolution:** Accepted **dev version** and **HEAD versionCode**. Final state: "version": "2.7.0", "versionCode": 89.
+
+**Rationale:** Android first. versionCode is required for Play Console; dev does not carry it. Take dev’s version (2.7.0) for consistency; keep versionCode 89 from Android branch.
+
+**Rejected from dev:** Omitting versionCode.
+
+**Failure-mode hints for later:** If Play Console rejects a build for version code, increment versionCode in mobile/package.json on the Android branch and keep it in sync with Android versioning.
+
+---
+
+### 2. `mobile/src/screens/HackMapScreen.tsx`
+
+**Conflict A (conditional map vs always-on wrapper + structure):**
+
+| Side | Content |
+|------|--------|
+| HEAD | Conditional: only render map when !showAntivirusModal && !showCrewModal && !showCrewOnboardingModal; GestureDetector > Animated.View (ref, onLayout) > View (gridArea) > tiles; when modals open render null. |
+| dev  | Always render: outer View > StyleSheet.absoluteFill View > GestureDetector > Animated.View > grid > tiles; then ProbeAnimationLayer; then probe follow modal. |
+
+**Conflict B (closing + ProbeAnimationLayer + probe follow modal):**
+
+| Side | Content |
+|------|--------|
+| HEAD | Close Animated.View, GestureDetector, then ) : null. No ProbeAnimationLayer in this block; no probe follow modal in conflict. |
+| dev  | Close Animated.View, GestureDetector, View; ProbeAnimationLayer with full props; close outer View; then showProbeFollowModal && followProbeId modal. |
+
+**Resolution:** Kept **HEAD’s conditional** and **dev’s map + ProbeAnimationLayer structure**. Final state: when modals are closed we render the full dev block (outer View, absoluteFill View, GestureDetector, Animated.View, grid, tiles, ProbeAnimationLayer, close outer View). When any of the three modals is open we render null. Probe follow modal remains outside the conditional so it can show when needed.
+
+**Rationale:** Android first. HEAD’s conditional avoids rendering the heavy map/gesture tree and ProbeAnimationLayer when antivirus, crew, or crew-onboarding modals are open (performance). Dev’s implementation adds the wrapper View, StyleSheet.absoluteFill, and ProbeAnimationLayer; we keep the performance optimization and use dev’s feature set when the map is shown.
+
+**Rejected from dev:** Always rendering the map (would render map behind modals and lose the conditional optimization). Rejected from HEAD: omitting ProbeAnimationLayer and dev’s wrapper structure when map is shown.
+
+**Failure-mode hints for later:**
+- If **tap on tile** or **probe layer** is unreliable on Android when map is visible, confirm mapViewRef, onLayout, combinedMapGesture, and ProbeAnimationLayer are still inside the conditional block that runs when modals are closed.
+- If **map or gestures** appear when a modal is open, confirm the conditional still uses `!showAntivirusModal && !showCrewModal && !showCrewOnboardingModal` and `) : null`.
+- If **probe follow modal** does not show, it is rendered outside the conditional; confirm showProbeFollowModal && followProbeId block is present after the conditional.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
+## Post-merge regression fix: 2025-03-01 (HackMapScreen researchFeatures.some)
+
+**Context:** After merge (Session 2025-03-01), Android crashed in HackMapScreen with `TypeError: researchFeatures.some is not a function (it is undefined)`.
+
+**Cause:** In the selected-cell panel (probe button visibility), code called `(researchFeatures as any[] | undefined)?.some(...)`. `researchFeatures` is the **query result object** from `useGetUserFeaturesQuery('home-defense')`, which has shape `{ features, insuranceReduction?, taxReduction? }` (researchFeaturesApi: getUserFeatures returns that shape). The array is `researchFeatures.features`, not `researchFeatures` itself. Calling `.some()` on the object is undefined and throws.
+
+**Fix:** Use the features array: `researchFeatures?.features?.some((f: any) => f.id === 'probe' && f.isUnlocked)` instead of `(researchFeatures as any[] | undefined)?.some(...)`.
+
+**File:** `mobile/src/screens/HackMapScreen.tsx` (line ~4119, selected cell panel probe-unlocked check).
+
+**Consistency:** Same file already uses `researchFeatures?.features?.find(...)` for antivirusFeature (line ~2213); this fix aligns the probe-unlocked check with the API shape.
+
+**Status:** Fixed. Use `researchFeatures?.features` whenever checking feature list from getUserFeatures in HackMapScreen (or elsewhere).
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
