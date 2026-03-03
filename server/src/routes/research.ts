@@ -23,7 +23,7 @@ const CASH_FLOW_SYNC_FEATURE_IDS = new Set([
 ]);
 
 /** Investments feature IDs that affect rental income (spec 18). */
-const INVESTMENTS_SYNC_FEATURE_IDS = new Set(['rental-profit-01', 'rental-profit-015']);
+const INVESTMENTS_SYNC_FEATURE_IDS = new Set(['rental-profit-01', 'rental-profit-015', 'rental-profit-02-i', 'rental-profit-02-ii', 'rental-profit-02-iii']);
 
 /** Shared sync for cash-flow research completion/speedup (income/insurance features per spec 18). */
 async function syncCashFlowResearchCompletion(
