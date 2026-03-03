@@ -635,6 +635,7 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
     const config = await getRentalPropertyConfig();
     const maxPropertyLevel = config.maxPropertyLevel;
     const maxRoomLevel = config.maxRoomLevel;
+    const maxGarageRoomLevel = config.maxGarageRoomLevel;
     const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId, maxPropertyLevel);
     const isUnlocked = propertyLevel >= 1;
     const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
@@ -675,6 +676,7 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
       activeRemodel,
       maxPropertyLevel,
       maxRoomLevel,
+      maxGarageRoomLevel,
       roomRemodelLevels,
     });
   } catch (error) {
@@ -994,7 +996,8 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
   try {
     let newBalance = 0;
     let activeRemodelPayload: { propertyId: number; room: string; startedAt: Date; completesAt: Date; targetRoomLevel: number } | null = null;
-    const [maxPropertyLevel, maxRoomLevel] = await Promise.all([getPropertyMaxLevel(), getRoomRemodelMaxLevel()]);
+    const rentalConfig = await getRentalPropertyConfig();
+    const { maxPropertyLevel, maxRoomLevel, maxGarageRoomLevel } = rentalConfig;
     await session.withTransaction(async () => {
       const user = await User.findById(userId).session(session);
       if (!user) throw new Error('User not found');
@@ -1006,16 +1009,20 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
       }
       const roomLevels = RentalHousingIncomeService.getRoomLevels(user, propertyId, maxRoomLevel);
       const currentRoomLevel = roomLevels[room as keyof typeof roomLevels] ?? 1;
-      if (currentRoomLevel >= maxRoomLevel) throw new Error('Room is already at max remodel level');
+      const maxForRoom = room === 'garage' ? maxGarageRoomLevel : maxRoomLevel;
+      if (currentRoomLevel >= maxForRoom) throw new Error('Room is already at max remodel level');
       const nextRoomLevel = currentRoomLevel + 1;
-      const config = await getRoomRemodelLevelConfig(nextRoomLevel);
-      if (propertyLevel < config.minPropertyLevel) {
-        throw new Error(`Property must be level ${config.minPropertyLevel} to remodel this room to level ${nextRoomLevel}`);
+      const tierConfig = await getRoomRemodelLevelConfig(nextRoomLevel);
+      const minPropForRoom = room === 'garage'
+        ? (nextRoomLevel === 2 ? 7 : nextRoomLevel === 3 ? 8 : nextRoomLevel === 4 ? 9 : 999)
+        : tierConfig.minPropertyLevel;
+      if (propertyLevel < minPropForRoom) {
+        throw new Error(`Property must be level ${minPropForRoom} to remodel this room to level ${nextRoomLevel}`);
       }
-      if (user.balance.total < config.cost) throw new Error('Insufficient funds');
+      if (user.balance.total < tierConfig.cost) throw new Error('Insufficient funds');
       const now = new Date();
-      const completesAt = new Date(now.getTime() + config.constructionTimeMinutes * 60 * 1000);
-      newBalance = user.balance.total - config.cost;
+      const completesAt = new Date(now.getTime() + tierConfig.constructionTimeMinutes * 60 * 1000);
+      newBalance = user.balance.total - tierConfig.cost;
       user.balance.total = newBalance;
       (user as any).activeRemodel = {
         propertyId,

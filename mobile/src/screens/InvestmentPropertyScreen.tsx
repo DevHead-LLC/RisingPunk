@@ -51,11 +51,13 @@ const GesturePanView = memo(function GesturePanView({
   offsetX,
   offsetY,
   panGesture,
+  contentStyle,
 }: {
   children: React.ReactNode;
   offsetX: any;
   offsetY: any;
   panGesture: any;
+  contentStyle?: any;
 }) {
   const animatedStyle: any = useAnimatedStyle(() => {
     'worklet';
@@ -69,9 +71,11 @@ const GesturePanView = memo(function GesturePanView({
     };
   }, [offsetX, offsetY]);
 
+  const style = contentStyle ?? styles.scrollContent;
+
   if (!panGesture) {
     return (
-      <Animated.View style={[styles.scrollContent, animatedStyle]}>
+      <Animated.View style={[style, animatedStyle]}>
         {children}
       </Animated.View>
     );
@@ -79,7 +83,7 @@ const GesturePanView = memo(function GesturePanView({
 
   return (
     <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.scrollContent, animatedStyle]}>
+      <Animated.View style={[style, animatedStyle]}>
         {children}
       </Animated.View>
     </GestureDetector>
@@ -117,6 +121,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const activeRemodelRoom = activeRemodel?.room ?? null;
   const showGarageTab = propertyLevel >= 7;
   const maxRoomLevel = status?.maxRoomLevel;
+  const maxGarageRoomLevel = status?.maxGarageRoomLevel;
   const roomRemodelLevels = status?.roomRemodelLevels;
   const hasRemodelConfig = Boolean(maxRoomLevel != null && roomRemodelLevels?.length);
 
@@ -262,6 +267,106 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     }, 100);
   }, [propertyId, centerView]);
 
+  const GARAGE_WIDTH = 1200;
+  const GARAGE_HEIGHT = 900;
+  const garageOffsetX: any = useSharedValue(0);
+  const garageOffsetY: any = useSharedValue(0);
+  const garageStartX: any = useSharedValue(0);
+  const garageStartY: any = useSharedValue(0);
+  const garageMinX: any = useSharedValue(-1000000);
+  const garageMaxX: any = useSharedValue(1000000);
+  const garageMinY: any = useSharedValue(-1000000);
+  const garageMaxY: any = useSharedValue(1000000);
+  const garageBoundsReady: any = useSharedValue(false);
+
+  const centerGarage = useCallback(() => {
+    const screenWidth = Dimensions.get('window').width;
+    const screenHeight = Dimensions.get('window').height;
+    const CENTER_X = (GARAGE_WIDTH - screenWidth) / 2;
+    const CENTER_Y = (GARAGE_HEIGHT - screenHeight) / 2;
+    let x = -CENTER_X;
+    let y = -CENTER_Y;
+    if (garageBoundsReady.value) {
+      x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
+      y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
+    }
+    garageOffsetX.value = x;
+    garageOffsetY.value = y;
+  }, [garageOffsetX, garageOffsetY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY]);
+
+  useEffect(() => {
+    if (!computePanBounds) return;
+    const WINDOW_WIDTH = Dimensions.get('window').width;
+    const WINDOW_HEIGHT = Dimensions.get('window').height;
+    const MARGIN_SIZE = 0;
+    let ADJUSTED_WIDTH = WINDOW_WIDTH;
+    let ADJUSTED_HEIGHT = WINDOW_HEIGHT;
+    if (Platform.OS === 'android') {
+      ADJUSTED_WIDTH = Dimensions.get('screen').width;
+    }
+    const boundsX = computePanBounds({
+      totalSize: GARAGE_WIDTH,
+      containerWidth: ADJUSTED_WIDTH,
+      containerHeight: ADJUSTED_HEIGHT,
+      marginSize: MARGIN_SIZE,
+    });
+    const boundsY = computePanBounds({
+      totalSize: GARAGE_HEIGHT,
+      containerWidth: ADJUSTED_WIDTH,
+      containerHeight: ADJUSTED_HEIGHT,
+      marginSize: MARGIN_SIZE,
+    });
+    garageMinX.value = boundsX.minX;
+    garageMaxX.value = boundsX.maxX;
+    garageMinY.value = boundsY.minY;
+    garageMaxY.value = boundsY.maxY;
+    garageBoundsReady.value = true;
+  }, [computePanBounds, GARAGE_WIDTH, GARAGE_HEIGHT]);
+
+  useEffect(() => {
+    if (activeTab === 'garage') {
+      setTimeout(centerGarage, 100);
+    }
+  }, [activeTab, centerGarage]);
+
+  const garagePanGesture = useMemo(() => {
+    if (!Gesture || !computePanBounds) return null;
+    return Gesture.Pan()
+      .minPointers(1)
+      .maxPointers(1)
+      .onStart(() => {
+        'worklet';
+        garageStartX.value = garageOffsetX.value;
+        garageStartY.value = garageOffsetY.value;
+      })
+      .onUpdate((g: any) => {
+        'worklet';
+        let x = garageStartX.value + g.translationX;
+        let y = garageStartY.value + g.translationY;
+        if (garageBoundsReady.value) {
+          x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
+          y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
+        }
+        garageOffsetX.value = x;
+        garageOffsetY.value = y;
+      })
+      .onEnd((g: any) => {
+        'worklet';
+        if (garageBoundsReady.value) {
+          garageOffsetX.value = withDecay({
+            velocity: g.velocityX,
+            deceleration: 0.99,
+            clamp: [garageMinX.value, garageMaxX.value],
+          });
+          garageOffsetY.value = withDecay({
+            velocity: g.velocityY,
+            deceleration: 0.99,
+            clamp: [garageMinY.value, garageMaxY.value],
+          });
+        }
+      });
+  }, [garageOffsetX, garageOffsetY, garageStartX, garageStartY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY, withDecay, computePanBounds]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={onBack} />
@@ -296,18 +401,26 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
             </View>
           </GesturePanView>
         ) : (
-          <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
-            <FloorPlan
-              propertyId={propertyId}
-              propertyLevel={propertyLevel}
-              onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
-              activeRemodelRoom={activeRemodelRoom}
-              activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
-              showGarage={true}
-              maxRoomLevel={maxRoomLevel}
-              roomRemodelLevels={roomRemodelLevels}
-            />
-          </View>
+          <GesturePanView
+            offsetX={garageOffsetX}
+            offsetY={garageOffsetY}
+            panGesture={garagePanGesture}
+            contentStyle={styles.garageScrollContent}
+          >
+            <View style={[styles.garageContainer, { borderColor: colors.matrix }]}>
+              <FloorPlan
+                propertyId={propertyId}
+                propertyLevel={propertyLevel}
+                onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
+                activeRemodelRoom={activeRemodelRoom}
+                activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
+                showGarage={true}
+                maxRoomLevel={maxRoomLevel}
+                maxGarageRoomLevel={maxGarageRoomLevel}
+                roomRemodelLevels={roomRemodelLevels}
+              />
+            </View>
+          </GesturePanView>
         )}
       </View>
 
@@ -422,7 +535,8 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
               ) : (
                 (() => {
                   const currentLevel = roomLevels[remodelRoom] ?? 1;
-                  if (!hasRemodelConfig || maxRoomLevel == null) {
+                  const effectiveMaxLevel = remodelRoom === 'garage' && maxGarageRoomLevel != null ? maxGarageRoomLevel : maxRoomLevel;
+                  if (!hasRemodelConfig || effectiveMaxLevel == null) {
                     return (
                       <>
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
@@ -434,11 +548,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                       </>
                     );
                   }
-                  if (currentLevel >= maxRoomLevel) {
+                  if (currentLevel >= effectiveMaxLevel) {
                     return (
                       <>
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
-                          This room is already at max level ({maxRoomLevel}).
+                          This room is already at max level ({effectiveMaxLevel}).
                         </Text>
                         <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
                           <Text style={styles.modalButtonText}>Close</Text>
@@ -446,9 +560,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                       </>
                     );
                   }
-                  const nextLevel = Math.min(maxRoomLevel, currentLevel + 1);
+                  const nextLevel = Math.min(effectiveMaxLevel, currentLevel + 1);
                   const tier = roomRemodelLevels!.find((r) => r.roomLevel === nextLevel);
-                  const minProp = tier?.minPropertyLevel;
+                  const minProp = remodelRoom === 'garage' && nextLevel >= 2 && nextLevel <= 4
+                    ? (nextLevel === 2 ? 7 : nextLevel === 3 ? 8 : 9)
+                    : tier?.minPropertyLevel;
                   if (!tier || minProp == null || propertyLevel < minProp) {
                     return (
                       <>
@@ -531,6 +647,11 @@ const styles = StyleSheet.create({
     height: 950,
     position: 'relative',
   },
+  garageScrollContent: {
+    width: 1200,
+    height: 900,
+    position: 'relative',
+  },
   floorPlanContainer: {
     padding: SIZING.spacing.lg,
     borderWidth: 2,
@@ -595,13 +716,15 @@ const styles = StyleSheet.create({
     color: '#b39ddb',
   },
   garageContainer: {
+    width: 1200,
+    height: 900,
     padding: SIZING.spacing.lg,
     borderWidth: 2,
     borderStyle: 'dashed',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 200,
+    alignSelf: 'center',
   },
   fixedPropertyText: {
     fontSize: 20,

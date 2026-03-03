@@ -144,6 +144,8 @@ export interface RentalHousingStatusResponse {
   maxPropertyLevel?: number;
   /** Max room remodel level. From server construction_config. */
   maxRoomLevel?: number;
+  /** Max garage room level (4). Garage remodels only up to this; main-floor rooms use maxRoomLevel. */
+  maxGarageRoomLevel?: number;
   /** Room remodel tiers from server (cost, time, minPropertyLevel). Use for modal and gating. */
   roomRemodelLevels?: Array<{
     roomLevel: number;

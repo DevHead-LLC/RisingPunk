@@ -3,14 +3,14 @@ import {
   IPropertyBuildLevel,
   IRoomRemodelLevel,
 } from '../models/RentalPropertyConstructionConfig';
-import { RENTAL_PROPERTY_LEVELS, RENTAL_ROOM_REMODEL_LEVELS } from '../config/constructionConfigSeedData';
+import { RENTAL_PROPERTY_LEVELS, RENTAL_ROOM_REMODEL_LEVELS, MAX_GARAGE_ROOM_LEVEL } from '../config/constructionConfigSeedData';
 
 const RENTAL_PROPERTY_BUILDING_TYPE = 'rental_property';
 
 const SEED_CMD = 'From server/: npx ts-node scripts/seedConstructionConfig.ts';
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
-let cachedConfig: { propertyLevels: IPropertyBuildLevel[]; roomRemodelLevels: IRoomRemodelLevel[]; maxPropertyLevel: number; maxRoomLevel: number } | null = null;
+let cachedConfig: { propertyLevels: IPropertyBuildLevel[]; roomRemodelLevels: IRoomRemodelLevel[]; maxPropertyLevel: number; maxRoomLevel: number; maxGarageRoomLevel: number } | null = null;
 let cacheExpiresAt = 0;
 
 export type RentalPropertyConfig = {
@@ -18,6 +18,7 @@ export type RentalPropertyConfig = {
   roomRemodelLevels: IRoomRemodelLevel[];
   maxPropertyLevel: number;
   maxRoomLevel: number;
+  maxGarageRoomLevel: number;
 };
 
 /**
@@ -54,7 +55,7 @@ export async function getRentalPropertyConfig(): Promise<RentalPropertyConfig> {
   }
   const maxPropertyLevel = Math.max(...propertyLevels.map((l) => l.level));
   const maxRoomLevel = Math.max(...roomRemodelLevels.map((l) => l.roomLevel));
-  cachedConfig = { propertyLevels, roomRemodelLevels, maxPropertyLevel, maxRoomLevel };
+  cachedConfig = { propertyLevels, roomRemodelLevels, maxPropertyLevel, maxRoomLevel, maxGarageRoomLevel: MAX_GARAGE_ROOM_LEVEL };
   cacheExpiresAt = now + CACHE_TTL_MS;
   return cachedConfig;
 }

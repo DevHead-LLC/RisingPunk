@@ -26,6 +26,8 @@ interface FloorPlanProps {
   showGarage?: boolean;
   /** Max room remodel level from server. When provided with roomRemodelLevels, used for gating. */
   maxRoomLevel?: number;
+  /** Max garage room level (4). When showGarage and provided, garage remodel is capped at this instead of maxRoomLevel. */
+  maxGarageRoomLevel?: number;
   /** Room remodel tiers from server. When provided with maxRoomLevel, used for min-property-level gating. */
   roomRemodelLevels?: RoomRemodelTier[];
 }
@@ -44,6 +46,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
   activeRemodelCompletesAt,
   showGarage = false,
   maxRoomLevel,
+  maxGarageRoomLevel,
   roomRemodelLevels,
 }) => {
   const colors = useThemeColors();
@@ -69,11 +72,16 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
   const hasRemodelCallback = Boolean(onRemodel);
   const hasRemodelConfig = maxRoomLevel != null && roomRemodelLevels?.length;
   const canShowRemodelForRoom = (roomLevel: number, isGarage: boolean) => {
-    if (!hasRemodelCallback || !hasRemodelConfig || maxRoomLevel == null || roomLevel >= maxRoomLevel) return false;
+    const effectiveMax = isGarage && maxGarageRoomLevel != null ? maxGarageRoomLevel : maxRoomLevel;
+    if (!hasRemodelCallback || !hasRemodelConfig || effectiveMax == null || roomLevel >= effectiveMax) return false;
     if (isGarage && propertyLevel < 7) return false;
     const nextLevel = roomLevel + 1;
     const tier = roomRemodelLevels!.find((r) => r.roomLevel === nextLevel);
     const minProp = tier?.minPropertyLevel;
+    if (isGarage && nextLevel >= 2 && nextLevel <= 4) {
+      const garageMinProp = nextLevel === 2 ? 7 : nextLevel === 3 ? 8 : 9;
+      return propertyLevel >= garageMinProp;
+    }
     return minProp != null && propertyLevel >= minProp;
   };
 
