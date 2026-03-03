@@ -240,7 +240,10 @@ const FEATURES: FeatureRow[] = [
     unlockCost: 4000000,
     levelRequirement: 25,
     researchTimeHours: 17,
-    requiredFeatureRefs: [{ categoryId: 'hack-ability', featureId: 'add-battalion-f' }],
+    requiredFeatureRefs: [
+      { categoryId: 'hack-ability', featureId: 'add-battalion-f' },
+      { categoryId: 'hack-ability', featureId: 'battalion-size-1000' },
+    ],
     researchCenterLevelRequirement: 6,
     effect: { type: 'improvement', value: 2000, target: 'battalion-size' },
   },
