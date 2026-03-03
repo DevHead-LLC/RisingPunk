@@ -235,7 +235,7 @@ const FEATURES: FeatureRow[] = [
   {
     categoryId: 'hack-ability',
     id: 'battalion-size-2000',
-    name: 'Battalion Size +2000',
+    name: 'Battalion Size +2,000',
     description: 'Increase maximum troops per battalion from 2,000 to 4,000.',
     unlockCost: 4000000,
     levelRequirement: 25,
@@ -250,7 +250,7 @@ const FEATURES: FeatureRow[] = [
   {
     categoryId: 'hack-ability',
     id: 'battalion-size-4500',
-    name: 'Battalion Size +4500',
+    name: 'Battalion Size +4,500',
     description: 'Increase maximum troops per battalion from 4,000 to 8,500.',
     unlockCost: 7500000,
     levelRequirement: 32,
@@ -262,7 +262,7 @@ const FEATURES: FeatureRow[] = [
   {
     categoryId: 'hack-ability',
     id: 'battalion-size-6500',
-    name: 'Battalion Size +6500',
+    name: 'Battalion Size +6,500',
     description: 'Increase maximum troops per battalion from 8,500 to 15,000.',
     unlockCost: 11000000,
     levelRequirement: 37,
