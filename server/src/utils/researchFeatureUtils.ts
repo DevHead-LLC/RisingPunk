@@ -43,13 +43,19 @@ const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
 /** Cash-flow feature IDs that reduce insurance expense (spec 18). Bugbot: no legacy IDs (e.g. reduce-insurance-expense) — never used in this project. */
 const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-insurance-01', value: 0.01 },
-  { featureId: 'reduce-insurance-02', value: 0.02 }
+  { featureId: 'reduce-insurance-02', value: 0.02 },
+  { featureId: 'reduce-insurance-03', value: 0.02 }
 ];
 
 /** Tax reduction: current spec (cash-flow) and legacy (financial/reduce-expenses). Check correct category per feature. Bugbot: new starts of financial/reduce-expenses are blocked in ResearchFeatureService to prevent cheap tax-reduction bypass. */
 const TAX_REDUCTION_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
   { featureId: 'reduce-tax-expense-02', value: 0.02, categoryId: 'cash-flow' },
   { featureId: 'reduce-expenses', value: 0.02, categoryId: 'financial' }
+];
+
+/** Cash-flow feature IDs that reduce rent/mortgage expense. No legacy. */
+const RENT_MORTGAGE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+  { featureId: 'reduce-rent-mortgage-05', value: 0.05 }
 ];
 
 /** Rental profit per room features (spec 18). All tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
@@ -101,6 +107,21 @@ export async function getInsuranceReductionBonus(userId: string, prefetch?: Bonu
   }
   const hasReplacement = await check('cash-flow', INSURANCE_LEGACY_REPLACEMENT_ID);
   if (!hasReplacement && (await check('cash-flow', 'reduce-insurance-expense'))) total += 0.02;
+  return total;
+}
+
+/**
+ * Total rent/mortgage expense reduction from all unlocked cash-flow features.
+ * Pass prefetch to avoid N+1 queries.
+ */
+export async function getRentMortgageReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+  const check = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
+  let total = 0;
+  for (const { featureId, value } of RENT_MORTGAGE_REDUCTION_FEATURES) {
+    if (await check('cash-flow', featureId)) total += value;
+  }
   return total;
 }
 
