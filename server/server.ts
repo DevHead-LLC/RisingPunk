@@ -313,6 +313,7 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
     // Expense modifiers from performSync (single source of truth for Financial Statements screen; no duplicate queries)
     const insuranceReduction = syncResult.insuranceReduction;
     const taxReduction = syncResult.taxReduction;
+    const rentMortgageReduction = syncResult.rentMortgageReduction;
 
     // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {
@@ -323,7 +324,8 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       lifetimeHighNetWorth: user.lifetimeHighNetWorth || 0,
       lifetimeHighUpdated: lifetimeHighUpdated,
       insuranceReduction,
-      taxReduction
+      taxReduction,
+      rentMortgageReduction
     };
 
     res.json(currentBalance);
