@@ -453,7 +453,7 @@ export class ResearchFeatureService {
           console.log(`[AUDIT] User ${userId} unlocked Battalion Size +1,000 at ${unlockedAt.toISOString()}`);
         }
 
-        if (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025' || featureId === 'increase-income-03')) {
+        if (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025' || featureId === 'increase-income-03' || featureId === 'increase-income-03-ii' || featureId === 'increase-income-03-iii')) {
           console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
         }
         if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {

@@ -35,7 +35,9 @@ const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-01', value: 0.01 },
   { featureId: 'increase-income-02', value: 0.02 },
   { featureId: 'increase-income-025', value: 0.025 },
-  { featureId: 'increase-income-03', value: 0.03 }
+  { featureId: 'increase-income-03', value: 0.03 },
+  { featureId: 'increase-income-03-ii', value: 0.03 },
+  { featureId: 'increase-income-03-iii', value: 0.03 }
 ];
 
 /** Cash-flow feature IDs that reduce insurance expense (spec 18). Bugbot: no legacy IDs (e.g. reduce-insurance-expense) — never used in this project. */

@@ -18,6 +18,7 @@ const MAX_RESEARCH_COMPLETION_ATTEMPTS = 10;
 /** Cash-flow feature IDs that affect base rate, insurance, or tax (spec 18). Triggers sync on completion/speedup. */
 const CASH_FLOW_SYNC_FEATURE_IDS = new Set([
   'increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03',
+  'increase-income-03-ii', 'increase-income-03-iii',
   'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'
 ]);
 
