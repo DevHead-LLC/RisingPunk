@@ -3,6 +3,7 @@ import { getRentalProfitBonusPerRoom, getResearchFeatureUnlockTime, getRentalPro
 import { getRentalPropertyConfig } from './RentalPropertyConfigService';
 import type { RentalPropertyConfig } from './RentalPropertyConfigService';
 import type { IPropertyBuildLevel, IRoomRemodelLevel } from '../models/RentalPropertyConstructionConfig';
+import { MAX_GARAGE_ROOM_LEVEL, GARAGE_REMODEL_ADD_SCHEDULE } from '../config/constructionConfigSeedData';
 
 export type RoomType = 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom' | 'garage';
 
@@ -42,7 +43,7 @@ export class RentalHousingIncomeService {
     return 0;
   }
 
-  /** Room levels for a property. Garage default 1. Clamped to 1..maxRoomLevel (from config). */
+  /** Room levels for a property. Garage default 1. Main-floor rooms clamped to 1..maxRoomLevel; garage clamped to 1..min(maxRoomLevel, MAX_GARAGE_ROOM_LEVEL). */
   static getRoomLevels(user: IUser, propertyId: number, maxRoomLevel: number): {
     bathroom: number;
     kitchen: number;
@@ -53,16 +54,18 @@ export class RentalHousingIncomeService {
     const rooms = user.rentalHousingRooms?.[`property${propertyId}` as keyof typeof user.rentalHousingRooms];
     if (!rooms) return { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1, garage: 1 };
     const clamp = (n: number) => Math.min(maxRoomLevel, Math.max(1, n));
+    const garageMax = Math.min(maxRoomLevel, MAX_GARAGE_ROOM_LEVEL);
+    const clampGarage = (n: number) => Math.min(garageMax, Math.max(1, n));
     return {
       bathroom: clamp(rooms.bathroom ?? 1),
       kitchen: clamp(rooms.kitchen ?? 1),
       bedroom: clamp(rooms.bedroom ?? 1),
       livingRoom: clamp(rooms.livingRoom ?? 1),
-      garage: clamp(rooms.garage ?? 1),
+      garage: clampGarage(rooms.garage ?? 1),
     };
   }
 
-  /** Compute one room's rate from config. Garage only when propertyLevel >= 7; garage remodel add only for room level 5+. */
+  /** Compute one room's rate from config. Garage appears at property 7 ($0.025), 8 ($0.03), 9 ($0.035). Garage room has levels 1–4 only; remodel adds at 2/3/4 require property 7/8/9. */
   static getRoomIncomeFromConfig(
     config: RentalPropertyConfig,
     propertyLevel: number,
@@ -79,9 +82,12 @@ export class RentalHousingIncomeService {
     if (roomType === 'garage') {
       const garageRate = levelConfig.rates.garage ?? 0;
       if (propertyLevel < 7 || garageRate === 0) return 0;
-      const remodelConfig = config.roomRemodelLevels.find((r) => r.roomLevel === roomLevel);
-      const minProp = remodelConfig?.minPropertyLevel ?? 999;
-      const add = roomLevel >= 5 && propertyLevel >= minProp && remodelConfig?.addRates.garage != null ? remodelConfig.addRates.garage : 0;
+      // Garage remodel add: use in-code schedule only (no DB dependency) so income is correct after rebuild.
+      let add = 0;
+      for (const tier of GARAGE_REMODEL_ADD_SCHEDULE) {
+        if (tier.roomLevel > roomLevel) break;
+        if (propertyLevel >= tier.minPropertyLevel) add += tier.addPerSecond;
+      }
       return garageRate + add;
     }
 
