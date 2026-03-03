@@ -247,13 +247,14 @@ export async function getMaxBattalionSize(userId: string, asOfTime?: Date): Prom
   return max;
 }
 
-const BATTALION_SLOT_FEATURE_IDS: Record<'C' | 'D' | 'E', string> = {
+const BATTALION_SLOT_FEATURE_IDS: Record<'C' | 'D' | 'E' | 'F', string> = {
   C: 'add-battalion-c',
   D: 'add-battalion-d',
   E: 'add-battalion-e',
+  F: 'add-battalion-f',
 };
 
-/** Legacy slot IDs so Battalion C is found under battalions-per-battle before grandfather migration. D/E have no legacy. */
+/** Legacy slot IDs so Battalion C is found under battalions-per-battle before grandfather migration. D/E/F have no legacy. */
 const BATTALION_SLOT_LEGACY_IDS: Record<string, string[]> = {
   'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
 };
@@ -264,7 +265,7 @@ const BATTALION_SLOT_LEGACY_IDS: Record<string, string[]> = {
  */
 export async function isBattalionSlotUnlocked(
   userId: string,
-  battalionId: 'C' | 'D' | 'E',
+  battalionId: 'C' | 'D' | 'E' | 'F',
   asOfTime?: Date
 ): Promise<boolean> {
   const featureId = BATTALION_SLOT_FEATURE_IDS[battalionId];
