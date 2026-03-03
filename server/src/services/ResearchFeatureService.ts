@@ -593,6 +593,7 @@ export class ResearchFeatureService {
         'crew-system-unlock': [],
         'reduce-insurance-01': ['reduce-insurance-01'],
         'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
+        'reduce-insurance-03': ['reduce-insurance-03'],
         'rental-profit-01': ['rental-profit-increase'],
         'increase-income-01': ['increase-income-rate'],
         'increase-income-02': ['increase-income-rate'],

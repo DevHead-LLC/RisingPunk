@@ -110,6 +110,18 @@ const FEATURES: FeatureRow[] = [
     effect: { type: 'reduction', value: 0.02, target: 'insurance-expense' },
   },
   {
+    categoryId: 'cash-flow',
+    id: 'reduce-insurance-03',
+    name: 'Reduce Insurance Expense $0.02 II',
+    description: 'Reduce your insurance expense by an additional $0.02 per second.',
+    unlockCost: 7500000,
+    levelRequirement: 32,
+    researchTimeHours: 20.5,
+    requiredFeatureRefs: [{ categoryId: 'cash-flow', featureId: 'reduce-insurance-02' }],
+    researchCenterLevelRequirement: 8,
+    effect: { type: 'reduction', value: 0.02, target: 'insurance-expense' },
+  },
+  {
     categoryId: 'hack-ability',
     id: 'battalion-size-250',
     name: 'Battalion Size +250',
