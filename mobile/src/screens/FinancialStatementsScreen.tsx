@@ -103,8 +103,9 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     const hasTaxInTemplate = Object.keys(baseIncomeStatement).some(
       k => /tax/.test(String(k).trim().toLowerCase())
     );
+    // Word boundaries so we match "Rent"/"Mortgage" only, not "current", "rental", "parent", etc.
     const hasRentMortgageInTemplate = Object.keys(baseIncomeStatement).some(
-      k => /rent|mortgage/.test(String(k).trim().toLowerCase())
+      k => /\brent\b|\bmortgage\b/.test(String(k).trim().toLowerCase())
     );
 
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
@@ -146,7 +147,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
         taxReductionApplied = true;
         return [k, num + taxReductionTotal] as [string, number];
       }
-      if (num < 0 && /rent|mortgage/.test(keyLower) && !rentMortgageReductionApplied) {
+      if (num < 0 && /\brent\b|\bmortgage\b/.test(keyLower) && !rentMortgageReductionApplied) {
         rentMortgageReductionApplied = true;
         return [k, num + rentMortgageReductionTotal] as [string, number];
       }
