@@ -432,7 +432,13 @@ router.post('/assign', auth, async (req, res) => {
             ? 'Complete "Battalion Size +500" research to increase to 1,000.'
             : maxLimit === 1000
               ? 'Complete "Battalion Size +1,000" research to increase to 2,000.'
-              : null;
+              : maxLimit === 2000
+                ? 'Complete "Battalion Size +2,000" research to increase to 4,000.'
+                : maxLimit === 4000
+                  ? 'Complete "Battalion Size +4,500" research to increase to 8,500.'
+                  : maxLimit === 8500
+                    ? 'Complete "Battalion Size +6,500" research to increase to 15,000.'
+                    : null;
       const errorMessage = nextStep
         ? `Maximum troops per battalion is ${maxLimit.toLocaleString()}. ${nextStep}`
         : `Maximum troops per battalion is ${maxLimit.toLocaleString()}.`;
