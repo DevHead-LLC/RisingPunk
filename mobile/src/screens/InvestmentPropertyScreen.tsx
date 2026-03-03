@@ -316,10 +316,28 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
       containerHeight: ADJUSTED_HEIGHT,
       marginSize: MARGIN_SIZE,
     });
-    garageMinX.value = boundsX.minX;
-    garageMaxX.value = boundsX.maxX;
-    garageMinY.value = boundsY.minY;
-    garageMaxY.value = boundsY.maxY;
+    let adjustedBounds: { minX: number; maxX: number; minY: number; maxY: number };
+    if (Platform.OS === 'android') {
+      const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
+      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
+      adjustedBounds = {
+        minX: boundsX.minX,
+        maxX: boundsX.maxX,
+        minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
+        maxY: boundsY.maxY,
+      };
+    } else {
+      adjustedBounds = {
+        minX: boundsX.minX,
+        maxX: boundsX.maxX,
+        minY: boundsY.minY,
+        maxY: boundsY.maxY,
+      };
+    }
+    garageMinX.value = adjustedBounds.minX;
+    garageMaxX.value = adjustedBounds.maxX;
+    garageMinY.value = adjustedBounds.minY;
+    garageMaxY.value = adjustedBounds.maxY;
     garageBoundsReady.value = true;
   }, [computePanBounds, GARAGE_WIDTH, GARAGE_HEIGHT]);
 
