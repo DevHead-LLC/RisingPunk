@@ -19,15 +19,11 @@ type Props = {
 
 type TabKey = 'income' | 'balance' | 'cashflow';
 
-/**
- * Cumulative build cost by property level (0–5). Source of truth: server/src/config/rentalPropertyConfig.ts
- * PROPERTY_BUILD_LEVELS — cumulative = sum of cost for levels 1..level. When server config changes, update here
- * and in any docs that reference this (see taskItems/ios/turf/rental-property-level-remodel-system.md § Client–server config sync).
- */
-const CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL: number[] = [0, 10000, 40000, 90000, 165000, 265000];
-
-function getPropertyCumulativeValue(level: number): number {
-  return CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL[Math.min(5, Math.max(0, level))] ?? 100000;
+/** Cumulative property value from server (cumulativeBuildValueByLevel). Clamps level to array bounds. */
+function getPropertyCumulativeValue(level: number, cumulativeBuildValueByLevel: number[] | undefined): number {
+  if (!cumulativeBuildValueByLevel?.length) return 0;
+  const idx = Math.min(cumulativeBuildValueByLevel.length - 1, Math.max(0, level));
+  return cumulativeBuildValueByLevel[idx] ?? 0;
 }
 
 export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element {
@@ -419,7 +415,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                       .filter(p => p.isUnlocked)
                       .map((property) => {
                         const level = property.propertyLevel ?? 1;
-                        const cumulativeValue = getPropertyCumulativeValue(level);
+                        const cumulativeValue = getPropertyCumulativeValue(level, rentalHousingData.cumulativeBuildValueByLevel);
                         return (
                           <View key={property.propertyId} style={styles.row}>
                             <Text style={styles.keyText}>Investment Property {property.propertyId} (Lv.{level})</Text>
@@ -435,7 +431,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     <View style={[styles.row, { marginTop: SIZING.spacing.sm }]}>
                       <Text style={styles.keyText}>Net Worth</Text>
                       <Text style={styles.valText}>
-                        {`$${Math.round(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).reduce((sum, p) => sum + getPropertyCumulativeValue(p.propertyLevel ?? 1), 0) : 0)).toLocaleString()}`}
+                        {`$${Math.round(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).reduce((sum, p) => sum + getPropertyCumulativeValue(p.propertyLevel ?? 1, rentalHousingData.cumulativeBuildValueByLevel), 0) : 0)).toLocaleString()}`}
                       </Text>
                     </View>
                   </View>

@@ -25,13 +25,14 @@ function isResearchFeatureEffectivelyUnlocked(feature: FeatureWithResearch | nul
 }
 
 /**
- * Returns whether Battalion C, D, and E slots are effectively unlocked (same logic as server isBattalionSlotUnlocked).
+ * Returns whether Battalion C, D, E, and F slots are effectively unlocked (same logic as server isBattalionSlotUnlocked).
  * Uses hack-ability user features; one source of truth for the "effectively unlocked" check on the client.
  */
 export function useBattalionSlotUnlocks(): {
   isBattalionCUnlocked: boolean;
   isBattalionDUnlocked: boolean;
   isBattalionEUnlocked: boolean;
+  isBattalionFUnlocked: boolean;
 } {
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
 
@@ -39,10 +40,12 @@ export function useBattalionSlotUnlocks(): {
     const battalionC = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-c');
     const battalionD = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-d');
     const battalionE = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-e');
+    const battalionF = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-f');
     return {
       isBattalionCUnlocked: isResearchFeatureEffectivelyUnlocked(battalionC),
       isBattalionDUnlocked: isResearchFeatureEffectivelyUnlocked(battalionD),
       isBattalionEUnlocked: isResearchFeatureEffectivelyUnlocked(battalionE),
+      isBattalionFUnlocked: isResearchFeatureEffectivelyUnlocked(battalionF),
     };
   }, [hackAbilityFeatures]);
 }

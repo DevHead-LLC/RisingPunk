@@ -35,7 +35,9 @@ const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-01', value: 0.01 },
   { featureId: 'increase-income-02', value: 0.02 },
   { featureId: 'increase-income-025', value: 0.025 },
-  { featureId: 'increase-income-03', value: 0.03 }
+  { featureId: 'increase-income-03', value: 0.03 },
+  { featureId: 'increase-income-03-ii', value: 0.03 },
+  { featureId: 'increase-income-03-iii', value: 0.03 }
 ];
 
 /** Cash-flow feature IDs that reduce insurance expense (spec 18). Bugbot: no legacy IDs (e.g. reduce-insurance-expense) — never used in this project. */
@@ -50,10 +52,13 @@ const TAX_REDUCTION_FEATURES: { featureId: string; value: number; categoryId: st
   { featureId: 'reduce-expenses', value: 0.02, categoryId: 'financial' }
 ];
 
-/** Rental profit per room features (spec 18). Both tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
+/** Rental profit per room features (spec 18). All tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
 export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
   { featureId: 'rental-profit-01', value: 0.01, categoryId: 'investments' },
-  { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' }
+  { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-i', value: 0.02, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-ii', value: 0.02, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-iii', value: 0.02, categoryId: 'investments' }
 ];
 
 /** Migration replacement set for increase-income-rate (grandfather creates 01+02+025). Add legacy only when user doesn't have all of these (Bugbot). */
@@ -245,13 +250,14 @@ export async function getMaxBattalionSize(userId: string, asOfTime?: Date): Prom
   return max;
 }
 
-const BATTALION_SLOT_FEATURE_IDS: Record<'C' | 'D' | 'E', string> = {
+const BATTALION_SLOT_FEATURE_IDS: Record<'C' | 'D' | 'E' | 'F', string> = {
   C: 'add-battalion-c',
   D: 'add-battalion-d',
   E: 'add-battalion-e',
+  F: 'add-battalion-f',
 };
 
-/** Legacy slot IDs so Battalion C is found under battalions-per-battle before grandfather migration. D/E have no legacy. */
+/** Legacy slot IDs so Battalion C is found under battalions-per-battle before grandfather migration. D/E/F have no legacy. */
 const BATTALION_SLOT_LEGACY_IDS: Record<string, string[]> = {
   'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
 };
@@ -262,7 +268,7 @@ const BATTALION_SLOT_LEGACY_IDS: Record<string, string[]> = {
  */
 export async function isBattalionSlotUnlocked(
   userId: string,
-  battalionId: 'C' | 'D' | 'E',
+  battalionId: 'C' | 'D' | 'E' | 'F',
   asOfTime?: Date
 ): Promise<boolean> {
   const featureId = BATTALION_SLOT_FEATURE_IDS[battalionId];
