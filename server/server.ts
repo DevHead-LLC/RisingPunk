@@ -353,10 +353,11 @@ app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) 
     await RentalHousingSyncService.ensureLegacyRentalLevels(user);
     const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
     const config = await getRentalPropertyConfig();
+    const sortedLevels = [...config.propertyLevels].sort((a, b) => a.level - b.level);
     const cumulativeBuildValueByLevel: number[] = [0];
-    for (let i = 0; i < config.propertyLevels.length; i++) {
+    for (let i = 0; i < sortedLevels.length; i++) {
       const prev = cumulativeBuildValueByLevel[cumulativeBuildValueByLevel.length - 1];
-      cumulativeBuildValueByLevel.push(prev + config.propertyLevels[i].cost);
+      cumulativeBuildValueByLevel.push(prev + sortedLevels[i].cost);
     }
 
     res.json({ ...rentalIncome, cumulativeBuildValueByLevel });
