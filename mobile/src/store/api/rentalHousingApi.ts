@@ -16,14 +16,18 @@ export interface RentalHousingIncome {
       kitchen: number;
       bedroom: number;
       livingRoom: number;
+      garage?: number;
     };
     roomLevels?: {
       bathroom: number;
       kitchen: number;
       bedroom: number;
       livingRoom: number;
+      garage?: number;
     };
   }[];
+  /** Cumulative build cost by property level (index = level). From server construction_config. Use for balance sheet valuations. */
+  cumulativeBuildValueByLevel?: number[];
 }
 
 const rentalHousingBaseQuery = async (args: any, api: any, extraOptions: any) => {

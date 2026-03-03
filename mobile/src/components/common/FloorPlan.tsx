@@ -5,9 +5,16 @@ import { useGetRentalHousingIncomeQuery } from '../../store/api/rentalHousingApi
 import { formatCurrencyThousandths } from '../../utils/currencyUtils';
 import type { RemodelRoomType } from '../../store/api/authApi';
 
+export type RoomRemodelTier = {
+  roomLevel: number;
+  cost: number;
+  constructionTimeMinutes: number;
+  minPropertyLevel: number;
+};
+
 interface FloorPlanProps {
   propertyId: number;
-  /** When set and property level >= 3, show Remodel button for rooms below level 4 */
+  /** When set and property level >= 3, show Remodel button for rooms below max level */
   propertyLevel?: number;
   /** When set, show room level badge and Remodel callback for upgradable rooms */
   onRemodel?: (room: RemodelRoomType) => void;
@@ -15,6 +22,14 @@ interface FloorPlanProps {
   activeRemodelRoom?: string | null;
   /** ISO date string when the active remodel completes (for countdown and speedup) */
   activeRemodelCompletesAt?: string | null;
+  /** When true, render only the Garage room (for Garage tab). When false, render Main Floor rooms only. */
+  showGarage?: boolean;
+  /** Max room remodel level from server. When provided with roomRemodelLevels, used for gating. */
+  maxRoomLevel?: number;
+  /** Max garage room level (4). When showGarage and provided, garage remodel is capped at this instead of maxRoomLevel. */
+  maxGarageRoomLevel?: number;
+  /** Room remodel tiers from server. When provided with maxRoomLevel, used for min-property-level gating. */
+  roomRemodelLevels?: RoomRemodelTier[];
 }
 
 function formatRemodelTimeLeft(remainingSec: number): string {
@@ -23,12 +38,17 @@ function formatRemodelTimeLeft(remainingSec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-/** Min property level required to remodel to this room level (2→3, 3→4, 4→5). Matches server ROOM_REMODEL_MIN_PROPERTY_LEVEL. */
-function minPropertyLevelForNextRoomLevel(nextLevel: 2 | 3 | 4): number {
-  return nextLevel === 2 ? 3 : nextLevel === 3 ? 4 : 5;
-}
-
-export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel = 0, onRemodel, activeRemodelRoom, activeRemodelCompletesAt }) => {
+export const FloorPlan: React.FC<FloorPlanProps> = ({
+  propertyId,
+  propertyLevel = 0,
+  onRemodel,
+  activeRemodelRoom,
+  activeRemodelCompletesAt,
+  showGarage = false,
+  maxRoomLevel,
+  maxGarageRoomLevel,
+  roomRemodelLevels,
+}) => {
   const colors = useThemeColors();
   const { data: rentalIncome, isLoading } = useGetRentalHousingIncomeQuery();
   const [now, setNow] = useState(() => Date.now());
@@ -50,10 +70,51 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
   const roomValues = propertyData?.roomValues;
   const roomLevels = propertyData?.roomLevels;
   const hasRemodelCallback = Boolean(onRemodel);
-  const canShowRemodelForRoom = (roomLevel: number) =>
-    hasRemodelCallback &&
-    roomLevel < 4 &&
-    propertyLevel >= minPropertyLevelForNextRoomLevel((roomLevel + 1) as 2 | 3 | 4);
+  const hasRemodelConfig = maxRoomLevel != null && roomRemodelLevels?.length;
+  const canShowRemodelForRoom = (roomLevel: number, isGarage: boolean) => {
+    const effectiveMax = isGarage && maxGarageRoomLevel != null ? maxGarageRoomLevel : maxRoomLevel;
+    if (!hasRemodelCallback || !hasRemodelConfig || effectiveMax == null || roomLevel >= effectiveMax) return false;
+    if (isGarage && propertyLevel < 7) return false;
+    const nextLevel = roomLevel + 1;
+    const tier = roomRemodelLevels!.find((r) => r.roomLevel === nextLevel);
+    const minProp = tier?.minPropertyLevel;
+    if (isGarage && nextLevel >= 2 && nextLevel <= 4) {
+      const garageMinProp = nextLevel === 2 ? 7 : nextLevel === 3 ? 8 : 9;
+      return propertyLevel >= garageMinProp;
+    }
+    return minProp != null && propertyLevel >= minProp;
+  };
+
+  if (showGarage) {
+    const garageLevel = roomLevels?.garage ?? 1;
+    const garageValue = roomValues?.garage ?? 0;
+    return (
+      <View style={styles.garageOnlyContainer}>
+        <View style={[styles.roomLabel, { backgroundColor: colors.secondary }]}>
+          <Text style={styles.roomText}>Garage</Text>
+          <View style={styles.roomLevelRow}>
+            <Text style={styles.roomLevelBadge}>Lv. {garageLevel}</Text>
+            {canShowRemodelForRoom(garageLevel, true) && !activeRemodelRoom && (
+              <TouchableOpacity onPress={() => onRemodel!('garage')} style={styles.remodelButton}>
+                <Text style={styles.remodelButtonText}>↑ Remodel</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={styles.roomValue}>
+            {isLoading ? '+$0.00' : formatCurrencyThousandths(garageValue)}
+          </Text>
+          {activeRemodelRoom === 'garage' && onRemodel && (
+            <View style={styles.remodelingRow}>
+              <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
+              <TouchableOpacity onPress={() => onRemodel('garage')} style={styles.remodelButton}>
+                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.floorPlan}>
@@ -67,7 +128,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
           <Text style={styles.roomText}>Bathroom</Text>
           <View style={styles.roomLevelRow}>
             <Text style={styles.roomLevelBadge}>Lv. {roomLevels?.bathroom ?? 1}</Text>
-            {canShowRemodelForRoom(roomLevels?.bathroom ?? 1) && !activeRemodelRoom && (
+            {canShowRemodelForRoom(roomLevels?.bathroom ?? 1, false) && !activeRemodelRoom && (
               <TouchableOpacity onPress={() => onRemodel!('bathroom')} style={styles.remodelButton}>
                 <Text style={styles.remodelButtonText}>↑ Remodel</Text>
               </TouchableOpacity>
@@ -100,7 +161,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
           <Text style={styles.roomText}>Kitchen</Text>
           <View style={styles.roomLevelRow}>
             <Text style={styles.roomLevelBadge}>Lv. {roomLevels?.kitchen ?? 1}</Text>
-            {canShowRemodelForRoom(roomLevels?.kitchen ?? 1) && !activeRemodelRoom && (
+            {canShowRemodelForRoom(roomLevels?.kitchen ?? 1, false) && !activeRemodelRoom && (
               <TouchableOpacity onPress={() => onRemodel!('kitchen')} style={styles.remodelButton}>
                 <Text style={styles.remodelButtonText}>↑ Remodel</Text>
               </TouchableOpacity>
@@ -127,7 +188,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
           <Text style={styles.roomText}>Bedroom</Text>
           <View style={styles.roomLevelRow}>
             <Text style={styles.roomLevelBadge}>Lv. {roomLevels?.bedroom ?? 1}</Text>
-            {canShowRemodelForRoom(roomLevels?.bedroom ?? 1) && !activeRemodelRoom && (
+            {canShowRemodelForRoom(roomLevels?.bedroom ?? 1, false) && !activeRemodelRoom && (
               <TouchableOpacity onPress={() => onRemodel!('bedroom')} style={styles.remodelButton}>
                 <Text style={styles.remodelButtonText}>↑ Remodel</Text>
               </TouchableOpacity>
@@ -153,7 +214,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
           <Text style={styles.roomText}>Living Room</Text>
           <View style={styles.roomLevelRow}>
             <Text style={styles.roomLevelBadge}>Lv. {roomLevels?.livingRoom ?? 1}</Text>
-            {canShowRemodelForRoom(roomLevels?.livingRoom ?? 1) && !activeRemodelRoom && (
+            {canShowRemodelForRoom(roomLevels?.livingRoom ?? 1, false) && !activeRemodelRoom && (
               <TouchableOpacity onPress={() => onRemodel!('livingRoom')} style={styles.remodelButton}>
                 <Text style={styles.remodelButtonText}>↑ Remodel</Text>
               </TouchableOpacity>
@@ -177,6 +238,11 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({ propertyId, propertyLevel 
 };
 
 const styles = StyleSheet.create({
+  garageOnlyContainer: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   floorPlan: {
     width: 1200,
     height: 900,

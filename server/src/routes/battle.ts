@@ -55,8 +55,7 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      // Max 5 until Add Battalion F exists (A–E per research spec).
-      const MAX_USER_BATTALIONS = 5;
+      const MAX_USER_BATTALIONS = 6;
       if (userBattalions.length > MAX_USER_BATTALIONS) {
         res.status(400).json({ success: false, error: `Maximum ${MAX_USER_BATTALIONS} battalions allowed` });
         return;
@@ -90,6 +89,17 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
           res.status(403).json({
             success: false,
             error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.'
+          });
+          return;
+        }
+      }
+
+      if (userBattalions.length > 5) {
+        const unlockedF = await isBattalionSlotUnlocked(String(req.user._id), 'F');
+        if (!unlockedF) {
+          res.status(403).json({
+            success: false,
+            error: 'Battalion F is locked. Complete the "Add Battalion F" research feature to unlock it.'
           });
           return;
         }

@@ -8,7 +8,12 @@ import { FinanceTemplate } from '../models/FinanceTemplate';
 import mongoose from 'mongoose';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { getTaskList } from '../config/taskListData';
-import { getPropertyBuildConfig, getRoomRemodelConfig } from '../config/rentalPropertyConfig';
+import {
+  getPropertyBuildLevelConfig,
+  getPropertyMaxLevel,
+  getRentalPropertyConfig,
+  getRoomRemodelLevelConfig,
+} from '../services/RentalPropertyConfigService';
 import { getResearchCenterLevelConfig, getResearchCenterMaxLevel, type ResearchCenterLevel } from '../config/researchCenterConfig';
 import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
 import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
@@ -626,7 +631,11 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
 
     await RentalHousingSyncService.ensureLegacyRentalLevels(user);
 
-    const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId);
+    const config = await getRentalPropertyConfig();
+    const maxPropertyLevel = config.maxPropertyLevel;
+    const maxRoomLevel = config.maxRoomLevel;
+    const maxGarageRoomLevel = config.maxGarageRoomLevel;
+    const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId, maxPropertyLevel);
     const isUnlocked = propertyLevel >= 1;
     const propertyKey = `property${propertyId}` as keyof typeof user.rentalHousingBuilds;
     const buildStatusRaw = user.rentalHousingBuilds?.[propertyKey] as { startedAt: Date | null; completesAt: Date | null; targetLevel?: number } | undefined;
@@ -635,17 +644,23 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
       : { startedAt: null, completesAt: null, targetLevel: 1 };
     
     const isBuilding = Boolean(buildStatus.startedAt && buildStatus.completesAt && new Date() < new Date(buildStatus.completesAt));
-    const nextBuildLevel = propertyLevel < 5 ? (propertyLevel + 1) as 1 | 2 | 3 | 4 | 5 : null;
+    const nextBuildLevel = propertyLevel < maxPropertyLevel ? propertyLevel + 1 : null;
     let nextBuildCost: number | null = null;
     let nextBuildTimeMinutes: number | null = null;
-    if (nextBuildLevel) {
-      const config = getPropertyBuildConfig(nextBuildLevel);
-      nextBuildCost = config.cost;
-      nextBuildTimeMinutes = config.constructionTimeMinutes;
+    if (nextBuildLevel != null) {
+      const levelConfig = await getPropertyBuildLevelConfig(nextBuildLevel);
+      nextBuildCost = levelConfig.cost;
+      nextBuildTimeMinutes = levelConfig.constructionTimeMinutes;
     }
-    const roomLevels = RentalHousingIncomeService.getRoomLevels(user, propertyId);
+    const roomLevels = RentalHousingIncomeService.getRoomLevels(user, propertyId, maxRoomLevel);
     const activeRemodel = user.activeRemodel?.propertyId === propertyId ? user.activeRemodel : null;
-    
+    const roomRemodelLevels = config.roomRemodelLevels.map((r) => ({
+      roomLevel: r.roomLevel,
+      cost: r.cost,
+      constructionTimeMinutes: r.constructionTimeMinutes,
+      minPropertyLevel: r.minPropertyLevel,
+    }));
+
     res.json({
       propertyId,
       isUnlocked,
@@ -655,9 +670,13 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
       nextBuildTimeMinutes,
       isBuilding,
       buildStatus,
-      canBuild: propertyLevel < 5 && !isBuilding,
+      canBuild: propertyLevel < maxPropertyLevel && !isBuilding,
       roomLevels,
       activeRemodel,
+      maxPropertyLevel,
+      maxRoomLevel,
+      maxGarageRoomLevel,
+      roomRemodelLevels,
     });
   } catch (error) {
     console.error('Error fetching rental housing status:', error);
@@ -683,8 +702,9 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
 
     await RentalHousingSyncService.ensureLegacyRentalLevels(user);
 
-    const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId);
-    if (propertyLevel >= 5) {
+    const maxPropertyLevel = await getPropertyMaxLevel();
+    const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId, maxPropertyLevel);
+    if (propertyLevel >= maxPropertyLevel) {
       res.status(400).json({ error: 'Property already at max level' });
       return;
     }
@@ -697,8 +717,8 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
       return;
     }
 
-    const nextBuildLevel = (propertyLevel + 1) as 1 | 2 | 3 | 4 | 5;
-    const config = getPropertyBuildConfig(nextBuildLevel);
+    const nextBuildLevel = propertyLevel + 1;
+    const config = await getPropertyBuildLevelConfig(nextBuildLevel);
     const buildCost = config.cost;
     const buildTimeMinutes = config.constructionTimeMinutes;
 
@@ -777,9 +797,10 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
       return;
     }
 
+    const maxPropertyLevel = await getPropertyMaxLevel();
     const rawTargetLevel = buildStatus.targetLevel;
     const isLegacyBuild = rawTargetLevel === undefined || rawTargetLevel === null;
-    const targetLevel = isLegacyBuild ? 5 : Math.min(5, Math.max(1, rawTargetLevel));
+    const targetLevel = isLegacyBuild ? Math.min(5, maxPropertyLevel) : Math.min(maxPropertyLevel, Math.max(1, rawTargetLevel));
 
     const updateData: any = {
       [`rentalHousingLevels.${propertyKey}`]: targetLevel,
@@ -868,10 +889,11 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
         throw new Error('Insufficient funds');
       }
 
+      const maxPropertyLevel = await getPropertyMaxLevel();
       const buildStatusWithTarget = userInTransaction.rentalHousingBuilds?.[propertyKey] as { startedAt: Date; completesAt: Date; targetLevel?: number } | undefined;
       const rawTargetLevel = buildStatusWithTarget?.targetLevel;
       const isLegacyBuild = rawTargetLevel === undefined || rawTargetLevel === null;
-      const targetLevel = isLegacyBuild ? 5 : Math.min(5, Math.max(1, rawTargetLevel));
+      const targetLevel = isLegacyBuild ? Math.min(5, maxPropertyLevel) : Math.min(maxPropertyLevel, Math.max(1, rawTargetLevel));
 
       (userInTransaction.rentalHousingLevels as any) = userInTransaction.rentalHousingLevels || {};
       (userInTransaction.rentalHousingLevels as any)[propertyKey] = targetLevel;
@@ -952,7 +974,7 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
 });
 
 // --- Remodel endpoints (room upgrades, one at a time) ---
-const ROOM_TYPES = ['bathroom', 'kitchen', 'bedroom', 'livingRoom'] as const;
+const ROOM_TYPES = ['bathroom', 'kitchen', 'bedroom', 'livingRoom', 'garage'] as const;
 
 router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> => {
   const userId = req.user?._id;
@@ -972,27 +994,34 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
   const session = await mongoose.startSession();
   try {
     let newBalance = 0;
-    let activeRemodelPayload: { propertyId: number; room: string; startedAt: Date; completesAt: Date; targetRoomLevel: 2 | 3 | 4 } | null = null;
+    let activeRemodelPayload: { propertyId: number; room: string; startedAt: Date; completesAt: Date; targetRoomLevel: number } | null = null;
+    const rentalConfig = await getRentalPropertyConfig();
+    const { maxPropertyLevel, maxRoomLevel, maxGarageRoomLevel } = rentalConfig;
     await session.withTransaction(async () => {
       const user = await User.findById(userId).session(session);
       if (!user) throw new Error('User not found');
-      const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId);
+      const propertyLevel = RentalHousingIncomeService.getPropertyLevel(user, propertyId, maxPropertyLevel);
       if (propertyLevel < 3) throw new Error('Property must be level 3 or higher to remodel rooms');
+      if (room === 'garage' && propertyLevel < 7) throw new Error('Property must be level 7 or higher to remodel garage');
       if (user.activeRemodel && (user.activeRemodel as any).propertyId != null) {
         throw new Error('Another remodel is already in progress');
       }
-      const roomLevels = RentalHousingIncomeService.getRoomLevels(user, propertyId);
+      const roomLevels = RentalHousingIncomeService.getRoomLevels(user, propertyId, maxRoomLevel);
       const currentRoomLevel = roomLevels[room as keyof typeof roomLevels] ?? 1;
-      if (currentRoomLevel >= 4) throw new Error('Room is already at max remodel level');
-      const nextRoomLevel = (currentRoomLevel + 1) as 2 | 3 | 4;
-      const config = getRoomRemodelConfig(nextRoomLevel);
-      if (propertyLevel < config.minPropertyLevel) {
-        throw new Error(`Property must be level ${config.minPropertyLevel} to remodel this room to level ${nextRoomLevel}`);
+      const maxForRoom = room === 'garage' ? maxGarageRoomLevel : maxRoomLevel;
+      if (currentRoomLevel >= maxForRoom) throw new Error('Room is already at max remodel level');
+      const nextRoomLevel = currentRoomLevel + 1;
+      const tierConfig = await getRoomRemodelLevelConfig(nextRoomLevel);
+      const minPropForRoom = room === 'garage'
+        ? (nextRoomLevel === 2 ? 7 : nextRoomLevel === 3 ? 8 : nextRoomLevel === 4 ? 9 : 999)
+        : tierConfig.minPropertyLevel;
+      if (propertyLevel < minPropForRoom) {
+        throw new Error(`Property must be level ${minPropForRoom} to remodel this room to level ${nextRoomLevel}`);
       }
-      if (user.balance.total < config.cost) throw new Error('Insufficient funds');
+      if (user.balance.total < tierConfig.cost) throw new Error('Insufficient funds');
       const now = new Date();
-      const completesAt = new Date(now.getTime() + config.constructionTimeMinutes * 60 * 1000);
-      newBalance = user.balance.total - config.cost;
+      const completesAt = new Date(now.getTime() + tierConfig.constructionTimeMinutes * 60 * 1000);
+      newBalance = user.balance.total - tierConfig.cost;
       user.balance.total = newBalance;
       (user as any).activeRemodel = {
         propertyId,
@@ -1058,7 +1087,7 @@ router.post('/complete-remodel/:propertyId', auth, async (req, res): Promise<voi
       }
       roomLevel = ar.targetRoomLevel;
       const rooms = userInTransaction.rentalHousingRooms || {} as any;
-      const propRooms = rooms[`property${propertyId}`] || { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1 };
+      const propRooms = rooms[`property${propertyId}`] || { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1, garage: 1 };
       propRooms[room] = ar.targetRoomLevel;
       rooms[`property${propertyId}`] = propRooms;
       userInTransaction.rentalHousingRooms = rooms;
@@ -1141,7 +1170,7 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
       const cost = remainingSeconds * 5;
       if (userInTransaction.balance.total < cost) throw new Error('Insufficient funds');
       const rooms = userInTransaction.rentalHousingRooms || {} as any;
-      const propRooms = rooms[`property${propertyId}`] || { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1 };
+      const propRooms = rooms[`property${propertyId}`] || { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1, garage: 1 };
       propRooms[room] = ar.targetRoomLevel;
       rooms[`property${propertyId}`] = propRooms;
       userInTransaction.rentalHousingRooms = rooms;

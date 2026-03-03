@@ -135,6 +135,15 @@ mongoose.connect(process.env.MONGODB_URI, {
     console.warn('NPC respawn catch-up failed (non-fatal):', respawnErr);
   }
 
+  // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
+  try {
+    const { ensureRentalPropertyConfig } = require('./src/services/RentalPropertyConfigService');
+    await ensureRentalPropertyConfig();
+  } catch (bootstrapErr: unknown) {
+    console.error('Rental property config bootstrap failed:', bootstrapErr);
+    process.exit(1);
+  }
+
   // Initialize Google Auth Service
   try {
     const { GoogleAuthService } = require('./src/services/GoogleAuthService');
@@ -332,7 +341,7 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
 app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) => {
   try {
     const user = await User.findById(req.user._id);
-    
+
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -340,10 +349,17 @@ app.get('/api/rental-housing/income', auth, async (req: Request, res: Response) 
 
     const { RentalHousingSyncService } = await import('./src/services/RentalHousingSyncService');
     const { RentalHousingIncomeService } = await import('./src/services/RentalHousingIncomeService');
+    const { getRentalPropertyConfig } = await import('./src/services/RentalPropertyConfigService');
     await RentalHousingSyncService.ensureLegacyRentalLevels(user);
     const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user);
+    const config = await getRentalPropertyConfig();
+    const cumulativeBuildValueByLevel: number[] = [0];
+    for (let i = 0; i < config.propertyLevels.length; i++) {
+      const prev = cumulativeBuildValueByLevel[cumulativeBuildValueByLevel.length - 1];
+      cumulativeBuildValueByLevel.push(prev + config.propertyLevels[i].cost);
+    }
 
-    res.json(rentalIncome);
+    res.json({ ...rentalIncome, cumulativeBuildValueByLevel });
   } catch (error: any) {
     console.error('Rental housing income fetch error:', error);
     res.status(500).json({ error: 'Server error' });
