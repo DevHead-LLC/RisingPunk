@@ -82,8 +82,3 @@ export async function getRoomRemodelLevelConfig(roomLevel: number): Promise<IRoo
   }
   return config;
 }
-
-export async function getRoomRemodelMaxLevel(): Promise<number> {
-  const { maxRoomLevel } = await getRentalPropertyConfig();
-  return maxRoomLevel;
-}

@@ -13,7 +13,6 @@ import {
   getPropertyMaxLevel,
   getRentalPropertyConfig,
   getRoomRemodelLevelConfig,
-  getRoomRemodelMaxLevel,
 } from '../services/RentalPropertyConfigService';
 import { getResearchCenterLevelConfig, getResearchCenterMaxLevel, type ResearchCenterLevel } from '../config/researchCenterConfig';
 import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
