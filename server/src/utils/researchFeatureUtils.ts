@@ -52,10 +52,13 @@ const TAX_REDUCTION_FEATURES: { featureId: string; value: number; categoryId: st
   { featureId: 'reduce-expenses', value: 0.02, categoryId: 'financial' }
 ];
 
-/** Rental profit per room features (spec 18). Both tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
+/** Rental profit per room features (spec 18). All tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
 export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
   { featureId: 'rental-profit-01', value: 0.01, categoryId: 'investments' },
-  { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' }
+  { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-i', value: 0.02, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-ii', value: 0.02, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-iii', value: 0.02, categoryId: 'investments' }
 ];
 
 /** Migration replacement set for increase-income-rate (grandfather creates 01+02+025). Add legacy only when user doesn't have all of these (Bugbot). */

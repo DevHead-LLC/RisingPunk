@@ -464,7 +464,7 @@ export class ResearchFeatureService {
           console.log(`[AUDIT] User ${userId} unlocked Reduce Tax Expense $0.02 at ${unlockedAt.toISOString()}`);
         }
 
-        if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015')) {
+        if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015' || featureId === 'rental-profit-02-i' || featureId === 'rental-profit-02-ii' || featureId === 'rental-profit-02-iii')) {
           console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
           const { RentalHousingSyncService } = await import('./RentalHousingSyncService');
           const { User } = await import('../models/User');
