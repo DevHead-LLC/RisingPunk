@@ -347,6 +347,7 @@ export class ResearchFeatureService {
     };
     const legacyIds = legacyMap[featureId];
     if (legacyIds) {
+      // Only featureIds that have a legacyMap entry can reach here. D/E/F have no legacy (researchFeatureUtils).
       const categoryMatch =
         (categoryId === 'cash-flow' && (featureId === 'reduce-insurance-01' || featureId === 'reduce-insurance-02')) ||
         (categoryId === 'hack-ability' && (featureId === 'add-battalion-c' || featureId === 'battalion-size-250')) ||
@@ -441,6 +442,9 @@ export class ResearchFeatureService {
         }
         if (categoryId === 'hack-ability' && featureId === 'add-battalion-e') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion E at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'hack-ability' && featureId === 'add-battalion-f') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion F at ${unlockedAt.toISOString()}`);
         }
 
         if (categoryId === 'hack-ability' && featureId === 'battalion-size-250') {

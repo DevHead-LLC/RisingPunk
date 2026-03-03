@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useMemo, useCallback, memo, useState } from 'react';
-import { View, ScrollView, StyleSheet, Dimensions, Text, Platform, Modal, TouchableOpacity } from 'react-native';
+import React, { useRef, useEffect, memo, useState } from 'react';
+import { View, ScrollView, StyleSheet, Text, Modal, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
@@ -14,20 +14,16 @@ import {
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
+import { usePanGesture } from '../hooks/usePanGesture';
 
-let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
+let GestureDetector: any, Animated: any, useAnimatedStyle: any;
 
 const gestureHandler = require('react-native-gesture-handler');
 const reanimated = require('react-native-reanimated');
-const mapPanBounds = require('../utils/mapPanBounds');
 
-Gesture = gestureHandler.Gesture;
 GestureDetector = gestureHandler.GestureDetector;
 Animated = reanimated.default;
-useSharedValue = reanimated.useSharedValue;
 useAnimatedStyle = reanimated.useAnimatedStyle;
-withDecay = reanimated.withDecay;
-computePanBounds = mapPanBounds.computePanBounds;
 
 interface InvestmentPropertyScreenProps {
   propertyId: number;
@@ -135,131 +131,9 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
-
-  const offsetX: any = useSharedValue(0);
-  const offsetY: any = useSharedValue(0);
-  const startX: any = useSharedValue(0);
-  const startY: any = useSharedValue(0);
-  
-  const minX: any = useSharedValue(-1000000);
-  const maxX: any = useSharedValue(1000000);
-  const minY: any = useSharedValue(-1000000);
-  const maxY: any = useSharedValue(1000000);
-  const boundsReady: any = useSharedValue(false);
-
-  const centerView = useCallback(() => {
-    const screenWidth = Dimensions.get('window').width;
-    const CENTER_X = (FLOOR_PLAN_WIDTH - screenWidth) / 2;
-    
-    let x = -CENTER_X;
-    let y = 0;
-    
-    if (boundsReady.value) {
-      x = Math.min(maxX.value, Math.max(minX.value, x));
-      y = Math.min(maxY.value, Math.max(minY.value, y));
-    }
-    
-    offsetX.value = x;
-    offsetY.value = y;
-  }, [offsetX, offsetY, FLOOR_PLAN_WIDTH, boundsReady, minX, maxX, minY, maxY]);
-
-  useEffect(() => {
-    if (computePanBounds) {
-      const WINDOW_WIDTH = Dimensions.get('window').width;
-      const WINDOW_HEIGHT = Dimensions.get('window').height;
-      const MARGIN_SIZE = 0;
-      
-      let ADJUSTED_WIDTH = WINDOW_WIDTH;
-      let ADJUSTED_HEIGHT = WINDOW_HEIGHT;
-
-      if (Platform.OS === 'android') {
-        const SCREEN_WIDTH = Dimensions.get('screen').width;
-        ADJUSTED_WIDTH = SCREEN_WIDTH;
-      }
-
-      const boundsX = computePanBounds({
-        totalSize: FLOOR_PLAN_WIDTH,
-        containerWidth: ADJUSTED_WIDTH,
-        containerHeight: ADJUSTED_HEIGHT,
-        marginSize: MARGIN_SIZE,
-      });
-
-      const boundsY = computePanBounds({
-        totalSize: FLOOR_PLAN_HEIGHT,
-        containerWidth: ADJUSTED_WIDTH,
-        containerHeight: ADJUSTED_HEIGHT,
-        marginSize: MARGIN_SIZE,
-      });
-
-      let adjustedBounds;
-      if (Platform.OS === 'android') {
-        const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
-        const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
-        
-        adjustedBounds = {
-          minX: boundsX.minX,
-          maxX: boundsX.maxX,
-          minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
-          maxY: boundsY.maxY
-        };
-      } else {
-        adjustedBounds = {
-          minX: boundsX.minX,
-          maxX: boundsX.maxX,
-          minY: boundsY.minY,
-          maxY: boundsY.maxY
-        };
-      }
-
-      minX.value = adjustedBounds.minX;
-      maxX.value = adjustedBounds.maxX;
-      minY.value = adjustedBounds.minY;
-      maxY.value = adjustedBounds.maxY;
-      boundsReady.value = true;
-    }
-  }, [minX, maxX, minY, maxY, boundsReady, computePanBounds, FLOOR_PLAN_WIDTH, FLOOR_PLAN_HEIGHT]);
-
-  const panGesture = useMemo(() => {
-    if (Gesture && computePanBounds) {
-      return Gesture.Pan()
-        .minPointers(1)
-        .maxPointers(1)
-        .onStart(() => {
-          'worklet';
-          startX.value = offsetX.value;
-          startY.value = offsetY.value;
-        })
-        .onUpdate((g: any) => {
-          'worklet';
-          let x = startX.value + g.translationX;
-          let y = startY.value + g.translationY;
-          
-          if (boundsReady.value) {
-            x = Math.min(maxX.value, Math.max(minX.value, x));
-            y = Math.min(maxY.value, Math.max(minY.value, y));
-          }
-          
-          offsetX.value = x;
-          offsetY.value = y;
-        })
-        .onEnd((g: any) => {
-          'worklet';
-          if (boundsReady.value) {
-            offsetX.value = withDecay({ 
-              velocity: g.velocityX, 
-              deceleration: 0.99,
-              clamp: [minX.value, maxX.value]
-            });
-            offsetY.value = withDecay({ 
-              velocity: g.velocityY, 
-              deceleration: 0.99,
-              clamp: [minY.value, maxY.value]
-            });
-          }
-        });
-    }
-    return null;
-  }, [offsetX, offsetY, startX, startY, boundsReady, minX, maxX, minY, maxY, withDecay, computePanBounds]);
+  const { offsetX, offsetY, panGesture, centerView } = usePanGesture(FLOOR_PLAN_WIDTH, FLOOR_PLAN_HEIGHT, {
+    centerVertically: false,
+  });
 
   useEffect(() => {
     setTimeout(() => {
@@ -269,121 +143,18 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
 
   const GARAGE_WIDTH = 1200;
   const GARAGE_HEIGHT = 900;
-  const garageOffsetX: any = useSharedValue(0);
-  const garageOffsetY: any = useSharedValue(0);
-  const garageStartX: any = useSharedValue(0);
-  const garageStartY: any = useSharedValue(0);
-  const garageMinX: any = useSharedValue(-1000000);
-  const garageMaxX: any = useSharedValue(1000000);
-  const garageMinY: any = useSharedValue(-1000000);
-  const garageMaxY: any = useSharedValue(1000000);
-  const garageBoundsReady: any = useSharedValue(false);
-
-  const centerGarage = useCallback(() => {
-    const screenWidth = Dimensions.get('window').width;
-    const screenHeight = Dimensions.get('window').height;
-    const CENTER_X = (GARAGE_WIDTH - screenWidth) / 2;
-    const CENTER_Y = (GARAGE_HEIGHT - screenHeight) / 2;
-    let x = -CENTER_X;
-    let y = -CENTER_Y;
-    if (garageBoundsReady.value) {
-      x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
-      y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
-    }
-    garageOffsetX.value = x;
-    garageOffsetY.value = y;
-  }, [garageOffsetX, garageOffsetY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY]);
-
-  useEffect(() => {
-    if (!computePanBounds) return;
-    const WINDOW_WIDTH = Dimensions.get('window').width;
-    const WINDOW_HEIGHT = Dimensions.get('window').height;
-    const MARGIN_SIZE = 0;
-    let ADJUSTED_WIDTH = WINDOW_WIDTH;
-    let ADJUSTED_HEIGHT = WINDOW_HEIGHT;
-    if (Platform.OS === 'android') {
-      ADJUSTED_WIDTH = Dimensions.get('screen').width;
-    }
-    const boundsX = computePanBounds({
-      totalSize: GARAGE_WIDTH,
-      containerWidth: ADJUSTED_WIDTH,
-      containerHeight: ADJUSTED_HEIGHT,
-      marginSize: MARGIN_SIZE,
-    });
-    const boundsY = computePanBounds({
-      totalSize: GARAGE_HEIGHT,
-      containerWidth: ADJUSTED_WIDTH,
-      containerHeight: ADJUSTED_HEIGHT,
-      marginSize: MARGIN_SIZE,
-    });
-    let adjustedBounds: { minX: number; maxX: number; minY: number; maxY: number };
-    if (Platform.OS === 'android') {
-      const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
-      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
-      adjustedBounds = {
-        minX: boundsX.minX,
-        maxX: boundsX.maxX,
-        minY: boundsY.minY - ANDROID_HEADER_HEIGHT,
-        maxY: boundsY.maxY,
-      };
-    } else {
-      adjustedBounds = {
-        minX: boundsX.minX,
-        maxX: boundsX.maxX,
-        minY: boundsY.minY,
-        maxY: boundsY.maxY,
-      };
-    }
-    garageMinX.value = adjustedBounds.minX;
-    garageMaxX.value = adjustedBounds.maxX;
-    garageMinY.value = adjustedBounds.minY;
-    garageMaxY.value = adjustedBounds.maxY;
-    garageBoundsReady.value = true;
-  }, [computePanBounds, GARAGE_WIDTH, GARAGE_HEIGHT]);
+  const {
+    offsetX: garageOffsetX,
+    offsetY: garageOffsetY,
+    panGesture: garagePanGesture,
+    centerView: centerGarage,
+  } = usePanGesture(GARAGE_WIDTH, GARAGE_HEIGHT, { centerVertically: true });
 
   useEffect(() => {
     if (activeTab === 'garage') {
       setTimeout(centerGarage, 100);
     }
   }, [activeTab, centerGarage]);
-
-  const garagePanGesture = useMemo(() => {
-    if (!Gesture || !computePanBounds) return null;
-    return Gesture.Pan()
-      .minPointers(1)
-      .maxPointers(1)
-      .onStart(() => {
-        'worklet';
-        garageStartX.value = garageOffsetX.value;
-        garageStartY.value = garageOffsetY.value;
-      })
-      .onUpdate((g: any) => {
-        'worklet';
-        let x = garageStartX.value + g.translationX;
-        let y = garageStartY.value + g.translationY;
-        if (garageBoundsReady.value) {
-          x = Math.min(garageMaxX.value, Math.max(garageMinX.value, x));
-          y = Math.min(garageMaxY.value, Math.max(garageMinY.value, y));
-        }
-        garageOffsetX.value = x;
-        garageOffsetY.value = y;
-      })
-      .onEnd((g: any) => {
-        'worklet';
-        if (garageBoundsReady.value) {
-          garageOffsetX.value = withDecay({
-            velocity: g.velocityX,
-            deceleration: 0.99,
-            clamp: [garageMinX.value, garageMaxX.value],
-          });
-          garageOffsetY.value = withDecay({
-            velocity: g.velocityY,
-            deceleration: 0.99,
-            clamp: [garageMinY.value, garageMaxY.value],
-          });
-        }
-      });
-  }, [garageOffsetX, garageOffsetY, garageStartX, garageStartY, garageBoundsReady, garageMinX, garageMaxX, garageMinY, garageMaxY, withDecay, computePanBounds]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -588,18 +359,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                       <>
                         <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
                           Property level too low for next remodel (need level {minProp ?? '?'}).
-                        </Text>
-                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
-                          <Text style={styles.modalButtonText}>Close</Text>
-                        </TouchableOpacity>
-                      </>
-                    );
-                  }
-                  if (remodelRoom === 'garage' && propertyLevel < 7) {
-                    return (
-                      <>
-                        <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
-                          Property must be level 7 or higher to remodel garage.
                         </Text>
                         <TouchableOpacity style={[styles.modalButton, { backgroundColor: colors.primary }]} onPress={() => setRemodelRoom(null)}>
                           <Text style={styles.modalButtonText}>Close</Text>

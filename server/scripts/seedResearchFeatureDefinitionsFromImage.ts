@@ -257,6 +257,18 @@ const FEATURES: FeatureRow[] = [
     effect: { type: 'improvement', value: 1, target: 'battalion-capacity' },
   },
   {
+    categoryId: 'hack-ability',
+    id: 'add-battalion-f',
+    name: 'Add Battalion F',
+    description: 'Unlock a sixth battalion (Battalion F) to deploy in attacking battles.',
+    unlockCost: 2000000,
+    levelRequirement: 16,
+    researchTimeHours: 10,
+    requiredFeatureRefs: [{ categoryId: 'hack-ability', featureId: 'add-battalion-e' }],
+    researchCenterLevelRequirement: 3,
+    effect: { type: 'improvement', value: 1, target: 'battalion-capacity' },
+  },
+  {
     categoryId: 'cash-flow',
     id: 'increase-income-03',
     name: 'Increase Income +$0.03 I',

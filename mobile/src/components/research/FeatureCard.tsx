@@ -55,6 +55,7 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'battalion-size-1000': require('../../assets/images/researchCenter/increaseBots250.png'),
   'add-battalion-d': require('../../assets/images/researchCenter/increaseBattalions.png'),
   'add-battalion-e': require('../../assets/images/researchCenter/increaseBattalions.png'),
+  'add-battalion-f': require('../../assets/images/researchCenter/increaseBattalions.png'),
   'bot-trap': require('../../assets/images/botTrapResearch.png'),
   'crew-system-unlock': require('../../assets/images/startCrew.png'),
   'rental-profit-01': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),

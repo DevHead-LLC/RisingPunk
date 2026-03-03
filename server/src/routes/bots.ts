@@ -440,8 +440,8 @@ router.post('/assign', auth, async (req, res) => {
       return;
     }
     
-    if (battalionId === 'C' || battalionId === 'D' || battalionId === 'E') {
-      const unlocked = await isBattalionSlotUnlocked(userId, battalionId as 'C' | 'D' | 'E');
+    if (battalionId === 'C' || battalionId === 'D' || battalionId === 'E' || battalionId === 'F') {
+      const unlocked = await isBattalionSlotUnlocked(userId, battalionId as 'C' | 'D' | 'E' | 'F');
       if (!unlocked) {
         res.status(403).json({
           error: `Battalion ${battalionId} is locked. Complete the "Add Battalion ${battalionId}" research feature to unlock it.`
@@ -593,6 +593,9 @@ router.post('/assign', auth, async (req, res) => {
         }
         if (battalionId === 'E') {
           console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion E`);
+        }
+        if (battalionId === 'F') {
+          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion F`);
         }
 
         res.json({ 
