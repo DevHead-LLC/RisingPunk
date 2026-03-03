@@ -53,6 +53,7 @@ export interface BalanceResponse {
   /** Research-based expense reduction per second (for Financial Statements). Server source of truth. */
   insuranceReduction?: number;
   taxReduction?: number;
+  rentMortgageReduction?: number;
 }
 
 export const balanceApi = createApi({

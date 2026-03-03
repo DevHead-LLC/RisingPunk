@@ -122,6 +122,18 @@ const FEATURES: FeatureRow[] = [
     effect: { type: 'reduction', value: 0.02, target: 'insurance-expense' },
   },
   {
+    categoryId: 'cash-flow',
+    id: 'reduce-rent-mortgage-05',
+    name: 'Reduce Rent/Mortgage $0.05',
+    description: 'Reduce your rent/mortgage expense by $0.05 per second.',
+    unlockCost: 9500000,
+    levelRequirement: 36,
+    researchTimeHours: 22.5,
+    requiredFeatureRefs: [{ categoryId: 'cash-flow', featureId: 'reduce-insurance-03' }],
+    researchCenterLevelRequirement: 10,
+    effect: { type: 'reduction', value: 0.05, target: 'rent-mortgage-expense' },
+  },
+  {
     categoryId: 'hack-ability',
     id: 'battalion-size-250',
     name: 'Battalion Size +250',
