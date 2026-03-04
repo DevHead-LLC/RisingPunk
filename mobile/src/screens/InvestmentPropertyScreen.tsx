@@ -18,16 +18,7 @@ import { usePanGesture } from '../hooks/usePanGesture';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-/**
- * Remodel tier cost/time. Source of truth: server/src/config/rentalPropertyConfig.ts ROOM_REMODEL_LEVELS.
- * Min property level per next room level (2→3, 3→4, 4→5) is in FloorPlan.minPropertyLevelForNextRoomLevel
- * and in the modal's propertyLevel check — must match server ROOM_REMODEL_MIN_PROPERTY_LEVEL. See task doc § Client–server config sync.
- */
-const ROOM_REMODEL_CONFIG: { level: number; cost: number; timeMinutes: number }[] = [
-  { level: 2, cost: 5000, timeMinutes: 5 },
-  { level: 3, cost: 10000, timeMinutes: 10 },
-  { level: 4, cost: 15000, timeMinutes: 15 },
-];
+// Remodel tier config (cost, time, min property level) comes from server via roomRemodelLevels (getRentalHousingStatus).
 
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, computePanBounds: any;
 
