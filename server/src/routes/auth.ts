@@ -320,7 +320,8 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
       },
       isGuest: !!user.isGuest,
       hasPassword: !!user.hashedAccessKey,
-      isAdmin: isUserAdmin(user)
+      isAdmin: isUserAdmin(user),
+      ...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })
     }
   });
 }
@@ -1538,7 +1539,8 @@ router.get('/verify-token', async (req, res): Promise<void> => {
         },
         isGuest: user.isGuest || false,
         hasPassword: !!(user as any).hashedAccessKey,
-        isAdmin: isUserAdmin(user)
+        isAdmin: isUserAdmin(user),
+        ...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })
       }
     });
   } catch (error: any) {

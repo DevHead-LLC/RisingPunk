@@ -32,6 +32,7 @@ export interface User {
   isGuest?: boolean;
   hasPassword?: boolean;
   isAdmin?: boolean;
+  guestDeviceId?: string;
 }
 
 export interface AuthState {
@@ -275,7 +276,7 @@ export const playAsGuest = createAsyncThunk(
   'auth/playAsGuest',
   async (payload: PlayAsGuestPayload, { rejectWithValue, dispatch }) => {
     try {
-      const forceNew = payload?.forceNew === true;
+      const forceNew = Boolean(payload && typeof payload === 'object' && payload.forceNew === true);
       if (forceNew) {
         await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
       }
@@ -287,6 +288,9 @@ export const playAsGuest = createAsyncThunk(
         if (result.ok) {
           await AsyncStorage.setItem('token', result.token);
           await AsyncStorage.setItem('user', JSON.stringify(result.user));
+          if (result.user?.guestDeviceId) {
+            await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, result.user.guestDeviceId);
+          }
           resetAllApiCaches({ dispatch } as any);
           await fetchBotsAndBuildStateForToken(result.token, dispatch, 'Failed to fetch initial data for guest resume:');
           await markAccountExists();
@@ -294,7 +298,8 @@ export const playAsGuest = createAsyncThunk(
         }
         // Only clear stored guest token when it's definitively invalid (401). On network/transient
         // errors, keep it so the next "Play as Guest" retry can resume instead of creating a new guest.
-        if (result.reason === 'invalid') {
+        const invalid = !result.ok && 'reason' in result && result.reason === 'invalid';
+        if (invalid) {
           await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
           return rejectWithValue('Previous session expired. Sign in with your account or tap Play as Guest to create a new guest.');
         }
@@ -329,11 +334,16 @@ export const playAsGuest = createAsyncThunk(
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       await AsyncStorage.setItem(GUEST_TOKEN_KEY, data.token);
+      if (data.user?.guestDeviceId) {
+        await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, data.user.guestDeviceId);
+      }
 
       resetAllApiCaches({ dispatch } as any);
       await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for guest:');
 
       await markAccountExists();
+      // New guest: clear persisted turf nav so they start on turf, not previous user's screen (e.g. map locked for new account).
+      await clearPersistedTurfNavState();
       return data;
     } catch (error) {
       console.error('[auth] Play as guest error', { apiHost: getApiHostForLogging(), error });
@@ -751,6 +761,9 @@ export const loadStoredAuth = createAsyncThunk(
 
       if (userData.user?.isGuest) {
         await AsyncStorage.setItem(GUEST_TOKEN_KEY, storedToken);
+        if (userData.user?.guestDeviceId) {
+          await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, userData.user.guestDeviceId);
+        }
       }
 
       // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
