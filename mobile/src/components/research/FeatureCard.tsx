@@ -29,7 +29,7 @@ export interface ResearchFeature {
   researchCompletesAt?: Date;
   /** Feature(s) that must be unlocked before this feature can be started. */
   requiredFeatureRefs?: ResearchFeatureRef[];
-  /** Required Research Center building level (1–4). */
+  /** Required Research Center building level (1–20). */
   researchCenterLevelRequirement?: number;
   effect: {
     type: 'unlock' | 'improvement' | 'reduction' | 'special';
@@ -53,18 +53,29 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'battalion-size-250': require('../../assets/images/researchCenter/increaseBots250.png'),
   'battalion-size-500': require('../../assets/images/researchCenter/increaseBots250.png'),
   'battalion-size-1000': require('../../assets/images/researchCenter/increaseBots250.png'),
+  'battalion-size-2000': require('../../assets/images/researchCenter/increaseBots250.png'),
+  'battalion-size-4500': require('../../assets/images/researchCenter/increaseBots250.png'),
+  'battalion-size-6500': require('../../assets/images/researchCenter/increaseBots250.png'),
   'add-battalion-d': require('../../assets/images/researchCenter/increaseBattalions.png'),
   'add-battalion-e': require('../../assets/images/researchCenter/increaseBattalions.png'),
+  'add-battalion-f': require('../../assets/images/researchCenter/increaseBattalions.png'),
   'bot-trap': require('../../assets/images/botTrapResearch.png'),
   'crew-system-unlock': require('../../assets/images/startCrew.png'),
   'rental-profit-01': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
   'rental-profit-015': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
+  'rental-profit-02-i': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
+  'rental-profit-02-ii': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
+  'rental-profit-02-iii': require('../../assets/images/researchCenter/rentalPropertyIncrease.png'),
   'increase-income-01': require('../../assets/images/researchCenter/incomeIncrease.png'),
   'increase-income-02': require('../../assets/images/researchCenter/incomeIncrease.png'),
   'increase-income-025': require('../../assets/images/researchCenter/incomeIncrease.png'),
   'increase-income-03': require('../../assets/images/researchCenter/incomeIncrease.png'),
+  'increase-income-03-ii': require('../../assets/images/researchCenter/incomeIncrease.png'),
+  'increase-income-03-iii': require('../../assets/images/researchCenter/incomeIncrease.png'),
   'reduce-insurance-01': require('../../assets/images/researchCenter/decreaseInsurance.png'),
   'reduce-insurance-02': require('../../assets/images/researchCenter/decreaseInsurance.png'),
+  'reduce-insurance-03': require('../../assets/images/researchCenter/decreaseInsurance.png'),
+  'reduce-rent-mortgage-05': require('../../assets/images/researchCenter/mortgageReduction.png'),
   'reduce-tax-expense-02': require('../../assets/images/researchCenter/taxExpenseReduction.png'),
   'probe': require('../../assets/images/researchCenter/probeResearch.png'),
   'mark-2-bots': require('../../assets/images/researchCenter/botUpgradeEvolution.png'),

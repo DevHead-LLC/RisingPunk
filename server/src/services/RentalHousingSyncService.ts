@@ -1,6 +1,7 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
-import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getRentalProfitBonusPerRoom, getRentalProfitBonusPerRoomAsOf, getResearchFeaturesForBonusSync, type BonusPrefetch } from '../utils/researchFeatureUtils';
+import { getPropertyMaxLevel } from './RentalPropertyConfigService';
+import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getRentMortgageReductionBonus, getRentalProfitBonusPerRoom, getRentalProfitBonusPerRoomAsOf, getResearchFeaturesForBonusSync, type BonusPrefetch } from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -15,6 +16,7 @@ export interface PerformSyncResult {
   newBalance: number;
   insuranceReduction: number;
   taxReduction: number;
+  rentMortgageReduction: number;
 }
 
 export class RentalHousingSyncService {
@@ -25,11 +27,12 @@ export class RentalHousingSyncService {
 
   static async checkAndSyncRentalHousingIncome(user: IUser, bonusPrefetch?: BonusPrefetch): Promise<RentalHousingSyncResult> {
     const now = new Date();
-    
+    const maxPropertyLevel = await getPropertyMaxLevel();
+
     // Check if user has any unlocked rental properties
-    const unlockedProperties = this.getUnlockedProperties(user);
+    const unlockedProperties = this.getUnlockedProperties(user, maxPropertyLevel);
     const totalUnlockedProperties = unlockedProperties.length;
-    
+
     if (totalUnlockedProperties === 0) {
       // No properties unlocked, no sync needed
       return {
@@ -42,7 +45,7 @@ export class RentalHousingSyncService {
 
     // Check if we need to sync
     const needsSync = this.needsSync(user, now);
-    
+
     if (!needsSync) {
       return {
         needsSync: false,
@@ -53,8 +56,8 @@ export class RentalHousingSyncService {
     }
 
     // Calculate historical income that should have been earned
-    const syncedAmount = await this.calculateHistoricalIncome(user, now, bonusPrefetch);
-    
+    const syncedAmount = await this.calculateHistoricalIncome(user, now, bonusPrefetch, maxPropertyLevel);
+
     return {
       needsSync: true,
       syncedAmount,
@@ -63,10 +66,10 @@ export class RentalHousingSyncService {
     };
   }
 
-  private static getUnlockedProperties(user: IUser): number[] {
+  private static getUnlockedProperties(user: IUser, maxPropertyLevel: number): number[] {
     const unlockedProperties: number[] = [];
     for (let i = 1; i <= 4; i++) {
-      const level = RentalHousingIncomeService.getPropertyLevel(user, i);
+      const level = RentalHousingIncomeService.getPropertyLevel(user, i, maxPropertyLevel);
       if (level >= 1) unlockedProperties.push(i);
     }
     return unlockedProperties;
@@ -85,8 +88,8 @@ export class RentalHousingSyncService {
     return user.balance.rentalHousingIncomeLastSynced < oneHourAgo;
   }
 
-  private static async calculateHistoricalIncome(user: IUser, now: Date, bonusPrefetch?: BonusPrefetch): Promise<number> {
-    const unlockedProperties = this.getUnlockedProperties(user);
+  private static async calculateHistoricalIncome(user: IUser, now: Date, bonusPrefetch: BonusPrefetch | undefined, maxPropertyLevel: number): Promise<number> {
+    const unlockedProperties = this.getUnlockedProperties(user, maxPropertyLevel);
     if (unlockedProperties.length === 0) {
       return 0;
     }
@@ -110,7 +113,7 @@ export class RentalHousingSyncService {
       const segmentEnd = boundaries[i + 1];
       const secondsInSegment = (segmentEnd.getTime() - segmentStart.getTime()) / 1000;
       const bonusPerRoom = await getRentalProfitBonusPerRoomAsOf(userId, segmentStart, bonusPrefetch);
-      const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, bonusPerRoom);
+      const incomePerSecond = await this.calculateIncomeForPeriod(user, unlockedProperties.length, bonusPerRoom, maxPropertyLevel);
       historicalIncome += Math.floor(secondsInSegment * incomePerSecond);
     }
 
@@ -118,11 +121,11 @@ export class RentalHousingSyncService {
   }
 
   /** True if every unlocked property would be grandfathered (no level or level 1 not set by build). Uses getPropertyLevel so we match getUnlockedProperties (levels and unlockedFeatures). */
-  private static isFullyLegacyForHistoricalIncome(user: IUser): boolean {
+  private static isFullyLegacyForHistoricalIncome(user: IUser, maxPropertyLevel: number): boolean {
     const levelSetByBuild = (user.rentalHousingLevelSetByBuild as Record<string, boolean>) || {};
     const levels = (user.rentalHousingLevels as Record<string, number>) || {};
     for (let i = 1; i <= 4; i++) {
-      const level = RentalHousingIncomeService.getPropertyLevel(user, i);
+      const level = RentalHousingIncomeService.getPropertyLevel(user, i, maxPropertyLevel);
       if (level < 1) continue;
       const storedLevel = levels[`property${i}`];
       const setByBuild = levelSetByBuild[`property${i}`];
@@ -133,8 +136,8 @@ export class RentalHousingSyncService {
   }
 
   /** researchBonusPerRoom: 0 = no bonus; for legacy users any positive value uses LEGACY_RESEARCH_BONUS_PER_PROPERTY. */
-  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, researchBonusPerRoom: number): Promise<number> {
-    if (this.isFullyLegacyForHistoricalIncome(user)) {
+  private static async calculateIncomeForPeriod(user: IUser, propertyCount: number, researchBonusPerRoom: number, maxPropertyLevel: number): Promise<number> {
+    if (this.isFullyLegacyForHistoricalIncome(user, maxPropertyLevel)) {
       return propertyCount * (this.LEGACY_FLAT_RATE_PER_PROPERTY + (researchBonusPerRoom > 0 ? this.LEGACY_RESEARCH_BONUS_PER_PROPERTY : 0));
     }
     const income = await RentalHousingIncomeService.calculateRentalHousingIncome(user, {
@@ -151,7 +154,9 @@ export class RentalHousingSyncService {
    */
   static async ensureLegacyRentalLevels(user: IUser): Promise<boolean> {
     let updated = false;
+    const maxPropertyLevel = await getPropertyMaxLevel();
     const levelSetByBuild = (user.rentalHousingLevelSetByBuild as Record<string, boolean>) || {};
+    (user.rentalHousingLevels as any) = user.rentalHousingLevels || {};
     for (let i = 1; i <= 4; i++) {
       const ufKey = `rentalHousing${i}` as keyof typeof user.unlockedFeatures;
       const isUnlocked = user.unlockedFeatures[ufKey];
@@ -159,8 +164,10 @@ export class RentalHousingSyncService {
       const setByBuild = levelSetByBuild[`property${i}`];
       const shouldGrandfather = isUnlocked && (typeof level !== 'number' || level < 1 || (level === 1 && !setByBuild));
       if (shouldGrandfather) {
-        (user.rentalHousingLevels as any) = user.rentalHousingLevels || {};
-        (user.rentalHousingLevels as any)[`property${i}`] = 5;
+        (user.rentalHousingLevels as any)[`property${i}`] = Math.min(5, maxPropertyLevel);
+        updated = true;
+      } else if (typeof level === 'number' && level > maxPropertyLevel) {
+        (user.rentalHousingLevels as any)[`property${i}`] = maxPropertyLevel;
         updated = true;
       }
     }
@@ -178,13 +185,14 @@ export class RentalHousingSyncService {
     await this.ensureLegacyRentalLevels(user);
 
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
-    // Base rate is $1.00 + income rate bonus (sum of increase-income-* per spec 18) + insurance reduction (sum of reduce-insurance-*) + tax reduction (reduce-tax-expense-02), plus passive income
-    const [incomeBonus, insuranceBonus, taxBonus] = await Promise.all([
+    // Base rate is $1.00 + income rate bonus + insurance + tax + rent/mortgage reduction, plus passive income
+    const [incomeBonus, insuranceBonus, taxBonus, rentMortgageBonus] = await Promise.all([
       getBaseIncomeRateBonus(userId, bonusPrefetch),
       getInsuranceReductionBonus(userId, bonusPrefetch),
       getTaxReductionBonus(userId, bonusPrefetch),
+      getRentMortgageReductionBonus(userId, bonusPrefetch),
     ]);
-    const baseRate = 1.0 + incomeBonus + insuranceBonus + taxBonus;
+    const baseRate = 1.0 + incomeBonus + insuranceBonus + taxBonus + rentMortgageBonus;
 
     if (baseRate < 0) {
       console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
@@ -230,6 +238,7 @@ export class RentalHousingSyncService {
       newBalance: user.balance.total,
       insuranceReduction: insuranceBonus,
       taxReduction: taxBonus,
+      rentMortgageReduction: rentMortgageBonus,
     };
   }
 }

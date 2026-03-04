@@ -354,6 +354,7 @@ export class ResearchFeatureService {
     };
     const legacyIds = legacyMap[featureId];
     if (legacyIds) {
+      // Only featureIds that have a legacyMap entry can reach here. D/E/F have no legacy (researchFeatureUtils).
       const categoryMatch =
         (categoryId === 'cash-flow' && (featureId === 'reduce-insurance-01' || featureId === 'reduce-insurance-02')) ||
         (categoryId === 'hack-ability' && (featureId === 'add-battalion-c' || featureId === 'battalion-size-250')) ||
@@ -449,6 +450,9 @@ export class ResearchFeatureService {
         if (categoryId === 'hack-ability' && featureId === 'add-battalion-e') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion E at ${unlockedAt.toISOString()}`);
         }
+        if (categoryId === 'hack-ability' && featureId === 'add-battalion-f') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion F at ${unlockedAt.toISOString()}`);
+        }
 
         if (categoryId === 'hack-ability' && featureId === 'battalion-size-250') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion Size +250 at ${unlockedAt.toISOString()}`);
@@ -459,15 +463,24 @@ export class ResearchFeatureService {
         if (categoryId === 'hack-ability' && featureId === 'battalion-size-1000') {
           console.log(`[AUDIT] User ${userId} unlocked Battalion Size +1,000 at ${unlockedAt.toISOString()}`);
         }
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-2000') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +2,000 at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-4500') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +4,500 at ${unlockedAt.toISOString()}`);
+        }
+        if (categoryId === 'hack-ability' && featureId === 'battalion-size-6500') {
+          console.log(`[AUDIT] User ${userId} unlocked Battalion Size +6,500 at ${unlockedAt.toISOString()}`);
+        }
 
-        if (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025' || featureId === 'increase-income-03')) {
+        if (categoryId === 'cash-flow' && (featureId === 'increase-income-01' || featureId === 'increase-income-02' || featureId === 'increase-income-025' || featureId === 'increase-income-03' || featureId === 'increase-income-03-ii' || featureId === 'increase-income-03-iii')) {
           console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
         }
         if (categoryId === 'cash-flow' && featureId === 'reduce-tax-expense-02') {
           console.log(`[AUDIT] User ${userId} unlocked Reduce Tax Expense $0.02 at ${unlockedAt.toISOString()}`);
         }
 
-        if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015')) {
+        if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015' || featureId === 'rental-profit-02-i' || featureId === 'rental-profit-02-ii' || featureId === 'rental-profit-02-iii')) {
           console.log(`[AUDIT] User ${userId} unlocked ${featureId} at ${unlockedAt.toISOString()}`);
           const { RentalHousingSyncService } = await import('./RentalHousingSyncService');
           const { User } = await import('../models/User');
@@ -587,6 +600,8 @@ export class ResearchFeatureService {
         'crew-system-unlock': [],
         'reduce-insurance-01': ['reduce-insurance-01'],
         'reduce-insurance-02': ['reduce-insurance-02', 'reduce-insurance-expense'],
+        'reduce-insurance-03': ['reduce-insurance-03'],
+        'reduce-rent-mortgage-05': ['reduce-rent-mortgage-05'],
         'rental-profit-01': ['rental-profit-increase'],
         'increase-income-01': ['increase-income-rate'],
         'increase-income-02': ['increase-income-rate'],

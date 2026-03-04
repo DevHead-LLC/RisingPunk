@@ -110,8 +110,8 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       (antivirusFeature?.isResearching && remaining === 0);
   }, [antivirusFeature?.isUnlocked, antivirusFeature?.isResearching, antivirusFeature?.researchCompletesAt]);
 
-  // Battalion C/D/E unlock state (shared logic with server isBattalionSlotUnlocked)
-  const { isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked } = useBattalionSlotUnlocks();
+  // Battalion C/D/E/F unlock state (shared logic with server isBattalionSlotUnlocked)
+  const { isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked } = useBattalionSlotUnlocks();
 
   // Memoize available battalions array (A and B always available)
   const availableBattalions = useMemo(() => {
@@ -216,11 +216,14 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       if (isBattalionEUnlocked) {
         resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'E' }));
       }
+      if (isBattalionFUnlocked) {
+        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'F' }));
+      }
       await Promise.all(resetPromises);
     } catch (error) {
       console.error('Failed to reset battalions:', error);
     }
-  }, [assignToBattalion, isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked]);
+  }, [assignToBattalion, isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked]);
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
@@ -446,9 +449,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
                   <BattalionSlot
                     name="F"
                     isEnemy={false}
-                    isLocked={true}
-                    onPress={undefined}
-                    assignment={undefined}
+                    isLocked={!isBattalionFUnlocked}
+                    onPress={isBattalionFUnlocked ? () => handleBattalionPress('F') : undefined}
+                    assignment={isBattalionFUnlocked ? assignments['F'] : undefined}
                     isHighlighted={false}
                     disabled={isBattalionAHighlight}
                   />

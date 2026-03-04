@@ -100,6 +100,7 @@ export interface UnlockResearchCenterResponse {
 export interface ResearchCenterStatusResponse {
   isUnlocked: boolean;
   level: number;
+  maxLevel: number;
   canBuild: boolean;
   nextBuildCost: number | null;
   nextBuildTimeMinutes: number | null;
@@ -130,6 +131,7 @@ export interface RentalHousingStatusResponse {
     kitchen: number;
     bedroom: number;
     livingRoom: number;
+    garage?: number;
   };
   activeRemodel?: {
     propertyId: number;
@@ -138,6 +140,19 @@ export interface RentalHousingStatusResponse {
     completesAt: string | null;
     targetRoomLevel: number;
   } | null;
+  /** Max property build level. UI stops offering upgrades at this level. */
+  maxPropertyLevel?: number;
+  /** Max room remodel level. From server construction_config. */
+  maxRoomLevel?: number;
+  /** Max garage room level (4). Garage remodels only up to this; main-floor rooms use maxRoomLevel. */
+  maxGarageRoomLevel?: number;
+  /** Room remodel tiers from server (cost, time, minPropertyLevel). Use for modal and gating. */
+  roomRemodelLevels?: Array<{
+    roomLevel: number;
+    cost: number;
+    constructionTimeMinutes: number;
+    minPropertyLevel: number;
+  }>;
 }
 
 export interface UnlockRentalHousingResponse {
@@ -170,7 +185,7 @@ export interface SpeedupPropertyConstructionResponse {
   ratePerSecond?: number;
 }
 
-export type RemodelRoomType = 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom';
+export type RemodelRoomType = 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom' | 'garage';
 
 export interface StartRemodelRequest {
   propertyId: number;

@@ -10,7 +10,7 @@ import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
 import { MapService } from '../services/MapService';
-import { filterBadWords, containsBadWords, containsBadWordsForHandle } from '../utils/contentModeration';
+import { filterBadWords, containsBadWords, containsBadWordsForHandle, isDisallowedHandle } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 
 function isUserAdmin(user: { _id?: unknown }): boolean {
@@ -1194,6 +1194,12 @@ router.post('/update-handle', async (req, res): Promise<void> => {
       return;
     }
 
+    // Block handles reserved for system/official use
+    if (isDisallowedHandle(handle)) {
+      res.status(400).json({ error: 'This handle is reserved for system use' });
+      return;
+    }
+
     // Check for existing user with same handle (case-insensitive)
     const existingUser = await User.findOne({ 
       handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') },
@@ -1373,6 +1379,12 @@ router.post('/check-handle', async (req, res): Promise<void> => {
 
     if (!/^[a-zA-Z0-9!&%^*_]+$/.test(handle)) {
       res.status(400).json({ error: 'Handle can only contain letters, numbers, and !&%^*_', available: false });
+      return;
+    }
+
+    // Block handles reserved for system/official use
+    if (isDisallowedHandle(handle)) {
+      res.json({ available: false, message: 'This handle is reserved for system use' });
       return;
     }
 

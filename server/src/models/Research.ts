@@ -15,7 +15,7 @@ export interface IResearchFeature {
   researchTimeHours?: number;
   /** Feature(s) that must be unlocked before this feature can be started (AND). */
   requiredFeatureRefs?: IResearchFeatureRef[];
-  /** Required Research Center building level (1–4). User must have at least this level to start research. */
+  /** Required Research Center building level (1–20). User must have at least this level to start research. */
   researchCenterLevelRequirement?: number;
   effect: {
     type: 'unlock' | 'improvement' | 'reduction' | 'special';
@@ -40,7 +40,7 @@ export interface IResearch extends Document {
   features: IResearchFeature[];
   /** Cost to unlock this category (paid at unlock). If missing, server uses fallback. */
   unlockCost?: number;
-  /** Required Research Center building level (1–3). If set, user must have at least this level. */
+  /** Required Research Center building level (1–20). If set, user must have at least this level. */
   researchCenterLevelRequirement?: number;
   /** Features that must be unlocked (or completed) before this category can unlock. */
   requiredFeatureRefs?: IResearchFeatureRef[];

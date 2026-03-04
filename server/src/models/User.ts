@@ -47,12 +47,12 @@ export interface IUser extends Document {
   };
   guestDeviceId?: string;
   currentTokenId?: string;
-  /** Research Center building level 1–3. Missing or 0 = not built (or legacy, resolved on read). */
+  /** Research Center building level 1–20 (max from construction_config). Missing or 0 = not built (or legacy, resolved on read). */
   researchCenterLevel?: number;
   researchCenterBuild?: {
     startedAt: Date | null;
     completesAt: Date | null;
-    /** Target level (1–3) for this build. */
+    /** Target level (1–20) for this build. */
     targetLevel?: number | null;
   };
   rentalHousingBuilds?: {
@@ -61,7 +61,7 @@ export interface IUser extends Document {
     property3: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
     property4: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
   };
-  /** Property level 0 = not built, 1-5 = build level. */
+  /** Property level 0 = not built, 1-9 = build level. */
   rentalHousingLevels?: {
     property1: number;
     property2: number;
@@ -75,17 +75,17 @@ export interface IUser extends Document {
     property3: boolean;
     property4: boolean;
   };
-  /** Room remodel level 1-4 per room (1 = base, 2-4 = remodel tiers). */
+  /** Room remodel level 1-8 per room (1 = base, 2-8 = remodel tiers). Garage only when property level >= 7. */
   rentalHousingRooms?: {
-    property1: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number };
-    property2: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number };
-    property3: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number };
-    property4: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number };
+    property1: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number; garage?: number };
+    property2: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number; garage?: number };
+    property3: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number; garage?: number };
+    property4: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number; garage?: number };
   };
   /** One active remodel at a time (any property). */
   activeRemodel?: {
     propertyId: number;
-    room: 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom';
+    room: 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom' | 'garage';
     startedAt: Date | null;
     completesAt: Date | null;
     targetRoomLevel: number;
@@ -357,30 +357,34 @@ const userSchema = new Schema({
       bathroom: { type: Number, default: 1 },
       kitchen: { type: Number, default: 1 },
       bedroom: { type: Number, default: 1 },
-      livingRoom: { type: Number, default: 1 }
+      livingRoom: { type: Number, default: 1 },
+      garage: { type: Number, default: 1 }
     },
     property2: {
       bathroom: { type: Number, default: 1 },
       kitchen: { type: Number, default: 1 },
       bedroom: { type: Number, default: 1 },
-      livingRoom: { type: Number, default: 1 }
+      livingRoom: { type: Number, default: 1 },
+      garage: { type: Number, default: 1 }
     },
     property3: {
       bathroom: { type: Number, default: 1 },
       kitchen: { type: Number, default: 1 },
       bedroom: { type: Number, default: 1 },
-      livingRoom: { type: Number, default: 1 }
+      livingRoom: { type: Number, default: 1 },
+      garage: { type: Number, default: 1 }
     },
     property4: {
       bathroom: { type: Number, default: 1 },
       kitchen: { type: Number, default: 1 },
       bedroom: { type: Number, default: 1 },
-      livingRoom: { type: Number, default: 1 }
+      livingRoom: { type: Number, default: 1 },
+      garage: { type: Number, default: 1 }
     }
   },
   activeRemodel: {
     propertyId: { type: Number, default: null },
-    room: { type: String, enum: ['bathroom', 'kitchen', 'bedroom', 'livingRoom'], default: null },
+    room: { type: String, enum: ['bathroom', 'kitchen', 'bedroom', 'livingRoom', 'garage'], default: null },
     startedAt: { type: Date, default: null },
     completesAt: { type: Date, default: null },
     targetRoomLevel: { type: Number, default: null }
