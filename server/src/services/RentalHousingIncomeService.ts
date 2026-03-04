@@ -1,12 +1,11 @@
 import { IUser } from '../models/User';
 import { getRentalProfitBonusPerRoom, getResearchFeatureUnlockTime, getRentalProfitUnlockTimes, RENTAL_PROFIT_FEATURES, type BonusPrefetch } from '../utils/researchFeatureUtils';
-import {
-  PROPERTY_BASE_RATES,
-  ROOM_REMODEL_ADD_SMALL,
-  ROOM_REMODEL_ADD_LARGE,
-  ROOM_REMODEL_MIN_PROPERTY_LEVEL,
-  type RoomType,
-} from '../config/rentalPropertyConfig';
+import { getRentalPropertyConfig } from './RentalPropertyConfigService';
+import type { RentalPropertyConfig } from './RentalPropertyConfigService';
+import type { IPropertyBuildLevel, IRoomRemodelLevel } from '../models/RentalPropertyConstructionConfig';
+import { MAX_GARAGE_ROOM_LEVEL, GARAGE_REMODEL_ADD_SCHEDULE } from '../config/constructionConfigSeedData';
+
+export type RoomType = 'bathroom' | 'kitchen' | 'bedroom' | 'livingRoom' | 'garage';
 
 export interface RentalHousingIncome {
   totalIncomePerSecond: number;
@@ -20,57 +19,87 @@ export interface RentalHousingIncome {
       kitchen: number;
       bedroom: number;
       livingRoom: number;
+      garage: number;
     };
     roomLevels?: {
       bathroom: number;
       kitchen: number;
       bedroom: number;
       livingRoom: number;
+      garage: number;
     };
   }[];
 }
 
 export class RentalHousingIncomeService {
-  /** Effective property level (1-5). Uses rentalHousingLevels; if legacy unlocked with no level, returns 1. */
-  static getPropertyLevel(user: IUser, propertyId: number): number {
+  /** Effective property level. Uses rentalHousingLevels; if legacy unlocked with no level, returns 1. Capped at maxPropertyLevel (from config). */
+  static getPropertyLevel(user: IUser, propertyId: number, maxPropertyLevel: number): number {
     const levels = user.rentalHousingLevels;
     const level = levels?.[`property${propertyId}` as keyof typeof levels];
-    if (typeof level === 'number' && level >= 1 && level <= 5) return level;
+    if (typeof level === 'number' && level >= 1 && level <= maxPropertyLevel) return Math.min(maxPropertyLevel, level);
     const rentalHousingKey = `rentalHousing${propertyId}` as keyof typeof user.unlockedFeatures;
     const isUnlocked = user.unlockedFeatures[rentalHousingKey];
     if (isUnlocked) return 1;
     return 0;
   }
 
-  /** Room levels 1-4 for a property. Default 1. */
-  static getRoomLevels(user: IUser, propertyId: number): { bathroom: number; kitchen: number; bedroom: number; livingRoom: number } {
+  /** Room levels for a property. Garage default 1. Main-floor rooms clamped to 1..maxRoomLevel; garage clamped to 1..min(maxRoomLevel, MAX_GARAGE_ROOM_LEVEL). */
+  static getRoomLevels(user: IUser, propertyId: number, maxRoomLevel: number): {
+    bathroom: number;
+    kitchen: number;
+    bedroom: number;
+    livingRoom: number;
+    garage: number;
+  } {
     const rooms = user.rentalHousingRooms?.[`property${propertyId}` as keyof typeof user.rentalHousingRooms];
-    if (!rooms) return { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1 };
+    if (!rooms) return { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1, garage: 1 };
+    const clamp = (n: number) => Math.min(maxRoomLevel, Math.max(1, n));
+    const garageMax = Math.min(maxRoomLevel, MAX_GARAGE_ROOM_LEVEL);
+    const clampGarage = (n: number) => Math.min(garageMax, Math.max(1, n));
     return {
-      bathroom: Math.min(4, Math.max(1, rooms.bathroom ?? 1)),
-      kitchen: Math.min(4, Math.max(1, rooms.kitchen ?? 1)),
-      bedroom: Math.min(4, Math.max(1, rooms.bedroom ?? 1)),
-      livingRoom: Math.min(4, Math.max(1, rooms.livingRoom ?? 1)),
+      bathroom: clamp(rooms.bathroom ?? 1),
+      kitchen: clamp(rooms.kitchen ?? 1),
+      bedroom: clamp(rooms.bedroom ?? 1),
+      livingRoom: clamp(rooms.livingRoom ?? 1),
+      garage: clampGarage(rooms.garage ?? 1),
     };
   }
 
-  /** Income for one room: base (from property level) + remodel add (if room level 2+ and property level allows). */
-  static getRoomIncome(
+  /** Compute one room's rate from config. Garage appears at property 7 ($0.025), 8 ($0.03), 9 ($0.035). Garage room has levels 1–4 only; remodel adds at 2/3/4 require property 7/8/9. */
+  static getRoomIncomeFromConfig(
+    config: RentalPropertyConfig,
     propertyLevel: number,
     roomLevel: number,
-    isSmallRoom: boolean
+    roomType: RoomType
   ): number {
-    if (propertyLevel < 1 || propertyLevel > 5) return 0;
-    const baseRates = isSmallRoom ? PROPERTY_BASE_RATES.small : PROPERTY_BASE_RATES.large;
-    let rate = baseRates[propertyLevel - 1];
-    if (roomLevel >= 2 && roomLevel <= 4) {
-      const minProp = ROOM_REMODEL_MIN_PROPERTY_LEVEL[roomLevel as 2 | 3 | 4];
-      if (propertyLevel >= minProp) {
-        const addRates = isSmallRoom ? ROOM_REMODEL_ADD_SMALL : ROOM_REMODEL_ADD_LARGE;
-        rate += addRates[roomLevel as 2 | 3 | 4];
+    if (propertyLevel < 1 || propertyLevel > config.maxPropertyLevel) return 0;
+    const levelConfig = config.propertyLevels.find((l) => l.level === propertyLevel);
+    if (!levelConfig) return 0;
+
+    const rateKey = roomType === 'bathroom' ? 'bath' : roomType === 'bedroom' ? 'bed1' : roomType === 'livingRoom' ? 'livingRoom' : roomType === 'kitchen' ? 'kitchen' : 'garage';
+    const addKey = roomType === 'bathroom' ? 'bathroom' : roomType === 'bedroom' ? 'bedroom' : roomType === 'livingRoom' ? 'livingRoom' : roomType === 'kitchen' ? 'kitchen' : 'garage';
+
+    if (roomType === 'garage') {
+      const garageRate = levelConfig.rates.garage ?? 0;
+      if (propertyLevel < 7 || garageRate === 0) return 0;
+      // Garage remodel add: use in-code schedule only (no DB dependency) so income is correct after rebuild.
+      let add = 0;
+      for (const tier of GARAGE_REMODEL_ADD_SCHEDULE) {
+        if (tier.roomLevel > roomLevel) break;
+        if (propertyLevel >= tier.minPropertyLevel) add += tier.addPerSecond;
       }
+      return garageRate + add;
     }
-    return rate;
+
+    let base = 0;
+    if (rateKey === 'bath') base = levelConfig.rates.bath;
+    else if (rateKey === 'bed1') base = levelConfig.rates.bed1;
+    else if (rateKey === 'livingRoom') base = levelConfig.rates.livingRoom;
+    else if (rateKey === 'kitchen') base = levelConfig.rates.kitchen;
+    const remodelConfig = config.roomRemodelLevels.find((r) => r.roomLevel === roomLevel);
+    const minProp = remodelConfig?.minPropertyLevel ?? 999;
+    const add = roomLevel >= 2 && propertyLevel >= minProp && remodelConfig ? (remodelConfig.addRates as any)[addKey] ?? 0 : 0;
+    return base + add;
   }
 
   static async getRentalProfitBonusPerRoom(userId: string, prefetch?: BonusPrefetch): Promise<number> {
@@ -92,16 +121,17 @@ export class RentalHousingIncomeService {
     return getRentalProfitUnlockTimes(userId, prefetch);
   }
 
+  /** Research bonus is applied per room. Garage only earns bonus when it has a base rate (property level >= 7). */
   static getRoomValuesWithResearch(
-    baseRoomValues: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number },
+    baseRoomValues: { bathroom: number; kitchen: number; bedroom: number; livingRoom: number; garage: number },
     bonusPerRoom: number
-  ): { bathroom: number; kitchen: number; bedroom: number; livingRoom: number } {
-    const bonus = bonusPerRoom;
+  ): { bathroom: number; kitchen: number; bedroom: number; livingRoom: number; garage: number } {
     return {
-      bathroom: baseRoomValues.bathroom + bonus,
-      kitchen: baseRoomValues.kitchen + bonus,
-      bedroom: baseRoomValues.bedroom + bonus,
-      livingRoom: baseRoomValues.livingRoom + bonus,
+      bathroom: baseRoomValues.bathroom + bonusPerRoom,
+      kitchen: baseRoomValues.kitchen + bonusPerRoom,
+      bedroom: baseRoomValues.bedroom + bonusPerRoom,
+      livingRoom: baseRoomValues.livingRoom + bonusPerRoom,
+      garage: baseRoomValues.garage > 0 ? baseRoomValues.garage + bonusPerRoom : 0,
     };
   }
 
@@ -109,6 +139,7 @@ export class RentalHousingIncomeService {
     user: IUser,
     options?: { includeResearchBonus?: boolean; rentalProfitBonusPerRoom?: number }
   ): Promise<RentalHousingIncome> {
+    const config = await getRentalPropertyConfig();
     const propertyBreakdown: RentalHousingIncome['propertyBreakdown'] = [];
     let totalIncomePerSecond = 0;
     const explicitBonus = options?.rentalProfitBonusPerRoom;
@@ -120,24 +151,26 @@ export class RentalHousingIncomeService {
           : 0;
 
     for (let propertyId = 1; propertyId <= 4; propertyId++) {
-      const propertyLevel = this.getPropertyLevel(user, propertyId);
+      const propertyLevel = this.getPropertyLevel(user, propertyId, config.maxPropertyLevel);
       const isUnlocked = propertyLevel >= 1;
-      const roomLevels = this.getRoomLevels(user, propertyId);
+      const roomLevels = this.getRoomLevels(user, propertyId, config.maxRoomLevel);
 
-      const bathroomRate = this.getRoomIncome(propertyLevel, roomLevels.bathroom, true);
-      const kitchenRate = this.getRoomIncome(propertyLevel, roomLevels.kitchen, true);
-      const bedroomRate = this.getRoomIncome(propertyLevel, roomLevels.bedroom, false);
-      const livingRoomRate = this.getRoomIncome(propertyLevel, roomLevels.livingRoom, false);
+      const bathroomRate = this.getRoomIncomeFromConfig(config, propertyLevel, roomLevels.bathroom, 'bathroom');
+      const kitchenRate = this.getRoomIncomeFromConfig(config, propertyLevel, roomLevels.kitchen, 'kitchen');
+      const bedroomRate = this.getRoomIncomeFromConfig(config, propertyLevel, roomLevels.bedroom, 'bedroom');
+      const livingRoomRate = this.getRoomIncomeFromConfig(config, propertyLevel, roomLevels.livingRoom, 'livingRoom');
+      const garageRate = this.getRoomIncomeFromConfig(config, propertyLevel, roomLevels.garage, 'garage');
 
       const baseRoomValues = {
         bathroom: bathroomRate,
         kitchen: kitchenRate,
         bedroom: bedroomRate,
         livingRoom: livingRoomRate,
+        garage: garageRate,
       };
       const roomValues = this.getRoomValuesWithResearch(baseRoomValues, bonusPerRoom);
       const incomePerSecond = isUnlocked
-        ? roomValues.bathroom + roomValues.kitchen + roomValues.bedroom + roomValues.livingRoom
+        ? roomValues.bathroom + roomValues.kitchen + roomValues.bedroom + roomValues.livingRoom + roomValues.garage
         : 0;
 
       propertyBreakdown.push({

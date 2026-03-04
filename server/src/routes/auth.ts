@@ -10,7 +10,7 @@ import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
 import { MapService } from '../services/MapService';
-import { filterBadWords, containsBadWords, containsBadWordsForHandle } from '../utils/contentModeration';
+import { filterBadWords, containsBadWords, containsBadWordsForHandle, isDisallowedHandle } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 
 function isUserAdmin(user: { _id?: unknown }): boolean {
@@ -320,7 +320,8 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
       },
       isGuest: !!user.isGuest,
       hasPassword: !!user.hashedAccessKey,
-      isAdmin: isUserAdmin(user)
+      isAdmin: isUserAdmin(user),
+      ...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })
     }
   });
 }
@@ -1194,6 +1195,12 @@ router.post('/update-handle', async (req, res): Promise<void> => {
       return;
     }
 
+    // Block handles reserved for system/official use
+    if (isDisallowedHandle(handle)) {
+      res.status(400).json({ error: 'This handle is reserved for system use' });
+      return;
+    }
+
     // Check for existing user with same handle (case-insensitive)
     const existingUser = await User.findOne({ 
       handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') },
@@ -1376,6 +1383,12 @@ router.post('/check-handle', async (req, res): Promise<void> => {
       return;
     }
 
+    // Block handles reserved for system/official use
+    if (isDisallowedHandle(handle)) {
+      res.json({ available: false, message: 'This handle is reserved for system use' });
+      return;
+    }
+
     // Check for existing user with same handle (case-insensitive)
     const existingUser = await User.findOne({ 
       handle: { $regex: new RegExp(`^${escapeRegexString(handle)}$`, 'i') }
@@ -1526,7 +1539,8 @@ router.get('/verify-token', async (req, res): Promise<void> => {
         },
         isGuest: user.isGuest || false,
         hasPassword: !!(user as any).hashedAccessKey,
-        isAdmin: isUserAdmin(user)
+        isAdmin: isUserAdmin(user),
+        ...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })
       }
     });
   } catch (error: any) {

@@ -35,13 +35,16 @@ const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-01', value: 0.01 },
   { featureId: 'increase-income-02', value: 0.02 },
   { featureId: 'increase-income-025', value: 0.025 },
-  { featureId: 'increase-income-03', value: 0.03 }
+  { featureId: 'increase-income-03', value: 0.03 },
+  { featureId: 'increase-income-03-ii', value: 0.03 },
+  { featureId: 'increase-income-03-iii', value: 0.03 }
 ];
 
 /** Cash-flow feature IDs that reduce insurance expense (spec 18). Bugbot: no legacy IDs (e.g. reduce-insurance-expense) — never used in this project. */
 const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-insurance-01', value: 0.01 },
-  { featureId: 'reduce-insurance-02', value: 0.02 }
+  { featureId: 'reduce-insurance-02', value: 0.02 },
+  { featureId: 'reduce-insurance-03', value: 0.02 }
 ];
 
 /** Tax reduction: current spec (cash-flow) and legacy (financial/reduce-expenses). Check correct category per feature. Bugbot: new starts of financial/reduce-expenses are blocked in ResearchFeatureService to prevent cheap tax-reduction bypass. */
@@ -50,10 +53,18 @@ const TAX_REDUCTION_FEATURES: { featureId: string; value: number; categoryId: st
   { featureId: 'reduce-expenses', value: 0.02, categoryId: 'financial' }
 ];
 
-/** Rental profit per room features (spec 18). Both tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
+/** Cash-flow feature IDs that reduce rent/mortgage expense. No legacy. */
+const RENT_MORTGAGE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+  { featureId: 'reduce-rent-mortgage-05', value: 0.05 }
+];
+
+/** Rental profit per room features (spec 18). All tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
 export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
   { featureId: 'rental-profit-01', value: 0.01, categoryId: 'investments' },
-  { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' }
+  { featureId: 'rental-profit-015', value: 0.015, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-i', value: 0.02, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-ii', value: 0.02, categoryId: 'investments' },
+  { featureId: 'rental-profit-02-iii', value: 0.02, categoryId: 'investments' }
 ];
 
 /** Migration replacement set for increase-income-rate (grandfather creates 01+02+025). Add legacy only when user doesn't have all of these (Bugbot). */
@@ -96,6 +107,21 @@ export async function getInsuranceReductionBonus(userId: string, prefetch?: Bonu
   }
   const hasReplacement = await check('cash-flow', INSURANCE_LEGACY_REPLACEMENT_ID);
   if (!hasReplacement && (await check('cash-flow', 'reduce-insurance-expense'))) total += 0.02;
+  return total;
+}
+
+/**
+ * Total rent/mortgage expense reduction from all unlocked cash-flow features.
+ * Pass prefetch to avoid N+1 queries.
+ */
+export async function getRentMortgageReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+  const check = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
+  let total = 0;
+  for (const { featureId, value } of RENT_MORTGAGE_REDUCTION_FEATURES) {
+    if (await check('cash-flow', featureId)) total += value;
+  }
   return total;
 }
 
@@ -209,7 +235,10 @@ export async function isResearchFeatureUnlocked(
 const BATTALION_SIZE_FEATURES: { featureId: string; add: number }[] = [
   { featureId: 'battalion-size-250', add: 250 },
   { featureId: 'battalion-size-500', add: 500 },
-  { featureId: 'battalion-size-1000', add: 1000 }
+  { featureId: 'battalion-size-1000', add: 1000 },
+  { featureId: 'battalion-size-2000', add: 2000 },
+  { featureId: 'battalion-size-4500', add: 4500 },
+  { featureId: 'battalion-size-6500', add: 6500 },
 ];
 
 /** Legacy feature IDs (pre–spec-18) so we find docs before grandfather migration runs. Same category hack-ability. */
@@ -220,7 +249,7 @@ const BATTALION_SIZE_LEGACY_IDS: Record<string, string[]> = {
 const BASE_BATTALION_SIZE = 250;
 
 /**
- * Max troops per battalion for a user from research (250, 500, 1000, or 2000).
+ * Max troops per battalion for a user from research (250, 500, 1000, 2000, 4000, 8500, or 15000).
  * Uses isUnlocked or "completing at or before asOfTime". Queries include legacy IDs so users with old docs are found before migration.
  * @param asOfTime If provided, research is treated unlocked when researchCompletesAt <= asOfTime.
  */
@@ -245,13 +274,14 @@ export async function getMaxBattalionSize(userId: string, asOfTime?: Date): Prom
   return max;
 }
 
-const BATTALION_SLOT_FEATURE_IDS: Record<'C' | 'D' | 'E', string> = {
+const BATTALION_SLOT_FEATURE_IDS: Record<'C' | 'D' | 'E' | 'F', string> = {
   C: 'add-battalion-c',
   D: 'add-battalion-d',
   E: 'add-battalion-e',
+  F: 'add-battalion-f',
 };
 
-/** Legacy slot IDs so Battalion C is found under battalions-per-battle before grandfather migration. D/E have no legacy. */
+/** Legacy slot IDs so Battalion C is found under battalions-per-battle before grandfather migration. D/E/F have no legacy. */
 const BATTALION_SLOT_LEGACY_IDS: Record<string, string[]> = {
   'add-battalion-c': ['add-battalion-c', 'battalions-per-battle'],
 };
@@ -262,7 +292,7 @@ const BATTALION_SLOT_LEGACY_IDS: Record<string, string[]> = {
  */
 export async function isBattalionSlotUnlocked(
   userId: string,
-  battalionId: 'C' | 'D' | 'E',
+  battalionId: 'C' | 'D' | 'E' | 'F',
   asOfTime?: Date
 ): Promise<boolean> {
   const featureId = BATTALION_SLOT_FEATURE_IDS[battalionId];

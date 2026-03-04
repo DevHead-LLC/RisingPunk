@@ -1,7 +1,6 @@
 /**
- * Rental property build levels (1-5) and room remodel levels (1-4).
- * Builds = property level upgrades. Remodels = per-room upgrades.
- * Room level 1 = base (no remodel). Room levels 2-4 add income (require property level 3+).
+ * @deprecated Use construction_config (rental_property) and RentalPropertyConfigService instead.
+ * Rental property build levels and room remodel levels now live in the database; this file is kept for reference only.
  */
 
 export const PROPERTY_BUILD_LEVELS = [

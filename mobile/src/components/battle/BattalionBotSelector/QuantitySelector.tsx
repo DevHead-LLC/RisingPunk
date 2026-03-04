@@ -6,7 +6,14 @@ import { useTheme } from '../../../context/ThemeContext';
 import { KeyboardAwareInput } from '../../common/KeyboardAwareInput';
 import { useGetUserFeaturesQuery } from '../../../store/api/researchFeaturesApi';
 
-const BATTALION_SIZE_FEATURE_IDS = ['battalion-size-250', 'battalion-size-500', 'battalion-size-1000'] as const;
+const BATTALION_SIZE_FEATURE_IDS = [
+  'battalion-size-250',
+  'battalion-size-500',
+  'battalion-size-1000',
+  'battalion-size-2000',
+  'battalion-size-4500',
+  'battalion-size-6500',
+] as const;
 
 type Props = {
   quantity: number;
@@ -45,6 +52,9 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
         if (id === 'battalion-size-250') max = 500;
         else if (id === 'battalion-size-500') max = 1000;
         else if (id === 'battalion-size-1000') max = 2000;
+        else if (id === 'battalion-size-2000') max = 4000;
+        else if (id === 'battalion-size-4500') max = 8500;
+        else if (id === 'battalion-size-6500') max = 15000;
       } else break;
     }
     return max;
@@ -118,7 +128,7 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
               }]}
               containerStyle={styles.inputContainer}
               isLastInput={true}
-              maxLength={4}
+              maxLength={5}
               editable={!disabled}
             />
           </View>

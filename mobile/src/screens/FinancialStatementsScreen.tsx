@@ -19,15 +19,11 @@ type Props = {
 
 type TabKey = 'income' | 'balance' | 'cashflow';
 
-/**
- * Cumulative build cost by property level (0–5). Source of truth: server/src/config/rentalPropertyConfig.ts
- * PROPERTY_BUILD_LEVELS — cumulative = sum of cost for levels 1..level. When server config changes, update here
- * and in any docs that reference this (see taskItems/ios/turf/rental-property-level-remodel-system.md § Client–server config sync).
- */
-const CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL: number[] = [0, 10000, 40000, 90000, 165000, 265000];
-
-function getPropertyCumulativeValue(level: number): number {
-  return CUMULATIVE_PROPERTY_BUILD_VALUE_BY_LEVEL[Math.min(5, Math.max(0, level))] ?? 100000;
+/** Cumulative property value from server (cumulativeBuildValueByLevel). Clamps level to array bounds. */
+function getPropertyCumulativeValue(level: number, cumulativeBuildValueByLevel: number[] | undefined): number {
+  if (!cumulativeBuildValueByLevel?.length) return 0;
+  const idx = Math.min(cumulativeBuildValueByLevel.length - 1, Math.max(0, level));
+  return cumulativeBuildValueByLevel[idx] ?? 0;
 }
 
 export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element {
@@ -59,6 +55,11 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     if (typeof balanceData?.taxReduction === 'number') return balanceData.taxReduction;
     return 0;
   }, [expenseModifiers?.taxReduction, balanceData?.taxReduction]);
+  const rentMortgageReductionTotal = useMemo(() => {
+    if (typeof expenseModifiers?.rentMortgageReduction === 'number') return expenseModifiers.rentMortgageReduction;
+    if (typeof balanceData?.rentMortgageReduction === 'number') return balanceData.rentMortgageReduction;
+    return 0;
+  }, [expenseModifiers?.rentMortgageReduction, balanceData?.rentMortgageReduction]);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   
@@ -102,10 +103,14 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     const hasTaxInTemplate = Object.keys(baseIncomeStatement).some(
       k => /tax/.test(String(k).trim().toLowerCase())
     );
+    // Word boundaries so we match "Rent"/"Mortgage" only, not "current", "rental", "parent", etc.
+    const hasRentMortgageInTemplate = Object.keys(baseIncomeStatement).some(
+      k => /\brent\b|\bmortgage\b/.test(String(k).trim().toLowerCase())
+    );
 
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
     
-    // Gross Income: subtract insurance and tax reduction from display when template has those lines,
+    // Gross Income: subtract insurance, tax, and rent/mortgage reduction from display when template has those lines,
     // so we don't double-count (savings shown as reduced expense). If template lacks them, show full incomeRateBonus.
     let effectiveIncomeRateBonus = incomeRateBonus;
     if (hasInsuranceInTemplate && insuranceReductionTotal > 0) {
@@ -113,6 +118,9 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     }
     if (hasTaxInTemplate && taxReductionTotal > 0) {
       effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - taxReductionTotal);
+    }
+    if (hasRentMortgageInTemplate && rentMortgageReductionTotal > 0) {
+      effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - rentMortgageReductionTotal);
     }
     const baseGrossIncome = 12.00;
     const grossIncome = baseGrossIncome + effectiveIncomeRateBonus;
@@ -129,13 +137,19 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       }
       return num < 0;
     });
-    // Apply tax reduction to the first expense line whose label contains "tax" only (so gross-income offset matches; Bugbot: avoid N× reduction with 1× offset when multiple "tax" lines exist).
+    // Apply tax reduction to the first expense line whose label contains "tax"; apply rent/mortgage reduction to the first line matching rent|mortgage (so gross-income offset matches).
     let taxReductionApplied = false;
+    let rentMortgageReductionApplied = false;
     const expenseEntries = rawExpenseEntries.map(([k, v]) => {
       const num = Number(v);
-      if (num < 0 && /tax/.test(String(k).trim().toLowerCase()) && !taxReductionApplied) {
+      const keyLower = String(k).trim().toLowerCase();
+      if (num < 0 && /tax/.test(keyLower) && !taxReductionApplied) {
         taxReductionApplied = true;
         return [k, num + taxReductionTotal] as [string, number];
+      }
+      if (num < 0 && /\brent\b|\bmortgage\b/.test(keyLower) && !rentMortgageReductionApplied) {
+        rentMortgageReductionApplied = true;
+        return [k, num + rentMortgageReductionTotal] as [string, number];
       }
       return [k, v] as [string, number];
     });
@@ -163,7 +177,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       passiveIncome,
       netCashFlow
     };
-  }, [merged, incomeRateBonus, insuranceReductionTotal, taxReductionTotal, rentalHousingData?.totalIncomePerSecond]);
+  }, [merged, incomeRateBonus, insuranceReductionTotal, taxReductionTotal, rentMortgageReductionTotal, rentalHousingData?.totalIncomePerSecond]);
 
   const getStyles = () => ({
     container: {
@@ -419,7 +433,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                       .filter(p => p.isUnlocked)
                       .map((property) => {
                         const level = property.propertyLevel ?? 1;
-                        const cumulativeValue = getPropertyCumulativeValue(level);
+                        const cumulativeValue = getPropertyCumulativeValue(level, rentalHousingData.cumulativeBuildValueByLevel);
                         return (
                           <View key={property.propertyId} style={styles.row}>
                             <Text style={styles.keyText}>Investment Property {property.propertyId} (Lv.{level})</Text>
@@ -435,7 +449,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                     <View style={[styles.row, { marginTop: SIZING.spacing.sm }]}>
                       <Text style={styles.keyText}>Net Worth</Text>
                       <Text style={styles.valText}>
-                        {`$${Math.round(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).reduce((sum, p) => sum + getPropertyCumulativeValue(p.propertyLevel ?? 1), 0) : 0)).toLocaleString()}`}
+                        {`$${Math.round(Number(currentCash) + (rentalHousingData ? rentalHousingData.propertyBreakdown.filter(p => p.isUnlocked).reduce((sum, p) => sum + getPropertyCumulativeValue(p.propertyLevel ?? 1, rentalHousingData.cumulativeBuildValueByLevel), 0) : 0)).toLocaleString()}`}
                       </Text>
                     </View>
                   </View>

@@ -828,6 +828,97 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-03-03 (merge dev → android_mergeDev)
+
+**Branch context:** Full merge flow per merge-flow.md: created `android_mergeDev` from `androidStaging`, pushed, merged `origin/dev`. Four conflicts: useBattalionSlotUnlocks.ts (API shape + battalion F), HackMapScreen.tsx (probe complete failure handling), InvestmentPropertyScreen.tsx (Dimensions/config/gesture vars + tab nav + Android comment), server probe.ts (comment).
+
+### 1. `mobile/src/hooks/useBattalionSlotUnlocks.ts`
+
+**Conflict:** Battalion feature lookup – API shape (.features?) and battalion F.
+
+| Side | Content |
+|------|--------|
+| HEAD | `hackAbilityFeatures?.features?.find(...)` for battalion C, D, E only. |
+| dev  | `hackAbilityFeatures?.find(...)` (no .features) for C, D, E and **battalion F**. |
+
+**Resolution:** Kept **HEAD’s API shape** and **dev’s battalion F**. Final state: `hackAbilityFeatures?.features?.find(...)` for C, D, E, and F; return includes `isBattalionFUnlocked` from battalionF.
+
+**Rationale:** getUserFeatures returns `{ features, ... }`; calling .find on the object is wrong (same as 2025-03-01 regression). Android/correct behavior: use .features. Dev adds battalion F slot; we keep that and fix the shape.
+
+**Rejected from dev:** Using `hackAbilityFeatures?.find` (wrong shape). Rejected from HEAD: omitting battalion F (we added it with .features?).
+
+**Failure-mode hints for later:** If battalion slot unlocks are wrong, confirm useGetUserFeaturesQuery('hack-ability') result is accessed as `?.features?.find(...)` in this hook.
+
+---
+
+### 2. `mobile/src/screens/HackMapScreen.tsx`
+
+**Conflict:** Probe completion failure in .catch – always notify vs server-already-handled check.
+
+| Side | Content |
+|------|--------|
+| HEAD | Always: `onProbeCompleteFailedRef.current(probe.id); cancelProbeMutation({ probeId: probe.id });` |
+| dev  | Check `err?.data?.error`; if "Probe already completed" or "Probe completion already in progress" skip callback and cancel; else call onProbeCompleteFailed and cancelProbeMutation. |
+
+**Resolution:** Accepted **dev’s logic** with **HEAD’s ref**. Final state: serverMsg/serverAlreadyHandled check; if (!serverAlreadyHandled) { onProbeCompleteFailedRef.current(probe.id); cancelProbeMutation(...); }.
+
+**Rationale:** Not Android-specific. Dev avoids double-cancel when server already handled; we want that. Kept ref (onProbeCompleteFailedRef.current) for consistency with callback context.
+
+**Rejected from HEAD:** Always calling callback and cancel (can double-cancel when server already handled).
+
+**Failure-mode hints for later:** If probe completion failure does not surface on client when it should, confirm serverAlreadyHandled only skips for the two known server messages.
+
+---
+
+### 3. `mobile/src/screens/InvestmentPropertyScreen.tsx`
+
+**Conflict A (Dimensions, ROOM_REMODEL_CONFIG, gesture vars):**
+
+| Side | Content |
+|------|--------|
+| HEAD | Dimensions.get('window'), ROOM_REMODEL_CONFIG array, full gesture vars (Gesture, GestureDetector, Animated, useSharedValue, useAnimatedStyle, withDecay, computePanBounds). |
+| dev  | Only `let GestureDetector, Animated, useAnimatedStyle`. |
+
+**Resolution:** Accepted **HEAD**. Final state: Dimensions + SCREEN_WIDTH/SCREEN_HEIGHT, ROOM_REMODEL_CONFIG, full gesture let list. Added Dimensions to react-native import.
+
+**Rationale:** Android first. HEAD’s overlay dimensions and config are required for remodel modal centering (taskItems/android/turf/investment-property-remodel-modal-android.md). SCREEN_WIDTH/SCREEN_HEIGHT used in modal overlay styles.
+
+**Conflict B (Android comment vs tab navigation):**
+
+| Side | Content |
+|------|--------|
+| HEAD | Comment only: "Remodel modal — Android: explicit overlay dimensions…" |
+| dev  | Tab navigation block (Main Floor / Garage) + "Remodel modal" comment. |
+
+**Resolution:** Combined **both**. Final state: HEAD’s Android comment retained; dev’s tab navigation block and "Remodel modal" comment added before the remodel Modal.
+
+**Rationale:** Android comment documents overlay fix; dev’s Garage tab is desired feature. Both kept.
+
+**Failure-mode hints for later:** If remodel modal mispositions on Android, confirm Dimensions and SCREEN_WIDTH/SCREEN_HEIGHT and overlay styles are still present.
+
+---
+
+### 4. `server/src/routes/probe.ts`
+
+**Conflict:** Comment above GET /active – two-line vs one-line.
+
+| Side | Content |
+|------|--------|
+| HEAD | Two lines: outbound travel time elapsed; on completion failure we delete probe so uncompletable not retried. |
+| dev  | One line: outbound + delay elapsed; threshold after client POST /complete (outbound end + 400ms buffer). |
+
+**Resolution:** Accepted **dev**. Final state: single comment with threshold/400ms buffer.
+
+**Rationale:** Server comment only; not Android-specific. Dev’s comment is more precise (threshold, 400ms).
+
+**Failure-mode hints for later:** None.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
