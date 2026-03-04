@@ -1,12 +1,21 @@
 /**
  * Persist and restore TurfScreen navigation state (currentScreen, turfViewPosition)
  * so refresh/hot reload or process restart keeps user on same screen and position.
+ * State is keyed by userId so each user gets their own screen/position; switching
+ * users or creating a new guest does not restore the previous user's state (fixes
+ * iOS/Android bug where new guest saw HackMap/onboarding from previous account).
  * See taskItems/in-progress.md Phase 2 (14.1 Refresh app — stay on current screen and position).
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const NAV_STATE_KEY = '@risingpunk_turf_nav_state';
+const NAV_STATE_KEY_PREFIX = '@risingpunk_turf_nav_state';
+/** Legacy single-key (pre per-user). Cleared on clearPersistedTurfNavState for migration. */
+const LEGACY_NAV_STATE_KEY = '@risingpunk_turf_nav_state';
+
+function navStateKey(userId: string): string {
+  return `${NAV_STATE_KEY_PREFIX}_${userId}`;
+}
 
 export type TurfScreenName =
   | 'turf'
@@ -56,10 +65,8 @@ function isValidPosition(p: unknown): p is { x: number; y: number } {
   );
 }
 
-export async function getPersistedTurfNavState(): Promise<TurfNavState | null> {
+function parseStoredState(raw: string): TurfNavState | null {
   try {
-    const raw = await AsyncStorage.getItem(NAV_STATE_KEY);
-    if (!raw) return null;
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== 'object') return null;
     const screen = (parsed as Record<string, unknown>).currentScreen;
@@ -78,19 +85,38 @@ export async function getPersistedTurfNavState(): Promise<TurfNavState | null> {
   }
 }
 
-export async function setPersistedTurfNavState(state: TurfNavState): Promise<void> {
+/** Get persisted turf nav state for the given user. When userId is null, returns null (e.g. logged out). */
+export async function getPersistedTurfNavState(userId: string | null): Promise<TurfNavState | null> {
+  if (!userId || typeof userId !== 'string' || !userId.trim()) return null;
+  try {
+    const key = navStateKey(userId.trim());
+    const raw = await AsyncStorage.getItem(key);
+    if (!raw) return null;
+    return parseStoredState(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Persist turf nav state for the given user. When userId is null, no-op. */
+export async function setPersistedTurfNavState(state: TurfNavState, userId: string | null): Promise<void> {
+  if (!userId || typeof userId !== 'string' || !userId.trim()) return;
   try {
     const currentScreen = TRANSIENT_SCREENS.includes(state.currentScreen) ? 'turf' : state.currentScreen;
-    await AsyncStorage.setItem(NAV_STATE_KEY, JSON.stringify({ ...state, currentScreen }));
+    const key = navStateKey(userId.trim());
+    await AsyncStorage.setItem(key, JSON.stringify({ ...state, currentScreen }));
   } catch {
     // Non-fatal; ignore
   }
 }
 
-/** Clear persisted turf nav state. Call on logout or account switch so the next user does not restore the previous user's screen/position. */
-export async function clearPersistedTurfNavState(): Promise<void> {
+/** Clear persisted turf nav state. Call on logout or account switch. Clears legacy global key and, when userId is provided, that user's key so the next user does not restore the previous user's screen/position. */
+export async function clearPersistedTurfNavState(userId?: string | null): Promise<void> {
   try {
-    await AsyncStorage.removeItem(NAV_STATE_KEY);
+    await AsyncStorage.removeItem(LEGACY_NAV_STATE_KEY);
+    if (userId && typeof userId === 'string' && userId.trim()) {
+      await AsyncStorage.removeItem(navStateKey(userId.trim()));
+    }
   } catch {
     // Non-fatal; ignore
   }
