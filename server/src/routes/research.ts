@@ -19,7 +19,7 @@ const MAX_RESEARCH_COMPLETION_ATTEMPTS = 10;
 const CASH_FLOW_SYNC_FEATURE_IDS = new Set([
   'increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03',
   'increase-income-03-ii', 'increase-income-03-iii',
-  'reduce-insurance-01', 'reduce-insurance-02', 'reduce-tax-expense-02'
+  'reduce-insurance-01', 'reduce-insurance-02', 'reduce-insurance-03', 'reduce-rent-mortgage-05', 'reduce-tax-expense-02'
 ]);
 
 /** Investments feature IDs that affect rental income (spec 18). */
@@ -260,15 +260,16 @@ router.post('/fix-user-research', auth, async (req: Request, res: Response): Pro
 router.get('/expense-modifiers', auth, async (req: Request, res: Response) => {
   try {
     const userId = String((req as any).user._id);
-    const { getInsuranceReductionBonus, getTaxReductionBonus } = await import('../utils/researchFeatureUtils');
-    const [insuranceReduction, taxReduction] = await Promise.all([
+    const { getInsuranceReductionBonus, getTaxReductionBonus, getRentMortgageReductionBonus } = await import('../utils/researchFeatureUtils');
+    const [insuranceReduction, taxReduction, rentMortgageReduction] = await Promise.all([
       getInsuranceReductionBonus(userId),
-      getTaxReductionBonus(userId)
+      getTaxReductionBonus(userId),
+      getRentMortgageReductionBonus(userId)
     ]);
-    res.json({ insuranceReduction, taxReduction });
+    res.json({ insuranceReduction, taxReduction, rentMortgageReduction });
   } catch (error) {
     console.error('Error fetching expense modifiers:', error);
-    res.status(500).json({ insuranceReduction: 0, taxReduction: 0 });
+    res.status(500).json({ insuranceReduction: 0, taxReduction: 0, rentMortgageReduction: 0 });
   }
 });
 
