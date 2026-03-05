@@ -46,8 +46,6 @@ export interface IUser extends Document {
     enableDebugLogs: boolean;
   };
   guestDeviceId?: string;
-  /** Stable device id (e.g. IDFV/ANDROID_ID) for recovery when AsyncStorage/Keychain is cleared; sparse. */
-  guestVendorId?: string;
   currentTokenId?: string;
   /** Research Center building level 1–20 (max from construction_config). Missing or 0 = not built (or legacy, resolved on read). */
   researchCenterLevel?: number;
@@ -463,12 +461,6 @@ const userSchema = new Schema({
     type: String,
     required: false,
     unique: true,
-    sparse: true
-  },
-  /** Stable device id (e.g. IDFV/ANDROID_ID) for recovery when client storage is cleared; sparse index for lookup. */
-  guestVendorId: {
-    type: String,
-    required: false,
     sparse: true
   },
   currentTokenId: {

@@ -331,7 +331,6 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
 router.post('/guest', async (req, res): Promise<void> => {
   try {
     const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId.trim() : undefined;
-    const vendorId = typeof req.body?.vendorId === 'string' ? req.body.vendorId.trim() : undefined;
     const forceNew = req.body?.forceNew === true;
 
     if (deviceId && forceNew) {
@@ -344,65 +343,23 @@ router.post('/guest', async (req, res): Promise<void> => {
 
     if (deviceId && !forceNew) {
       // Find device-linked account by guestDeviceId only (guest or formerly-guest-now-linked).
-      const existingByDevice = await User.findOne({ guestDeviceId: deviceId });
-      if (existingByDevice) {
-        // Older-account recovery (vendorId): prefer oldest account for this device when same device lost storage.
-        // Bugbot fix: Only clear existingByDevice's device link after olderByVendor is successfully saved;
-        // never mutate before, or a failed save would leave the DB with a corrupted (cleared) device link.
-        if (vendorId) {
-          const olderByVendor = await User.findOne({ guestVendorId: vendorId }).sort({ createdAt: 1 }).limit(1).exec();
-          const existingId = existingByDevice._id?.toString();
-          const olderId = olderByVendor?._id?.toString();
-          if (olderByVendor && existingId && olderId && existingId !== olderId) {
-            olderByVendor.guestDeviceId = deviceId;
-            if (!olderByVendor.guestVendorId) olderByVendor.guestVendorId = vendorId;
-            let olderSaveFailed: unknown;
-            for (let attempt = 0; attempt < 2; attempt++) {
-              try {
-                await olderByVendor.save();
-                olderSaveFailed = undefined;
-                break;
-              } catch (e) {
-                olderSaveFailed = e;
-                if (attempt === 0) console.warn('Guest older-account re-link save failed, will retry once:', e);
-              }
-            }
-            if (olderSaveFailed === undefined) {
-              // Success: only now clear the newer account's link so we don't leave two users for same device.
-              existingByDevice.guestDeviceId = undefined;
-              existingByDevice.guestVendorId = undefined;
-              await existingByDevice.save().catch((e: unknown) => console.warn('Guest clear newer device link:', e));
-              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-              olderByVendor.setCurrentToken(sessionId);
-              await olderByVendor.save();
-              const token = jwt.sign(
-                { userId: olderByVendor._id, sessionId },
-                process.env.JWT_SECRET || 'defaultsecret',
-                { expiresIn: '7d' }
-              );
-              sendGuestUserResponse(res, olderByVendor, token, 200);
-              return;
-            }
-            // olderByVendor save failed — do not mutate existingByDevice; fall through to return it.
-          }
-        }
-        // Return current device-linked user (existingByDevice unchanged).
+      const existing = await User.findOne({ guestDeviceId: deviceId });
+      if (existing) {
+        // Try to return existing user (with one retry for transient errors). Never clear guestDeviceId
+        // on failure — that would orphan the account and lose progress on transient DB/network errors.
         let lastReturnError: unknown;
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
             const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-            existingByDevice.setCurrentToken(sessionId);
-            await existingByDevice.save();
-            if (vendorId && !existingByDevice.guestVendorId) {
-              existingByDevice.guestVendorId = vendorId;
-              await existingByDevice.save().catch((e: unknown) => console.warn('Guest stamp vendorId:', e));
-            }
+            existing.setCurrentToken(sessionId);
+            await existing.save();
+
             const token = jwt.sign(
-              { userId: existingByDevice._id, sessionId },
+              { userId: existing._id, sessionId },
               process.env.JWT_SECRET || 'defaultsecret',
               { expiresIn: '7d' }
             );
-            sendGuestUserResponse(res, existingByDevice, token, 200);
+            sendGuestUserResponse(res, existing, token, 200);
             return;
           } catch (returnError) {
             lastReturnError = returnError;
@@ -420,46 +377,13 @@ router.post('/guest', async (req, res): Promise<void> => {
       }
     }
 
-    // Recovery: deviceId not found but vendorId provided — same device may have lost storage; prefer oldest account for this vendor.
-    if (deviceId && vendorId && !forceNew) {
-      const byVendor = await User.findOne({ guestVendorId: vendorId }).sort({ createdAt: 1 }).limit(1).exec();
-      if (byVendor) {
-        byVendor.guestDeviceId = deviceId;
-        if (!byVendor.guestVendorId) byVendor.guestVendorId = vendorId;
-        let lastErr: unknown;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            await byVendor.save();
-            lastErr = undefined;
-            break;
-          } catch (e) {
-            lastErr = e;
-            if (attempt === 0) console.warn('Guest vendor recovery save failed, will retry once:', e);
-          }
-        }
-        if (lastErr === undefined) {
-          const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-          byVendor.setCurrentToken(sessionId);
-          await byVendor.save();
-          const token = jwt.sign(
-            { userId: byVendor._id, sessionId },
-            process.env.JWT_SECRET || 'defaultsecret',
-            { expiresIn: '7d' }
-          );
-          sendGuestUserResponse(res, byVendor, token, 200);
-          return;
-        }
-      }
-    }
-
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
       handle: guestHandle,
       needsHandleSelection: true,
       isGuest: true,
       emailVerificationPrompted: true,
-      ...(deviceId && { guestDeviceId: deviceId }),
-      ...(vendorId && { guestVendorId: vendorId })
+      ...(deviceId && { guestDeviceId: deviceId })
     });
 
     try {
@@ -475,10 +399,6 @@ router.post('/guest', async (req, res): Promise<void> => {
               const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
               existing.setCurrentToken(sessionId);
               await existing.save();
-              if (vendorId && !existing.guestVendorId) {
-                existing.guestVendorId = vendorId;
-                await existing.save().catch((e: unknown) => console.warn('Guest stamp vendorId (race):', e));
-              }
               const token = jwt.sign(
                 { userId: existing._id, sessionId },
                 process.env.JWT_SECRET || 'defaultsecret',
