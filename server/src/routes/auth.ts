@@ -10,6 +10,7 @@ import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
 import { MapService } from '../services/MapService';
+import { AccountDeletionService } from '../services/AccountDeletionService';
 import { filterBadWords, containsBadWords, containsBadWordsForHandle, isDisallowedHandle } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 
@@ -328,25 +329,102 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
 
 // Play as guest — one guest per device: get existing guest by deviceId or create new (no email/password)
 // Optional body.forceNew: if true, unlink this device from any existing user and create a new guest (no manual DB cleanup needed).
+//
+// Reliability: Client stores deviceId (and token) in Keychain so they survive app updates and typical storage clears.
+// Same deviceId => same account returned; nothing resets the link except forceNew or client losing Keychain (e.g. uninstall).
+// Recovery: If the device loses deviceId (e.g. reinstall), automatic re-link by vendorId alone is disabled (security).
+// Manual recovery: user sends Device ID + Vendor ID (and old handle if known) to support; support runs relinkGuestDevice.ts
+// to re-link the old account to the current deviceId; user then logs out and taps Play as Guest to resume that account.
 router.post('/guest', async (req, res): Promise<void> => {
   try {
     const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId.trim() : undefined;
+    const vendorId = typeof req.body?.vendorId === 'string' ? req.body.vendorId.trim() : undefined;
     const forceNew = req.body?.forceNew === true;
 
+    // When forceNew: fully unlink so vendor recovery cannot re-link this abandoned account (Bugbot: also clear guestVendorId).
     if (deviceId && forceNew) {
       const existing = await User.findOne({ guestDeviceId: deviceId });
       if (existing) {
         existing.guestDeviceId = undefined;
+        existing.guestVendorId = undefined;
         await existing.save();
       }
     }
 
     if (deviceId && !forceNew) {
-      // Find device-linked account by guestDeviceId only (guest or formerly-guest-now-linked).
-      const existing = await User.findOne({ guestDeviceId: deviceId });
+      // Find device-linked account by guestDeviceId (guest or formerly-guest-now-linked).
+      const existingByDevice = await User.findOne({ guestDeviceId: deviceId });
+      // If we have vendorId, also check for an older account (same vendorId). Only prefer it when the current
+      // device-linked account was created recently (Bugbot: avoid silently deleting long-lived active accounts
+      // when JWT expires — we must not delete the account they've been using). Window is 7d so users affected
+      // before the fix (e.g. during app-store review) can still recover their older account after deploy.
+      const RECENT_GUEST_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (covers store approval delay; can reduce to 24h later)
+      const currentAccountCreatedAt = existingByDevice?.createdAt ? new Date(existingByDevice.createdAt).getTime() : 0;
+      const currentAccountIsRecent = currentAccountCreatedAt > 0 && (Date.now() - currentAccountCreatedAt < RECENT_GUEST_MS);
+      if (existingByDevice && vendorId && currentAccountIsRecent) {
+        const olderByVendor = await User.findOne({ guestVendorId: vendorId }).sort({ createdAt: 1 }).limit(1).exec();
+        const existingId = existingByDevice._id as mongoose.Types.ObjectId;
+        const olderId = olderByVendor?._id as mongoose.Types.ObjectId | undefined;
+        const olderIsDifferent = olderByVendor && olderId && !olderId.equals(existingId);
+        const olderIsActuallyOlder = olderByVendor && existingByDevice.createdAt && olderByVendor.createdAt && olderByVendor.createdAt < existingByDevice.createdAt;
+        if (olderByVendor && olderIsDifferent && olderIsActuallyOlder) {
+          // Prefer the older-created account: re-link it to this device, unlink the new one, and delete the new guest.
+          // guestDeviceId has a unique index: we must clear existingByDevice's link before saving olderByVendor.
+          // Bugbot: Only restore existingByDevice if olderByVendor.save() never succeeded; else restore would E11000 and fallthrough would 503.
+          const newerUserId = existingId.toString();
+          const previousVendorId = existingByDevice.guestVendorId;
+          olderByVendor.guestDeviceId = deviceId;
+          if (!olderByVendor.guestVendorId) olderByVendor.guestVendorId = vendorId;
+          let lastReturnError: unknown;
+          let olderByVendorPersisted = false;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              existingByDevice.guestDeviceId = undefined;
+              existingByDevice.guestVendorId = undefined;
+              await existingByDevice.save();
+              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+              olderByVendor.setCurrentToken(sessionId);
+              await olderByVendor.save();
+              olderByVendorPersisted = true;
+              const token = jwt.sign(
+                { userId: olderByVendor._id, sessionId },
+                process.env.JWT_SECRET || 'defaultsecret',
+                { expiresIn: '7d' }
+              );
+              sendGuestUserResponse(res, olderByVendor, token, 200);
+              // Delete the abandoned newer account only if it's still a guest (no email/password linked).
+              if (existingByDevice.isGuest) {
+                AccountDeletionService.deleteAccount(newerUserId).catch((e: unknown) =>
+                  console.warn('Guest abandon delete (newer account):', e)
+                );
+              }
+              return;
+            } catch (returnError) {
+              lastReturnError = returnError;
+              if (!olderByVendorPersisted) {
+                existingByDevice.guestDeviceId = deviceId;
+                existingByDevice.guestVendorId = previousVendorId ?? vendorId ?? undefined;
+                await existingByDevice.save().catch((e: unknown) => console.warn('Guest restore device link after recovery fail:', e));
+              }
+              if (attempt === 0) continue;
+            }
+          }
+          console.error('Guest older-account recovery failed after retry:', lastReturnError);
+          if (olderByVendorPersisted) {
+            res.status(503).json({
+              error: 'Session could not be completed. Please tap Play as Guest again to resume your account.'
+            });
+            return;
+          }
+        }
+      }
+      const existing = existingByDevice;
       if (existing) {
-        // Try to return existing user (with one retry for transient errors). Never clear guestDeviceId
-        // on failure — that would orphan the account and lose progress on transient DB/network errors.
+        // Stamp vendorId so future "lost storage" recovery can find this account by vendorId.
+        if (vendorId && !existing.guestVendorId) {
+          existing.guestVendorId = vendorId;
+          await existing.save().catch((e: unknown) => console.warn('Guest stamp vendorId:', e));
+        }
         let lastReturnError: unknown;
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
@@ -377,13 +455,18 @@ router.post('/guest', async (req, res): Promise<void> => {
       }
     }
 
+    // Bugbot: Unauthenticated recovery by vendorId alone was removed to prevent account takeover.
+    // Anyone with a user's vendorId could previously send it with a new deviceId and hijack the guest account.
+    // Recovery by vendorId is intended to be manual (user shares vendorId with support); no automatic re-link here.
+
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
       handle: guestHandle,
       needsHandleSelection: true,
       isGuest: true,
       emailVerificationPrompted: true,
-      ...(deviceId && { guestDeviceId: deviceId })
+      ...(deviceId && { guestDeviceId: deviceId }),
+      ...(vendorId && { guestVendorId: vendorId })
     });
 
     try {

@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../../config';
+import { getGuestToken, setGuestToken, removeGuestToken, getGuestDeviceId, setGuestDeviceId } from '../../services/guestCredentialsStorage';
+import DeviceInfo from 'react-native-device-info';
 import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
@@ -89,7 +91,7 @@ export const loginUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      // Do not clear GUEST_TOKEN_KEY: the device-linked (guest or linked) token is preserved so
+      // Do not clear guest token (guestCredentialsStorage): the device-linked (guest or linked) token is preserved so
       // after signing out, "Play as Guest" can resume that account on this device.
 
       // Clear RTK Query caches so new user does not see previous user's data (PM, profile, etc.)
@@ -164,7 +166,7 @@ export const registerUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      // Do not clear GUEST_TOKEN_KEY: preserve device-linked token for "Play as Guest" resume.
+      // Do not clear guest token (guestCredentialsStorage): preserve device-linked token for "Play as Guest" resume.
 
       // Track account creation
       await trackAccountCreated('email');
@@ -184,7 +186,6 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-const GUEST_TOKEN_KEY = 'guestToken';
 const GUEST_DEVICE_ID_KEY = 'guestDeviceId';
 
 /** Extract hostname from API_URL for logging (handles URL with/without protocol). */
@@ -202,12 +203,12 @@ function getApiHostForLogging(): string {
   }
 }
 
-/** Stable device ID for "one guest per device"; created once per install and sent with POST /auth/guest. */
+/** Stable device ID for "one guest per device"; created once per install and sent with POST /auth/guest. Persisted in Keychain + AsyncStorage so it survives storage clears. */
 async function getOrCreateGuestDeviceId(): Promise<string> {
-  let id = await AsyncStorage.getItem(GUEST_DEVICE_ID_KEY);
+  let id = await getGuestDeviceId();
   if (!id) {
     id = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, id);
+    await setGuestDeviceId(id);
   }
   return id;
 }
@@ -276,12 +277,12 @@ export const playAsGuest = createAsyncThunk(
   'auth/playAsGuest',
   async (payload: PlayAsGuestPayload, { rejectWithValue, dispatch }) => {
     try {
-      const forceNew = Boolean(payload && typeof payload === 'object' && payload.forceNew === true);
+      const forceNew = payload && typeof payload === 'object' && payload.forceNew === true;
       if (forceNew) {
-        await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
+        await removeGuestToken();
       }
 
-      const storedGuestToken = await AsyncStorage.getItem(GUEST_TOKEN_KEY);
+      const storedGuestToken = await getGuestToken();
 
       if (storedGuestToken) {
         const result = await resumeGuestSession(storedGuestToken);
@@ -298,15 +299,21 @@ export const playAsGuest = createAsyncThunk(
         }
         // Only clear stored guest token when it's definitively invalid (401). On network/transient
         // errors, keep it so the next "Play as Guest" retry can resume instead of creating a new guest.
-        const invalid = !result.ok && 'reason' in result && result.reason === 'invalid';
-        if (invalid) {
-          await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]);
+        if (!result.ok && 'reason' in result && result.reason === 'invalid') {
+          await removeGuestToken();
           return rejectWithValue('Previous session expired. Sign in with your account or tap Play as Guest to create a new guest.');
         }
         return rejectWithValue('Network error. Check your connection and try "Play as Guest" again to resume your account.');
       }
 
       const deviceId = await getOrCreateGuestDeviceId();
+      let vendorId: string | undefined;
+      try {
+        const id = await DeviceInfo.getUniqueId();
+        if (id && typeof id === 'string' && id.trim().length > 0) vendorId = id.trim();
+      } catch {
+        // Non-fatal; server can still use deviceId
+      }
       const guestUrl = `${API_URL}/api/auth/guest`;
       let response: Response;
       const controller = new AbortController();
@@ -315,7 +322,7 @@ export const playAsGuest = createAsyncThunk(
         response = await fetch(guestUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceId, ...(forceNew && { forceNew: true }) }),
+          body: JSON.stringify({ deviceId, ...(vendorId && { vendorId }), ...(forceNew && { forceNew: true }) }),
           signal: controller.signal,
         });
       } finally {
@@ -333,7 +340,7 @@ export const playAsGuest = createAsyncThunk(
       const data = await response.json();
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      await AsyncStorage.setItem(GUEST_TOKEN_KEY, data.token);
+      await setGuestToken(data.token);
       if (data.user?.guestDeviceId) {
         await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, data.user.guestDeviceId);
       }
@@ -391,7 +398,7 @@ export const googleSignInUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      // Do not clear GUEST_TOKEN_KEY: preserve device-linked token for "Play as Guest" resume.
+      // Do not clear guest token (guestCredentialsStorage): preserve device-linked token for "Play as Guest" resume.
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
@@ -444,7 +451,7 @@ export const googleSignUpUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      // Do not clear GUEST_TOKEN_KEY: preserve device-linked token for "Play as Guest" resume.
+      // Do not clear guest token (guestCredentialsStorage): preserve device-linked token for "Play as Guest" resume.
 
       // Track account creation
       await trackAccountCreated('google');
@@ -518,7 +525,7 @@ export const appleSignInUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      // Do not clear GUEST_TOKEN_KEY: preserve device-linked token for "Play as Guest" resume.
+      // Do not clear guest token (guestCredentialsStorage): preserve device-linked token for "Play as Guest" resume.
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
@@ -571,7 +578,7 @@ export const appleSignUpUser = createAsyncThunk(
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
-      // Do not clear GUEST_TOKEN_KEY: preserve device-linked token for "Play as Guest" resume.
+      // Do not clear guest token (guestCredentialsStorage): preserve device-linked token for "Play as Guest" resume.
 
       // Track account creation
       await trackAccountCreated('apple');
@@ -702,15 +709,16 @@ export const unlockHackRig = createAsyncThunk(
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { dispatch, getState }) => {
-    // Clear current session only. Do NOT touch GUEST_TOKEN_KEY:
-    // - If the user logged out from the device-linked account (guest or linked), GUEST_TOKEN_KEY
-    //   already holds that token; leaving it allows "Play as Guest" to resume later.
+    // Clear current session only. Do NOT clear guest token (guestCredentialsStorage):
+    // - If the user logged out from the device-linked account (guest or linked), it already
+    //   holds that token; leaving it allows "Play as Guest" to resume later.
     // - If the user logged out from another account (Apple/Google/handle), we must not overwrite
-    //   GUEST_TOKEN_KEY with that token; leaving it preserves the previous device-linked token
-    //   so "Play as Guest" can resume the guest (or linked) account after signing out.
+    //   it with that token; leaving it preserves the previous device-linked token so
+    //   "Play as Guest" can resume the guest (or linked) account after signing out.
+    const userId = (getState() as { auth: AuthState }).auth.user?._id ?? undefined;
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
-    await clearPersistedTurfNavState();
+    await clearPersistedTurfNavState(userId);
 
     // Note: We do NOT clear first-time tracking flags on logout.
     // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
@@ -760,7 +768,7 @@ export const loadStoredAuth = createAsyncThunk(
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
 
       if (userData.user?.isGuest) {
-        await AsyncStorage.setItem(GUEST_TOKEN_KEY, storedToken);
+        await setGuestToken(storedToken);
         if (userData.user?.guestDeviceId) {
           await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, userData.user.guestDeviceId);
         }

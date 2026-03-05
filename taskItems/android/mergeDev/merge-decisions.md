@@ -919,6 +919,125 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-03-05 (merge dev → android_mergeDev)
+
+**Branch context:** Full merge flow per merge-flow.md: created/checked out `android_mergeDev` from `androidStaging`, pushed, merged `origin/dev`. Three conflicts: mobile/package.json (versionCode), mobile/package-lock.json (version + hasInstallScript), authSlice.ts (guest flow: constants, timeout, vendorId, storage).
+
+### 1. `mobile/package.json`
+
+**Conflict:** version and versionCode.
+
+| Side | Content |
+|------|--------|
+| HEAD | "version": "2.8.0", "versionCode": 92 |
+| dev  | "version": "2.8.0" (no versionCode) |
+
+**Resolution:** Accepted **dev version** and **HEAD versionCode**. Final state: "version": "2.8.0", "versionCode": 92.
+
+**Rationale:** Android first. versionCode is required for Play Console; dev does not carry it. Take dev’s version (2.8.0) for consistency; keep versionCode 92 from Android branch.
+
+**Rejected from dev:** Omitting versionCode.
+
+**Failure-mode hints for later:** If Play Console rejects a build for version code, increment versionCode in mobile/package.json on the Android branch and keep it in sync with Android versioning.
+
+---
+
+### 2. `mobile/package-lock.json`
+
+**Conflict:** Root package version and packages."".version + hasInstallScript.
+
+| Side | Content |
+|------|--------|
+| HEAD | "version": "2.6.0", "hasInstallScript": true (in packages."") |
+| dev  | "version": "2.8.0" (no hasInstallScript) |
+
+**Resolution:** Combined **both**. Final state: "version": "2.8.0" (match package.json), "hasInstallScript": true in packages."".
+
+**Rationale:** Lockfile version should match package.json (2.8.0). hasInstallScript is npm metadata for postinstall; keeping it from HEAD does not affect Android deployment.
+
+**Failure-mode hints for later:** If package.json version and lockfile root version drift, align lockfile to package.json.
+
+---
+
+### 3. `mobile/src/store/slices/authSlice.ts`
+
+**Conflict A (constants + getApiHostForLogging vs comment):**
+
+| Side | Content |
+|------|--------|
+| HEAD | GUEST_TOKEN_KEY, GUEST_DEVICE_ID_KEY, getApiHostForLogging(); short getOrCreateGuestDeviceId comment. |
+| dev  | Longer getOrCreateGuestDeviceId comment only: "Persisted in Keychain + AsyncStorage so it survives storage clears." |
+
+**Resolution:** Kept **HEAD’s GUEST_DEVICE_ID_KEY and getApiHostForLogging**; dropped HEAD’s GUEST_TOKEN_KEY (unused after using setGuestToken/removeGuestToken); merged **dev’s comment** into getOrCreateGuestDeviceId.
+
+**Rationale:** Android first. getApiHostForLogging is used in guest creation error logging; GUEST_DEVICE_ID_KEY is used for storing guestDeviceId (Keychain helper may not persist it). Token persistence uses dev’s setGuestToken/removeGuestToken from guestCredentialsStorage.
+
+**Conflict B (forceNew):**
+
+| Side | Content |
+|------|--------|
+| HEAD | `const forceNew = Boolean(payload && ...);` |
+| dev  | `const forceNew = payload && typeof payload === 'object' && payload.forceNew === true;` |
+
+**Resolution:** Accepted **dev**. Final state: dev’s forceNew expression.
+
+**Rationale:** Same behavior; dev’s is simpler. Not Android-specific.
+
+**Conflict C (invalid token clear):**
+
+| Side | Content |
+|------|--------|
+| HEAD | `const invalid = ...; if (invalid) { await AsyncStorage.multiRemove([GUEST_TOKEN_KEY]); }` then return reject. |
+| dev  | `if (!result.ok && 'reason' in result && result.reason === 'invalid') { await removeGuestToken(); return rejectWithValue(...); }` |
+
+**Resolution:** Accepted **dev**. Final state: removeGuestToken() and single if with return inside.
+
+**Rationale:** Single source of truth for token removal (guestCredentialsStorage); not Android-specific.
+
+**Conflict D (guest creation fetch):**
+
+| Side | Content |
+|------|--------|
+| HEAD | guestUrl, AbortController + 15s timeout, fetch with deviceId + forceNew, signal, getApiHostForLogging. |
+| dev  | vendorId from DeviceInfo.getUniqueId(); fetch with deviceId, vendorId, forceNew; no timeout. |
+
+**Resolution:** Combined **both**. Final state: get vendorId (dev); then controller + 15s timeout (HEAD); fetch with body `{ deviceId, ...(vendorId && { vendorId }), ...(forceNew && { forceNew: true }) }`, signal (HEAD); apiHost for logging (HEAD).
+
+**Rationale:** Android first. Timeout avoids hung guest creation on slow networks (same as prior merge decisions). Dev’s vendorId supports server-side device linking/relink. Both needed.
+
+**Conflict E (after guest creation – token/deviceId storage):**
+
+| Side | Content |
+|------|--------|
+| HEAD | AsyncStorage.setItem(GUEST_TOKEN_KEY, data.token); AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, data.user.guestDeviceId). |
+| dev  | setGuestToken(data.token) only. |
+
+**Resolution:** Combined **both**. Final state: setGuestToken(data.token); if (data.user?.guestDeviceId) AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, data.user.guestDeviceId).
+
+**Rationale:** Token via guestCredentialsStorage (Keychain + AsyncStorage); deviceId still in AsyncStorage via GUEST_DEVICE_ID_KEY for compatibility.
+
+**Conflict F (verify-token path – guest token/deviceId):**
+
+| Side | Content |
+|------|--------|
+| HEAD | AsyncStorage.setItem(GUEST_TOKEN_KEY, storedToken); AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, userData.user.guestDeviceId). |
+| dev  | setGuestToken(storedToken) only. |
+
+**Resolution:** Combined **both**. Final state: setGuestToken(storedToken); if (userData.user?.guestDeviceId) AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, userData.user.guestDeviceId).
+
+**Rationale:** Same as E; consistent use of setGuestToken + GUEST_DEVICE_ID_KEY.
+
+**Failure-mode hints for later:**
+- If **guest creation hangs** on Android, the 15s abort should fire; confirm controller.signal is passed to fetch and clearTimeout runs.
+- If **vendorId** is required for relink on server, confirm DeviceInfo.getUniqueId() runs and vendorId is sent in POST /auth/guest body.
+- If **guest token** is lost after app restart, confirm setGuestToken/getGuestToken from guestCredentialsStorage are used (Keychain + AsyncStorage).
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.

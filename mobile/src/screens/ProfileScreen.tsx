@@ -35,6 +35,8 @@ import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';
 import { HandleSelectionModal } from '../components/modals/HandleSelectionModal';
 import { LinkAccountModal } from '../components/modals/LinkAccountModal';
 import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
+import { getGuestDeviceId } from '../services/guestCredentialsStorage';
+import DeviceInfo from 'react-native-device-info';
 
 interface BotStats {
   role: string;
@@ -465,6 +467,9 @@ const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: numb
     marginBottom: SIZING.spacing.sm,
     textAlign: 'center',
   },
+  settingDescription: {
+    fontSize: SIZING.font.small,
+  },
   themeToggleContainer: {
     alignItems: 'center',
   },
@@ -600,6 +605,25 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [trackUsernameChangeSettingView] = useTrackUsernameChangeSettingViewMutation();
   const hasTrackedUsernameChangeSettingRef = useRef(false);
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
+  const [recoveryDeviceId, setRecoveryDeviceId] = useState<string | null>(null);
+  const [recoveryVendorId, setRecoveryVendorId] = useState<string | null>(null);
+
+  // Load device ID and vendor ID for account recovery (shown on Account tab)
+  useEffect(() => {
+    if (activeTab !== 'account') return;
+    let cancelled = false;
+    (async () => {
+      const [devId, vendorId] = await Promise.all([
+        getGuestDeviceId(),
+        DeviceInfo.getUniqueId().catch(() => null),
+      ]);
+      if (!cancelled) {
+        setRecoveryDeviceId(devId ?? null);
+        setRecoveryVendorId(vendorId && typeof vendorId === 'string' && vendorId.trim() ? vendorId.trim() : null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab]);
 
   // Mark "View Username Change setting" guided task when user views Account tab (where Change User Handle is)
   useEffect(() => {
@@ -1259,6 +1283,29 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                     <Text style={styles.primaryButtonText}>CHANGE PASSWORD</Text>
                   </TouchableOpacity>
                 ) : null}
+
+                {/* Account recovery: show device ID and vendor ID so user can send to support to re-link an older guest account */}
+                <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
+                  <Text style={styles.settingLabel}>ACCOUNT RECOVERY</Text>
+                  <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.xs }]}>
+                    Lost access to an older guest account on this device? Send the IDs below to support@risingpunk.com so we can try to re-link this device to that account. Then log out and tap "Play as Guest" again.
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.sm, fontStyle: 'italic' }]}>
+                    We cannot guarantee that an old account can be found or re-linked. For better protection and use across devices, please link email and password and verify your email.
+                  </Text>
+                  <View style={{ marginTop: SIZING.spacing.sm }}>
+                    <Text style={[styles.settingLabel, { fontSize: 12, marginBottom: 2 }]}>Device ID</Text>
+                    <Text selectable style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                      {recoveryDeviceId ?? '— (tap Play as Guest first)'}
+                    </Text>
+                  </View>
+                  <View style={{ marginTop: SIZING.spacing.sm }}>
+                    <Text style={[styles.settingLabel, { fontSize: 12, marginBottom: 2 }]}>Vendor ID</Text>
+                    <Text selectable style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                      {recoveryVendorId ?? '—'}
+                    </Text>
+                  </View>
+                </View>
                 
                 {/* Email Verification Status */}
                 <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
