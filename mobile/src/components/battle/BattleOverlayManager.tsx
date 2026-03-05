@@ -74,6 +74,18 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     }
   }, [battleError]);
 
+  // Ref updates for battle phase: keep useMemo pure; reset refs when battle is not complete (Bugbot).
+  useEffect(() => {
+    if (!battleState) return;
+    const clientPhase = mapServerPhaseToClientPhase(battleState.phase);
+    if (clientPhase === BattlePhase.COMPLETE) {
+      battleEndLogged.current = true;
+    } else {
+      battleEndLogged.current = false;
+      userWinNotifiedRef.current = false;
+    }
+  }, [battleState?.phase]);
+
   const phaseData = React.useMemo(() => {
     if (!battleState) return null;
 
@@ -92,17 +104,6 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     // Server sends timeRemaining: 3,2,1 during countdown phase
     const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= BATTLE_CONFIG.COUNTDOWN_DURATION && timeRemaining > 0;
     const countdownValue = isCountdownPhase ? timeRemaining : 0;
-
-    // Debug logging for battle end - only log once
-    if (clientPhase === BattlePhase.COMPLETE && !battleEndLogged.current) {
-      battleEndLogged.current = true;
-    }
-
-    // Reset battle end logged flag when battle is not complete
-    if (clientPhase !== BattlePhase.COMPLETE) {
-      battleEndLogged.current = false;
-      userWinNotifiedRef.current = false;
-    }
 
     return {
       clientPhase,
