@@ -353,9 +353,14 @@ router.post('/guest', async (req, res): Promise<void> => {
     if (deviceId && !forceNew) {
       // Find device-linked account by guestDeviceId (guest or formerly-guest-now-linked).
       const existingByDevice = await User.findOne({ guestDeviceId: deviceId });
-      // If we have vendorId, also check for an older account linked to this device (same vendorId).
-      // If the user just created a new guest after losing storage, we can give them the older account back and abandon the new one.
-      if (existingByDevice && vendorId) {
+      // If we have vendorId, also check for an older account (same vendorId). Only prefer it when the current
+      // device-linked account was created recently (Bugbot: avoid silently deleting long-lived active accounts
+      // when JWT expires — we must not delete the account they've been using). Window is 7d so users affected
+      // before the fix (e.g. during app-store review) can still recover their older account after deploy.
+      const RECENT_GUEST_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (covers store approval delay; can reduce to 24h later)
+      const currentAccountCreatedAt = existingByDevice?.createdAt ? new Date(existingByDevice.createdAt).getTime() : 0;
+      const currentAccountIsRecent = currentAccountCreatedAt > 0 && (Date.now() - currentAccountCreatedAt < RECENT_GUEST_MS);
+      if (existingByDevice && vendorId && currentAccountIsRecent) {
         const olderByVendor = await User.findOne({ guestVendorId: vendorId }).sort({ createdAt: 1 }).limit(1).exec();
         const existingId = existingByDevice._id as mongoose.Types.ObjectId;
         const olderId = olderByVendor?._id as mongoose.Types.ObjectId | undefined;
@@ -363,12 +368,14 @@ router.post('/guest', async (req, res): Promise<void> => {
         const olderIsActuallyOlder = olderByVendor && existingByDevice.createdAt && olderByVendor.createdAt && olderByVendor.createdAt < existingByDevice.createdAt;
         if (olderByVendor && olderIsDifferent && olderIsActuallyOlder) {
           // Prefer the older-created account: re-link it to this device, unlink the new one, and delete the new guest.
-          // guestDeviceId has a unique index: we must clear existingByDevice's link before saving olderByVendor, then restore it if save fails.
+          // guestDeviceId has a unique index: we must clear existingByDevice's link before saving olderByVendor.
+          // Bugbot: Only restore existingByDevice if olderByVendor.save() never succeeded; else restore would E11000 and fallthrough would 503.
           const newerUserId = existingId.toString();
           const previousVendorId = existingByDevice.guestVendorId;
           olderByVendor.guestDeviceId = deviceId;
           if (!olderByVendor.guestVendorId) olderByVendor.guestVendorId = vendorId;
           let lastReturnError: unknown;
+          let olderByVendorPersisted = false;
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
               existingByDevice.guestDeviceId = undefined;
@@ -377,6 +384,7 @@ router.post('/guest', async (req, res): Promise<void> => {
               const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
               olderByVendor.setCurrentToken(sessionId);
               await olderByVendor.save();
+              olderByVendorPersisted = true;
               const token = jwt.sign(
                 { userId: olderByVendor._id, sessionId },
                 process.env.JWT_SECRET || 'defaultsecret',
@@ -392,13 +400,21 @@ router.post('/guest', async (req, res): Promise<void> => {
               return;
             } catch (returnError) {
               lastReturnError = returnError;
-              existingByDevice.guestDeviceId = deviceId;
-              existingByDevice.guestVendorId = previousVendorId ?? vendorId ?? undefined;
-              await existingByDevice.save().catch((e: unknown) => console.warn('Guest restore device link after recovery fail:', e));
+              if (!olderByVendorPersisted) {
+                existingByDevice.guestDeviceId = deviceId;
+                existingByDevice.guestVendorId = previousVendorId ?? vendorId ?? undefined;
+                await existingByDevice.save().catch((e: unknown) => console.warn('Guest restore device link after recovery fail:', e));
+              }
               if (attempt === 0) continue;
             }
           }
           console.error('Guest older-account recovery failed after retry:', lastReturnError);
+          if (olderByVendorPersisted) {
+            res.status(503).json({
+              error: 'Session could not be completed. Please tap Play as Guest again to resume your account.'
+            });
+            return;
+          }
         }
       }
       const existing = existingByDevice;
