@@ -26,6 +26,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
 
   // One-time review prompt when user wins a battle (no reward; store policy). Keys are per-user (Bugbot).
+  // Mark "seen" on modal dismiss, not before display, so unmount-before-show doesn't permanently suppress prompt (Bugbot).
   const handleUserWin = useCallback(() => {
     (async () => {
       try {
@@ -34,12 +35,16 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
         if (alreadyOpened) return;
         const seen = await getHasSeenReviewPrompt(userId);
         if (seen) return;
-        await setReviewPromptSeen(userId);
         setShowReviewPrompt(true);
       } catch {
         // ignore
       }
     })();
+  }, [userId]);
+
+  const handleReviewPromptClose = useCallback(() => {
+    if (userId) setReviewPromptSeen(userId);
+    setShowReviewPrompt(false);
   }, [userId]);
 
   // Handle missing battleId
@@ -83,7 +88,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
       </View>
       <ReviewPromptModal
         visible={showReviewPrompt}
-        onClose={() => setShowReviewPrompt(false)}
+        onClose={handleReviewPromptClose}
         userId={userId}
       />
     </SafeAreaView>
