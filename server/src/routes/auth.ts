@@ -360,7 +360,10 @@ router.post('/guest', async (req, res): Promise<void> => {
       const RECENT_GUEST_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (covers store approval delay; can reduce to 24h later)
       const currentAccountCreatedAt = existingByDevice?.createdAt ? new Date(existingByDevice.createdAt).getTime() : 0;
       const currentAccountIsRecent = currentAccountCreatedAt > 0 && (Date.now() - currentAccountCreatedAt < RECENT_GUEST_MS);
-      if (existingByDevice && vendorId && currentAccountIsRecent) {
+      // Bugbot: Only allow vendorId-based recovery when this device's stored vendorId matches the request.
+      // Otherwise an attacker with a new deviceId could send a victim's vendorId and hijack the victim's account.
+      const deviceVendorMatchesRequest = (existingByDevice?.guestVendorId != null) && existingByDevice.guestVendorId === vendorId;
+      if (existingByDevice && vendorId && currentAccountIsRecent && deviceVendorMatchesRequest) {
         const olderByVendor = await User.findOne({ guestVendorId: vendorId }).sort({ createdAt: 1 }).limit(1).exec();
         const existingId = existingByDevice._id as mongoose.Types.ObjectId;
         const olderId = olderByVendor?._id as mongoose.Types.ObjectId | undefined;
