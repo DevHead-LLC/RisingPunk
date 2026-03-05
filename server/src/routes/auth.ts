@@ -328,16 +328,24 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
 
 // Play as guest — one guest per device: get existing guest by deviceId or create new (no email/password)
 // Optional body.forceNew: if true, unlink this device from any existing user and create a new guest (no manual DB cleanup needed).
+//
+// Reliability: Client stores deviceId (and token) in Keychain so they survive app updates and typical storage clears.
+// Same deviceId => same account returned; nothing resets the link except forceNew or client losing Keychain (e.g. uninstall).
+// Recovery: If the device loses deviceId (e.g. reinstall), automatic re-link by vendorId alone is disabled (security).
+// Manual recovery: user sends Device ID + Vendor ID (and old handle if known) to support; support runs relinkGuestDevice.ts
+// to re-link the old account to the current deviceId; user then logs out and taps Play as Guest to resume that account.
 router.post('/guest', async (req, res): Promise<void> => {
   try {
     const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId.trim() : undefined;
     const vendorId = typeof req.body?.vendorId === 'string' ? req.body.vendorId.trim() : undefined;
     const forceNew = req.body?.forceNew === true;
 
+    // When forceNew: fully unlink so vendor recovery cannot re-link this abandoned account (Bugbot: also clear guestVendorId).
     if (deviceId && forceNew) {
       const existing = await User.findOne({ guestDeviceId: deviceId });
       if (existing) {
         existing.guestDeviceId = undefined;
+        existing.guestVendorId = undefined;
         await existing.save();
       }
     }
@@ -430,33 +438,9 @@ router.post('/guest', async (req, res): Promise<void> => {
       }
     }
 
-    // Recovery: deviceId not found but vendorId provided — same device may have lost storage and created a new guest; prefer oldest account for this vendor.
-    if (deviceId && vendorId && !forceNew) {
-      const byVendor = await User.findOne({ guestVendorId: vendorId }).sort({ createdAt: 1 }).limit(1).exec();
-      if (byVendor) {
-        byVendor.guestDeviceId = deviceId;
-        if (!byVendor.guestVendorId) byVendor.guestVendorId = vendorId;
-        let lastReturnError: unknown;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-            byVendor.setCurrentToken(sessionId);
-            await byVendor.save();
-            const token = jwt.sign(
-              { userId: byVendor._id, sessionId },
-              process.env.JWT_SECRET || 'defaultsecret',
-              { expiresIn: '7d' }
-            );
-            sendGuestUserResponse(res, byVendor, token, 200);
-            return;
-          } catch (returnError) {
-            lastReturnError = returnError;
-            if (attempt === 0) continue;
-          }
-        }
-        console.error('Guest vendor recovery failed after retry:', lastReturnError);
-      }
-    }
+    // Bugbot: Unauthenticated recovery by vendorId alone was removed to prevent account takeover.
+    // Anyone with a user's vendorId could previously send it with a new deviceId and hijack the guest account.
+    // Recovery by vendorId is intended to be manual (user shares vendorId with support); no automatic re-link here.
 
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
