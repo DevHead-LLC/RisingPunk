@@ -842,8 +842,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   };
 
   const handleReviewPress = useCallback(async () => {
-    await openReviewUrl(userId);
-    setHasOpenedReview(true);
+    const opened = await openReviewUrl(userId);
+    if (opened) setHasOpenedReview(true);
   }, [userId]);
 
   // Transform API data to match our interface
