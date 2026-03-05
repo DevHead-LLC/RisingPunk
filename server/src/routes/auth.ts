@@ -355,18 +355,20 @@ router.post('/guest', async (req, res): Promise<void> => {
         const olderIsActuallyOlder = olderByVendor && existingByDevice.createdAt && olderByVendor.createdAt && olderByVendor.createdAt < existingByDevice.createdAt;
         if (olderByVendor && olderIsDifferent && olderIsActuallyOlder) {
           // Prefer the older-created account: re-link it to this device, unlink the new one, and delete the new guest.
+          // Do not mutate existingByDevice until recovery succeeds, so a failed retry does not corrupt the device link.
           const newerUserId = existingId.toString();
           olderByVendor.guestDeviceId = deviceId;
           if (!olderByVendor.guestVendorId) olderByVendor.guestVendorId = vendorId;
-          existingByDevice.guestDeviceId = undefined;
-          existingByDevice.guestVendorId = undefined;
-          await existingByDevice.save().catch((e: unknown) => console.warn('Guest clear newer device link:', e));
           let lastReturnError: unknown;
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
               const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
               olderByVendor.setCurrentToken(sessionId);
               await olderByVendor.save();
+              // Only clear the newer account's device link after we've persisted the older account; otherwise fallthrough would persist corrupted existingByDevice.
+              existingByDevice.guestDeviceId = undefined;
+              existingByDevice.guestVendorId = undefined;
+              await existingByDevice.save().catch((e: unknown) => console.warn('Guest clear newer device link:', e));
               const token = jwt.sign(
                 { userId: olderByVendor._id, sessionId },
                 process.env.JWT_SECRET || 'defaultsecret',
