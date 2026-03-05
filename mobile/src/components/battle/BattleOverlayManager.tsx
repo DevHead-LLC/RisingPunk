@@ -38,16 +38,21 @@ const mapServerPhaseToClientPhase = (serverPhase: ServerPhase | undefined): Batt
 interface BattleOverlayManagerProps {
   battleId: string;
   onClose?: () => void;
+  /** Called once when this battle ends with the user as winner (e.g. to show a one-time review prompt). */
+  onUserWin?: () => void;
 }
 
 export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
   battleId,
   onClose,
+  onUserWin,
 }) => {
   // Track logged errors to prevent spam
   const loggedErrors = useRef<Set<string>>(new Set());
   // Track if battle end has been logged to prevent multiple logs
   const battleEndLogged = useRef<boolean>(false);
+  // Call onUserWin only once per battle when user wins
+  const userWinNotifiedRef = useRef<boolean>(false);
 
   const {
     data: battleState,
@@ -96,6 +101,7 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     // Reset battle end logged flag when battle is not complete
     if (clientPhase !== BattlePhase.COMPLETE) {
       battleEndLogged.current = false;
+      userWinNotifiedRef.current = false;
     }
 
     return {
@@ -107,6 +113,19 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
       isTimerVisible: clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE
     };
   }, [battleState, onClose]);
+
+  // Notify parent once when user wins this battle (for one-time review prompt)
+  useEffect(() => {
+    if (
+      phaseData?.clientPhase === BattlePhase.COMPLETE &&
+      battleState?.winner === 'user' &&
+      onUserWin &&
+      !userWinNotifiedRef.current
+    ) {
+      userWinNotifiedRef.current = true;
+      onUserWin();
+    }
+  }, [phaseData?.clientPhase, battleState?.winner, onUserWin]);
 
   const renderOverlays = React.useMemo(() => {
     if (!phaseData) return null;

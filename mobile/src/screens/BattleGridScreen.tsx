@@ -3,13 +3,18 @@
  * @description Main battle screen container - orchestrates battle components
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, SafeAreaView, Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
+import { ReviewPromptModal } from '../components/profile/ReviewPromptModal';
+import { getHasOpenedReview } from '../utils/openReviewAndClaimReward';
 import { battleGridStyles, createThemeAwareBattleGridStyles } from '../styles/battleGridStyles';
 import { useThemeColors } from '../hooks/useThemeColors';
+
+const REVIEW_PROMPT_SEEN_KEY = '@RisingPunk/hasSeenReviewPrompt';
 
 type Props = {
   _onClose?: () => void;
@@ -19,6 +24,24 @@ type Props = {
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   const colors = useThemeColors();
   const themeStyles = createThemeAwareBattleGridStyles(colors);
+  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
+
+  // One-time review prompt when user wins a battle (no reward; store policy).
+  // Bugbot: Skip prompt if user already opened review (e.g. from Profile) so we don't show it again.
+  const handleUserWin = useCallback(() => {
+    (async () => {
+      try {
+        const alreadyOpened = await getHasOpenedReview();
+        if (alreadyOpened) return;
+        const seen = await AsyncStorage.getItem(REVIEW_PROMPT_SEEN_KEY);
+        if (seen === 'true') return;
+        await AsyncStorage.setItem(REVIEW_PROMPT_SEEN_KEY, 'true');
+        setShowReviewPrompt(true);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
 
   // Handle missing battleId
   if (!battleId) {
@@ -39,6 +62,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
         <BattleOverlayManager
           battleId={battleId}
           onClose={_onClose}
+          onUserWin={handleUserWin}
         />
 
         {/* Network visualization - self-contained with its own API call */}
@@ -58,6 +82,10 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
           />
         </View>
       </View>
+      <ReviewPromptModal
+        visible={showReviewPrompt}
+        onClose={() => setShowReviewPrompt(false)}
+      />
     </SafeAreaView>
   );
 });

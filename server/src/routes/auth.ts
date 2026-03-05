@@ -360,7 +360,10 @@ router.post('/guest', async (req, res): Promise<void> => {
       const RECENT_GUEST_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (covers store approval delay; can reduce to 24h later)
       const currentAccountCreatedAt = existingByDevice?.createdAt ? new Date(existingByDevice.createdAt).getTime() : 0;
       const currentAccountIsRecent = currentAccountCreatedAt > 0 && (Date.now() - currentAccountCreatedAt < RECENT_GUEST_MS);
-      if (existingByDevice && vendorId && currentAccountIsRecent) {
+      // Bugbot: Only allow vendorId-based recovery when this device's stored vendorId matches the request.
+      // Otherwise an attacker with a new deviceId could send a victim's vendorId and hijack the victim's account.
+      const deviceVendorMatchesRequest = (existingByDevice?.guestVendorId != null) && existingByDevice.guestVendorId === vendorId;
+      if (existingByDevice && vendorId && currentAccountIsRecent && deviceVendorMatchesRequest) {
         const olderByVendor = await User.findOne({ guestVendorId: vendorId }).sort({ createdAt: 1 }).limit(1).exec();
         const existingId = existingByDevice._id as mongoose.Types.ObjectId;
         const olderId = olderByVendor?._id as mongoose.Types.ObjectId | undefined;
@@ -419,11 +422,9 @@ router.post('/guest', async (req, res): Promise<void> => {
       }
       const existing = existingByDevice;
       if (existing) {
-        // Stamp vendorId so future "lost storage" recovery can find this account by vendorId.
-        if (vendorId && !existing.guestVendorId) {
-          existing.guestVendorId = vendorId;
-          await existing.save().catch((e: unknown) => console.warn('Guest stamp vendorId:', e));
-        }
+        // Bugbot: Do not stamp client-supplied vendorId onto the account. An attacker could send victim's
+        // vendorId on request 2, then on request 3 deviceVendorMatchesRequest would be true and recovery would hijack.
+        // guestVendorId is only set by relinkGuestDevice.ts (manual recovery) or legacy accounts; no automatic stamp.
         let lastReturnError: unknown;
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
@@ -458,14 +459,16 @@ router.post('/guest', async (req, res): Promise<void> => {
     // Anyone with a user's vendorId could previously send it with a new deviceId and hijack the guest account.
     // Recovery by vendorId is intended to be manual (user shares vendorId with support); no automatic re-link here.
 
+    // Bugbot: Do not set guestVendorId at creation. Otherwise an attacker could create a guest with
+    // victim's vendorId and bypass the deviceVendorMatchesRequest guard. guestVendorId is only set by
+    // relinkGuestDevice.ts (manual recovery) or legacy accounts; we do not stamp it from the client.
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
       handle: guestHandle,
       needsHandleSelection: true,
       isGuest: true,
       emailVerificationPrompted: true,
-      ...(deviceId && { guestDeviceId: deviceId }),
-      ...(vendorId && { guestVendorId: vendorId })
+      ...(deviceId && { guestDeviceId: deviceId })
     });
 
     try {
