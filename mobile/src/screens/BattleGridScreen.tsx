@@ -5,16 +5,14 @@
 
 import React, { useState, useCallback } from 'react';
 import { View, SafeAreaView, Text } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppSelector } from '../store/hooks';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
 import { ReviewPromptModal } from '../components/profile/ReviewPromptModal';
-import { getHasOpenedReview } from '../utils/openReviewAndClaimReward';
+import { getHasOpenedReview, getHasSeenReviewPrompt, setReviewPromptSeen } from '../utils/openReviewAndClaimReward';
 import { battleGridStyles, createThemeAwareBattleGridStyles } from '../styles/battleGridStyles';
 import { useThemeColors } from '../hooks/useThemeColors';
-
-const REVIEW_PROMPT_SEEN_KEY = '@RisingPunk/hasSeenReviewPrompt';
 
 type Props = {
   _onClose?: () => void;
@@ -24,24 +22,25 @@ type Props = {
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   const colors = useThemeColors();
   const themeStyles = createThemeAwareBattleGridStyles(colors);
+  const userId = useAppSelector((state) => state.auth.user?._id);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
 
-  // One-time review prompt when user wins a battle (no reward; store policy).
-  // Bugbot: Skip prompt if user already opened review (e.g. from Profile) so we don't show it again.
+  // One-time review prompt when user wins a battle (no reward; store policy). Keys are per-user (Bugbot).
   const handleUserWin = useCallback(() => {
     (async () => {
       try {
-        const alreadyOpened = await getHasOpenedReview();
+        if (!userId) return;
+        const alreadyOpened = await getHasOpenedReview(userId);
         if (alreadyOpened) return;
-        const seen = await AsyncStorage.getItem(REVIEW_PROMPT_SEEN_KEY);
-        if (seen === 'true') return;
-        await AsyncStorage.setItem(REVIEW_PROMPT_SEEN_KEY, 'true');
+        const seen = await getHasSeenReviewPrompt(userId);
+        if (seen) return;
+        await setReviewPromptSeen(userId);
         setShowReviewPrompt(true);
       } catch {
         // ignore
       }
     })();
-  }, []);
+  }, [userId]);
 
   // Handle missing battleId
   if (!battleId) {
@@ -85,6 +84,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
       <ReviewPromptModal
         visible={showReviewPrompt}
         onClose={() => setShowReviewPrompt(false)}
+        userId={userId}
       />
     </SafeAreaView>
   );
