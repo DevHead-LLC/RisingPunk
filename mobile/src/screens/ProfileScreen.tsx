@@ -37,7 +37,7 @@ import { LinkAccountModal } from '../components/modals/LinkAccountModal';
 import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 import { getGuestDeviceId } from '../services/guestCredentialsStorage';
 import DeviceInfo from 'react-native-device-info';
-import { openReviewUrl } from '../utils/openReviewAndClaimReward';
+import { openReviewUrl, getHasOpenedReview } from '../utils/openReviewAndClaimReward';
 
 interface BotStats {
   role: string;
@@ -608,19 +608,22 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
   const [recoveryDeviceId, setRecoveryDeviceId] = useState<string | null>(null);
   const [recoveryVendorId, setRecoveryVendorId] = useState<string | null>(null);
+  const [hasOpenedReview, setHasOpenedReview] = useState(false);
 
-  // Load device ID and vendor ID for account recovery (shown on Account tab)
+  // Load device ID, vendor ID, and "has opened review" for Account tab
   useEffect(() => {
     if (activeTab !== 'account') return;
     let cancelled = false;
     (async () => {
-      const [devId, vendorId] = await Promise.all([
+      const [devId, vendorId, opened] = await Promise.all([
         getGuestDeviceId(),
         DeviceInfo.getUniqueId().catch(() => null),
+        getHasOpenedReview(),
       ]);
       if (!cancelled) {
         setRecoveryDeviceId(devId ?? null);
         setRecoveryVendorId(vendorId && typeof vendorId === 'string' && vendorId.trim() ? vendorId.trim() : null);
+        setHasOpenedReview(!!opened);
       }
     })();
     return () => { cancelled = true; };
@@ -839,6 +842,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   const handleReviewPress = useCallback(async () => {
     await openReviewUrl();
+    setHasOpenedReview(true);
   }, []);
 
   // Transform API data to match our interface
@@ -1290,16 +1294,20 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 ) : null}
 
                 <View style={[styles.settingCard, { marginTop: SIZING.spacing.sm }]}>
-                  <Text style={styles.settingLabel}>REVIEW US</Text>
+                  <Text style={styles.settingLabel}>{hasOpenedReview ? 'THANK YOU FOR YOUR REVIEW' : 'REVIEW US'}</Text>
                   <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.xs }]}>
-                    {Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Play Store' : 'The store'}: rate us there. Having an issue or something to report? Contact support@risingpunk.com and we'll help.
+                    {hasOpenedReview
+                      ? "We appreciate your feedback. Having an issue or something to report? Contact support@risingpunk.com and we'll help."
+                      : `${Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Play Store' : 'The store'}: rate us there. Having an issue or something to report? Contact support@risingpunk.com and we'll help.`}
                   </Text>
-                  <TouchableOpacity
-                    style={[styles.primaryButton, { marginTop: SIZING.spacing.sm }]}
-                    onPress={handleReviewPress}
-                  >
-                    <Text style={styles.primaryButtonText}>REVIEW US</Text>
-                  </TouchableOpacity>
+                  {!hasOpenedReview && (
+                    <TouchableOpacity
+                      style={[styles.primaryButton, { marginTop: SIZING.spacing.sm }]}
+                      onPress={handleReviewPress}
+                    >
+                      <Text style={styles.primaryButtonText}>REVIEW US</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
 
                 {/* Account recovery: show device ID and vendor ID so user can send to support to re-link an older guest account */}
