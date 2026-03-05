@@ -2,18 +2,18 @@ import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getReviewUrlForOpen } from '../constants/updateUrls';
 
-/** Keys are scoped per userId so multiple users on the same device each have their own state (Bugbot: avoid cross-user leak). */
-const REVIEW_OPENED_KEY_PREFIX = '@RisingPunk/hasOpenedReview';
-const REVIEW_PROMPT_SEEN_KEY_PREFIX = '@RisingPunk/hasSeenReviewPrompt';
-/** Legacy global keys (pre per-user). Migrated on first read then removed (Bugbot: avoid orphaned keys and state reset). */
-const LEGACY_REVIEW_OPENED_KEY = '@RisingPunk/hasOpenedReview';
-const LEGACY_REVIEW_PROMPT_SEEN_KEY = '@RisingPunk/hasSeenReviewPrompt';
+/**
+ * Review state keys. Same value is used as: (1) legacy global key for migration read/remove,
+ * (2) prefix for per-user keys (per-user key = `${KEY}_${userId}`). Do not change; legacy key must stay for migration (Bugbot).
+ */
+const REVIEW_OPENED_KEY = '@RisingPunk/hasOpenedReview';
+const REVIEW_PROMPT_SEEN_KEY = '@RisingPunk/hasSeenReviewPrompt';
 
 function reviewOpenedKey(userId: string): string {
-  return `${REVIEW_OPENED_KEY_PREFIX}_${userId}`;
+  return `${REVIEW_OPENED_KEY}_${userId}`;
 }
 function reviewPromptSeenKey(userId: string): string {
-  return `${REVIEW_PROMPT_SEEN_KEY_PREFIX}_${userId}`;
+  return `${REVIEW_PROMPT_SEEN_KEY}_${userId}`;
 }
 
 export async function markReviewOpened(userId: string | null): Promise<void> {
@@ -31,10 +31,10 @@ export async function getHasOpenedReview(userId: string | null): Promise<boolean
   try {
     const value = await AsyncStorage.getItem(key);
     if (value === 'true') return true;
-    const legacy = await AsyncStorage.getItem(LEGACY_REVIEW_OPENED_KEY);
+    const legacy = await AsyncStorage.getItem(REVIEW_OPENED_KEY);
     if (legacy === 'true') {
       await AsyncStorage.setItem(key, 'true');
-      await AsyncStorage.removeItem(LEGACY_REVIEW_OPENED_KEY);
+      // Do not remove legacy key: on multi-user devices every user must be able to inherit; removing would assign state to whichever user reads first (Bugbot).
       return true;
     }
     return false;
@@ -58,10 +58,10 @@ export async function getHasSeenReviewPrompt(userId: string | null): Promise<boo
   try {
     const value = await AsyncStorage.getItem(key);
     if (value === 'true') return true;
-    const legacy = await AsyncStorage.getItem(LEGACY_REVIEW_PROMPT_SEEN_KEY);
+    const legacy = await AsyncStorage.getItem(REVIEW_PROMPT_SEEN_KEY);
     if (legacy === 'true') {
       await AsyncStorage.setItem(key, 'true');
-      await AsyncStorage.removeItem(LEGACY_REVIEW_PROMPT_SEEN_KEY);
+      // Do not remove legacy key: on multi-user devices every user must be able to inherit; removing would assign state to whichever user reads first (Bugbot).
       return true;
     }
     return false;
