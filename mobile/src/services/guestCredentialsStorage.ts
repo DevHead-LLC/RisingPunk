@@ -41,7 +41,11 @@ export async function getGuestToken(): Promise<string | null> {
   if (value) return value;
   value = await AsyncStorage.getItem(GUEST_TOKEN_KEY);
   if (value) {
-    await setGuestToken(value);
+    try {
+      await setGuestToken(value);
+    } catch {
+      // Migration best-effort; still return the value we read (Bugbot)
+    }
   }
   return value;
 }
@@ -71,7 +75,11 @@ export async function getGuestDeviceId(): Promise<string | null> {
   if (value) return value;
   value = await AsyncStorage.getItem(GUEST_DEVICE_ID_KEY);
   if (value) {
-    await setGuestDeviceId(value);
+    try {
+      await setGuestDeviceId(value);
+    } catch {
+      // Migration best-effort; still return the value we read (Bugbot)
+    }
   }
   return value;
 }
