@@ -11,7 +11,6 @@ import {
   Alert,
   Platform,
   Animated,
-  Linking,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
@@ -21,7 +20,7 @@ import { useUpdatePreferencesMutation } from '../store/api/preferencesApi';
 import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation, useTrackProfileVisitMutation, useTrackThemeChangeMutation, useTrackAvatarChangeMutation, useTrackUsernameChangeSettingViewMutation } from '../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
-import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, useClaimReviewRewardMutation, authApi } from '../store/api/authApi';
+import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, authApi } from '../store/api/authApi';
 import { useFetchBotStatsQuery, botsApi } from '../store/api/botsApi';
 import { balanceApi } from '../store/api/balanceApi';
 import { mapApi } from '../store/api/mapApi';
@@ -34,13 +33,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '../components/profile/TermsOfServiceModal';
 import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';
-import { ReviewPromptModal } from '../components/profile/ReviewPromptModal';
 import { HandleSelectionModal } from '../components/modals/HandleSelectionModal';
 import { LinkAccountModal } from '../components/modals/LinkAccountModal';
 import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 import { getGuestDeviceId } from '../services/guestCredentialsStorage';
 import DeviceInfo from 'react-native-device-info';
-import { getReviewUrlForOpen } from '../constants/updateUrls';
+import { openReviewUrl } from '../utils/openReviewAndClaimReward';
 
 interface BotStats {
   role: string;
@@ -78,8 +76,6 @@ interface UserProfile {
 }
 
 type TabType = 'profile' | 'settings' | 'account' | 'content';
-
-const REVIEW_PROMPT_SEEN_KEY = '@RisingPunk/hasSeenReviewPrompt';
 
 const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: number) => StyleSheet.create({
   container: {
@@ -596,7 +592,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [showChangeHandle, setShowChangeHandle] = useState(false);
   const [showLinkAccount, setShowLinkAccount] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const { themeMode, toggleTheme } = useTheme();
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
@@ -604,7 +599,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   const [updatePreferences] = useUpdatePreferencesMutation();
   const [deleteAccount] = useDeleteAccountMutation();
-  const [claimReviewReward] = useClaimReviewRewardMutation();
   const { data: taskGuideData } = useGetCurrentTaskGuideTaskQuery();
   const [updateTaskGuideVisibility] = useUpdateTaskGuideVisibilityMutation();
   const [trackProfileVisit] = useTrackProfileVisitMutation();
@@ -640,24 +634,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       void trackUsernameChangeSettingView();
     }
   }, [activeTab, trackUsernameChangeSettingView]);
-
-  // One-time "Leave us a rating" prompt: show modal once on next profile visit; set flag as soon as we show it so they never see the popup again (dismiss, no tap, or app close)
-  useEffect(() => {
-    if (!token) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const seen = await AsyncStorage.getItem(REVIEW_PROMPT_SEEN_KEY);
-        if (!cancelled && seen !== 'true') {
-          setShowReviewPrompt(true);
-          AsyncStorage.setItem(REVIEW_PROMPT_SEEN_KEY, 'true').catch(() => {});
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [token]);
 
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';
@@ -862,25 +838,9 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     }
   };
 
-  // Bugbot: Name matches semantics — true on non-native (e.g. web), false on iOS/Android (store policy).
-  const grantReviewRewardOnNonNative = Platform.OS !== 'ios' && Platform.OS !== 'android';
   const handleReviewPress = useCallback(async () => {
-    const url = await getReviewUrlForOpen();
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) await Linking.openURL(url);
-      else Linking.openURL(url).catch(() => {});
-    } catch {
-      Linking.openURL(url).catch(() => {});
-    }
-    if (grantReviewRewardOnNonNative && !(profileData?.hasClaimedReviewReward)) {
-      try {
-        await claimReviewReward().unwrap();
-      } catch {
-        Alert.alert('Error', 'Could not apply reward. Please try again later.');
-      }
-    }
-  }, [grantReviewRewardOnNonNative, profileData?.hasClaimedReviewReward, claimReviewReward]);
+    await openReviewUrl();
+  }, []);
 
   // Transform API data to match our interface
   const profile: UserProfile | null = profileData ? {
@@ -1330,24 +1290,18 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   </TouchableOpacity>
                 ) : null}
 
-                {profileData?.hasClaimedReviewReward ? (
-                  <View style={{ marginTop: SIZING.spacing.sm, paddingVertical: SIZING.spacing.sm }}>
-                    <Text style={[styles.settingDescription, { color: colors.matrix, fontWeight: '600' }]}>
-                      Thank you for your review
-                    </Text>
-                  </View>
-                ) : (
+                <View style={[styles.settingCard, { marginTop: SIZING.spacing.sm }]}>
+                  <Text style={styles.settingLabel}>REVIEW US</Text>
+                  <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.xs }]}>
+                    {Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Play Store' : 'The store'}: rate us there. Having an issue or something to report? Contact support@risingpunk.com and we'll help.
+                  </Text>
                   <TouchableOpacity
                     style={[styles.primaryButton, { marginTop: SIZING.spacing.sm }]}
                     onPress={handleReviewPress}
                   >
-                    <Text style={styles.primaryButtonText}>
-                      {grantReviewRewardOnNonNative
-                        ? 'REVIEW US AND RECEIVE AN AWARD'
-                        : 'REVIEW US'}
-                    </Text>
+                    <Text style={styles.primaryButtonText}>REVIEW US</Text>
                   </TouchableOpacity>
-                )}
+                </View>
 
                 {/* Account recovery: show device ID and vendor ID so user can send to support to re-link an older guest account */}
                 <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
@@ -1506,15 +1460,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       <ChangePasswordModal
         isVisible={showChangePassword}
         onClose={() => setShowChangePassword(false)}
-      />
-      <ReviewPromptModal
-        visible={showReviewPrompt}
-        onClose={() => setShowReviewPrompt(false)}
-        onClaimReward={async () => {
-          await claimReviewReward().unwrap();
-        }}
-        hasClaimedReviewReward={profileData?.hasClaimedReviewReward ?? false}
-        grantRewardOnOpen={Platform.OS !== 'ios' && Platform.OS !== 'android'}
       />
     </SafeAreaView>
   );

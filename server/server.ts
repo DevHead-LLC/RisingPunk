@@ -341,13 +341,15 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
 
 // One-time "review us" reward: credit 1,000,000 to wallet. Client should only call from non-store platforms (e.g. web) to comply with Apple/Google policies against incentivized reviews; on iOS/Android we only open the store link.
 // Bugbot: Use atomic findOneAndUpdate so concurrent requests cannot double-claim (read-then-write race).
+// Bugbot: Do not set balance.lastUpdated here — /api/balance credits passive income from lastUpdated to now;
+// resetting lastUpdated to "now" would permanently lose that uncredited income. Leave lastUpdated unchanged.
 const REVIEW_REWARD_AMOUNT = 1_000_000;
 app.post('/api/review-reward', auth, async (req: Request, res: Response) => {
   try {
     const updated = await User.findOneAndUpdate(
       { _id: req.user._id, hasClaimedReviewReward: { $ne: true } },
       {
-        $set: { hasClaimedReviewReward: true, 'balance.lastUpdated': new Date() },
+        $set: { hasClaimedReviewReward: true },
         $inc: { 'balance.total': REVIEW_REWARD_AMOUNT }
       },
       { new: true }
