@@ -422,11 +422,9 @@ router.post('/guest', async (req, res): Promise<void> => {
       }
       const existing = existingByDevice;
       if (existing) {
-        // Stamp vendorId so future "lost storage" recovery can find this account by vendorId.
-        if (vendorId && !existing.guestVendorId) {
-          existing.guestVendorId = vendorId;
-          await existing.save().catch((e: unknown) => console.warn('Guest stamp vendorId:', e));
-        }
+        // Bugbot: Do not stamp client-supplied vendorId onto the account. An attacker could send victim's
+        // vendorId on request 2, then on request 3 deviceVendorMatchesRequest would be true and recovery would hijack.
+        // guestVendorId is only set by relinkGuestDevice.ts (manual recovery) or legacy accounts; no automatic stamp.
         let lastReturnError: unknown;
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
@@ -461,14 +459,16 @@ router.post('/guest', async (req, res): Promise<void> => {
     // Anyone with a user's vendorId could previously send it with a new deviceId and hijack the guest account.
     // Recovery by vendorId is intended to be manual (user shares vendorId with support); no automatic re-link here.
 
+    // Bugbot: Do not set guestVendorId at creation. Otherwise an attacker could create a guest with
+    // victim's vendorId and bypass the deviceVendorMatchesRequest guard. guestVendorId is only set by
+    // relinkGuestDevice.ts (manual recovery) or legacy accounts; we do not stamp it from the client.
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
       handle: guestHandle,
       needsHandleSelection: true,
       isGuest: true,
       emailVerificationPrompted: true,
-      ...(deviceId && { guestDeviceId: deviceId }),
-      ...(vendorId && { guestVendorId: vendorId })
+      ...(deviceId && { guestDeviceId: deviceId })
     });
 
     try {
