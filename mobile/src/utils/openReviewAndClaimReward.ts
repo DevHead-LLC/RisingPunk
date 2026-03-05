@@ -5,6 +5,9 @@ import { getReviewUrlForOpen } from '../constants/updateUrls';
 /** Keys are scoped per userId so multiple users on the same device each have their own state (Bugbot: avoid cross-user leak). */
 const REVIEW_OPENED_KEY_PREFIX = '@RisingPunk/hasOpenedReview';
 const REVIEW_PROMPT_SEEN_KEY_PREFIX = '@RisingPunk/hasSeenReviewPrompt';
+/** Legacy global keys (pre per-user). Migrated on first read then removed (Bugbot: avoid orphaned keys and state reset). */
+const LEGACY_REVIEW_OPENED_KEY = '@RisingPunk/hasOpenedReview';
+const LEGACY_REVIEW_PROMPT_SEEN_KEY = '@RisingPunk/hasSeenReviewPrompt';
 
 function reviewOpenedKey(userId: string): string {
   return `${REVIEW_OPENED_KEY_PREFIX}_${userId}`;
@@ -24,8 +27,17 @@ export async function markReviewOpened(userId: string | null): Promise<void> {
 
 export async function getHasOpenedReview(userId: string | null): Promise<boolean> {
   if (!userId || typeof userId !== 'string' || !userId.trim()) return false;
+  const key = reviewOpenedKey(userId.trim());
   try {
-    return (await AsyncStorage.getItem(reviewOpenedKey(userId.trim()))) === 'true';
+    const value = await AsyncStorage.getItem(key);
+    if (value === 'true') return true;
+    const legacy = await AsyncStorage.getItem(LEGACY_REVIEW_OPENED_KEY);
+    if (legacy === 'true') {
+      await AsyncStorage.setItem(key, 'true');
+      await AsyncStorage.removeItem(LEGACY_REVIEW_OPENED_KEY);
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -42,8 +54,17 @@ export async function setReviewPromptSeen(userId: string | null): Promise<void> 
 
 export async function getHasSeenReviewPrompt(userId: string | null): Promise<boolean> {
   if (!userId || typeof userId !== 'string' || !userId.trim()) return false;
+  const key = reviewPromptSeenKey(userId.trim());
   try {
-    return (await AsyncStorage.getItem(reviewPromptSeenKey(userId.trim()))) === 'true';
+    const value = await AsyncStorage.getItem(key);
+    if (value === 'true') return true;
+    const legacy = await AsyncStorage.getItem(LEGACY_REVIEW_PROMPT_SEEN_KEY);
+    if (legacy === 'true') {
+      await AsyncStorage.setItem(key, 'true');
+      await AsyncStorage.removeItem(LEGACY_REVIEW_PROMPT_SEEN_KEY);
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
