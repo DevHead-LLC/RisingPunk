@@ -197,33 +197,47 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   }, []);
 
   // Restore persisted nav state on mount (Phase 2: refresh — stay on current screen and position).
-  // We do not paint the main content until restore is attempted so we avoid flashing turf centered then jumping to the restored screen.
+  // State is per-user so a new guest does not see the previous account's screen (e.g. HackMap/onboarding).
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  const restorePendingForUserIdRef = useRef<string | null>(null);
   useEffect(() => {
+    if (!userId) {
+      setNavRestoreAttempted(true);
+      return;
+    }
+    setNavRestoreAttempted(false);
+    restorePendingForUserIdRef.current = userId;
     let cancelled = false;
-    getPersistedTurfNavState().then((state) => {
+    getPersistedTurfNavState(userId).then((state) => {
       if (cancelled) return;
+      restorePendingForUserIdRef.current = null;
       if (state) {
         setCurrentScreen(state.currentScreen);
         setTurfViewPosition(state.turfViewPosition);
+      } else {
+        setCurrentScreen('turf');
+        setTurfViewPosition(null);
       }
       setNavRestoreAttempted(true);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [userId]);
 
   // Persist nav state when screen or turf position changes (debounced). Only after restore attempted so we don't overwrite stored state with defaults on slow devices.
+  // Skip scheduling when userId just changed and restore is still pending (avoids persisting previous user's state under new user's key).
   const persistNavStateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (!navRestoreAttempted) return;
+    if (!navRestoreAttempted || !userId) return;
+    if (restorePendingForUserIdRef.current === userId) return;
     if (persistNavStateTimeoutRef.current) clearTimeout(persistNavStateTimeoutRef.current);
     persistNavStateTimeoutRef.current = setTimeout(() => {
       persistNavStateTimeoutRef.current = null;
-      setPersistedTurfNavState({ currentScreen, turfViewPosition });
+      setPersistedTurfNavState({ currentScreen, turfViewPosition }, userId);
     }, 400);
     return () => {
       if (persistNavStateTimeoutRef.current) clearTimeout(persistNavStateTimeoutRef.current);
     };
-  }, [navRestoreAttempted, currentScreen, turfViewPosition]);
+  }, [navRestoreAttempted, userId, currentScreen, turfViewPosition]);
 
   // Phase 4: When app returns from background and we're on battle screen, refetch battle state so UI shows current progress
   const appStateRef = useRef(AppState.currentState);
