@@ -461,14 +461,16 @@ router.post('/guest', async (req, res): Promise<void> => {
     // Anyone with a user's vendorId could previously send it with a new deviceId and hijack the guest account.
     // Recovery by vendorId is intended to be manual (user shares vendorId with support); no automatic re-link here.
 
+    // Bugbot: Do not set guestVendorId at creation. Otherwise an attacker could create a guest with
+    // victim's vendorId, then on the next request deviceVendorMatchesRequest would be true and recovery would hijack.
+    // guestVendorId is only stamped when returning an existing device-linked account (see stamp above).
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
       handle: guestHandle,
       needsHandleSelection: true,
       isGuest: true,
       emailVerificationPrompted: true,
-      ...(deviceId && { guestDeviceId: deviceId }),
-      ...(vendorId && { guestVendorId: vendorId })
+      ...(deviceId && { guestDeviceId: deviceId })
     });
 
     try {
