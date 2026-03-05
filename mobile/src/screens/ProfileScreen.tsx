@@ -609,8 +609,9 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [recoveryDeviceId, setRecoveryDeviceId] = useState<string | null>(null);
   const [recoveryVendorId, setRecoveryVendorId] = useState<string | null>(null);
   const [hasOpenedReview, setHasOpenedReview] = useState(false);
+  const userId = user?._id ?? null;
 
-  // Load device ID, vendor ID, and "has opened review" for Account tab
+  // Load device ID, vendor ID, and "has opened review" for Account tab (per-user keys)
   useEffect(() => {
     if (activeTab !== 'account') return;
     let cancelled = false;
@@ -618,7 +619,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       const [devId, vendorId, opened] = await Promise.all([
         getGuestDeviceId(),
         DeviceInfo.getUniqueId().catch(() => null),
-        getHasOpenedReview(),
+        getHasOpenedReview(userId),
       ]);
       if (!cancelled) {
         setRecoveryDeviceId(devId ?? null);
@@ -627,7 +628,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       }
     })();
     return () => { cancelled = true; };
-  }, [activeTab]);
+  }, [activeTab, userId]);
 
   // Mark "View Username Change setting" guided task when user views Account tab (where Change User Handle is)
   useEffect(() => {
@@ -841,9 +842,9 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   };
 
   const handleReviewPress = useCallback(async () => {
-    await openReviewUrl();
+    await openReviewUrl(userId);
     setHasOpenedReview(true);
-  }, []);
+  }, [userId]);
 
   // Transform API data to match our interface
   const profile: UserProfile | null = profileData ? {

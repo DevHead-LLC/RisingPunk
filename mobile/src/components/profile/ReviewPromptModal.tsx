@@ -16,18 +16,21 @@ import { openReviewUrl } from '../../utils/openReviewAndClaimReward';
 interface ReviewPromptModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Current user ID so review-opened state is stored per user (multi-user on same device). */
+  userId: string | null;
 }
 
 export function ReviewPromptModal({
   visible,
   onClose,
+  userId,
 }: ReviewPromptModalProps) {
   const colors = useThemeColors();
 
   const handleOpenReview = useCallback(async () => {
-    await openReviewUrl();
+    await openReviewUrl(userId);
     onClose();
-  }, [onClose]);
+  }, [onClose, userId]);
 
   return (
     <Modal
