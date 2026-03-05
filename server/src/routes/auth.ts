@@ -321,8 +321,7 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
       },
       isGuest: !!user.isGuest,
       hasPassword: !!user.hashedAccessKey,
-      isAdmin: isUserAdmin(user),
-      ...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })
+      isAdmin: isUserAdmin(user)
     }
   });
 }
@@ -862,7 +861,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
           },
           isGuest: false,
           hasPassword: false
-          // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
         }
       });
 
@@ -983,7 +981,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                 },
                 isGuest: existingUser.isGuest || false,
                 hasPassword: !!(existingUser as any).hashedAccessKey
-                // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
               }
             });
             return;
@@ -1083,7 +1080,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   },
                   isGuest: existingUser.isGuest || false,
                   hasPassword: !!(existingUser as any).hashedAccessKey
-                  // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
                 }
               });
               return;
@@ -1126,14 +1122,13 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   },
                   isGuest: existingUser.isGuest || false,
                   hasPassword: !!(existingUser as any).hashedAccessKey
-                  // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
                 }
               });
               return;
             }
             // Account already has Apple ID or other conflicts
             else {
-              res.status(400).json({
+              res.status(400).json({ 
                 error: 'An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
               });
               return;
@@ -1199,7 +1194,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
           },
           isGuest: false,
           hasPassword: false
-          // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
         }
       });
 
@@ -1622,8 +1616,7 @@ router.get('/verify-token', async (req, res): Promise<void> => {
         },
         isGuest: user.isGuest || false,
         hasPassword: !!(user as any).hashedAccessKey,
-        isAdmin: isUserAdmin(user),
-        ...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })
+        isAdmin: isUserAdmin(user)
       }
     });
   } catch (error: any) {

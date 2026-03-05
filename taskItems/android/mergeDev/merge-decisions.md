@@ -1034,7 +1034,20 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
-**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+## Post-merge: 2025-03-05 (prioritize dev for guest account recovery)
+
+**Context:** User requested dev as priority and to remove conflicting/duplicated Android-only guest account recovery changes.
+
+**Findings:**
+- No duplicate **files**: single `guestCredentialsStorage.ts` (from dev); no Android-only copy.
+- **server/src/routes/auth.ts** had Android-only additions not on dev: (1) `guestDeviceId` in `sendGuestUserResponse` and `/verify-token` response, (2) several `// bugbot: isAdmin omitted...` comments.
+- **mobile/src/store/slices/authSlice.ts** stored server-returned `guestDeviceId` in three places; dev does not send `guestDeviceId` in auth responses (client uses deviceId from `getOrCreateGuestDeviceId()` only).
+
+**Changes made:**
+1. **auth.ts** – Aligned to dev: removed `...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })` from guest response and verify-token; removed all bugbot comments. File now matches `origin/dev`.
+2. **authSlice.ts** – Removed reliance on server-sent `guestDeviceId`: removed the three blocks that stored `result.user?.guestDeviceId` / `data.user?.guestDeviceId` / `userData.user?.guestDeviceId`; removed unused `GUEST_DEVICE_ID_KEY`. Device ID remains client-only (Keychain/AsyncStorage via `guestCredentialsStorage.getOrCreateGuestDeviceId()`).
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file.)
 
 ---
 

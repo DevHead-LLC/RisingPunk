@@ -186,8 +186,6 @@ export const registerUser = createAsyncThunk(
   }
 );
 
-const GUEST_DEVICE_ID_KEY = 'guestDeviceId';
-
 /** Extract hostname from API_URL for logging (handles URL with/without protocol). */
 function getApiHostForLogging(): string {
   try {
@@ -289,9 +287,6 @@ export const playAsGuest = createAsyncThunk(
         if (result.ok) {
           await AsyncStorage.setItem('token', result.token);
           await AsyncStorage.setItem('user', JSON.stringify(result.user));
-          if (result.user?.guestDeviceId) {
-            await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, result.user.guestDeviceId);
-          }
           resetAllApiCaches({ dispatch } as any);
           await fetchBotsAndBuildStateForToken(result.token, dispatch, 'Failed to fetch initial data for guest resume:');
           await markAccountExists();
@@ -341,10 +336,7 @@ export const playAsGuest = createAsyncThunk(
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       await setGuestToken(data.token);
-      if (data.user?.guestDeviceId) {
-        await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, data.user.guestDeviceId);
-      }
-
+      // Device ID already persisted by getOrCreateGuestDeviceId(); server does not echo guestDeviceId (dev is source of truth).
       resetAllApiCaches({ dispatch } as any);
       await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for guest:');
 
@@ -769,9 +761,6 @@ export const loadStoredAuth = createAsyncThunk(
 
       if (userData.user?.isGuest) {
         await setGuestToken(storedToken);
-        if (userData.user?.guestDeviceId) {
-          await AsyncStorage.setItem(GUEST_DEVICE_ID_KEY, userData.user.guestDeviceId);
-        }
       }
 
       // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
