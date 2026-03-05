@@ -72,26 +72,20 @@ export async function getHasSeenReviewPrompt(userId: string | null): Promise<boo
 
 /**
  * Open the store review URL (App Store / Play Store). No reward or claim.
- * Marks review as opened only when openURL succeeds. Returns true if opened (and marked), false otherwise (Bugbot: caller can update UI only on success).
+ * getReviewUrlForOpen already validates openability on iOS (Bugbot: single place for canOpenURL).
+ * We try openURL once; on success mark and return true, else false.
  */
 export async function openReviewUrl(userId: string | null): Promise<boolean> {
   const url = await getReviewUrlForOpen();
   try {
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) {
-      await Linking.openURL(url);
-      await markReviewOpened(userId);
-      return true;
-    }
+    await Linking.openURL(url);
     try {
-      await Linking.openURL(url);
       await markReviewOpened(userId);
-      return true;
     } catch {
-      return false;
+      // persist failed but store opened; still report success so UI/retry don't re-prompt (Bugbot)
     }
+    return true;
   } catch {
-    Linking.openURL(url).catch(() => {});
     return false;
   }
 }
