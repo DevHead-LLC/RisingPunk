@@ -10,6 +10,7 @@ import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
 import { ReviewPromptModal } from '../components/profile/ReviewPromptModal';
+import { getHasOpenedReview } from '../utils/openReviewAndClaimReward';
 import { battleGridStyles, createThemeAwareBattleGridStyles } from '../styles/battleGridStyles';
 import { useThemeColors } from '../hooks/useThemeColors';
 
@@ -26,9 +27,12 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
 
   // One-time review prompt when user wins a battle (no reward; store policy).
+  // Bugbot: Skip prompt if user already opened review (e.g. from Profile) so we don't show it again.
   const handleUserWin = useCallback(() => {
     (async () => {
       try {
+        const alreadyOpened = await getHasOpenedReview();
+        if (alreadyOpened) return;
         const seen = await AsyncStorage.getItem(REVIEW_PROMPT_SEEN_KEY);
         if (seen === 'true') return;
         await AsyncStorage.setItem(REVIEW_PROMPT_SEEN_KEY, 'true');
