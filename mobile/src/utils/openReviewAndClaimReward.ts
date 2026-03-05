@@ -72,16 +72,25 @@ export async function getHasSeenReviewPrompt(userId: string | null): Promise<boo
 
 /**
  * Open the store review URL (App Store / Play Store). No reward or claim.
- * Marks review as opened for this userId so Profile shows "Thank you for your review!"
+ * Marks review as opened only when openURL succeeds, so Profile "Thank you" is accurate (Bugbot).
  */
 export async function openReviewUrl(userId: string | null): Promise<void> {
   const url = await getReviewUrlForOpen();
   try {
     const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) await Linking.openURL(url);
-    else Linking.openURL(url).catch(() => {});
+    if (canOpen) {
+      await Linking.openURL(url);
+      await markReviewOpened(userId);
+    } else {
+      try {
+        await Linking.openURL(url);
+        await markReviewOpened(userId);
+      } catch {
+        // open failed, don't mark — user never left the app for review
+      }
+    }
   } catch {
     Linking.openURL(url).catch(() => {});
+    // canOpenURL failed; don't mark so user can retry and keep the review button
   }
-  await markReviewOpened(userId);
 }

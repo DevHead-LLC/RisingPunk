@@ -113,7 +113,7 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
       countdownValue,
       isTimerVisible: clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE
     };
-  }, [battleState, onClose]);
+  }, [battleState]);
 
   // Notify parent once when user wins this battle (for one-time review prompt)
   useEffect(() => {
