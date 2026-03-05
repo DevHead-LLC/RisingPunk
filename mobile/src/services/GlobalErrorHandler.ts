@@ -1,8 +1,11 @@
+import { AppState, AppStateStatus } from 'react-native';
 import { API_URL } from '../config';
 
 /** Wait this long after first "server down" recognition before rechecking; only then show modal if still down. */
 const SERVER_DOWN_RECHECK_AFTER_MS = 30000;
 const SERVER_DOWN_HEALTH_FETCH_TIMEOUT_MS = 5000;
+/** After app returns from background, ignore "server down" errors for this long (transient resume failures). */
+const RESUME_GRACE_PERIOD_MS = 15000;
 
 export class GlobalErrorHandler {
   private static instance: GlobalErrorHandler;
@@ -16,6 +19,10 @@ export class GlobalErrorHandler {
   private healthCheckTimeoutId: ReturnType<typeof setTimeout> | null = null;
   /** Set true when we abort the health check from markServerReachable; catch uses this to skip showModalAndCleanup. 5s timeout abort leaves it false. */
   private healthCheckAbortedByReachable = false;
+  /** When app last transitioned to active from background/inactive; used to avoid treating resume-time network glitches as server down. */
+  private lastBecameActiveAt = 0;
+  private appStateSubscription: { remove: () => void } | null = null;
+  private currentAppState: AppStateStatus = 'active';
 
   private constructor(dispatch?: (action: any) => void, getState?: () => any) {
     this.dispatchCallback = dispatch || null;
@@ -33,6 +40,20 @@ export class GlobalErrorHandler {
   updateCallbacks(dispatch: (action: any) => void, getState: () => any): void {
     this.dispatchCallback = dispatch;
     this.getStateCallback = getState;
+    this.ensureAppStateSubscription();
+  }
+
+  /** Subscribe once to AppState so we can ignore "server down" errors in the brief period after app resumes from background. */
+  private ensureAppStateSubscription(): void {
+    if (this.appStateSubscription) return;
+    this.currentAppState = AppState.currentState;
+    this.appStateSubscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      const wasBackgroundOrInactive = this.currentAppState.match(/inactive|background/);
+      this.currentAppState = nextState;
+      if (wasBackgroundOrInactive && nextState === 'active') {
+        this.lastBecameActiveAt = Date.now();
+      }
+    });
   }
 
   // Backward compatibility method
@@ -94,6 +115,13 @@ export class GlobalErrorHandler {
     }
 
     if (this.isServerDownError(error, errorStatus)) {
+      const now = Date.now();
+      const withinResumeGracePeriod = this.lastBecameActiveAt > 0 && now - this.lastBecameActiveAt < RESUME_GRACE_PERIOD_MS;
+      if (withinResumeGracePeriod) {
+        // App just returned from background; transient network failures are common — don't treat as server down.
+        this.isHandlingError = false;
+        return;
+      }
       this.handleServerDownInInitialPhase();
     }
     this.isHandlingError = false;
