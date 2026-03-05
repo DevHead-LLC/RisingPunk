@@ -862,7 +862,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     }
   };
 
-  const grantReviewRewardOnNative = Platform.OS !== 'ios' && Platform.OS !== 'android';
+  // Bugbot: Name matches semantics — true on non-native (e.g. web), false on iOS/Android (store policy).
+  const grantReviewRewardOnNonNative = Platform.OS !== 'ios' && Platform.OS !== 'android';
   const handleReviewPress = useCallback(async () => {
     const url = await getReviewUrlForOpen();
     try {
@@ -872,14 +873,14 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     } catch {
       Linking.openURL(url).catch(() => {});
     }
-    if (grantReviewRewardOnNative && !(profileData?.hasClaimedReviewReward)) {
+    if (grantReviewRewardOnNonNative && !(profileData?.hasClaimedReviewReward)) {
       try {
         await claimReviewReward().unwrap();
       } catch {
         Alert.alert('Error', 'Could not apply reward. Please try again later.');
       }
     }
-  }, [grantReviewRewardOnNative, profileData?.hasClaimedReviewReward, claimReviewReward]);
+  }, [grantReviewRewardOnNonNative, profileData?.hasClaimedReviewReward, claimReviewReward]);
 
   // Transform API data to match our interface
   const profile: UserProfile | null = profileData ? {
@@ -1341,7 +1342,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                     onPress={handleReviewPress}
                   >
                     <Text style={styles.primaryButtonText}>
-                      {grantReviewRewardOnNative
+                      {grantReviewRewardOnNonNative
                         ? 'REVIEW US AND RECEIVE AN AWARD'
                         : 'REVIEW US'}
                     </Text>

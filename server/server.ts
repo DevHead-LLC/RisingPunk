@@ -340,25 +340,33 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
 // Removed unused /api/balance/deduct endpoint - not used by mobile app
 
 // One-time "review us" reward: credit 1,000,000 to wallet. Client should only call from non-store platforms (e.g. web) to comply with Apple/Google policies against incentivized reviews; on iOS/Android we only open the store link.
+// Bugbot: Use atomic findOneAndUpdate so concurrent requests cannot double-claim (read-then-write race).
 const REVIEW_REWARD_AMOUNT = 1_000_000;
 app.post('/api/review-reward', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
+    const updated = await User.findOneAndUpdate(
+      { _id: req.user._id, hasClaimedReviewReward: { $ne: true } },
+      {
+        $set: { hasClaimedReviewReward: true, 'balance.lastUpdated': new Date() },
+        $inc: { 'balance.total': REVIEW_REWARD_AMOUNT }
+      },
+      { new: true }
+    );
+    if (!updated) {
+      const user = await User.findById(req.user._id).select('balance').lean();
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      res.json({ success: true, alreadyClaimed: true, newBalance: (user as any).balance?.total ?? 0 });
       return;
     }
-    if ((user as any).hasClaimedReviewReward) {
-      res.json({ success: true, alreadyClaimed: true, newBalance: user.balance.total });
-      return;
-    }
-    user.balance.total += REVIEW_REWARD_AMOUNT;
-    user.balance.lastUpdated = new Date();
-    (user as any).hasClaimedReviewReward = true;
     const { LifetimeHighNetWorthService } = await import('./src/services/LifetimeHighNetWorthService');
-    LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
-    await user.save();
-    res.json({ success: true, alreadyClaimed: false, newBalance: user.balance.total });
+    const lifetimeHighUpdated = LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(updated);
+    if (lifetimeHighUpdated) {
+      await updated.save();
+    }
+    res.json({ success: true, alreadyClaimed: false, newBalance: updated.balance.total });
   } catch (error: any) {
     console.error('Review reward error:', error);
     res.status(500).json({ error: 'Server error' });
