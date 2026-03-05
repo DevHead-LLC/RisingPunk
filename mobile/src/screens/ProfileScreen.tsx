@@ -29,7 +29,6 @@ import { SIZING } from '../styles/theme';
 import { useTheme } from '../context/ThemeContext';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useResponsiveDimensions } from '../hooks/useResponsiveDimensions';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PrivacyPolicyModal } from '../components/profile/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '../components/profile/TermsOfServiceModal';
 import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';

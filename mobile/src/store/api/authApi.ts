@@ -56,13 +56,6 @@ export interface ProfileResponse {
   };
   profileGender: 'male' | 'female';
   totalGuardiansBuilt?: number;
-  hasClaimedReviewReward?: boolean;
-}
-
-export interface ClaimReviewRewardResponse {
-  success: boolean;
-  alreadyClaimed: boolean;
-  newBalance: number;
 }
 
 export interface UserLookupResponse {
@@ -317,22 +310,6 @@ export const authApi = createApi({
     getProfile: builder.query<ProfileResponse, void>({
       query: () => '/api/users/profile',
       providesTags: ['User'],
-    }),
-
-    claimReviewReward: builder.mutation<ClaimReviewRewardResponse, void>({
-      query: () => ({
-        url: '/api/review-reward',
-        method: 'POST',
-      }),
-      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
-        try {
-          await queryFulfilled;
-          dispatch(balanceApi.util.invalidateTags(['Balance']));
-        } catch {
-          // Error handling is done by the mutation itself
-        }
-      },
-      invalidatesTags: ['User'],
     }),
 
     getUserProfile: builder.query<UserProfileResponse, string>({
@@ -844,7 +821,6 @@ export const {
   useSpeedupRemodelMutation,
   useCompleteOnboardingMutation,
   useDeleteAccountMutation,
-  useClaimReviewRewardMutation,
   useForgotPasswordMutation,
   useLinkAccountMutation,
   useChangePasswordMutation,
