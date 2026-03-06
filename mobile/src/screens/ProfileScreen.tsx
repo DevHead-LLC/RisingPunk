@@ -608,6 +608,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
   const [recoveryDeviceId, setRecoveryDeviceId] = useState<string | null>(null);
   const [recoveryVendorId, setRecoveryVendorId] = useState<string | null>(null);
+  const [revealDeviceId, setRevealDeviceId] = useState(false);
+  const [revealVendorId, setRevealVendorId] = useState(false);
   const [hasOpenedReview, setHasOpenedReview] = useState(false);
   const userId = user?._id ?? null;
 
@@ -1294,7 +1296,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   </TouchableOpacity>
                 ) : null}
 
-                <View style={[styles.settingCard, { marginTop: SIZING.spacing.sm }]}>
+                <View style={[styles.settingCard, { marginTop: SIZING.spacing.sm }, themeMode === 'dark' && { backgroundColor: colors.background }]}>
                   <Text style={styles.settingLabel}>{hasOpenedReview ? 'THANK YOU FOR YOUR REVIEW' : 'REVIEW US'}</Text>
                   <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.xs }]}>
                     {hasOpenedReview
@@ -1311,28 +1313,55 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   )}
                 </View>
 
-                {/* Account recovery: show device ID and vendor ID so user can send to support to re-link an older guest account */}
-                <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
-                  <Text style={styles.settingLabel}>ACCOUNT RECOVERY</Text>
-                  <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.xs }]}>
-                    Lost access to an older guest account on this device? Send the IDs below to support@risingpunk.com so we can try to re-link this device to that account. Then log out and tap "Play as Guest" again.
-                  </Text>
-                  <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.sm, fontStyle: 'italic' }]}>
-                    We cannot guarantee that an old account can be found or re-linked. For better protection and use across devices, please link email and password and verify your email.
-                  </Text>
-                  <View style={{ marginTop: SIZING.spacing.sm }}>
-                    <Text style={[styles.settingLabel, { fontSize: 12, marginBottom: 2 }]}>Device ID</Text>
-                    <Text selectable style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
-                      {recoveryDeviceId ?? '— (tap Play as Guest first)'}
+                {/* Account recovery: only for unverified guest accounts (no password set); hide for Google/Apple or verified guests */}
+                {user?.isGuest === true && user?.emailVerified !== true && user?.hasPassword !== true && (
+                  <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }, themeMode === 'dark' && { backgroundColor: colors.background }]}>
+                    <Text style={styles.settingLabel}>ACCOUNT RECOVERY</Text>
+                    <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.xs }]}>
+                      Lost access to an older guest account on this device? Send the IDs below to support@risingpunk.com so we can try to re-link this device to that account. Then log out and tap "Play as Guest" again.
                     </Text>
-                  </View>
-                  <View style={{ marginTop: SIZING.spacing.sm }}>
-                    <Text style={[styles.settingLabel, { fontSize: 12, marginBottom: 2 }]}>Vendor ID</Text>
-                    <Text selectable style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
-                      {recoveryVendorId ?? '—'}
+                    <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.sm, fontStyle: 'italic' }]}>
+                      We cannot guarantee that an old account can be found or re-linked. For better protection and use across devices, please link email and password and verify your email.
                     </Text>
+                    <Text style={[styles.settingDescription, { color: colors.error, marginTop: SIZING.spacing.sm, fontSize: SIZING.font.small }]}>
+                      Only share with support@risingpunk.com. Never share this information with anyone else.
+                    </Text>
+                    <View style={{ marginTop: SIZING.spacing.sm }}>
+                      <Text style={[styles.settingLabel, { fontSize: 12, marginBottom: 2 }]}>Device ID</Text>
+                      {revealDeviceId ? (
+                        <Text selectable style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                          {recoveryDeviceId ?? '— (tap Play as Guest first)'}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                          {recoveryDeviceId ? '••••••••••••••••••••' : '— (tap Play as Guest first)'}
+                        </Text>
+                      )}
+                      <TouchableOpacity onPress={() => setRevealDeviceId((prev) => !prev)} style={{ marginTop: 2 }}>
+                        <Text style={[styles.settingDescription, { color: colors.primary, fontSize: 12 }]}>
+                          {revealDeviceId ? 'Hide' : 'Show to copy'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ marginTop: SIZING.spacing.sm }}>
+                      <Text style={[styles.settingLabel, { fontSize: 12, marginBottom: 2 }]}>Vendor ID</Text>
+                      {revealVendorId ? (
+                        <Text selectable style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                          {recoveryVendorId ?? '—'}
+                        </Text>
+                      ) : (
+                        <Text style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                          {recoveryVendorId ? '••••••••••••••••••••' : '—'}
+                        </Text>
+                      )}
+                      <TouchableOpacity onPress={() => setRevealVendorId((prev) => !prev)} style={{ marginTop: 2 }}>
+                        <Text style={[styles.settingDescription, { color: colors.primary, fontSize: 12 }]}>
+                          {revealVendorId ? 'Hide' : 'Show to copy'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
+                )}
                 
                 {/* Email Verification Status */}
                 <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
