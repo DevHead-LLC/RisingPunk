@@ -661,16 +661,25 @@ export const unlockHackRig = createAsyncThunk(
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { dispatch, getState }) => {
-    // Clear current session only. Do NOT clear guest token (guestCredentialsStorage):
-    // - If the user logged out from the device-linked account (guest or linked), it already
-    //   holds that token; leaving it allows "Play as Guest" to resume later.
-    // - If the user logged out from another account (Apple/Google/handle), we must not overwrite
-    //   it with that token; leaving it preserves the previous device-linked token so
-    //   "Play as Guest" can resume the guest (or linked) account after signing out.
-    const userId = (getState() as { auth: AuthState }).auth.user?._id ?? undefined;
+    // Clear current session.
+    const authState = (getState() as { auth: AuthState }).auth;
+    const userId = authState.user?._id ?? undefined;
+    const isGuest = authState.user?.isGuest === true;
+
     await AsyncStorage.removeItem('token');
     await AsyncStorage.removeItem('user');
     await clearPersistedTurfNavState(userId);
+
+    // When logging out from a guest account, clear the stored guest token so the next
+    // "Play as Guest" calls POST /guest with deviceId instead of resuming the old token.
+    // This allows account recovery (relink script): after relink, user logs out and taps
+    // "Play as Guest" to get the re-linked account. If we did not clear here, the app would
+    // resume the previous guest session (old token) and never hit POST /guest.
+    if (isGuest) {
+      await removeGuestToken();
+    }
+    // When logging out from a non-guest account (Apple/Google/linked), we do NOT clear
+    // guest token so "Play as Guest" can still resume the device-linked guest (or linked) account.
 
     // Note: We do NOT clear first-time tracking flags on logout.
     // With user-scoped keys (e.g., has_built_bots_before_${userId}), flags should
