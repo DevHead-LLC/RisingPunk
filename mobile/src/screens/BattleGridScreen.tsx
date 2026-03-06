@@ -3,11 +3,14 @@
  * @description Main battle screen container - orchestrates battle components
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, SafeAreaView, Text } from 'react-native';
+import { useAppSelector } from '../store/hooks';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
 import { BattleOverlayManager } from '../components/battle/BattleOverlayManager';
+import { ReviewPromptModal } from '../components/profile/ReviewPromptModal';
+import { getHasOpenedReview, getHasSeenReviewPrompt, setReviewPromptSeen } from '../utils/openReviewAndClaimReward';
 import { battleGridStyles, createThemeAwareBattleGridStyles } from '../styles/battleGridStyles';
 import { useThemeColors } from '../hooks/useThemeColors';
 
@@ -19,6 +22,30 @@ type Props = {
 export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
   const colors = useThemeColors();
   const themeStyles = createThemeAwareBattleGridStyles(colors);
+  const userId = useAppSelector((state) => state.auth.user?._id);
+  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
+
+  // One-time review prompt when user wins a battle (no reward; store policy). Keys are per-user (Bugbot).
+  // Mark "seen" on modal dismiss, not before display, so unmount-before-show doesn't permanently suppress prompt (Bugbot).
+  const handleUserWin = useCallback(() => {
+    (async () => {
+      try {
+        if (!userId) return;
+        const alreadyOpened = await getHasOpenedReview(userId);
+        if (alreadyOpened) return;
+        const seen = await getHasSeenReviewPrompt(userId);
+        if (seen) return;
+        setShowReviewPrompt(true);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [userId]);
+
+  const handleReviewPromptClose = useCallback(() => {
+    if (userId) setReviewPromptSeen(userId);
+    setShowReviewPrompt(false);
+  }, [userId]);
 
   // Handle missing battleId
   if (!battleId) {
@@ -39,6 +66,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
         <BattleOverlayManager
           battleId={battleId}
           onClose={_onClose}
+          onUserWin={handleUserWin}
         />
 
         {/* Network visualization - self-contained with its own API call */}
@@ -58,6 +86,11 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId }: Props) => {
           />
         </View>
       </View>
+      <ReviewPromptModal
+        visible={showReviewPrompt}
+        onClose={handleReviewPromptClose}
+        userId={userId}
+      />
     </SafeAreaView>
   );
 });
