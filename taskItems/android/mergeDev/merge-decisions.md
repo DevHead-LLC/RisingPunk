@@ -1051,6 +1051,33 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+## Session: 2025-03-06 (merge dev → android_mergeDev)
+
+**Branch context:** Full merge flow per merge-flow.md: created `android_mergeDev` from `androidStaging`, pushed, merged `origin/dev`. One conflict: mobile/package.json (versionCode).
+
+### 1. `mobile/package.json`
+
+**Conflict:** version and versionCode.
+
+| Side | Content |
+|------|--------|
+| HEAD | "version": "2.8.1", "versionCode": 94 |
+| dev  | "version": "2.8.1" (no versionCode) |
+
+**Resolution:** Accepted **dev version** and **HEAD versionCode**. Final state: "version": "2.8.1", "versionCode": 94.
+
+**Rationale:** Android first. versionCode is required for Play Console; dev does not carry it. Take dev’s version (2.8.1) for consistency; keep versionCode 94 from Android branch.
+
+**Rejected from dev:** Omitting versionCode.
+
+**Failure-mode hints for later:** If Play Console rejects a build for version code, increment versionCode in mobile/package.json on the Android branch and keep it in sync with Android versioning.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
