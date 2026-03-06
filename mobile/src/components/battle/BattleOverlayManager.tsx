@@ -49,8 +49,6 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
 }) => {
   // Track logged errors to prevent spam
   const loggedErrors = useRef<Set<string>>(new Set());
-  // Track if battle end has been logged to prevent multiple logs
-  const battleEndLogged = useRef<boolean>(false);
   // Call onUserWin only once per battle when user wins
   const userWinNotifiedRef = useRef<boolean>(false);
 
@@ -74,14 +72,11 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     }
   }, [battleError]);
 
-  // Ref updates for battle phase: keep useMemo pure; reset refs when battle is not complete (Bugbot).
+  // Reset userWinNotifiedRef when battle is not complete so next win can trigger onUserWin (Bugbot: battleEndLogged removed as dead).
   useEffect(() => {
     if (!battleState) return;
     const clientPhase = mapServerPhaseToClientPhase(battleState.phase);
-    if (clientPhase === BattlePhase.COMPLETE) {
-      battleEndLogged.current = true;
-    } else {
-      battleEndLogged.current = false;
+    if (clientPhase !== BattlePhase.COMPLETE) {
       userWinNotifiedRef.current = false;
     }
   }, [battleState?.phase]);
