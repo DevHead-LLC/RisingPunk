@@ -41,7 +41,7 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           },
           {
             label: 'Device and vendor identifiers (guest accounts)',
-            text: 'for guest play we store a device-linked identifier and an optional stable device (vendor) identifier to persist your guest session and to attempt account recovery if you contact support; we do not guarantee that recovery is possible.'
+            text: 'for guest play we store a device-linked identifier and an optional stable device (vendor) identifier to persist your guest session and to attempt account recovery if you contact support; we do not guarantee that recovery is possible. Share these identifiers only with support@risingpunk.com when requesting recovery; never share them with anyone else.'
           },
           {
             label: 'Server logs',
@@ -122,7 +122,7 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
         title: 'Guest Accounts and Device Linking',
         content: `You may play as a guest without providing an email. Guest accounts are linked to your device using device and vendor identifiers so you can resume the same account when you return. We store these identifiers to support guest session persistence and optional account recovery.
 
-We cannot guarantee that a previously used guest account can be found or re-linked to your device if you lose access (for example after an app reinstall or device change). If you need to recover a guest account, you may contact support with your device and vendor IDs (shown in Profile → Account → Account recovery); we will attempt to re-link when possible but make no guarantees.
+We cannot guarantee that a previously used guest account can be found or re-linked to your device if you lose access (for example after an app reinstall or device change). If you need to recover a guest account, you may contact support with your device and vendor IDs (shown in Profile → Account → Account recovery); we will attempt to re-link when possible but make no guarantees. Only share your device and vendor IDs with support@risingpunk.com when requesting account recovery; never share them elsewhere.
 
 For better protection and the ability to use your account across devices, we strongly recommend that you link an email and password to your guest account and verify your email. Linked and verified accounts can sign in from any device and use password recovery.`,
         note: 'Guest accounts that are not linked to email have no cross-device recovery option and may be lost if device linking cannot be restored.'
@@ -241,7 +241,7 @@ For better protection and the ability to use your account across devices, we str
       },
       {
         title: 'Guest Accounts',
-        content: `You may play as a guest without registering an email. Guest accounts are tied to your device. We cannot guarantee that a guest account can be found or re-linked if you lose access (e.g., after an app reinstall or if you are prompted to create a new guest). Account recovery may be attempted via support but is not assured.
+        content: `You may play as a guest without registering an email. Guest accounts are tied to your device. We collect device and vendor identifiers to support guest session persistence and account recovery. We cannot guarantee that a guest account can be found or re-linked if you lose access (e.g., after an app reinstall or if you are prompted to create a new guest). Account recovery may be attempted via support but is not assured. If you contact support for recovery, share your device and vendor IDs only with support@risingpunk.com; never share them with anyone else.
 
 For better protection and to use your account across devices, we strongly recommend linking an email and password to your guest account and verifying your email. Linked and verified accounts can sign in from any device and use password recovery.`,
         note: 'We do not guarantee recovery of guest accounts that are not linked to email.'
