@@ -302,6 +302,7 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
   res.status(statusCode).json({
     token,
     user: {
+      _id: String(user._id),
       handle: user.handle,
       email: user.getDecryptedEmail(),
       level: user.level,
