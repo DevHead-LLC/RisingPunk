@@ -1271,7 +1271,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
             <ScrollView style={styles.settingsContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
               <Text style={styles.settingsTitle}>ACCOUNT SETTINGS</Text>
               
-              <View style={styles.settingCard}>
+              <View style={[styles.settingCard, themeMode === 'dark' && { backgroundColor: colors.background }]}>
                 <Text style={styles.settingLabel}>UPDATE ACCOUNT SETTINGS</Text>
                 <TouchableOpacity
                   style={[styles.primaryButton, { marginTop: SIZING.spacing.md }]}
@@ -1364,7 +1364,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 )}
                 
                 {/* Email Verification Status */}
-                <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
+                <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }, themeMode === 'dark' && { backgroundColor: colors.background }]}>
                   <Text style={styles.settingLabel}>EMAIL VERIFICATION</Text>
                   <View style={styles.emailVerificationContainer}>
                     <View style={styles.verificationStatus}>
@@ -1412,7 +1412,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 )}
               </View>
               
-              <View style={styles.settingCard}>
+              <View style={[styles.settingCard, themeMode === 'dark' && { backgroundColor: colors.background }]}>
                 <Text style={styles.settingLabel}>DANGER ZONE</Text>
                 <TouchableOpacity
                   style={[styles.disconnectButton, { marginTop: SIZING.spacing.md }]}
