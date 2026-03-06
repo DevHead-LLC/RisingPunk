@@ -10,6 +10,7 @@ import { AppleAuthService } from '../services/AppleAuthService';
 import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
 import { MapService } from '../services/MapService';
+import { AccountDeletionService } from '../services/AccountDeletionService';
 import { filterBadWords, containsBadWords, containsBadWordsForHandle, isDisallowedHandle } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 
@@ -301,6 +302,7 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
   res.status(statusCode).json({
     token,
     user: {
+      _id: String(user._id),
       handle: user.handle,
       email: user.getDecryptedEmail(),
       level: user.level,
@@ -320,33 +322,110 @@ function sendGuestUserResponse(res: Response, user: any, token: string, statusCo
       },
       isGuest: !!user.isGuest,
       hasPassword: !!user.hashedAccessKey,
-      isAdmin: isUserAdmin(user),
-      ...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })
+      isAdmin: isUserAdmin(user)
     }
   });
 }
 
 // Play as guest — one guest per device: get existing guest by deviceId or create new (no email/password)
 // Optional body.forceNew: if true, unlink this device from any existing user and create a new guest (no manual DB cleanup needed).
+//
+// Reliability: Client stores deviceId (and token) in Keychain so they survive app updates and typical storage clears.
+// Same deviceId => same account returned; nothing resets the link except forceNew or client losing Keychain (e.g. uninstall).
+// Recovery: If the device loses deviceId (e.g. reinstall), automatic re-link by vendorId alone is disabled (security).
+// Manual recovery: user sends Device ID + Vendor ID (and old handle if known) to support; support runs relinkGuestDevice.ts
+// to re-link the old account to the current deviceId; user then logs out and taps Play as Guest to resume that account.
 router.post('/guest', async (req, res): Promise<void> => {
   try {
     const deviceId = typeof req.body?.deviceId === 'string' ? req.body.deviceId.trim() : undefined;
+    const vendorId = typeof req.body?.vendorId === 'string' ? req.body.vendorId.trim() : undefined;
     const forceNew = req.body?.forceNew === true;
 
+    // When forceNew: fully unlink so vendor recovery cannot re-link this abandoned account (Bugbot: also clear guestVendorId).
     if (deviceId && forceNew) {
       const existing = await User.findOne({ guestDeviceId: deviceId });
       if (existing) {
         existing.guestDeviceId = undefined;
+        existing.guestVendorId = undefined;
         await existing.save();
       }
     }
 
     if (deviceId && !forceNew) {
-      // Find device-linked account by guestDeviceId only (guest or formerly-guest-now-linked).
-      const existing = await User.findOne({ guestDeviceId: deviceId });
+      // Find device-linked account by guestDeviceId (guest or formerly-guest-now-linked).
+      const existingByDevice = await User.findOne({ guestDeviceId: deviceId });
+      // If we have vendorId, also check for an older account (same vendorId). Only prefer it when the current
+      // device-linked account was created recently (Bugbot: avoid silently deleting long-lived active accounts
+      // when JWT expires — we must not delete the account they've been using). Window is 7d so users affected
+      // before the fix (e.g. during app-store review) can still recover their older account after deploy.
+      const RECENT_GUEST_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (covers store approval delay; can reduce to 24h later)
+      const currentAccountCreatedAt = existingByDevice?.createdAt ? new Date(existingByDevice.createdAt).getTime() : 0;
+      const currentAccountIsRecent = currentAccountCreatedAt > 0 && (Date.now() - currentAccountCreatedAt < RECENT_GUEST_MS);
+      // Bugbot: Only allow vendorId-based recovery when this device's stored vendorId matches the request.
+      // Otherwise an attacker with a new deviceId could send a victim's vendorId and hijack the victim's account.
+      const deviceVendorMatchesRequest = (existingByDevice?.guestVendorId != null) && existingByDevice.guestVendorId === vendorId;
+      if (existingByDevice && vendorId && currentAccountIsRecent && deviceVendorMatchesRequest) {
+        const olderByVendor = await User.findOne({ guestVendorId: vendorId }).sort({ createdAt: 1 }).limit(1).exec();
+        const existingId = existingByDevice._id as mongoose.Types.ObjectId;
+        const olderId = olderByVendor?._id as mongoose.Types.ObjectId | undefined;
+        const olderIsDifferent = olderByVendor && olderId && !olderId.equals(existingId);
+        const olderIsActuallyOlder = olderByVendor && existingByDevice.createdAt && olderByVendor.createdAt && olderByVendor.createdAt < existingByDevice.createdAt;
+        if (olderByVendor && olderIsDifferent && olderIsActuallyOlder) {
+          // Prefer the older-created account: re-link it to this device, unlink the new one, and delete the new guest.
+          // guestDeviceId has a unique index: we must clear existingByDevice's link before saving olderByVendor.
+          // Bugbot: Only restore existingByDevice if olderByVendor.save() never succeeded; else restore would E11000 and fallthrough would 503.
+          const newerUserId = existingId.toString();
+          const previousVendorId = existingByDevice.guestVendorId;
+          olderByVendor.guestDeviceId = deviceId;
+          if (!olderByVendor.guestVendorId) olderByVendor.guestVendorId = vendorId;
+          let lastReturnError: unknown;
+          let olderByVendorPersisted = false;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              existingByDevice.guestDeviceId = undefined;
+              existingByDevice.guestVendorId = undefined;
+              await existingByDevice.save();
+              const sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+              olderByVendor.setCurrentToken(sessionId);
+              await olderByVendor.save();
+              olderByVendorPersisted = true;
+              const token = jwt.sign(
+                { userId: olderByVendor._id, sessionId },
+                process.env.JWT_SECRET || 'defaultsecret',
+                { expiresIn: '7d' }
+              );
+              sendGuestUserResponse(res, olderByVendor, token, 200);
+              // Delete the abandoned newer account only if it's still a guest (no email/password linked).
+              if (existingByDevice.isGuest) {
+                AccountDeletionService.deleteAccount(newerUserId).catch((e: unknown) =>
+                  console.warn('Guest abandon delete (newer account):', e)
+                );
+              }
+              return;
+            } catch (returnError) {
+              lastReturnError = returnError;
+              if (!olderByVendorPersisted) {
+                existingByDevice.guestDeviceId = deviceId;
+                existingByDevice.guestVendorId = previousVendorId ?? vendorId ?? undefined;
+                await existingByDevice.save().catch((e: unknown) => console.warn('Guest restore device link after recovery fail:', e));
+              }
+              if (attempt === 0) continue;
+            }
+          }
+          console.error('Guest older-account recovery failed after retry:', lastReturnError);
+          if (olderByVendorPersisted) {
+            res.status(503).json({
+              error: 'Session could not be completed. Please tap Play as Guest again to resume your account.'
+            });
+            return;
+          }
+        }
+      }
+      const existing = existingByDevice;
       if (existing) {
-        // Try to return existing user (with one retry for transient errors). Never clear guestDeviceId
-        // on failure — that would orphan the account and lose progress on transient DB/network errors.
+        // Bugbot: Do not stamp client-supplied vendorId onto the account. An attacker could send victim's
+        // vendorId on request 2, then on request 3 deviceVendorMatchesRequest would be true and recovery would hijack.
+        // guestVendorId is only set by relinkGuestDevice.ts (manual recovery) or legacy accounts; no automatic stamp.
         let lastReturnError: unknown;
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
@@ -377,6 +456,13 @@ router.post('/guest', async (req, res): Promise<void> => {
       }
     }
 
+    // Bugbot: Unauthenticated recovery by vendorId alone was removed to prevent account takeover.
+    // Anyone with a user's vendorId could previously send it with a new deviceId and hijack the guest account.
+    // Recovery by vendorId is intended to be manual (user shares vendorId with support); no automatic re-link here.
+
+    // Bugbot: Do not set guestVendorId at creation. Otherwise an attacker could create a guest with
+    // victim's vendorId and bypass the deviceVendorMatchesRequest guard. guestVendorId is only set by
+    // relinkGuestDevice.ts (manual recovery) or legacy accounts; we do not stamp it from the client.
     const guestHandle = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const user = new User({
       handle: guestHandle,
@@ -779,7 +865,6 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
           },
           isGuest: false,
           hasPassword: false
-          // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
         }
       });
 
@@ -900,7 +985,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                 },
                 isGuest: existingUser.isGuest || false,
                 hasPassword: !!(existingUser as any).hashedAccessKey
-                // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
               }
             });
             return;
@@ -1000,7 +1084,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   },
                   isGuest: existingUser.isGuest || false,
                   hasPassword: !!(existingUser as any).hashedAccessKey
-                  // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
                 }
               });
               return;
@@ -1043,14 +1126,13 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
                   },
                   isGuest: existingUser.isGuest || false,
                   hasPassword: !!(existingUser as any).hashedAccessKey
-                  // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
                 }
               });
               return;
             }
             // Account already has Apple ID or other conflicts
             else {
-              res.status(400).json({
+              res.status(400).json({ 
                 error: 'An account already exists with this email address. Please use the "EXISTING_IDENTITY (SIGN_IN)" option to sign in.'
               });
               return;
@@ -1116,7 +1198,6 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
           },
           isGuest: false,
           hasPassword: false
-          // bugbot: isAdmin omitted here - server-only; fix on server branch (android-bugs.md §0)
         }
       });
 
@@ -1539,8 +1620,7 @@ router.get('/verify-token', async (req, res): Promise<void> => {
         },
         isGuest: user.isGuest || false,
         hasPassword: !!(user as any).hashedAccessKey,
-        isAdmin: isUserAdmin(user),
-        ...(user.guestDeviceId && { guestDeviceId: user.guestDeviceId })
+        isAdmin: isUserAdmin(user)
       }
     });
   } catch (error: any) {

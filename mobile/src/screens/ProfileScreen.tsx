@@ -35,6 +35,9 @@ import { DeleteAccountModal } from '../components/profile/DeleteAccountModal';
 import { HandleSelectionModal } from '../components/modals/HandleSelectionModal';
 import { LinkAccountModal } from '../components/modals/LinkAccountModal';
 import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
+import { getGuestDeviceId } from '../services/guestCredentialsStorage';
+import DeviceInfo from 'react-native-device-info';
+import { openReviewUrl, getHasOpenedReview } from '../utils/openReviewAndClaimReward';
 
 interface BotStats {
   role: string;
@@ -465,6 +468,9 @@ const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: numb
     marginBottom: SIZING.spacing.sm,
     textAlign: 'center',
   },
+  settingDescription: {
+    fontSize: SIZING.font.small,
+  },
   themeToggleContainer: {
     alignItems: 'center',
   },
@@ -600,6 +606,29 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [trackUsernameChangeSettingView] = useTrackUsernameChangeSettingViewMutation();
   const hasTrackedUsernameChangeSettingRef = useRef(false);
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
+  const [recoveryDeviceId, setRecoveryDeviceId] = useState<string | null>(null);
+  const [recoveryVendorId, setRecoveryVendorId] = useState<string | null>(null);
+  const [hasOpenedReview, setHasOpenedReview] = useState(false);
+  const userId = user?._id ?? null;
+
+  // Load device ID, vendor ID, and "has opened review" for Account tab (per-user keys)
+  useEffect(() => {
+    if (activeTab !== 'account') return;
+    let cancelled = false;
+    (async () => {
+      const [devId, vendorId, opened] = await Promise.all([
+        getGuestDeviceId(),
+        DeviceInfo.getUniqueId().catch(() => null),
+        getHasOpenedReview(userId),
+      ]);
+      if (!cancelled) {
+        setRecoveryDeviceId(devId ?? null);
+        setRecoveryVendorId(vendorId && typeof vendorId === 'string' && vendorId.trim() ? vendorId.trim() : null);
+        setHasOpenedReview(!!opened);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [activeTab, userId]);
 
   // Mark "View Username Change setting" guided task when user views Account tab (where Change User Handle is)
   useEffect(() => {
@@ -608,7 +637,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       void trackUsernameChangeSettingView();
     }
   }, [activeTab, trackUsernameChangeSettingView]);
-  
+
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';
   const isHideTaskListTask = highlightTaskId === 'hide-task-list';
@@ -811,6 +840,11 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       throw error;
     }
   };
+
+  const handleReviewPress = useCallback(async () => {
+    const opened = await openReviewUrl(userId);
+    if (opened) setHasOpenedReview(true);
+  }, [userId]);
 
   // Transform API data to match our interface
   const profile: UserProfile | null = profileData ? {
@@ -1259,6 +1293,46 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                     <Text style={styles.primaryButtonText}>CHANGE PASSWORD</Text>
                   </TouchableOpacity>
                 ) : null}
+
+                <View style={[styles.settingCard, { marginTop: SIZING.spacing.sm }]}>
+                  <Text style={styles.settingLabel}>{hasOpenedReview ? 'THANK YOU FOR YOUR REVIEW' : 'REVIEW US'}</Text>
+                  <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.xs }]}>
+                    {hasOpenedReview
+                      ? "We appreciate your feedback. Having an issue or something to report? Contact support@risingpunk.com and we'll help."
+                      : `${Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Play Store' : 'The store'}: rate us there. Having an issue or something to report? Contact support@risingpunk.com and we'll help.`}
+                  </Text>
+                  {!hasOpenedReview && (
+                    <TouchableOpacity
+                      style={[styles.primaryButton, { marginTop: SIZING.spacing.sm }]}
+                      onPress={handleReviewPress}
+                    >
+                      <Text style={styles.primaryButtonText}>REVIEW US</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Account recovery: show device ID and vendor ID so user can send to support to re-link an older guest account */}
+                <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>
+                  <Text style={styles.settingLabel}>ACCOUNT RECOVERY</Text>
+                  <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.xs }]}>
+                    Lost access to an older guest account on this device? Send the IDs below to support@risingpunk.com so we can try to re-link this device to that account. Then log out and tap "Play as Guest" again.
+                  </Text>
+                  <Text style={[styles.settingDescription, { color: colors.text.secondary, marginTop: SIZING.spacing.sm, fontStyle: 'italic' }]}>
+                    We cannot guarantee that an old account can be found or re-linked. For better protection and use across devices, please link email and password and verify your email.
+                  </Text>
+                  <View style={{ marginTop: SIZING.spacing.sm }}>
+                    <Text style={[styles.settingLabel, { fontSize: 12, marginBottom: 2 }]}>Device ID</Text>
+                    <Text selectable style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                      {recoveryDeviceId ?? '— (tap Play as Guest first)'}
+                    </Text>
+                  </View>
+                  <View style={{ marginTop: SIZING.spacing.sm }}>
+                    <Text style={[styles.settingLabel, { fontSize: 12, marginBottom: 2 }]}>Vendor ID</Text>
+                    <Text selectable style={[styles.settingDescription, { color: colors.text.primary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                      {recoveryVendorId ?? '—'}
+                    </Text>
+                  </View>
+                </View>
                 
                 {/* Email Verification Status */}
                 <View style={[styles.settingCard, { marginTop: SIZING.spacing.md }]}>

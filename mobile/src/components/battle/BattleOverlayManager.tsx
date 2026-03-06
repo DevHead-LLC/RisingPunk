@@ -38,16 +38,19 @@ const mapServerPhaseToClientPhase = (serverPhase: ServerPhase | undefined): Batt
 interface BattleOverlayManagerProps {
   battleId: string;
   onClose?: () => void;
+  /** Called once when this battle ends with the user as winner (e.g. to show a one-time review prompt). */
+  onUserWin?: () => void;
 }
 
 export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
   battleId,
   onClose,
+  onUserWin,
 }) => {
   // Track logged errors to prevent spam
   const loggedErrors = useRef<Set<string>>(new Set());
-  // Track if battle end has been logged to prevent multiple logs
-  const battleEndLogged = useRef<boolean>(false);
+  // Call onUserWin only once per battle when user wins
+  const userWinNotifiedRef = useRef<boolean>(false);
 
   const {
     data: battleState,
@@ -69,6 +72,15 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     }
   }, [battleError]);
 
+  // Reset userWinNotifiedRef when battle is not complete so next win can trigger onUserWin (Bugbot: battleEndLogged removed as dead).
+  useEffect(() => {
+    if (!battleState) return;
+    const clientPhase = mapServerPhaseToClientPhase(battleState.phase);
+    if (clientPhase !== BattlePhase.COMPLETE) {
+      userWinNotifiedRef.current = false;
+    }
+  }, [battleState?.phase]);
+
   const phaseData = React.useMemo(() => {
     if (!battleState) return null;
 
@@ -88,16 +100,6 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
     const isCountdownPhase = clientPhase === BattlePhase.COUNTDOWN && timeRemaining <= BATTLE_CONFIG.COUNTDOWN_DURATION && timeRemaining > 0;
     const countdownValue = isCountdownPhase ? timeRemaining : 0;
 
-    // Debug logging for battle end - only log once
-    if (clientPhase === BattlePhase.COMPLETE && !battleEndLogged.current) {
-      battleEndLogged.current = true;
-    }
-
-    // Reset battle end logged flag when battle is not complete
-    if (clientPhase !== BattlePhase.COMPLETE) {
-      battleEndLogged.current = false;
-    }
-
     return {
       clientPhase,
       battleTime,
@@ -106,7 +108,20 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
       countdownValue,
       isTimerVisible: clientPhase === BattlePhase.COUNTDOWN || clientPhase === BattlePhase.ACTIVE
     };
-  }, [battleState, onClose]);
+  }, [battleState]);
+
+  // Notify parent once when user wins this battle (for one-time review prompt)
+  useEffect(() => {
+    if (
+      phaseData?.clientPhase === BattlePhase.COMPLETE &&
+      battleState?.winner === 'user' &&
+      onUserWin &&
+      !userWinNotifiedRef.current
+    ) {
+      userWinNotifiedRef.current = true;
+      onUserWin();
+    }
+  }, [phaseData?.clientPhase, battleState?.winner, onUserWin]);
 
   const renderOverlays = React.useMemo(() => {
     if (!phaseData) return null;

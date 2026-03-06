@@ -46,6 +46,8 @@ export interface IUser extends Document {
     enableDebugLogs: boolean;
   };
   guestDeviceId?: string;
+  /** Stable device identifier (e.g. iOS identifierForVendor) for recovery when AsyncStorage/Keychain is cleared; prefer oldest account by createdAt when multiple guests share same vendor. */
+  guestVendorId?: string;
   currentTokenId?: string;
   /** Research Center building level 1–20 (max from construction_config). Missing or 0 = not built (or legacy, resolved on read). */
   researchCenterLevel?: number;
@@ -110,6 +112,9 @@ export interface IUser extends Document {
   lifetimeHighNetWorth?: number;
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
   blockedUserIds?: mongoose.Types.ObjectId[];
+  /** Set by schema timestamps: true. */
+  createdAt?: Date;
+  updatedAt?: Date;
   verifyAccessKey(accessKey: string): Promise<boolean>;
   getDecryptedEmail(): string;
   getDecryptedEmailVerificationNewEmail(): string;
@@ -462,6 +467,13 @@ const userSchema = new Schema({
     required: false,
     unique: true,
     sparse: true
+  },
+  /** Stable vendor/device id for recovery when client loses guestDeviceId; sparse index for lookup. */
+  guestVendorId: {
+    type: String,
+    required: false,
+    sparse: true,
+    index: true
   },
   currentTokenId: {
     type: String,
