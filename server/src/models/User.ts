@@ -112,8 +112,6 @@ export interface IUser extends Document {
   lifetimeHighNetWorth?: number;
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
   blockedUserIds?: mongoose.Types.ObjectId[];
-  /** True after user has claimed the one-time "review us" in-game reward (one-time credit). */
-  hasClaimedReviewReward?: boolean;
   /** Set by schema timestamps: true. */
   createdAt?: Date;
   updatedAt?: Date;
@@ -485,10 +483,6 @@ const userSchema = new Schema({
     type: [Schema.Types.ObjectId],
     ref: 'User',
     default: []
-  },
-  hasClaimedReviewReward: {
-    type: Boolean,
-    default: false
   }
 }, { 
   collection: 'users',  // Explicitly name the collection

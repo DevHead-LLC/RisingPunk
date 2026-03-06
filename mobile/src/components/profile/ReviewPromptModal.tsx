@@ -5,57 +5,32 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Linking,
   Platform,
-  ActivityIndicator,
-  Alert,
 } from 'react-native';
+
+const STORE_NAME = Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Play Store' : 'the store';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { getReviewUrlForOpen } from '../../constants/updateUrls';
+import { openReviewUrl } from '../../utils/openReviewAndClaimReward';
 
 interface ReviewPromptModalProps {
   visible: boolean;
   onClose: () => void;
-  onClaimReward: () => Promise<{ alreadyClaimed?: boolean } | void>;
-  hasClaimedReviewReward: boolean;
-  /** On iOS/Android we do not grant in-game reward (App Store and Play policies prohibit incentivized reviews); on web/other we do. */
-  grantRewardOnOpen: boolean;
+  /** Current user ID so review-opened state is stored per user (multi-user on same device). */
+  userId: string | null;
 }
 
 export function ReviewPromptModal({
   visible,
   onClose,
-  onClaimReward,
-  hasClaimedReviewReward,
-  grantRewardOnOpen,
+  userId,
 }: ReviewPromptModalProps) {
   const colors = useThemeColors();
-  const [isLoading, setIsLoading] = React.useState(false);
 
   const handleOpenReview = useCallback(async () => {
-    const url = await getReviewUrlForOpen();
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-      }
-    } catch {
-      // Fallback: try open anyway
-      Linking.openURL(url).catch(() => {});
-    }
-    if (grantRewardOnOpen && !hasClaimedReviewReward) {
-      setIsLoading(true);
-      try {
-        await onClaimReward();
-      } catch (e) {
-        Alert.alert('Error', 'Could not apply reward. Please try again later.');
-      } finally {
-        setIsLoading(false);
-      }
-    }
+    await openReviewUrl(userId);
     onClose();
-  }, [grantRewardOnOpen, hasClaimedReviewReward, onClaimReward, onClose]);
+  }, [onClose, userId]);
 
   return (
     <Modal
@@ -68,34 +43,26 @@ export function ReviewPromptModal({
       <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
         <View style={[styles.card, { backgroundColor: colors.background, borderColor: colors.matrix }]}>
           <Text style={[styles.title, { color: colors.text.primary }]}>
-            Leave us a rating
+            Rate us on the {STORE_NAME}
           </Text>
           <Text style={[styles.body, { color: colors.text.secondary }]}>
-            We'd love to hear from you. Your feedback helps us improve.
+            We'd love to hear from you. Your rating and review in the {STORE_NAME} helps us improve.
           </Text>
           <Text style={[styles.support, { color: colors.text.secondary }]}>
-            Don't like something? Please send us a review so we can fix it for you at support@risingpunk.com.
+            Having an issue or something negative to report? Contact us at support@risingpunk.com and we'll do our best to help.
           </Text>
           <View style={styles.actions}>
             <TouchableOpacity
               style={[styles.primaryButton, { backgroundColor: colors.matrix }]}
               onPress={handleOpenReview}
-              disabled={isLoading}
             >
-              {isLoading ? (
-                <ActivityIndicator color={colors.background} size="small" />
-              ) : (
-                <Text style={[styles.primaryButtonText, { color: colors.background }]}>
-                  {grantRewardOnOpen && !hasClaimedReviewReward
-                    ? 'Review us and receive an award'
-                    : 'Leave a rating'}
-                </Text>
-              )}
+              <Text style={[styles.primaryButtonText, { color: colors.background }]}>
+                Leave a rating on the {STORE_NAME}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryButton, { borderColor: colors.text.secondary }]}
               onPress={onClose}
-              disabled={isLoading}
             >
               <Text style={[styles.secondaryButtonText, { color: colors.text.secondary }]}>
                 Maybe later
