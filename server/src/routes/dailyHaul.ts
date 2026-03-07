@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { User } from '../models/User';
 import {
@@ -134,54 +135,130 @@ router.get('/status', auth, async (req: Request, res: Response) => {
   }
 });
 
-/** POST /api/daily-haul/claim — claim next day; credit balance; return amount, day, resetsAt, balance */
+/** POST /api/daily-haul/claim — claim next day; credit balance; return amount, day, resetsAt, balance. Uses transaction + atomic findOneAndUpdate to prevent double reward on concurrent requests. */
 router.post('/claim', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user!._id);
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-
+    const userId = req.user!._id;
     const now = new Date();
     const weekStart = getWeekStartUtc(now);
     const resetsAt = getNextResetUtc(now);
-
-    const stored = user.dailyHaul;
-    const isSameWeek = stored?.weekStartUtc && new Date(stored.weekStartUtc).getTime() === weekStart.getTime();
-    const claimedDays: number[] = isSameWeek && Array.isArray(stored!.claimedDays) ? [...stored!.claimedDays] : [];
-    const lastClaimedDateUtc = isSameWeek ? stored?.lastClaimedDateUtc : undefined;
-
-    const todayDayNum = getDayOfWeekUtc(now);
     const todayStartUtc = getStartOfDayUtc(now);
-    const markedOffDays = getMarkedOffDays(todayDayNum);
-    const nextClaimDay = getNextClaimDayNum(claimedDays.length, todayDayNum);
-    const allowedToClaimToday = canClaimToday(lastClaimedDateUtc, todayStartUtc);
+    const todayDayNum = getDayOfWeekUtc(now);
 
-    if (nextClaimDay === null || !allowedToClaimToday) {
-      res.status(400).json({ error: 'No claim available this week' });
+    const session = await mongoose.startSession();
+    let updatedUser: InstanceType<typeof User> | null = null;
+    let awardedAmount = 0;
+    let claimedDay: DailyHaulDay = 1;
+
+    try {
+      await session.withTransaction(async () => {
+        const user = await User.findById(userId).session(session);
+        if (!user) {
+          throw new Error('User not found');
+        }
+
+        const stored = user.dailyHaul;
+        const isSameWeek = stored?.weekStartUtc && new Date(stored.weekStartUtc).getTime() === weekStart.getTime();
+        const claimedDays: number[] = isSameWeek && Array.isArray(stored!.claimedDays) ? stored!.claimedDays : [];
+        const lastClaimedDateUtc = isSameWeek ? stored?.lastClaimedDateUtc : undefined;
+
+        const nextClaimDay = getNextClaimDayNum(claimedDays.length, todayDayNum);
+        const allowedToClaimToday = canClaimToday(lastClaimedDateUtc, todayStartUtc);
+
+        if (nextClaimDay === null || !allowedToClaimToday) {
+          throw new Error('No claim available this week');
+        }
+
+        const day = nextClaimDay as DailyHaulDay;
+        const amount = rollReward(day);
+        awardedAmount = amount;
+        claimedDay = day;
+
+        const lastClaimedFilter = {
+          $or: [
+            { 'dailyHaul.lastClaimedDateUtc': null },
+            { 'dailyHaul.lastClaimedDateUtc': { $exists: false } },
+            { 'dailyHaul.lastClaimedDateUtc': { $lt: todayStartUtc } },
+          ],
+        };
+
+        let result: InstanceType<typeof User> | null = null;
+
+        if (isSameWeek) {
+          const sameWeekFilter: mongoose.FilterQuery<InstanceType<typeof User>> = {
+            _id: userId,
+            'dailyHaul.weekStartUtc': weekStart,
+            $expr: { $eq: [{ $size: { $ifNull: ['$dailyHaul.claimedDays', []] } }, day - 1] },
+            ...lastClaimedFilter,
+          };
+          result = await User.findOneAndUpdate(
+            sameWeekFilter,
+            {
+              $set: {
+                'dailyHaul.lastClaimedDateUtc': todayStartUtc,
+                'balance.lastUpdated': now,
+              },
+              $push: {
+                'dailyHaul.claimedDays': day,
+                'dailyHaul.awardedAmounts': amount,
+              },
+              $inc: { 'balance.total': amount },
+            },
+            { session, new: true }
+          );
+        }
+
+        if (!result && day === 1) {
+          const newWeekFilter: mongoose.FilterQuery<InstanceType<typeof User>> = {
+            _id: userId,
+            $and: [
+              {
+                $or: [
+                  { dailyHaul: null },
+                  { dailyHaul: { $exists: false } },
+                  { 'dailyHaul.weekStartUtc': { $ne: weekStart } },
+                ],
+              },
+              lastClaimedFilter,
+            ],
+            $expr: { $eq: [{ $size: { $ifNull: ['$dailyHaul.claimedDays', []] } }, 0] },
+          };
+          result = await User.findOneAndUpdate(
+            newWeekFilter,
+            {
+              $set: {
+                dailyHaul: {
+                  weekStartUtc: weekStart,
+                  claimedDays: [day],
+                  awardedAmounts: [amount],
+                  lastClaimedDateUtc: todayStartUtc,
+                },
+                'balance.lastUpdated': now,
+              },
+              $inc: { 'balance.total': amount },
+            },
+            { session, new: true }
+          );
+        }
+
+        if (!result) {
+          throw new Error('Claim conflict');
+        }
+        updatedUser = result;
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    if (!updatedUser) {
+      res.status(500).json({ error: 'Server error' });
       return;
     }
 
-    const day = nextClaimDay as DailyHaulDay;
-    const amount = rollReward(day);
-
-    const existingAwarded = isSameWeek && Array.isArray(stored?.awardedAmounts) ? stored.awardedAmounts : [];
-    if (!user.dailyHaul) {
-      user.dailyHaul = { weekStartUtc: weekStart, claimedDays: [], awardedAmounts: [], lastClaimedDateUtc: todayStartUtc };
-    }
-    user.dailyHaul.weekStartUtc = weekStart;
-    user.dailyHaul.claimedDays = [...claimedDays, day];
-    user.dailyHaul.awardedAmounts = [...existingAwarded, amount];
-    user.dailyHaul.lastClaimedDateUtc = todayStartUtc;
-
-    user.balance.total += amount;
-    user.balance.lastUpdated = new Date();
-    await user.save();
-
+    const user = updatedUser as InstanceType<typeof User>;
     res.json({
-      awardedAmount: amount,
-      day,
+      awardedAmount,
+      day: claimedDay,
       resetsAt: resetsAt.toISOString(),
       balance: {
         total: user.balance.total,
@@ -190,6 +267,16 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
       },
     });
   } catch (error: unknown) {
+    if (error instanceof Error) {
+      if (error.message === 'User not found') {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      if (error.message === 'No claim available this week' || error.message === 'Claim conflict') {
+        res.status(400).json({ error: 'No claim available this week' });
+        return;
+      }
+    }
     console.error('Daily haul claim error:', error);
     res.status(500).json({ error: 'Server error' });
   }

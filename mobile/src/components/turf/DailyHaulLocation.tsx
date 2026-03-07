@@ -170,7 +170,11 @@ export const DailyHaulLocation = memo(function DailyHaulLocation() {
           accessibilityHint="Opens daily reward"
         >
           <Image
-            source={require('../../assets/images/ui/dailyHaul.png')}
+            source={
+              canClaim
+                ? require('../../assets/images/ui/dailyHaulActive.png')
+                : require('../../assets/images/ui/dailyHaul.png')
+            }
             style={styles.iconImage}
             resizeMode="contain"
           />
