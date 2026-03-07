@@ -209,6 +209,7 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
         }
 
         if (!result && day === 1) {
+          // Match user in new week (or no dailyHaul) who can claim today. We $set dailyHaul to new week's data, so we do not require claimedDays length 0 — old week's claimedDays are overwritten.
           const newWeekFilter: mongoose.FilterQuery<InstanceType<typeof User>> = {
             _id: userId,
             $and: [
@@ -221,7 +222,6 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
               },
               lastClaimedFilter,
             ],
-            $expr: { $eq: [{ $size: { $ifNull: ['$dailyHaul.claimedDays', []] } }, 0] },
           };
           result = await User.findOneAndUpdate(
             newWeekFilter,
