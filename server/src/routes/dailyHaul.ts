@@ -37,10 +37,9 @@ function getNextClaimDayNum(claimedLength: number, todayDayNum: number): number 
 }
 
 /**
- * Display only: red X count = closed calendar days (Mon..yesterday) that had no claim.
- * A claim made *today* is not on a closed day, so we don't subtract it when counting missed closed days.
- * - Saturday, 1 claim from Monday: 4 closed days without claim → 4 X's on 7,6,5,4. Day 3 still claimable Sunday.
- * - Saturday, 1 claim from today: 5 closed days without claim → 5 X's on 7,6,5,4,3. Day 3 stays X'd.
+ * Display only: red X = closed calendar days (Mon..yesterday) with no claim. A claim made *today*
+ * is not on a closed day, so we don't subtract it. Never show a red X on nextClaimDay (same day
+ * must not be both "next claimable" and "missed"). So we exclude nextClaimDay from the marked list.
  */
 function getMarkedOffDays(
   todayDayNum: number,
@@ -56,6 +55,11 @@ function getMarkedOffDays(
   const marked: number[] = [];
   for (let i = 0; i < missedClosedDays; i++) {
     marked.push(7 - i);
+  }
+  const nextClaimDay = getNextClaimDayNum(claimedLength, todayDayNum);
+  if (nextClaimDay != null) {
+    const idx = marked.indexOf(nextClaimDay);
+    if (idx !== -1) marked.splice(idx, 1);
   }
   return marked;
 }
