@@ -10,6 +10,7 @@ import {ResearchScreen} from './ResearchScreen';
 
 import {useThemeColors} from '../hooks/useThemeColors';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
+import {DailyHaulLocation} from '../components/turf/DailyHaulLocation';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
 import {ResearchCenterLocation} from '../components/turf/ResearchCenterLocation';
@@ -1510,6 +1511,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               </>
             )}
             <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
+            <DailyHaulLocation />
             <TaskGuide 
               currentScreen={currentScreen} 
               onNavigateToProfile={() => navigateToScreen('profile')}
