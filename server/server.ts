@@ -31,6 +31,7 @@ import probeRoutes from './src/routes/probe';
 import leaderboardRoutes from './src/routes/leaderboardRoutes';
 import userGuideRoutes from './src/routes/userGuideRoutes';
 import marketingRoutes from './src/routes/marketing';
+import dailyHaulRoutes from './src/routes/dailyHaul';
 
 declare global {
   namespace Express {
@@ -600,6 +601,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/private-messages', privateMessagesRoutes);
 app.use('/api/probe', probeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/daily-haul', dailyHaulRoutes);
 app.use('/documents', documentsRoutes);
 
 // Test routes for privacy policy compliance verification

@@ -5,6 +5,7 @@ export const resetAllApiCaches = (api: any) => {
   api.dispatch({ type: 'api/resetApiState' });
   api.dispatch({ type: 'authApi/resetApiState' });
   api.dispatch({ type: 'balanceApi/resetApiState' });
+  api.dispatch({ type: 'dailyHaulApi/resetApiState' });
   api.dispatch({ type: 'botsApi/resetApiState' });
   api.dispatch({ type: 'mapApi/resetApiState' });
   api.dispatch({ type: 'battleApi/resetApiState' });
