@@ -9,6 +9,7 @@ import {
   getNextResetUtc,
   getDayOfWeekUtc,
 } from '../config/dailyHaulConfig';
+import { accrueBalanceToTime } from '../utils/balanceAccrual';
 
 const router = express.Router();
 
@@ -64,28 +65,6 @@ function rollReward(day: DailyHaulDay): number {
   const min = config.min!;
   const max = config.max!;
   return Math.floor(min + Math.random() * (max - min + 1));
-}
-
-/** Accrue passive income from lastUpdated to now (same 10s bucket + fractionalRemainder as research/crew). Advances lastUpdated by rounded seconds only, preserving unrounded remainder for next accrual. Returns { total, fractionalRemainder, lastUpdated } to $set on balance. */
-function accrueBalanceToNow(
-  currentTotal: number,
-  ratePerSecond: number,
-  lastUpdated: Date,
-  fractionalRemainder: number,
-  now: Date
-): { total: number; fractionalRemainder: number; lastUpdated: Date } {
-  const lastMs = new Date(lastUpdated).getTime();
-  const secondsElapsed = (now.getTime() - lastMs) / 1000;
-  const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
-  const fullPrecisionIncome = roundedSecondsElapsed * ratePerSecond;
-  const totalWithRemainder = (fractionalRemainder || 0) + fullPrecisionIncome;
-  const wholeDollarsToAdd = Math.floor(totalWithRemainder);
-  const advancedLastUpdated = new Date(lastMs + roundedSecondsElapsed * 1000);
-  return {
-    total: currentTotal + wholeDollarsToAdd,
-    fractionalRemainder: totalWithRemainder - wholeDollarsToAdd,
-    lastUpdated: advancedLastUpdated,
-  };
 }
 
 /** GET /api/daily-haul/status — resets at, next claim day, can claim, reward info, marked off days */
@@ -213,7 +192,7 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
         awardedAmount = amount;
         claimedDay = day;
 
-        const accrued = accrueBalanceToNow(
+        const accrued = accrueBalanceToTime(
           user.balance?.total ?? 0,
           user.balance?.ratePerSecond ?? 0,
           user.balance?.lastUpdated ?? now,

@@ -7,6 +7,7 @@ import { ResearchUser } from '../models/ResearchUser';
 import { User } from '../models/User';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { getTaskList } from '../config/taskListData';
+import { accrueBalanceFromTo } from '../utils/balanceAccrual';
 import mongoose from 'mongoose';
 
 const router = express.Router();
@@ -44,14 +45,15 @@ async function syncCashFlowResearchCompletion(
     .sort({ unlockedAt: -1 })
     .lean();
   const unlockTime = researchFeature?.unlockedAt || new Date();
-  const secondsElapsed = (unlockTime.getTime() - user.balance.lastUpdated.getTime()) / 1000;
-  if (secondsElapsed > 0) {
-    const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
-    const fullPrecisionIncome = roundedSecondsElapsed * user.balance.ratePerSecond;
-    const totalWithRemainder = (user.balance.fractionalRemainder || 0) + fullPrecisionIncome;
-    const wholeDollarsToAdd = Math.floor(totalWithRemainder);
-    user.balance.total += wholeDollarsToAdd;
-    user.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
+  const accrual = accrueBalanceFromTo({
+    lastUpdatedMs: user.balance.lastUpdated.getTime(),
+    toTimeMs: unlockTime.getTime(),
+    ratePerSecond: user.balance.ratePerSecond,
+    fractionalRemainder: user.balance.fractionalRemainder ?? 0,
+  });
+  if (accrual.accrued) {
+    user.balance.total += accrual.wholeDollarsToAdd;
+    user.balance.fractionalRemainder = accrual.newFractionalRemainder;
     user.balance.lastUpdated = unlockTime;
   } else if (unlockTime > user.balance.lastUpdated) {
     user.balance.lastUpdated = unlockTime;
