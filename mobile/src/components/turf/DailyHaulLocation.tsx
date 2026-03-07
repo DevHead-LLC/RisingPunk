@@ -78,7 +78,7 @@ function DayCell({
           <Text style={[styles.checkmark, { color: colors.success ?? colors.matrix }]}>✓</Text>
         </View>
       )}
-      {isMarkedOff && (
+      {isMarkedOff && !isClaimed && !isClaimable && (
         <View style={styles.dayOverlay} pointerEvents="none">
           <Text style={[styles.markedOffX, { color: colors.error }]}>✗</Text>
         </View>
