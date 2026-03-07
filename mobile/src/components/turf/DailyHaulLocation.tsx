@@ -26,15 +26,15 @@ const BUTTON_SIZE = 48;
 /** Offset so the icon is centered under the profile (profile is PROFILE_WIDTH wide). */
 const CENTER_OFFSET = (PROFILE_WIDTH - BUTTON_SIZE) / 2;
 
-/** Reward display config per day (matches server dailyHaulConfig). */
-const REWARD_DISPLAY: { day: number; range: string }[] = [
+/** Reward display per day (matches server dailyHaulConfig). fixed = single prize; else variable (random) range. */
+const REWARD_DISPLAY: { day: number; range: string; fixed?: boolean }[] = [
   { day: 1, range: '$10,000 – $50,000' },
   { day: 2, range: '$50,000 – $100,000' },
   { day: 3, range: '$100,000 – $200,000' },
   { day: 4, range: '$200,000 – $300,000' },
   { day: 5, range: '$300,000 – $400,000' },
-  { day: 6, range: '$600,000' },
-  { day: 7, range: '$750,000' },
+  { day: 6, range: '$600,000', fixed: true },
+  { day: 7, range: '$750,000', fixed: true },
 ];
 
 function getResetsInText(resetsAt: string): string {
@@ -222,13 +222,13 @@ export const DailyHaulLocation = memo(function DailyHaulLocation() {
                     <Text style={[styles.tableHeaderText, { color: colors.primary }]}>Days</Text>
                   </View>
                   <View style={styles.rewardCol}>
-                    <Text style={[styles.tableHeaderText, { color: colors.primary }]}>Reward</Text>
+                    <Text style={[styles.tableHeaderText, { color: colors.primary }]}>Haul</Text>
                   </View>
                   <View style={styles.wonCol}>
-                    <Text style={[styles.tableHeaderText, { color: colors.primary }]}>Won</Text>
+                    <Text style={[styles.tableHeaderText, { color: colors.primary }]}>Pulled</Text>
                   </View>
                 </View>
-                {REWARD_DISPLAY.map(({ day, range }) => (
+                {REWARD_DISPLAY.map(({ day, range, fixed }) => (
                   <View key={day} style={[styles.tableRow, styles.tableDataRow, { borderColor: colors.primary }]}>
                     <View style={styles.daysCol}>
                       {isClaiming && nextClaimDay === day ? (
@@ -252,7 +252,7 @@ export const DailyHaulLocation = memo(function DailyHaulLocation() {
                         style={[styles.rewardCellText, { color: colors.text?.secondary ?? colors.primary }]}
                         numberOfLines={2}
                       >
-                        Random Prize Range = {range}
+                        {fixed ? `Prize: ${range}` : `Variable: ${range}`}
                       </Text>
                     </View>
                     <View style={[styles.wonCol, styles.wonCell]}>

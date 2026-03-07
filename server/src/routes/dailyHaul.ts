@@ -21,19 +21,24 @@ function getStartOfDayUtc(date: Date): Date {
   ));
 }
 
-/** Claim sequence is always 1 → 2 → … → 7. Next day = claimedLength + 1, capped by missed slots (7 - missedCount). */
-function getNextClaimDayNum(claimedLength: number, missedCount: number): number | null {
+/**
+ * Claim sequence is always 1 → 2 → … → 7. Next day = claimedLength + 1.
+ * Cap: maxClaimable = 7 - missedOpportunities, where missedOpportunities = calendar days
+ * that passed without a claim (so users who claim every day can reach day 7).
+ */
+function getNextClaimDayNum(claimedLength: number, todayDayNum: number): number | null {
+  const calendarDaysPassed = todayDayNum - 1;
+  const missedOpportunities = Math.max(0, calendarDaysPassed - claimedLength);
+  const maxClaimable = 7 - missedOpportunities;
   const next = claimedLength + 1;
-  const maxClaimable = 7 - missedCount;
   return next <= maxClaimable ? next : null;
 }
 
-/** Missed tiers = calendar days that passed before today (never reduced by claiming). Mark off from 7 down: 7, 6, 5, … */
+/** Display only: tiers to show as x-ed off = calendar days that passed (never reduced by claiming). From 7 down: 7, 6, 5, … */
 function getMarkedOffDays(todayDayNum: number): number[] {
-  const calendarDaysPassed = todayDayNum - 1;
-  const missedCount = Math.min(7, Math.max(0, calendarDaysPassed));
+  const calendarDaysPassed = Math.min(7, Math.max(0, todayDayNum - 1));
   const marked: number[] = [];
-  for (let i = 0; i < missedCount; i++) {
+  for (let i = 0; i < calendarDaysPassed; i++) {
     marked.push(7 - i);
   }
   return marked;
@@ -89,8 +94,7 @@ router.get('/status', auth, async (req: Request, res: Response) => {
     const todayDayNum = getDayOfWeekUtc(now);
     const todayStartUtc = getStartOfDayUtc(now);
     const markedOffDays = getMarkedOffDays(todayDayNum);
-    const missedCount = markedOffDays.length;
-    const nextClaimDay = getNextClaimDayNum(claimedDays.length, missedCount);
+    const nextClaimDay = getNextClaimDayNum(claimedDays.length, todayDayNum);
     const allowedToClaimToday = canClaimToday(lastClaimedDateUtc, todayStartUtc);
     const canClaim = nextClaimDay !== null && allowedToClaimToday;
 
@@ -151,8 +155,7 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
     const todayDayNum = getDayOfWeekUtc(now);
     const todayStartUtc = getStartOfDayUtc(now);
     const markedOffDays = getMarkedOffDays(todayDayNum);
-    const missedCount = markedOffDays.length;
-    const nextClaimDay = getNextClaimDayNum(claimedDays.length, missedCount);
+    const nextClaimDay = getNextClaimDayNum(claimedDays.length, todayDayNum);
     const allowedToClaimToday = canClaimToday(lastClaimedDateUtc, todayStartUtc);
 
     if (nextClaimDay === null || !allowedToClaimToday) {

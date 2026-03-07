@@ -38,13 +38,6 @@ export function getNextResetUtc(date: Date): Date {
   return next;
 }
 
-/** Number of whole calendar days since week start (Monday = 0, Tuesday = 1, ...). */
-export function getDaysSinceWeekStart(date: Date): number {
-  const weekStart = getWeekStartUtc(date);
-  const ms = date.getTime() - weekStart.getTime();
-  return Math.floor(ms / 86400000);
-}
-
 /** Day of week 1–7 (Monday = 1, Sunday = 7). */
 export function getDayOfWeekUtc(date: Date): number {
   const d = date.getUTCDay();
