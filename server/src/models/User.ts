@@ -110,6 +110,14 @@ export interface IUser extends Document {
   totalPhreaksBuilt?: number;
   totalBreachersBuilt?: number;
   lifetimeHighNetWorth?: number;
+  /** Daily Haul (7-day claim): week boundary, claimed sequence (1→2→…→7), amounts, and last claim date for one-claim-per-UTC-day. */
+  dailyHaul?: {
+    weekStartUtc: Date;
+    claimedDays: number[];
+    awardedAmounts?: number[];
+    /** Start of UTC day when user last claimed; used to allow only one claim per calendar day. */
+    lastClaimedDateUtc?: Date;
+  };
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
   blockedUserIds?: mongoose.Types.ObjectId[];
   /** Set by schema timestamps: true. */
@@ -478,6 +486,12 @@ const userSchema = new Schema({
   currentTokenId: {
     type: String,
     required: false
+  },
+  dailyHaul: {
+    weekStartUtc: { type: Date, required: false },
+    claimedDays: { type: [Number], default: [] },
+    awardedAmounts: { type: [Number], default: undefined },
+    lastClaimedDateUtc: { type: Date, required: false }
   },
   blockedUserIds: {
     type: [Schema.Types.ObjectId],
