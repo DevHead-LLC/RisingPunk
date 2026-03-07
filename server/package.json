@@ -13,9 +13,7 @@
     "seed:database": "node scripts/seedDatabase.js",
     "backup:guide": "node scripts/backupRestore.js",
     "update:npc": "ts-node scripts/updateNPCs.ts",
-    "update:npc-spreadsheet": "ts-node scripts/updateNpcCollectionFromSpreadsheet.ts",
-    "script:grandfather-research": "ts-node scripts/grandfatherResearchUnlocks.ts",
-    "script:grandfather-research:dry": "DRY_RUN=1 ts-node scripts/grandfatherResearchUnlocks.ts"
+    "update:npc-spreadsheet": "ts-node scripts/updateNpcCollectionFromSpreadsheet.ts"
   },
   "keywords": [],
   "author": "",
