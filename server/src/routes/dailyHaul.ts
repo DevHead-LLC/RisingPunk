@@ -35,12 +35,11 @@ function getNextClaimDayNum(claimedLength: number, todayDayNum: number): number 
   return next <= maxClaimable ? next : null;
 }
 
-/** Display only: tiers to show as x-ed off = truly unreachable days (same logic as getNextClaimDayNum). Marks top N from 7 down where N = missedOpportunities = calendarDaysPassed - claimedLength. */
-function getMarkedOffDays(todayDayNum: number, claimedLength: number): number[] {
+/** Display only: red X count = calendar days that have passed (never reduced by claiming). Marks top N from 7 down (7, 6, 5, …). So on Saturday, 5 X's on 7–3; after claiming Day 1, those 5 X's stay — Day 3 keeps its X. Eligibility (getNextClaimDayNum) still uses missedOpportunities so user can claim Day 2 then Day 3. */
+function getMarkedOffDays(todayDayNum: number): number[] {
   const calendarDaysPassed = Math.min(7, Math.max(0, todayDayNum - 1));
-  const missedOpportunities = Math.max(0, calendarDaysPassed - claimedLength);
   const marked: number[] = [];
-  for (let i = 0; i < missedOpportunities; i++) {
+  for (let i = 0; i < calendarDaysPassed; i++) {
     marked.push(7 - i);
   }
   return marked;
@@ -106,10 +105,27 @@ router.get('/status', auth, async (req: Request, res: Response) => {
     const isSameWeek = stored?.weekStartUtc && new Date(stored.weekStartUtc).getTime() === weekStart.getTime();
     const claimedDays: number[] = isSameWeek && Array.isArray(stored!.claimedDays) ? stored!.claimedDays : [];
 
-    // Lazy cleanup: if we're in a new week, overwrite stored dailyHaul so we don't keep last week's data in the DB.
-    if (!isSameWeek && user.dailyHaul) {
-      user.dailyHaul = { weekStartUtc: weekStart, claimedDays: [], awardedAmounts: [] };
-      await user.save();
+    // Lazy cleanup: only set new-week empty state when the document still has the old week (or no dailyHaul). Uses conditional findOneAndUpdate so we never overwrite a concurrent claim that already wrote new week data.
+    if (!isSameWeek) {
+      await User.findOneAndUpdate(
+        {
+          _id: user._id,
+          $or: [
+            { dailyHaul: null },
+            { dailyHaul: { $exists: false } },
+            { 'dailyHaul.weekStartUtc': { $ne: weekStart } },
+          ],
+        },
+        {
+          $set: {
+            dailyHaul: {
+              weekStartUtc: weekStart,
+              claimedDays: [],
+              awardedAmounts: [],
+            },
+          },
+        }
+      );
     }
 
     const awardedAmounts: number[] = isSameWeek && Array.isArray(stored?.awardedAmounts) ? stored.awardedAmounts : [];
@@ -117,7 +133,7 @@ router.get('/status', auth, async (req: Request, res: Response) => {
 
     const todayDayNum = getDayOfWeekUtc(now);
     const todayStartUtc = getStartOfDayUtc(now);
-    const markedOffDays = getMarkedOffDays(todayDayNum, claimedDays.length);
+    const markedOffDays = getMarkedOffDays(todayDayNum);
     const nextClaimDay = getNextClaimDayNum(claimedDays.length, todayDayNum);
     const allowedToClaimToday = canClaimToday(lastClaimedDateUtc, todayStartUtc);
     const canClaim = nextClaimDay !== null && allowedToClaimToday;
