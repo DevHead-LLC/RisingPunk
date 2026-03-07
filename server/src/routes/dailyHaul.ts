@@ -36,7 +36,7 @@ function getNextClaimDayNum(claimedLength: number, todayDayNum: number): number 
   return next <= maxClaimable ? next : null;
 }
 
-/** Display only: red X count = calendar days that have passed (never reduced by claiming). Marks top N from 7 down (7, 6, 5, …). So on Saturday, 5 X's on 7–3; after claiming Day 1, those 5 X's stay — Day 3 keeps its X. Eligibility (getNextClaimDayNum) still uses missedOpportunities so user can claim Day 2 then Day 3. */
+/** Display only: red X count = calendar days that have passed. Never reduced when you claim — red X's once placed stay until Monday 00:00 UTC reset. Marks top N from 7 down (7, 6, 5, …). So Saturday = 5 X's on 7–3; after claiming Day 1, still 5 X's, Day 3 keeps its X. */
 function getMarkedOffDays(todayDayNum: number): number[] {
   const calendarDaysPassed = Math.min(7, Math.max(0, todayDayNum - 1));
   const marked: number[] = [];
