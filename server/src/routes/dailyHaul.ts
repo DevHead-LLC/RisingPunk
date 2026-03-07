@@ -36,11 +36,12 @@ function getNextClaimDayNum(claimedLength: number, todayDayNum: number): number 
   return next <= maxClaimable ? next : null;
 }
 
-/** Display only: red X count = calendar days that have passed. Never reduced when you claim — red X's once placed stay until Monday 00:00 UTC reset. Marks top N from 7 down (7, 6, 5, …). So Saturday = 5 X's on 7–3; after claiming Day 1, still 5 X's, Day 3 keeps its X. */
-function getMarkedOffDays(todayDayNum: number): number[] {
+/** Display only: red X count = missed days only (missedOpportunities). A day is "missed" when the full UTC day passed with no claim; at 12:00 am of the next day that day counts as missed and we assign an X from the top (7, 6, 5, …). Saturday with 1 claim = 4 missed → X's on 7, 6, 5, 4 only; Day 3 never gets an X. Same logic as getNextClaimDayNum. */
+function getMarkedOffDays(todayDayNum: number, claimedLength: number): number[] {
   const calendarDaysPassed = Math.min(7, Math.max(0, todayDayNum - 1));
+  const missedOpportunities = Math.max(0, calendarDaysPassed - claimedLength);
   const marked: number[] = [];
-  for (let i = 0; i < calendarDaysPassed; i++) {
+  for (let i = 0; i < missedOpportunities; i++) {
     marked.push(7 - i);
   }
   return marked;
@@ -112,7 +113,7 @@ router.get('/status', auth, async (req: Request, res: Response) => {
 
     const todayDayNum = getDayOfWeekUtc(now);
     const todayStartUtc = getStartOfDayUtc(now);
-    const markedOffDays = getMarkedOffDays(todayDayNum);
+    const markedOffDays = getMarkedOffDays(todayDayNum, claimedDays.length);
     const nextClaimDay = getNextClaimDayNum(claimedDays.length, todayDayNum);
     const allowedToClaimToday = canClaimToday(lastClaimedDateUtc, todayStartUtc);
     const canClaim = nextClaimDay !== null && allowedToClaimToday;
