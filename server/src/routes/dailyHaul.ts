@@ -35,11 +35,12 @@ function getNextClaimDayNum(claimedLength: number, todayDayNum: number): number 
   return next <= maxClaimable ? next : null;
 }
 
-/** Display only: tiers to show as x-ed off = calendar days that passed (never reduced by claiming). From 7 down: 7, 6, 5, … */
-function getMarkedOffDays(todayDayNum: number): number[] {
+/** Display only: tiers to show as x-ed off = truly unreachable days (same logic as getNextClaimDayNum). Marks top N from 7 down where N = missedOpportunities = calendarDaysPassed - claimedLength. */
+function getMarkedOffDays(todayDayNum: number, claimedLength: number): number[] {
   const calendarDaysPassed = Math.min(7, Math.max(0, todayDayNum - 1));
+  const missedOpportunities = Math.max(0, calendarDaysPassed - claimedLength);
   const marked: number[] = [];
-  for (let i = 0; i < calendarDaysPassed; i++) {
+  for (let i = 0; i < missedOpportunities; i++) {
     marked.push(7 - i);
   }
   return marked;
@@ -94,7 +95,7 @@ router.get('/status', auth, async (req: Request, res: Response) => {
 
     const todayDayNum = getDayOfWeekUtc(now);
     const todayStartUtc = getStartOfDayUtc(now);
-    const markedOffDays = getMarkedOffDays(todayDayNum);
+    const markedOffDays = getMarkedOffDays(todayDayNum, claimedDays.length);
     const nextClaimDay = getNextClaimDayNum(claimedDays.length, todayDayNum);
     const allowedToClaimToday = canClaimToday(lastClaimedDateUtc, todayStartUtc);
     const canClaim = nextClaimDay !== null && allowedToClaimToday;
