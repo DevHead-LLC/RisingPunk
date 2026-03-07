@@ -67,7 +67,7 @@ function rollReward(day: DailyHaulDay): number {
   return Math.floor(min + Math.random() * (max - min + 1));
 }
 
-/** Accrue passive income from lastUpdated to now (same 10s bucket + fractionalRemainder as research/crew). Returns { total, fractionalRemainder, lastUpdated } to $set on balance. */
+/** Accrue passive income from lastUpdated to now (same 10s bucket + fractionalRemainder as research/crew). Advances lastUpdated by rounded seconds only, preserving unrounded remainder for next accrual. Returns { total, fractionalRemainder, lastUpdated } to $set on balance. */
 function accrueBalanceToNow(
   currentTotal: number,
   ratePerSecond: number,
@@ -81,10 +81,11 @@ function accrueBalanceToNow(
   const fullPrecisionIncome = roundedSecondsElapsed * ratePerSecond;
   const totalWithRemainder = (fractionalRemainder || 0) + fullPrecisionIncome;
   const wholeDollarsToAdd = Math.floor(totalWithRemainder);
+  const advancedLastUpdated = new Date(lastMs + roundedSecondsElapsed * 1000);
   return {
     total: currentTotal + wholeDollarsToAdd,
     fractionalRemainder: totalWithRemainder - wholeDollarsToAdd,
-    lastUpdated: now,
+    lastUpdated: advancedLastUpdated,
   };
 }
 
