@@ -36,12 +36,25 @@ function getNextClaimDayNum(claimedLength: number, todayDayNum: number): number 
   return next <= maxClaimable ? next : null;
 }
 
-/** Display only: red X count = missed days only (missedOpportunities). A day is "missed" when the full UTC day passed with no claim; at 12:00 am of the next day that day counts as missed and we assign an X from the top (7, 6, 5, …). Saturday with 1 claim = 4 missed → X's on 7, 6, 5, 4 only; Day 3 never gets an X. Same logic as getNextClaimDayNum. */
-function getMarkedOffDays(todayDayNum: number, claimedLength: number): number[] {
-  const calendarDaysPassed = Math.min(7, Math.max(0, todayDayNum - 1));
-  const missedOpportunities = Math.max(0, calendarDaysPassed - claimedLength);
+/**
+ * Display only: red X count = closed calendar days (Mon..yesterday) that had no claim.
+ * A claim made *today* is not on a closed day, so we don't subtract it when counting missed closed days.
+ * - Saturday, 1 claim from Monday: 4 closed days without claim → 4 X's on 7,6,5,4. Day 3 still claimable Sunday.
+ * - Saturday, 1 claim from today: 5 closed days without claim → 5 X's on 7,6,5,4,3. Day 3 stays X'd.
+ */
+function getMarkedOffDays(
+  todayDayNum: number,
+  claimedLength: number,
+  lastClaimedDateUtc: Date | undefined,
+  todayStartUtc: Date
+): number[] {
+  const closedDays = Math.min(7, Math.max(0, todayDayNum - 1));
+  const claimedToday =
+    lastClaimedDateUtc != null && new Date(lastClaimedDateUtc).getTime() >= todayStartUtc.getTime();
+  const claimsOnClosedDays = claimedLength - (claimedToday ? 1 : 0);
+  const missedClosedDays = Math.max(0, closedDays - claimsOnClosedDays);
   const marked: number[] = [];
-  for (let i = 0; i < missedOpportunities; i++) {
+  for (let i = 0; i < missedClosedDays; i++) {
     marked.push(7 - i);
   }
   return marked;
@@ -113,7 +126,7 @@ router.get('/status', auth, async (req: Request, res: Response) => {
 
     const todayDayNum = getDayOfWeekUtc(now);
     const todayStartUtc = getStartOfDayUtc(now);
-    const markedOffDays = getMarkedOffDays(todayDayNum, claimedDays.length);
+    const markedOffDays = getMarkedOffDays(todayDayNum, claimedDays.length, lastClaimedDateUtc, todayStartUtc);
     const nextClaimDay = getNextClaimDayNum(claimedDays.length, todayDayNum);
     const allowedToClaimToday = canClaimToday(lastClaimedDateUtc, todayStartUtc);
     const canClaim = nextClaimDay !== null && allowedToClaimToday;
