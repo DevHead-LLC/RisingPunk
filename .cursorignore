@@ -3,3 +3,9 @@ server/scripts/seed*.js
 server/scripts/*seed*.js
 **/seed*.js
 **/*seed*.js
+
+# Backup/restore/encrypt scripts - DO NOT ACCESS - Could modify data
+server/scripts/backup*.js
+server/scripts/restore*.js
+server/scripts/encrypt*.js
+server/scripts/addEmailHash.js
