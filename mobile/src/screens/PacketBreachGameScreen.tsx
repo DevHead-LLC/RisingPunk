@@ -69,6 +69,7 @@ const DIGIT_IMAGES: Record<string, number> = {
   ssh: require('../assets/images/miniGame/ssh.png'),
   http: require('../assets/images/miniGame/https.png'),
   https: require('../assets/images/miniGame/https.png'),
+  dns: require('../assets/images/miniGame/dns.png'),
 };
 
 export function PacketBreachGameScreen({ levelId, initialSession, onClose }: PacketBreachGameScreenProps) {

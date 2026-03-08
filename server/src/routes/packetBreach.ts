@@ -110,7 +110,7 @@ function generateDigitsPuzzleWithDecoy5(): {
     { id: '2', protocol: 'udp', port: 2 },
     { id: '3', protocol: 'ssh', port: 3 },
     { id: '4', protocol: 'http', port: 4 },
-    { id: '5', protocol: 'https', port: 5 },
+    { id: '5', protocol: 'dns', port: 5 },
   ];
   const allIds = ['1', '2', '3', '4', '5'];
   const decoyIndex = Math.floor(Math.random() * 5);
@@ -304,17 +304,6 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         });
         return;
       }
-      const newTotal = accrued.total - cost;
-      await User.updateOne(
-        { _id: userId },
-        {
-          $set: {
-            'balance.total': newTotal,
-            'balance.lastUpdated': accrued.lastUpdated,
-            'balance.fractionalRemainder': accrued.fractionalRemainder,
-          },
-        }
-      );
       const puzzle = generatePuzzle(levelId);
       const { nodePool, solution, antiSolution } = puzzle;
       const session: SessionData = {
@@ -326,11 +315,45 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         firstAttemptPaid: false,
         ...(puzzle.decoyNodeId != null && { decoyNodeId: puzzle.decoyNodeId }),
       };
-      await PacketBreachSession.create({
-        userId: user._id,
-        levelId,
-        ...session,
-      });
+      try {
+        await PacketBreachSession.create({
+          userId: user._id,
+          levelId,
+          ...session,
+        });
+      } catch (createErr: unknown) {
+        const code = (createErr as { code?: number })?.code;
+        if (code === 11000) {
+          const existing = await PacketBreachSession.findOne({ userId: user._id, levelId }).lean();
+          if (existing) {
+            const existingSession = docToSessionData(existing);
+            res.json({
+              nodePool: existingSession.nodePool,
+              slots: existingSession.slots,
+              attemptsLeft: existingSession.attemptsLeft,
+            });
+            return;
+          }
+        }
+        throw createErr;
+      }
+      const newTotal = accrued.total - cost;
+      try {
+        await User.updateOne(
+          { _id: userId },
+          {
+            $set: {
+              'balance.total': newTotal,
+              'balance.lastUpdated': accrued.lastUpdated,
+              'balance.fractionalRemainder': accrued.fractionalRemainder,
+            },
+          }
+        );
+      } catch {
+        await PacketBreachSession.deleteOne({ userId: user._id, levelId });
+        res.status(500).json({ error: 'Server error' });
+        return;
+      }
       res.json({
         nodePool: session.nodePool,
         slots: session.slots,

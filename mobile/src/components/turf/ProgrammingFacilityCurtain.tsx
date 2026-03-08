@@ -71,7 +71,7 @@ export const ProgrammingFacilityCurtain = memo(function ProgrammingFacilityCurta
                   ${PROGRAMMING_FACILITY_UNLOCK_COST.toLocaleString()}
                 </Text>
               )}
-              <Text style={[styles.priceSubtext, { color: colors.text?.secondary ?? colors.primary }]}>
+              <Text style={[styles.priceSubtext, { color: '#60A5FA' }]}>
                 Tap to unlock
               </Text>
             </View>

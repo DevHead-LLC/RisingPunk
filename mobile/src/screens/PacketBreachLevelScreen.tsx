@@ -192,7 +192,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
           // Insufficient funds (e.g. balance changed); don't navigate
           return;
         }
-        throw err;
+        // Other errors (500, network, etc.) already surfaced by RTK Query / global error handler; don't re-throw (would be unhandled promise rejection from onPress).
       }
     },
     [status?.levelConfigs, numericBalance, startSession, onSelectLevel]
