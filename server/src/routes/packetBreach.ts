@@ -28,7 +28,7 @@ interface SessionData {
   attemptsLeft: number;
   nodePool: NodeDef[];
   slots: number;
-  /** First attempt is paid at session start; submit skips deduct on first attempt. */
+  /** false = first submit will NOT deduct (cost already taken at session start); set true after first submit so subsequent submits charge. Do not double-charge. */
   firstAttemptPaid: boolean;
   /** Tier 7+: the node id that is the decoy (not used in solution). Omitted for tiers 1–6. */
   decoyNodeId?: string;
@@ -72,6 +72,15 @@ function generateDigitsPuzzle(): { nodePool: NodeDef[]; solution: string[]; anti
   return { nodePool, solution, antiSolution };
 }
 
+/** Count positions where a and b differ (same length). */
+function countDifferences(a: string[], b: string[]): number {
+  let n = 0;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) n++;
+  }
+  return n;
+}
+
 /** Tier 7+: pool of 4 nodes (1–4), one random node is the decoy (not in solution). Solution/anti use only the other 3. */
 function generateDigitsPuzzleWithDecoy(): {
   nodePool: NodeDef[];
@@ -92,7 +101,7 @@ function generateDigitsPuzzleWithDecoy(): {
   const randActive = () => activeDigits[Math.floor(Math.random() * 3)];
   const solution: string[] = [randActive(), randActive(), randActive()];
   let antiSolution: string[] = [randActive(), randActive(), randActive()];
-  while (antiSolution.every((d, i) => d === solution[i])) {
+  while (countDifferences(antiSolution, solution) < 2) {
     antiSolution = [randActive(), randActive(), randActive()];
   }
   return { nodePool, solution, antiSolution, decoyNodeId };
@@ -119,7 +128,7 @@ function generateDigitsPuzzleWithDecoy5(): {
   const randActive = () => activeIds[Math.floor(Math.random() * 4)];
   const solution: string[] = [randActive(), randActive(), randActive()];
   let antiSolution: string[] = [randActive(), randActive(), randActive()];
-  while (antiSolution.every((d, i) => d === solution[i])) {
+  while (countDifferences(antiSolution, solution) < 2) {
     antiSolution = [randActive(), randActive(), randActive()];
   }
   return { nodePool, solution, antiSolution, decoyNodeId };
@@ -312,7 +321,7 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         attemptsLeft: params.attempts,
         nodePool,
         slots: params.slots,
-        firstAttemptPaid: false,
+        firstAttemptPaid: false, // cost taken above; first submit must skip deduction
         ...(puzzle.decoyNodeId != null && { decoyNodeId: puzzle.decoyNodeId }),
       };
       try {
@@ -426,7 +435,7 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       bal?.fractionalRemainder ?? 0,
       now
     );
-    const isFirstAttempt = session.firstAttemptPaid === false;
+    const isFirstAttempt = session.firstAttemptPaid === false; // first submit: no deduct (charged at session start)
     if (isFirstAttempt) {
       session.firstAttemptPaid = true;
       await PacketBreachSession.updateOne(
@@ -505,6 +514,7 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       res.json({
         decoyUsed: true,
         attemptsLeft: session.attemptsLeft,
+        ...(session.attemptsLeft === 0 && { lostAllAttempts: true }),
         win: false,
         balance: {
           total: newTotal,
