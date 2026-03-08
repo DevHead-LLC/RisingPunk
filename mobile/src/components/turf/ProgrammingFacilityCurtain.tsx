@@ -79,10 +79,10 @@ export const ProgrammingFacilityCurtain = memo(function ProgrammingFacilityCurta
         ) : (
           <View style={[styles.lockBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
             <Text style={styles.lockEmoji}>🔒</Text>
-            <Text style={[styles.lockText, { color: colors.text?.secondary ?? colors.primary }]}>
+            <Text style={[styles.lockText, { color: '#60A5FA' }]}>
               Locked
             </Text>
-            <Text style={[styles.lockSubtext, { color: colors.text?.secondary ?? colors.primary }]}>
+            <Text style={[styles.lockSubtext, { color: '#60A5FA' }]}>
               Reach level 20
             </Text>
           </View>

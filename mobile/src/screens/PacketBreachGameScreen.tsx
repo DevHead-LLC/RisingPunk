@@ -146,15 +146,14 @@ export function PacketBreachGameScreen({ levelId, onClose }: PacketBreachGameScr
       setAttemptHistory((prev) => [entry, ...prev]);
       setAttemptsLeft(result.attemptsLeft);
       setSequence([]);
-      if (result.lostAllAttempts || result.attemptsLeft === 0) {
-        lostOrWonRef.current = true;
-        setAntiSolutionTriggered(result.antiSolutionTriggered === true);
-        setLostAll(true);
-      }
       if (result.win) {
         lostOrWonRef.current = true;
         await claimLevel(levelId).unwrap();
         setWin(true);
+      } else if (result.lostAllAttempts || result.attemptsLeft === 0) {
+        lostOrWonRef.current = true;
+        setAntiSolutionTriggered(result.antiSolutionTriggered === true);
+        setLostAll(true);
       }
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status;

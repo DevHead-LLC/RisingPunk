@@ -34,6 +34,8 @@ interface SessionData {
 }
 
 const sessionStore = new Map<string, SessionData>();
+/** Keys (userId:levelId) that are allowed to call claim — set when submit returns win. */
+const pendingClaimStore = new Set<string>();
 
 function sessionKey(userId: string, levelId: string): string {
   return `${userId}:${levelId}`;
@@ -421,6 +423,9 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
     } else {
       sessionStore.set(key, session);
     }
+    if (win) {
+      pendingClaimStore.add(key);
+    }
     if (decoyUsed) {
       res.json({
         decoyUsed: true,
@@ -476,8 +481,10 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
     const levelsCompleted: string[] = Array.isArray(user.packetBreach?.levelsCompleted)
       ? user.packetBreach!.levelsCompleted
       : [];
+    const key = sessionKey(userId, levelId);
     if (levelsCompleted.includes(levelId)) {
-      sessionStore.delete(sessionKey(userId, levelId));
+      sessionStore.delete(key);
+      pendingClaimStore.delete(key);
       res.json({ success: true, levelsCompleted });
       return;
     }
@@ -490,6 +497,11 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
       res.status(403).json({ error: 'Level not unlocked' });
       return;
     }
+    if (!pendingClaimStore.has(key)) {
+      res.status(403).json({ error: 'Win the level before claiming' });
+      return;
+    }
+    pendingClaimStore.delete(key);
     const updated = await User.findByIdAndUpdate(
       userId,
       { $addToSet: { 'packetBreach.levelsCompleted': levelId } },
@@ -505,7 +517,7 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
     // Recompute from all completed levels so every tier reward (1–6+) is included
     const armyBonus = computePacketBreachArmyBonus(newCompleted);
     await User.updateOne({ _id: userId }, { $set: { armyBonus } });
-    sessionStore.delete(sessionKey(userId, levelId));
+    sessionStore.delete(key);
     res.json({ success: true, levelsCompleted: newCompleted });
   } catch (error: unknown) {
     console.error('Packet Breach claim error:', error);
