@@ -36,13 +36,16 @@ type PacketBreachGameScreenProps = {
   onClose: () => void;
 };
 
-/** Digits mode: pool has 3 nodes (tiers 1–6) or 4 nodes with decoy (tiers 7+), ids "1"–"3" or "1"–"4". */
+/** Digits mode: pool has 3 nodes (tiers 1–6), 4 with decoy (tiers 7–12), or 5 with decoy (tiers 13+); ids "1"–"3", "1"–"4", or "1"–"5". */
 function isDigitsMode(nodePool: NodeDef[]): boolean {
-  const validIds = nodePool.length === 3
-    ? (n: NodeDef) => n.id === '1' || n.id === '2' || n.id === '3'
-    : (n: NodeDef) => n.id === '1' || n.id === '2' || n.id === '3' || n.id === '4';
+  const validIds =
+    nodePool.length === 3
+      ? (n: NodeDef) => n.id === '1' || n.id === '2' || n.id === '3'
+      : nodePool.length === 4
+        ? (n: NodeDef) => n.id === '1' || n.id === '2' || n.id === '3' || n.id === '4'
+        : (n: NodeDef) => n.id === '1' || n.id === '2' || n.id === '3' || n.id === '4' || n.id === '5';
   return (
-    (nodePool.length === 3 || nodePool.length === 4) &&
+    (nodePool.length === 3 || nodePool.length === 4 || nodePool.length === 5) &&
     nodePool.every(validIds) &&
     nodePool.some((n) => n.protocol === 'tcp')
   );
@@ -65,6 +68,7 @@ const DIGIT_IMAGES: Record<string, number> = {
   udp: require('../assets/images/miniGame/udp.png'),
   ssh: require('../assets/images/miniGame/ssh.png'),
   http: require('../assets/images/miniGame/https.png'),
+  https: require('../assets/images/miniGame/https.png'),
 };
 
 export function PacketBreachGameScreen({ levelId, initialSession, onClose }: PacketBreachGameScreenProps) {
@@ -80,6 +84,8 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
   const [lostAll, setLostAll] = useState(false);
   const [antiSolutionTriggered, setAntiSolutionTriggered] = useState(false);
   const [insufficientFunds, setInsufficientFunds] = useState(false);
+  /** When true, we got win from submit but claim API failed; user can retry claim. */
+  const [claimError, setClaimError] = useState(false);
   const lostOrWonRef = useRef(false);
 
   const [startSession, { isLoading: starting, error: startError }] =
@@ -98,6 +104,7 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
       setWin(false);
       setLostAll(false);
       setAntiSolutionTriggered(false);
+      setClaimError(false);
       lostOrWonRef.current = false;
       return;
     }
@@ -114,12 +121,14 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
           setWin(false);
           setLostAll(false);
           setAntiSolutionTriggered(false);
+          setClaimError(false);
           lostOrWonRef.current = false;
         }
       } catch (_) {
         if (!cancelled) {
           setLostAll(false);
           setWin(false);
+          setClaimError(false);
         }
       }
     })();
@@ -162,8 +171,13 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
       setSequence([]);
       if (result.win) {
         lostOrWonRef.current = true;
-        await claimLevel(levelId).unwrap();
-        setWin(true);
+        try {
+          await claimLevel(levelId).unwrap();
+          setWin(true);
+          setClaimError(false);
+        } catch {
+          setClaimError(true);
+        }
       } else if (result.lostAllAttempts || result.attemptsLeft === 0) {
         lostOrWonRef.current = true;
         setAntiSolutionTriggered(result.antiSolutionTriggered === true);
@@ -177,6 +191,16 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
       // Other errors surfaced by API / global handler
     }
   }, [levelId, sequence, slots, submitting, win, lostAll, submitAttempt, claimLevel, nodePool]);
+
+  const handleRetryClaim = useCallback(async () => {
+    setClaimError(false);
+    try {
+      await claimLevel(levelId).unwrap();
+      setWin(true);
+    } catch {
+      setClaimError(true);
+    }
+  }, [levelId, claimLevel]);
 
   if (startError) {
     return (
@@ -211,6 +235,34 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
           </Text>
           <TouchableOpacity
             style={[styles.backButton, { borderColor: colors.primary }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.backButtonText, { color: colors.primary }]}>Back to levels</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (claimError) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <CloseButton onPress={onClose} />
+        <View style={styles.centered}>
+          <Text style={[styles.winTitle, { color: colors.success ?? colors.primary }]}>
+            Level complete
+          </Text>
+          <Text style={[styles.lostSub, { color: colors.text?.secondary ?? colors.primary }]}>
+            Claiming the reward failed. Tap Retry to try again.
+          </Text>
+          <TouchableOpacity
+            style={[styles.backButton, { borderColor: colors.primary }]}
+            onPress={handleRetryClaim}
+          >
+            <Text style={[styles.backButtonText, { color: colors.primary }]}>Retry claim</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.backButton, { borderColor: colors.primary, marginTop: SIZING.spacing.sm }]}
             onPress={onClose}
           >
             <Text style={[styles.backButtonText, { color: colors.primary }]}>Back to levels</Text>

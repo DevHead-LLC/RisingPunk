@@ -22,7 +22,7 @@ import {
   type PacketBreachSessionResponse,
 } from '../store/api/packetBreachApi';
 
-/** Tier reward label and level range for display; order matches tier number. Tiers 7–9 use 4-node pool and Decoy. */
+/** Tier reward label and level range for display; order matches tier number. Tiers 7+ use 4-node pool and Decoy. */
 const TIER_CONFIGS: { tier: number; rewardLabel: string; levelRange: string }[] = [
   { tier: 1, rewardLabel: 'Attack +0.5', levelRange: '1.1–1.5' },
   { tier: 2, rewardLabel: 'Health +1', levelRange: '2.1–2.5' },
@@ -33,6 +33,18 @@ const TIER_CONFIGS: { tier: number; rewardLabel: string; levelRange: string }[] 
   { tier: 7, rewardLabel: 'Attack +1.5', levelRange: '7.1–7.5' },
   { tier: 8, rewardLabel: 'Health +3', levelRange: '8.1–8.5' },
   { tier: 9, rewardLabel: 'Defense +0.50%', levelRange: '9.1–9.5' },
+  { tier: 10, rewardLabel: 'Attack +2', levelRange: '10.1–10.5' },
+  { tier: 11, rewardLabel: 'Health +4', levelRange: '11.1–11.5' },
+  { tier: 12, rewardLabel: 'Defense +0.70%', levelRange: '12.1–12.5' },
+  { tier: 13, rewardLabel: 'Attack +2.5', levelRange: '13.1–13.5' },
+  { tier: 14, rewardLabel: 'Health +5', levelRange: '14.1–14.5' },
+  { tier: 15, rewardLabel: 'Defense +0.90%', levelRange: '15.1–15.5' },
+  { tier: 16, rewardLabel: 'Attack +3', levelRange: '16.1–16.5' },
+  { tier: 17, rewardLabel: 'Health +6', levelRange: '17.1–17.5' },
+  { tier: 18, rewardLabel: 'Defense +1.10%', levelRange: '18.1–18.5' },
+  { tier: 19, rewardLabel: 'Attack +3.5', levelRange: '19.1–19.5' },
+  { tier: 20, rewardLabel: 'Health +7', levelRange: '20.1–20.5' },
+  { tier: 21, rewardLabel: 'Defense +1.30%', levelRange: '21.1–21.5' },
 ];
 
 const GAME_RULES_TEXT = `PACKET BREACH — HOW TO PLAY
@@ -59,7 +71,8 @@ Use these counts to narrow down the solution on your next guess.
 RULES BY TIER
 • From level 1: Every level has a hidden trap (anti-solution) sequence. If your guess exactly matches this trap sequence, you lose all remaining attempts for that run ("You've Been Traced!"). Use the Routed / Misrouted / Rejected hints to avoid the trap and find the real solution.
 • Tiers 1–6: The solution is a hidden sequence of three nodes from a pool of three. It is randomized each time you start or retry a level.
-• Tier 7 and above: The node pool has four nodes; one is a decoy (you don't know which). The solution uses only three of them. If you include the decoy in your sequence, that attempt returns no hint (no Routed/Misrouted/Rejected). The anti-solution (trap) still applies.
+• Tier 7–12: The node pool has four nodes; one is a decoy (you don't know which). The solution uses only three of them. If you include the decoy in your sequence, that attempt returns no hint (no Routed/Misrouted/Rejected). The anti-solution (trap) still applies.
+• Tier 13 and above: The node pool has five nodes; one is a decoy. The solution uses three of the other four. Same decoy rule: including the decoy gives no hint. The anti-solution (trap) still applies.
 
 WIN
 Your sequence exactly matches the solution → you breach the node and complete the level. Complete all levels in a tier to unlock that tier's Infantry reward.`;

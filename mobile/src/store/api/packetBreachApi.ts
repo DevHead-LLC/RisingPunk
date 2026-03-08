@@ -162,10 +162,11 @@ export const packetBreachApi = createApi({
         method: 'POST',
         body: { levelId },
       }),
-      invalidatesTags: ['PacketBreach', 'Bots', 'User'],
+      invalidatesTags: ['PacketBreach'],
       async onQueryStarted(_, { queryFulfilled, dispatch }) {
         try {
           await queryFulfilled;
+          // Bots/army stats updated by claim; refetch so UI shows new Infantry bonus.
           dispatch(
             botsApi.endpoints.fetchBotStatsBreakdown.initiate(undefined, { forceRefetch: true })
           );

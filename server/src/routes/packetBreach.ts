@@ -98,7 +98,34 @@ function generateDigitsPuzzleWithDecoy(): {
   return { nodePool, solution, antiSolution, decoyNodeId };
 }
 
-/** Generate node pool and solution/anti. Tiers 1–6: 3-node digits. Tier 7+: 4-node with decoy. */
+/** Tier 13+: pool of 5 nodes (1–5), one random node is the decoy. Solution/anti use 3 from the other 4. */
+function generateDigitsPuzzleWithDecoy5(): {
+  nodePool: NodeDef[];
+  solution: string[];
+  antiSolution: string[];
+  decoyNodeId: string;
+} {
+  const nodePool: NodeDef[] = [
+    { id: '1', protocol: 'tcp', port: 1 },
+    { id: '2', protocol: 'udp', port: 2 },
+    { id: '3', protocol: 'ssh', port: 3 },
+    { id: '4', protocol: 'http', port: 4 },
+    { id: '5', protocol: 'https', port: 5 },
+  ];
+  const allIds = ['1', '2', '3', '4', '5'];
+  const decoyIndex = Math.floor(Math.random() * 5);
+  const decoyNodeId = allIds[decoyIndex];
+  const activeIds = allIds.filter((_, i) => i !== decoyIndex);
+  const randActive = () => activeIds[Math.floor(Math.random() * 4)];
+  const solution: string[] = [randActive(), randActive(), randActive()];
+  let antiSolution: string[] = [randActive(), randActive(), randActive()];
+  while (antiSolution.every((d, i) => d === solution[i])) {
+    antiSolution = [randActive(), randActive(), randActive()];
+  }
+  return { nodePool, solution, antiSolution, decoyNodeId };
+}
+
+/** Generate node pool and solution/anti. Tiers 1–6: 3-node. Tier 7–12: 4-node with decoy. Tier 13+: 5-node with decoy. */
 function generatePuzzle(levelId: LevelId): {
   nodePool: NodeDef[];
   solution: string[];
@@ -113,7 +140,10 @@ function generatePuzzle(levelId: LevelId): {
   if (params.slots === 3 && params.nodeTypes === 4 && params.tier >= 7) {
     return generateDigitsPuzzleWithDecoy();
   }
-  if (params.slots !== 3 || (params.nodeTypes !== 3 && params.nodeTypes !== 4)) {
+  if (params.slots === 3 && params.nodeTypes === 5 && params.tier >= 13) {
+    return generateDigitsPuzzleWithDecoy5();
+  }
+  if (params.slots !== 3 || (params.nodeTypes !== 3 && params.nodeTypes !== 4 && params.nodeTypes !== 5)) {
     throw new Error('Invalid level params');
   }
   const protocols = PROTOCOLS.slice(0, params.nodeTypes);
