@@ -487,18 +487,18 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       ? { routed: 0, misrouted: 0, rejected: 0 }
       : computeFeedback(session.solution, sequence);
     session.attemptsLeft--;
+    if (win) {
+      await User.updateOne(
+        { _id: userId },
+        { $addToSet: { 'packetBreach.pendingClaimLevelIds': levelId } }
+      );
+    }
     if (session.attemptsLeft === 0) {
       await PacketBreachSession.deleteOne({ userId: req.user!._id, levelId });
     } else {
       await PacketBreachSession.updateOne(
         { userId: req.user!._id, levelId },
         { $set: { attemptsLeft: session.attemptsLeft } }
-      );
-    }
-    if (win) {
-      await User.updateOne(
-        { _id: userId },
-        { $addToSet: { 'packetBreach.pendingClaimLevelIds': levelId } }
       );
     }
     if (decoyUsed) {
