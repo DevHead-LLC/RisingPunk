@@ -27,6 +27,7 @@ export interface IUser extends Document {
   unlockedFeatures: {
     hackRig: boolean;
     researchCenter: boolean;
+    programmingFacility: boolean;
     rentalHousing1: boolean;
     rentalHousing2: boolean;
     rentalHousing3: boolean;
@@ -117,6 +118,10 @@ export interface IUser extends Document {
     awardedAmounts?: number[];
     /** Start of UTC day when user last claimed; used to allow only one claim per calendar day. */
     lastClaimedDateUtc?: Date;
+  };
+  /** Packet Breach: level IDs completed (e.g. ["1.1", "1.2"]). Linear unlock: next level unlocks when prior is completed. */
+  packetBreach?: {
+    levelsCompleted: string[];
   };
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
   blockedUserIds?: mongoose.Types.ObjectId[];
@@ -244,6 +249,10 @@ const userSchema = new Schema({
       default: false
     },
     researchCenter: {
+      type: Boolean,
+      default: false
+    },
+    programmingFacility: {
       type: Boolean,
       default: false
     },
@@ -492,6 +501,9 @@ const userSchema = new Schema({
     claimedDays: { type: [Number], default: [] },
     awardedAmounts: { type: [Number], default: undefined },
     lastClaimedDateUtc: { type: Date, required: false }
+  },
+  packetBreach: {
+    levelsCompleted: { type: [String], default: [] }
   },
   blockedUserIds: {
     type: [Schema.Types.ObjectId],

@@ -1,6 +1,14 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { BotType } from '../slices/botsSlice';
+
+export interface StatRow {
+  health: number;
+  offense: number;
+  defense: number;
+  speed: number;
+  range: number;
+}
 import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
@@ -62,6 +70,13 @@ export const botsApi = createApi({
     }),
     fetchBotStats: builder.query<{ botStats: any }, void>({
       query: () => '/api/bots/stats',
+      providesTags: ['Bots'],
+    }),
+    fetchBotStatsBreakdown: builder.query<
+      { userLevel: number; breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> },
+      void
+    >({
+      query: () => '/api/bots/stats-breakdown',
       providesTags: ['Bots'],
     }),
     startBuild: builder.mutation<any, { type: BotType; quantity: number; totalCost: number }>({
@@ -147,4 +162,4 @@ export const botsApi = createApi({
   }),
 });
 
-export const { useFetchBotsQuery, useFetchBuildStateQuery, useFetchBotStatsQuery, useStartBuildMutation, useAssignToBattalionMutation, useSpeedupBotBuildMutation } = botsApi;
+export const { useFetchBotsQuery, useFetchBuildStateQuery, useFetchBotStatsQuery, useFetchBotStatsBreakdownQuery, useStartBuildMutation, useAssignToBattalionMutation, useSpeedupBotBuildMutation } = botsApi;

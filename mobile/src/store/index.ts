@@ -22,6 +22,7 @@ import { leaderboardApi } from './api/leaderboardApi';
 import { userGuideApi } from './api/userGuideApi';
 import { privateMessagesApi } from './api/privateMessagesApi';
 import { dailyHaulApi } from './api/dailyHaulApi';
+import { packetBreachApi } from './api/packetBreachApi';
 
 export const store = configureStore({
   reducer: {
@@ -47,6 +48,7 @@ export const store = configureStore({
     [userGuideApi.reducerPath]: userGuideApi.reducer,
     [privateMessagesApi.reducerPath]: privateMessagesApi.reducer,
     [dailyHaulApi.reducerPath]: dailyHaulApi.reducer,
+    [packetBreachApi.reducerPath]: packetBreachApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -68,7 +70,8 @@ export const store = configureStore({
     .concat(leaderboardApi.middleware)
     .concat(userGuideApi.middleware)
     .concat(privateMessagesApi.middleware)
-    .concat(dailyHaulApi.middleware),
+    .concat(dailyHaulApi.middleware)
+    .concat(packetBreachApi.middleware),
   devTools: __DEV__,
 });
 

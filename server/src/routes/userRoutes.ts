@@ -166,7 +166,8 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
       },
       unlockedFeatures: {
         hackRig: user.unlockedFeatures?.hackRig || false,
-        researchCenter: user.unlockedFeatures?.researchCenter || false
+        researchCenter: user.unlockedFeatures?.researchCenter || false,
+        programmingFacility: user.unlockedFeatures?.programmingFacility || false
       },
       profileGender: user.profileGender || 'male',
       emailVerified: user.emailVerified || false,
@@ -280,12 +281,60 @@ router.post('/unlock-hack-rig', auth, async (req: Request, res: Response) => {
       level: user.level,
       unlockedFeatures: {
         hackRig: user.unlockedFeatures?.hackRig || false,
-        researchCenter: user.unlockedFeatures?.researchCenter || false
+        researchCenter: user.unlockedFeatures?.researchCenter || false,
+        programmingFacility: user.unlockedFeatures?.programmingFacility || false
       }
     });
   } catch (error) {
     console.error('Server error:', error);
     res.status(500).json({ message: 'Error unlocking hack rig' });
+  }
+});
+
+const PROGRAMMING_FACILITY_UNLOCK_COST = 1_000_000;
+
+router.post('/unlock-programming-facility', auth, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+    if (user.level < 20) {
+      res.status(403).json({ message: 'Programming Facility unlocks at level 20.' });
+      return;
+    }
+    if (user.unlockedFeatures?.programmingFacility) {
+      res.status(400).json({ message: 'Programming Facility is already unlocked.' });
+      return;
+    }
+    if (user.balance.total < PROGRAMMING_FACILITY_UNLOCK_COST) {
+      res.status(400).json({
+        message: `Insufficient balance. Unlock costs $${PROGRAMMING_FACILITY_UNLOCK_COST.toLocaleString()}.`
+      });
+      return;
+    }
+    user.balance.total -= PROGRAMMING_FACILITY_UNLOCK_COST;
+    if (!user.unlockedFeatures) user.unlockedFeatures = {} as IUser['unlockedFeatures'];
+    (user.unlockedFeatures as any).programmingFacility = true;
+    await user.save();
+
+    res.json({
+      success: true,
+      balance: {
+        total: user.balance.total,
+        ratePerSecond: user.balance.ratePerSecond,
+        lastUpdated: user.balance.lastUpdated.toISOString()
+      },
+      unlockedFeatures: {
+        hackRig: user.unlockedFeatures?.hackRig || false,
+        researchCenter: user.unlockedFeatures?.researchCenter || false,
+        programmingFacility: true
+      }
+    });
+  } catch (error) {
+    console.error('Server error unlocking programming facility:', error);
+    res.status(500).json({ message: 'Error unlocking Programming Facility' });
   }
 });
 
@@ -443,7 +492,8 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
       },
       unlockedFeatures: {
         hackRig: user.unlockedFeatures?.hackRig || false,
-        researchCenter: user.unlockedFeatures?.researchCenter || false
+        researchCenter: user.unlockedFeatures?.researchCenter || false,
+        programmingFacility: user.unlockedFeatures?.programmingFacility || false
       }
     });
   } catch (error) {
@@ -545,7 +595,8 @@ router.post('/speedup-research-center-construction', auth, async (req: Request, 
     },
     unlockedFeatures: {
       hackRig: updatedUser.unlockedFeatures?.hackRig || false,
-      researchCenter: true
+      researchCenter: true,
+      programmingFacility: updatedUser.unlockedFeatures?.programmingFacility || false
     }
   });
 });

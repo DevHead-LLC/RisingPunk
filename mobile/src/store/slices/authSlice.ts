@@ -19,6 +19,8 @@ export interface User {
   level: number;
   unlockedFeatures: {
     hackRig: boolean;
+    researchCenter?: boolean;
+    programmingFacility?: boolean;
   };
   profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
@@ -982,6 +984,11 @@ export const authSlice = createSlice({
         state.user.level = action.payload;
       }
     },
+    setProgrammingFacilityUnlocked: (state) => {
+      if (state.user?.unlockedFeatures) {
+        state.user.unlockedFeatures.programmingFacility = true;
+      }
+    },
     handleAccountSwitched: (state, action) => {
       // Prevent multiple calls - if already logged out, don't process again
       if (!state.token) {
@@ -1318,7 +1325,7 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserLevel, handleAccountSwitched } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserLevel, setProgrammingFacilityUnlocked, handleAccountSwitched } = authSlice.actions;
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;

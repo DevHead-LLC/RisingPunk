@@ -11,6 +11,8 @@ import {ResearchScreen} from './ResearchScreen';
 import {useThemeColors} from '../hooks/useThemeColors';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {DailyHaulLocation} from '../components/turf/DailyHaulLocation';
+import {ProgrammingFacilityLocation} from '../components/turf/ProgrammingFacilityLocation';
+import {ProgrammingFacilityCurtain} from '../components/turf/ProgrammingFacilityCurtain';
 import {HomeLocation} from '../components/turf/HomeLocation';
 import {DigitalBarracksLocation} from '../components/turf/DigitalBarracksLocation';
 import {ResearchCenterLocation} from '../components/turf/ResearchCenterLocation';
@@ -18,6 +20,8 @@ import {DevelopmentZone, RentalHousingLocation, FutureBuildingPlaceholder} from 
 import {BattlePreparationScreen} from './BattlePreparationScreen';
 import {BattleGridScreen} from './BattleGridScreen';
 import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
+import {PacketBreachLevelScreen} from './PacketBreachLevelScreen';
+import {PacketBreachGameScreen} from './PacketBreachGameScreen';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
 import {fetchInitialData, setOnboardingCompleted, setShowOnboarding, setShowEmailVerification, setEmailVerificationPrompted, refreshUserDataSilent} from '../store/slices/authSlice';
@@ -178,6 +182,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
   const [previousScreen, setPreviousScreen] = useState<TurfScreenName>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
+  const [packetBreachLevelId, setPacketBreachLevelId] = useState<string | null>(null);
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
@@ -716,7 +721,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     setCurrentIntroStep(step);
   }, []);
 
-  const navigateToScreen = useCallback((screen: 'turf' | 'hackRig' | 'barracks' | 'botAssembly' | 'battlePrep' | 'battle' | 'map' | 'profile' | 'research' | 'investmentProperty') => {
+  const navigateToScreen = useCallback((screen: TurfScreenName) => {
     const previousScreenBeforeUpdate = currentScreen;
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
@@ -1163,6 +1168,37 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             }
           }}
         />;
+      case 'packetBreachLevels':
+        return (
+          <PacketBreachLevelScreen
+            onClose={() => navigateToScreen('turf')}
+            onSelectLevel={(levelId) => {
+              setPacketBreachLevelId(levelId);
+              navigateToScreen('packetBreachGame');
+            }}
+          />
+        );
+      case 'packetBreachGame':
+        if (!packetBreachLevelId) {
+          return (
+            <PacketBreachLevelScreen
+              onClose={() => navigateToScreen('turf')}
+              onSelectLevel={(levelId) => {
+                setPacketBreachLevelId(levelId);
+                navigateToScreen('packetBreachGame');
+              }}
+            />
+          );
+        }
+        return (
+          <PacketBreachGameScreen
+            levelId={packetBreachLevelId}
+            onClose={() => {
+              setPacketBreachLevelId(null);
+              navigateToScreen('packetBreachLevels');
+            }}
+          />
+        );
       default:
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1279,6 +1315,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       }} 
                       isIntroActive={currentIntroStep === 'research'}
                     />
+                    {(user && (user.level < 20 || !user.unlockedFeatures?.programmingFacility)) && (
+                      <ProgrammingFacilityCurtain showUnlockPrice={user.level >= 20} />
+                    )}
+                    <ProgrammingFacilityLocation onSelectPacketBreach={() => navigateToScreen('packetBreachLevels')} />
                     <DevelopmentZone buildingProperties={buildingProperties}>
                       {/* Property 2: Conditionally render based on Property 1's unlock status */}
                       {(() => {
@@ -1363,9 +1403,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                         }
                       }
                       navigateToScreen('research');
-                    }} 
+                    }}
                     isIntroActive={currentIntroStep === 'research'}
                   />
+                  {(user && (user.level < 20 || !user.unlockedFeatures?.programmingFacility)) && (
+                    <ProgrammingFacilityCurtain showUnlockPrice={user.level >= 20} />
+                  )}
+                  <ProgrammingFacilityLocation onSelectPacketBreach={() => navigateToScreen('packetBreachLevels')} />
                   <DevelopmentZone buildingProperties={buildingProperties}>
                     {/* Property 2: Conditionally render based on Property 1's unlock status */}
                     {(() => {

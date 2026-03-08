@@ -21,12 +21,14 @@ export class BattleSetupService {
   static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Get user level for bot stat calculations
+    // Get attacker level and army bonus (e.g. Packet Breach tier rewards) for bot stat calculations
     let userLevel = 1;
+    let attackerArmyBonus: { strength: number; defense: number; speed: number; health: number } | undefined;
     if (attackerId !== 'computer-opponent') {
       try {
-        const user = await User.findById(attackerId);
-        userLevel = user?.level || 1;
+        const attacker = await User.findById(attackerId);
+        userLevel = attacker?.level || 1;
+        attackerArmyBonus = attacker?.armyBonus;
       } catch (error) {
         console.warn('Could not fetch user level, using default level 1:', error);
       }
@@ -98,14 +100,14 @@ export class BattleSetupService {
       }
     }
     
-    // Calculate total army health using new BotService
+    // Calculate total army health using new BotService (attacker army bonus applied for breacher)
     let userTotal = 0;
     for (const battalion of userBattalions) {
       if (!battalion.quantity || battalion.quantity <= 0) {
         continue;
       }
       const botType = battalion.type as BotType;
-      const botConfig = await BotService.getUserBotStats(botType, userLevel);
+      const botConfig = await BotService.getUserBotStats(botType, userLevel, attackerArmyBonus);
       userTotal += botConfig.stats.health * battalion.quantity;
     }
     
@@ -123,11 +125,12 @@ export class BattleSetupService {
       const BotModel = mongoose.model('Bot');
       const defenderBots = await BotModel.findOne({ userId: defenderId });
       
-      // Calculate total health for all available bots in defender's inventory
+      // Calculate total health for all available bots in defender's inventory (defender army bonus for breacher)
+      const defenderArmyBonus = defender.armyBonus;
       if (defenderBots && defenderBots.bots) {
         for (const [botType, quantity] of Object.entries(defenderBots.bots)) {
           if (typeof quantity === 'number' && quantity > 0) {
-            const botConfig = await BotService.getUserBotStats(botType as BotType, defenderLevel);
+            const botConfig = await BotService.getUserBotStats(botType as BotType, defenderLevel, defenderArmyBonus);
             enemyTotal += botConfig.stats.health * quantity;
           }
         }
@@ -151,7 +154,7 @@ export class BattleSetupService {
     // Now create nodes with the correct total army health
     const nodes = createNodesWithTugOfWar(totalArmyHealth, screenWidth, screenHeight);
     
-    const userBattalionsList = await BattalionService.createUserBattalions(nodes, userLevel, userBattalions);
+    const userBattalionsList = await BattalionService.createUserBattalions(nodes, userLevel, userBattalions, attackerArmyBonus);
 
     let enemyBattalions: IBattalion[];
     if (isUserDefender) {
