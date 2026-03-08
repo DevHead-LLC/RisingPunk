@@ -22,6 +22,7 @@ import {BattleGridScreen} from './BattleGridScreen';
 import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
 import {PacketBreachLevelScreen} from './PacketBreachLevelScreen';
 import {PacketBreachGameScreen} from './PacketBreachGameScreen';
+import type { PacketBreachSessionResponse } from '../store/api/packetBreachApi';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
 import {fetchInitialData, setOnboardingCompleted, setShowOnboarding, setShowEmailVerification, setEmailVerificationPrompted, refreshUserDataSilent} from '../store/slices/authSlice';
@@ -183,6 +184,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [previousScreen, setPreviousScreen] = useState<TurfScreenName>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
   const [packetBreachLevelId, setPacketBreachLevelId] = useState<string | null>(null);
+  const [packetBreachInitialSession, setPacketBreachInitialSession] = useState<PacketBreachSessionResponse | null>(null);
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
@@ -1172,8 +1174,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         return (
           <PacketBreachLevelScreen
             onClose={() => navigateToScreen('turf')}
-            onSelectLevel={(levelId) => {
+            onSelectLevel={(levelId, session) => {
               setPacketBreachLevelId(levelId);
+              setPacketBreachInitialSession(session ?? null);
               navigateToScreen('packetBreachGame');
             }}
           />
@@ -1183,8 +1186,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           return (
             <PacketBreachLevelScreen
               onClose={() => navigateToScreen('turf')}
-              onSelectLevel={(levelId) => {
+              onSelectLevel={(levelId, session) => {
                 setPacketBreachLevelId(levelId);
+                setPacketBreachInitialSession(session ?? null);
                 navigateToScreen('packetBreachGame');
               }}
             />
@@ -1193,8 +1197,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         return (
           <PacketBreachGameScreen
             levelId={packetBreachLevelId}
+            initialSession={packetBreachInitialSession}
             onClose={() => {
               setPacketBreachLevelId(null);
+              setPacketBreachInitialSession(null);
               navigateToScreen('packetBreachLevels');
             }}
           />

@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import auth from '../middleware/auth';
 import { User } from '../models/User';
+import { PacketBreachSession } from '../models/PacketBreachSession';
 import {
   getLevelParams,
   getLevelIdsForPhase1,
@@ -33,12 +34,16 @@ interface SessionData {
   decoyNodeId?: string;
 }
 
-const sessionStore = new Map<string, SessionData>();
-/** Keys (userId:levelId) that are allowed to call claim — set when submit returns win. */
-const pendingClaimStore = new Set<string>();
-
-function sessionKey(userId: string, levelId: string): string {
-  return `${userId}:${levelId}`;
+function docToSessionData(doc: { solution: string[]; antiSolution: string[]; attemptsLeft: number; nodePool: NodeDef[]; slots: number; firstAttemptPaid: boolean; decoyNodeId?: string }): SessionData {
+  return {
+    solution: [...doc.solution],
+    antiSolution: [...doc.antiSolution],
+    attemptsLeft: doc.attemptsLeft,
+    nodePool: doc.nodePool.map((n) => ({ id: n.id, protocol: n.protocol, port: n.port })),
+    slots: doc.slots,
+    firstAttemptPaid: doc.firstAttemptPaid,
+    ...(doc.decoyNodeId != null && { decoyNodeId: doc.decoyNodeId }),
+  };
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -249,9 +254,8 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Level already completed' });
       return;
     }
-    const key = sessionKey(userId, levelId);
-    let session = sessionStore.get(key);
-    if (!session) {
+    let sessionDoc = await PacketBreachSession.findOne({ userId: user._id, levelId }).lean();
+    if (!sessionDoc) {
       const cost = getCostForLevel(levelId);
       const now = new Date();
       const bal = user.balance;
@@ -283,7 +287,7 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       );
       const puzzle = generatePuzzle(levelId);
       const { nodePool, solution, antiSolution } = puzzle;
-      session = {
+      const session: SessionData = {
         solution,
         antiSolution,
         attemptsLeft: params.attempts,
@@ -292,7 +296,11 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         firstAttemptPaid: false,
         ...(puzzle.decoyNodeId != null && { decoyNodeId: puzzle.decoyNodeId }),
       };
-      sessionStore.set(key, session);
+      await PacketBreachSession.create({
+        userId: user._id,
+        levelId,
+        ...session,
+      });
       res.json({
         nodePool: session.nodePool,
         slots: session.slots,
@@ -305,6 +313,7 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       });
       return;
     }
+    const session = docToSessionData(sessionDoc);
     res.json({
       nodePool: session.nodePool,
       slots: session.slots,
@@ -330,12 +339,12 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Invalid level' });
       return;
     }
-    const key = sessionKey(userId, levelId);
-    const session = sessionStore.get(key);
-    if (!session) {
+    const sessionDoc = await PacketBreachSession.findOne({ userId: req.user!._id, levelId });
+    if (!sessionDoc) {
       res.status(400).json({ error: 'No active session; start a session first' });
       return;
     }
+    const session = docToSessionData(sessionDoc);
     const validIds = new Set(session.nodePool.map((n) => n.id));
     if (sequence.length !== session.slots || sequence.some((id) => !validIds.has(id))) {
       res.status(400).json({ error: 'Invalid sequence length or node ids' });
@@ -367,7 +376,10 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
     const isFirstAttempt = session.firstAttemptPaid === false;
     if (isFirstAttempt) {
       session.firstAttemptPaid = true;
-      sessionStore.set(key, session);
+      await PacketBreachSession.updateOne(
+        { userId: req.user!._id, levelId },
+        { $set: { firstAttemptPaid: true } }
+      );
     } else {
       if (accrued.total < cost) {
         res.status(402).json({
@@ -395,7 +407,7 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       session.antiSolution.every((id, i) => id === sequence[i]);
     if (antiMatch) {
       session.attemptsLeft = 0;
-      sessionStore.delete(key);
+      await PacketBreachSession.deleteOne({ userId: req.user!._id, levelId });
       res.json({
         lostAllAttempts: true,
         antiSolutionTriggered: true,
@@ -413,24 +425,34 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
     }
     const decoyUsed =
       session.decoyNodeId != null && sequence.includes(session.decoyNodeId);
-    const feedback = computeFeedback(session.solution, sequence);
-    session.attemptsLeft--;
+    /** Winning sequence never contains decoy; solution does not use decoy node by design. */
     const win =
+      !decoyUsed &&
       session.solution.length === sequence.length &&
       session.solution.every((id, i) => id === sequence[i]);
+    const feedback = decoyUsed
+      ? { routed: 0, misrouted: 0, rejected: 0 }
+      : computeFeedback(session.solution, sequence);
+    session.attemptsLeft--;
     if (session.attemptsLeft === 0) {
-      sessionStore.delete(key);
+      await PacketBreachSession.deleteOne({ userId: req.user!._id, levelId });
     } else {
-      sessionStore.set(key, session);
+      await PacketBreachSession.updateOne(
+        { userId: req.user!._id, levelId },
+        { $set: { attemptsLeft: session.attemptsLeft } }
+      );
     }
     if (win) {
-      pendingClaimStore.add(key);
+      await User.updateOne(
+        { _id: userId },
+        { $addToSet: { 'packetBreach.pendingClaimLevelIds': levelId } }
+      );
     }
     if (decoyUsed) {
       res.json({
         decoyUsed: true,
         attemptsLeft: session.attemptsLeft,
-        win: win || undefined,
+        win: false,
         balance: {
           total: newTotal,
           ratePerSecond: bal?.ratePerSecond ?? 0,
@@ -481,10 +503,15 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
     const levelsCompleted: string[] = Array.isArray(user.packetBreach?.levelsCompleted)
       ? user.packetBreach!.levelsCompleted
       : [];
-    const key = sessionKey(userId, levelId);
+    const pendingClaimLevelIds: string[] = Array.isArray(user.packetBreach?.pendingClaimLevelIds)
+      ? user.packetBreach.pendingClaimLevelIds
+      : [];
     if (levelsCompleted.includes(levelId)) {
-      sessionStore.delete(key);
-      pendingClaimStore.delete(key);
+      await PacketBreachSession.deleteOne({ userId: user._id, levelId });
+      await User.updateOne(
+        { _id: userId },
+        { $pull: { 'packetBreach.pendingClaimLevelIds': levelId } }
+      );
       res.json({ success: true, levelsCompleted });
       return;
     }
@@ -497,11 +524,14 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
       res.status(403).json({ error: 'Level not unlocked' });
       return;
     }
-    if (!pendingClaimStore.has(key)) {
+    if (!pendingClaimLevelIds.includes(levelId)) {
       res.status(403).json({ error: 'Win the level before claiming' });
       return;
     }
-    pendingClaimStore.delete(key);
+    await User.updateOne(
+      { _id: userId },
+      { $pull: { 'packetBreach.pendingClaimLevelIds': levelId } }
+    );
     const updated = await User.findByIdAndUpdate(
       userId,
       { $addToSet: { 'packetBreach.levelsCompleted': levelId } },
@@ -517,7 +547,7 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
     // Recompute from all completed levels so every tier reward (1–6+) is included
     const armyBonus = computePacketBreachArmyBonus(newCompleted);
     await User.updateOne({ _id: userId }, { $set: { armyBonus } });
-    sessionStore.delete(key);
+    await PacketBreachSession.deleteOne({ userId: user._id, levelId });
     res.json({ success: true, levelsCompleted: newCompleted });
   } catch (error: unknown) {
     console.error('Packet Breach claim error:', error);

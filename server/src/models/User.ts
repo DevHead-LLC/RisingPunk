@@ -122,6 +122,8 @@ export interface IUser extends Document {
   /** Packet Breach: level IDs completed (e.g. ["1.1", "1.2"]). Linear unlock: next level unlocks when prior is completed. */
   packetBreach?: {
     levelsCompleted: string[];
+    /** Level IDs won but not yet claimed; allows claim after server restart. */
+    pendingClaimLevelIds?: string[];
   };
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
   blockedUserIds?: mongoose.Types.ObjectId[];
@@ -503,7 +505,8 @@ const userSchema = new Schema({
     lastClaimedDateUtc: { type: Date, required: false }
   },
   packetBreach: {
-    levelsCompleted: { type: [String], default: [] }
+    levelsCompleted: { type: [String], default: [] },
+    pendingClaimLevelIds: { type: [String], default: [] }
   },
   blockedUserIds: {
     type: [Schema.Types.ObjectId],

@@ -31,6 +31,8 @@ type AttemptEntry = {
 
 type PacketBreachGameScreenProps = {
   levelId: string;
+  /** When present (e.g. from level screen after startSession), use this and do not call startSession again to avoid double charge. */
+  initialSession?: { nodePool: NodeDef[]; slots: number; attemptsLeft: number } | null;
   onClose: () => void;
 };
 
@@ -65,7 +67,7 @@ const DIGIT_IMAGES: Record<string, number> = {
   http: require('../assets/images/miniGame/https.png'),
 };
 
-export function PacketBreachGameScreen({ levelId, onClose }: PacketBreachGameScreenProps) {
+export function PacketBreachGameScreen({ levelId, initialSession, onClose }: PacketBreachGameScreenProps) {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const digitColor = themeMode === 'light' ? colors.secondary : (colors.matrix ?? colors.success);
@@ -87,6 +89,18 @@ export function PacketBreachGameScreen({ levelId, onClose }: PacketBreachGameScr
   useGetPacketBreachStatusQuery(undefined, { refetchOnMountOrArgChange: true });
 
   useEffect(() => {
+    if (initialSession) {
+      setNodePool(initialSession.nodePool);
+      setSlots(initialSession.slots);
+      setAttemptsLeft(initialSession.attemptsLeft);
+      setSequence([]);
+      setAttemptHistory([]);
+      setWin(false);
+      setLostAll(false);
+      setAntiSolutionTriggered(false);
+      lostOrWonRef.current = false;
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
@@ -112,7 +126,7 @@ export function PacketBreachGameScreen({ levelId, onClose }: PacketBreachGameScr
     return () => {
       cancelled = true;
     };
-  }, [levelId, startSession]);
+  }, [levelId, startSession, initialSession]);
 
   const addToSequence = useCallback(
     (nodeId: string) => {

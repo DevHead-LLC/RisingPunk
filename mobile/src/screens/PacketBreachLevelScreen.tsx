@@ -19,6 +19,7 @@ import {
   useGetPacketBreachStatusQuery,
   useStartPacketBreachSessionMutation,
   type PacketBreachLevelConfig,
+  type PacketBreachSessionResponse,
 } from '../store/api/packetBreachApi';
 
 /** Tier reward label and level range for display; order matches tier number. Tiers 7–9 use 4-node pool and Decoy. */
@@ -65,7 +66,8 @@ Your sequence exactly matches the solution → you breach the node and complete 
 
 type PacketBreachLevelScreenProps = {
   onClose: () => void;
-  onSelectLevel: (levelId: string) => void;
+  /** levelId and optional session from startSession (avoids game screen calling startSession again and double-charging). */
+  onSelectLevel: (levelId: string, session?: PacketBreachSessionResponse) => void;
 };
 
 function formatCost(cost: number): string {
@@ -165,10 +167,10 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
       if (!config?.isUnlocked || config?.isCompleted || numericBalance < (config.cost ?? 0)) return;
       setStartingLevelId(levelId);
       try {
-        await startSession(levelId).unwrap();
+        const result = await startSession(levelId).unwrap();
         setTimeout(() => {
           setStartingLevelId(null);
-          onSelectLevel(levelId);
+          onSelectLevel(levelId, result);
         }, ENTRY_DEDUCTION_DELAY_MS);
       } catch (err: unknown) {
         setStartingLevelId(null);

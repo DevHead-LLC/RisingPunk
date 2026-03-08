@@ -17,6 +17,7 @@ import {
 import { getResearchCenterLevelConfig, getResearchCenterMaxLevel, type ResearchCenterLevel } from '../config/researchCenterConfig';
 import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
 import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
+import { accrueBalanceToTime } from '../utils/balanceAccrual';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -308,23 +309,40 @@ router.post('/unlock-programming-facility', auth, async (req: Request, res: Resp
       res.status(400).json({ message: 'Programming Facility is already unlocked.' });
       return;
     }
-    if (user.balance.total < PROGRAMMING_FACILITY_UNLOCK_COST) {
-      res.status(400).json({
+    const now = new Date();
+    const bal = user.balance;
+    const accrued = accrueBalanceToTime(
+      bal?.total ?? 0,
+      bal?.ratePerSecond ?? 0,
+      bal?.lastUpdated ?? now,
+      bal?.fractionalRemainder ?? 0,
+      now
+    );
+    if (accrued.total < PROGRAMMING_FACILITY_UNLOCK_COST) {
+      res.status(402).json({
         message: `Insufficient balance. Unlock costs $${PROGRAMMING_FACILITY_UNLOCK_COST.toLocaleString()}.`
       });
       return;
     }
-    user.balance.total -= PROGRAMMING_FACILITY_UNLOCK_COST;
-    if (!user.unlockedFeatures) user.unlockedFeatures = {} as IUser['unlockedFeatures'];
-    (user.unlockedFeatures as any).programmingFacility = true;
-    await user.save();
+    const newTotal = accrued.total - PROGRAMMING_FACILITY_UNLOCK_COST;
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          'balance.total': newTotal,
+          'balance.lastUpdated': accrued.lastUpdated,
+          'balance.fractionalRemainder': accrued.fractionalRemainder,
+          'unlockedFeatures.programmingFacility': true,
+        },
+      }
+    );
 
     res.json({
       success: true,
       balance: {
-        total: user.balance.total,
-        ratePerSecond: user.balance.ratePerSecond,
-        lastUpdated: user.balance.lastUpdated.toISOString()
+        total: newTotal,
+        ratePerSecond: bal?.ratePerSecond ?? 0,
+        lastUpdated: accrued.lastUpdated.toISOString()
       },
       unlockedFeatures: {
         hackRig: user.unlockedFeatures?.hackRig || false,
