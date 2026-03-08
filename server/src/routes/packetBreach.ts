@@ -493,7 +493,7 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
         { $addToSet: { 'packetBreach.pendingClaimLevelIds': levelId } }
       );
     }
-    if (session.attemptsLeft === 0) {
+    if (win || session.attemptsLeft === 0) {
       await PacketBreachSession.deleteOne({ userId: req.user!._id, levelId });
     } else {
       await PacketBreachSession.updateOne(
@@ -581,13 +581,12 @@ router.post('/claim', auth, async (req: Request, res: Response) => {
       res.status(403).json({ error: 'Win the level before claiming' });
       return;
     }
-    await User.updateOne(
-      { _id: userId },
-      { $pull: { 'packetBreach.pendingClaimLevelIds': levelId } }
-    );
     const updated = await User.findByIdAndUpdate(
       userId,
-      { $addToSet: { 'packetBreach.levelsCompleted': levelId } },
+      {
+        $pull: { 'packetBreach.pendingClaimLevelIds': levelId },
+        $addToSet: { 'packetBreach.levelsCompleted': levelId },
+      },
       { new: true }
     );
     if (!updated) {

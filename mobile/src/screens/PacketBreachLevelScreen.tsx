@@ -92,15 +92,19 @@ function LevelCell({
   colors,
   onPress,
   canAfford,
-  isStarting,
+  isSessionStarting,
+  isThisLevelStarting,
 }: {
   config: PacketBreachLevelConfig;
   colors: ReturnType<typeof useThemeColors>;
   onPress: () => void;
   canAfford: boolean;
-  isStarting?: boolean;
+  /** True when any level is being started; disables tap on all cells to prevent double start/charge. */
+  isSessionStarting: boolean;
+  /** True when this level is the one being started; shows spinner on this cell only. */
+  isThisLevelStarting: boolean;
 }) {
-  const canTap = config.isUnlocked && !config.isCompleted && canAfford && !isStarting;
+  const canTap = config.isUnlocked && !config.isCompleted && canAfford && !isSessionStarting;
   const costLabel = formatCost(config.cost ?? 0);
   const content = (
     <View
@@ -118,12 +122,12 @@ function LevelCell({
       <Text style={[styles.levelCost, { color: colors.text?.secondary ?? colors.primary }]}>
         {costLabel}
       </Text>
-      {isStarting && (
+      {isThisLevelStarting && (
         <View style={styles.levelOverlay} pointerEvents="none">
           <ActivityIndicator size="small" color={colors.primary} />
         </View>
       )}
-      {config.isCompleted && !isStarting && (
+      {config.isCompleted && !isThisLevelStarting && (
         <View style={styles.levelOverlay} pointerEvents="none">
           <Text style={[styles.defeatedX, { color: colors.error }]}>✗</Text>
         </View>
@@ -135,10 +139,10 @@ function LevelCell({
       <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.7}
-        disabled={!canAfford || isStarting}
+        disabled={!canAfford || isSessionStarting}
         accessible
         accessibilityLabel={
-          isStarting
+          isThisLevelStarting
             ? `Level ${config.levelId}, starting...`
             : canAfford
               ? `Level ${config.levelId}, ${costLabel} per attempt. Tap to play.`
@@ -243,7 +247,8 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
                         colors={colors}
                         onPress={() => handleSelectLevel(config.levelId)}
                         canAfford={numericBalance >= (config.cost ?? 0)}
-                        isStarting={startingLevelId === config.levelId}
+                        isSessionStarting={startingLevelId !== null}
+                        isThisLevelStarting={startingLevelId === config.levelId}
                       />
                     ))}
                   </View>
