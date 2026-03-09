@@ -87,6 +87,8 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
   const [insufficientFunds, setInsufficientFunds] = useState(false);
   /** When true, we got win from submit but claim API failed; user can retry claim. */
   const [claimError, setClaimError] = useState(false);
+  /** When true, a retry claim is in progress; keep showing claim UI to avoid flashing game board. */
+  const [claimingInProgress, setClaimingInProgress] = useState(false);
   const lostOrWonRef = useRef(false);
 
   const [startSession, { isLoading: starting, error: startError }] =
@@ -107,6 +109,7 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
       setAntiSolutionTriggered(false);
       setInsufficientFunds(false);
       setClaimError(false);
+      setClaimingInProgress(false);
       lostOrWonRef.current = false;
       return;
     }
@@ -125,6 +128,7 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
           setAntiSolutionTriggered(false);
           setInsufficientFunds(false);
           setClaimError(false);
+          setClaimingInProgress(false);
           lostOrWonRef.current = false;
         }
       } catch (_) {
@@ -133,6 +137,7 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
           setWin(false);
           setInsufficientFunds(false);
           setClaimError(false);
+          setClaimingInProgress(false);
         }
       }
     })();
@@ -197,11 +202,14 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
   }, [levelId, sequence, slots, submitting, win, lostAll, submitAttempt, claimLevel, nodePool]);
 
   const handleRetryClaim = useCallback(async () => {
-    setClaimError(false);
+    setClaimingInProgress(true);
     try {
       await claimLevel(levelId).unwrap();
+      setClaimingInProgress(false);
+      setClaimError(false);
       setWin(true);
     } catch {
+      setClaimingInProgress(false);
       setClaimError(true);
     }
   }, [levelId, claimLevel]);
@@ -248,7 +256,7 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
     );
   }
 
-  if (claimError) {
+  if (claimError || claimingInProgress) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <CloseButton onPress={onClose} />
@@ -256,15 +264,26 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
           <Text style={[styles.winTitle, { color: colors.success ?? colors.primary }]}>
             Level complete
           </Text>
-          <Text style={[styles.lostSub, { color: colors.text?.secondary ?? colors.primary }]}>
-            Claiming the reward failed. Tap Retry to try again.
-          </Text>
-          <TouchableOpacity
-            style={[styles.backButton, { borderColor: colors.primary }]}
-            onPress={handleRetryClaim}
-          >
-            <Text style={[styles.backButtonText, { color: colors.primary }]}>Retry claim</Text>
-          </TouchableOpacity>
+          {claimingInProgress ? (
+            <>
+              <Text style={[styles.lostSub, { color: colors.text?.secondary ?? colors.primary }]}>
+                Claiming reward…
+              </Text>
+              <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
+            </>
+          ) : (
+            <>
+              <Text style={[styles.lostSub, { color: colors.text?.secondary ?? colors.primary }]}>
+                Claiming the reward failed. Tap Retry to try again.
+              </Text>
+              <TouchableOpacity
+                style={[styles.backButton, { borderColor: colors.primary }]}
+                onPress={handleRetryClaim}
+              >
+                <Text style={[styles.backButtonText, { color: colors.primary }]}>Retry claim</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <TouchableOpacity
             style={[styles.backButton, { borderColor: colors.primary, marginTop: SIZING.spacing.sm }]}
             onPress={onClose}

@@ -66,7 +66,7 @@ function generateDigitsPuzzle(): { nodePool: NodeDef[]; solution: string[]; anti
   const randDigit = () => digits[Math.floor(Math.random() * 3)];
   const solution: string[] = [randDigit(), randDigit(), randDigit()];
   let antiSolution: string[] = [randDigit(), randDigit(), randDigit()];
-  while (antiSolution.every((d, i) => d === solution[i])) {
+  while (countDifferences(antiSolution, solution) < 2) {
     antiSolution = [randDigit(), randDigit(), randDigit()];
   }
   return { nodePool, solution, antiSolution };
