@@ -13,7 +13,7 @@ import { CloseButton } from '../components/common/CloseButton';
 import { Balance } from '../components/common/Balance';
 import { SIZING } from '../styles/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { useAppSelector } from '../store/hooks';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
 import {
   useGetPacketBreachStatusQuery,
@@ -21,6 +21,7 @@ import {
   type PacketBreachLevelConfig,
   type PacketBreachSessionResponse,
 } from '../store/api/packetBreachApi';
+import { balanceApi } from '../store/api/balanceApi';
 
 /** Tier reward label and level range for display; order matches tier number. Tiers 7+ use 4-node pool and Decoy. */
 const TIER_CONFIGS: { tier: number; rewardLabel: string; levelRange: string }[] = [
@@ -161,6 +162,7 @@ const ENTRY_DEDUCTION_DELAY_MS = 1000;
 
 export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreachLevelScreenProps) {
   const colors = useThemeColors();
+  const dispatch = useAppDispatch();
   const [showRules, setShowRules] = useState(false);
   const [startingLevelId, setStartingLevelId] = useState<string | null>(null);
   const entryDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,6 +172,10 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
     pollingInterval: 60000,
   });
   const [startSession] = useStartPacketBreachSessionMutation();
+
+  useEffect(() => {
+    dispatch(balanceApi.util.invalidateTags(['Balance']));
+  }, [dispatch]);
 
   useEffect(() => {
     return () => {

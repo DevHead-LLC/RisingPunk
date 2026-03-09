@@ -100,6 +100,7 @@ router.get('/stats-breakdown', auth, async (req, res) => {
     if (!armyBonusMatches) {
       await User.updateOne({ _id: user._id }, { $set: { armyBonus: programmingFromLevels } });
     }
+    const armyBonusForStats = armyBonusMatches ? storedArmyBonus : programmingFromLevels;
 
     const zeroRow = (): StatRow => ({ health: 0, offense: 0, defense: 0, speed: 0, range: 0 });
     const breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> = {};
@@ -125,7 +126,7 @@ router.get('/stats-breakdown', auth, async (req, res) => {
             }
           : zeroRow();
       const researchBonus = zeroRow(); // Placeholder for future research bonuses
-      const finalConfig = await BotService.getUserBotStats(botType, userLevel, storedArmyBonus);
+      const finalConfig = await BotService.getUserBotStats(botType, userLevel, armyBonusForStats);
       const s = finalConfig.stats;
       const total: StatRow = {
         health: Math.round(s.health * 100) / 100,

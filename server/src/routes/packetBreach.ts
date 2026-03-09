@@ -1,5 +1,4 @@
 import express, { Request, Response } from 'express';
-import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { User } from '../models/User';
 import { PacketBreachSession } from '../models/PacketBreachSession';
@@ -326,60 +325,54 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         ...(puzzle.decoyNodeId != null && { decoyNodeId: puzzle.decoyNodeId }),
       };
       const newTotal = accrued.total - cost;
-      const mongoSession = await mongoose.startSession();
-      type DuplicateSessionError = Error & { __duplicateSession: true; existingSessionData: SessionData };
       try {
-        await mongoSession.withTransaction(async () => {
-          try {
-            await PacketBreachSession.create(
-              { userId: user._id, levelId, ...sessionData },
-              { session: mongoSession }
+        await PacketBreachSession.create({ userId: user._id, levelId, ...sessionData });
+      } catch (createErr: unknown) {
+        const code = (createErr as { code?: number })?.code;
+        if (code === 11000) {
+          const existing = await PacketBreachSession.findOne({ userId: user._id, levelId }).lean();
+          if (existing) {
+            const existingSessionData = docToSessionData(existing);
+            const userNow = await User.findById(userId).lean();
+            const nowDup = new Date();
+            const balDup = userNow?.balance ?? user.balance;
+            const accruedDup = accrueBalanceToTime(
+              balDup?.total ?? 0,
+              balDup?.ratePerSecond ?? 0,
+              balDup?.lastUpdated ?? nowDup,
+              balDup?.fractionalRemainder ?? 0,
+              nowDup
             );
-          } catch (createErr: unknown) {
-            const code = (createErr as { code?: number })?.code;
-            if (code === 11000) {
-              const existing = await PacketBreachSession.findOne({
-                userId: user._id,
-                levelId,
-              })
-                .session(mongoSession)
-                .lean();
-              if (existing) {
-                const existingSessionData = docToSessionData(existing);
-                const err = new Error('Duplicate session') as DuplicateSessionError;
-                err.__duplicateSession = true;
-                err.existingSessionData = existingSessionData;
-                throw err;
-              }
-            }
-            throw createErr;
-          }
-          await User.updateOne(
-            { _id: userId },
-            {
-              $set: {
-                'balance.total': newTotal,
-                'balance.lastUpdated': accrued.lastUpdated,
-                'balance.fractionalRemainder': accrued.fractionalRemainder,
+            res.json({
+              nodePool: existingSessionData.nodePool,
+              slots: existingSessionData.slots,
+              attemptsLeft: existingSessionData.attemptsLeft,
+              balance: {
+                total: accruedDup.total,
+                ratePerSecond: balDup?.ratePerSecond ?? 0,
+                lastUpdated: accruedDup.lastUpdated.toISOString(),
               },
-            },
-            { session: mongoSession }
-          );
-        });
-      } catch (txErr: unknown) {
-        const dupErr = txErr as DuplicateSessionError;
-        if (dupErr?.__duplicateSession && dupErr.existingSessionData) {
-          const existing = dupErr.existingSessionData;
-          res.json({
-            nodePool: existing.nodePool,
-            slots: existing.slots,
-            attemptsLeft: existing.attemptsLeft,
-          });
-          return;
+            });
+            return;
+          }
         }
-        throw txErr;
-      } finally {
-        await mongoSession.endSession();
+        throw createErr;
+      }
+      try {
+        await User.updateOne(
+          { _id: userId },
+          {
+            $set: {
+              'balance.total': newTotal,
+              'balance.lastUpdated': accrued.lastUpdated,
+              'balance.fractionalRemainder': accrued.fractionalRemainder,
+            },
+          }
+        );
+      } catch {
+        await PacketBreachSession.deleteOne({ userId: user._id, levelId });
+        res.status(500).json({ error: 'Server error' });
+        return;
       }
       res.json({
         nodePool: sessionData.nodePool,
@@ -394,10 +387,24 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       return;
     }
     const session = docToSessionData(sessionDoc);
+    const nowExisting = new Date();
+    const balExisting = user.balance;
+    const accruedExisting = accrueBalanceToTime(
+      balExisting?.total ?? 0,
+      balExisting?.ratePerSecond ?? 0,
+      balExisting?.lastUpdated ?? nowExisting,
+      balExisting?.fractionalRemainder ?? 0,
+      nowExisting
+    );
     res.json({
       nodePool: session.nodePool,
       slots: session.slots,
       attemptsLeft: session.attemptsLeft,
+      balance: {
+        total: accruedExisting.total,
+        ratePerSecond: balExisting?.ratePerSecond ?? 0,
+        lastUpdated: accruedExisting.lastUpdated.toISOString(),
+      },
     });
   } catch (error: unknown) {
     console.error('Packet Breach session start error:', error);

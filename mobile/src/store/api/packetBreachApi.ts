@@ -31,6 +31,10 @@ const packetBreachBaseQuery = async (args: any, api: any, extraOptions: any) => 
       api.dispatch({ type: 'auth/logout' });
       return result;
     }
+    if ((result.error as any).status === 402) {
+      // Insufficient funds; let the caller handle (e.g. level screen shows spinner stop, no global modal)
+      return result;
+    }
     globalErrorHandler.handleDatabaseError(result.error);
   } else {
     globalErrorHandler.markServerReachable();
