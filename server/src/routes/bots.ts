@@ -108,7 +108,7 @@ router.get('/stats-breakdown', auth, async (req, res) => {
       const levelBonus: StatRow = {
         health: Math.round((effective.health - base.health) * 100) / 100,
         offense: Math.round((effective.offense - base.offense) * 100) / 100,
-        defense: Math.round((effective.defense - base.defense) * 100) / 100,
+        defense: Math.round((effective.defense - base.defense) * 1000) / 1000,
         speed: effective.speed - base.speed,
         range: effective.range - base.range,
       };
