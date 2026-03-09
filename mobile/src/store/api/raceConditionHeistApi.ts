@@ -63,6 +63,8 @@ export interface RCHPacket {
 
 export interface RaceConditionHeistSessionResponse {
   startedAt: string;
+  /** Server time when response was built; client uses this to sync word timing with server. */
+  serverTime?: string;
   matchDurationMs: number;
   /** Score required to pass this level (e.g. 50 tier 1, 100 tier 2). From server so client uses correct threshold. */
   scoreThreshold?: number;
@@ -79,6 +81,10 @@ export interface RaceConditionHeistSessionResponse {
   wordRotationPhase3?: string[];
   wordStartOffsetPhase3?: number;
   phase3StartedAt?: string;
+  /** Tier 4: fourth word cycle and start time for fourth node (Bypass). */
+  wordRotationPhase4?: string[];
+  wordStartOffsetPhase4?: number;
+  phase4StartedAt?: string;
   phase: 'RUNNING' | 'LOCKDOWN' | 'RESULTS';
   packets: RCHPacket[];
   score: number;
@@ -103,6 +109,10 @@ export interface RaceConditionHeistAttemptResponse {
   phase2StartedAt?: string;
   /** Set when second node is captured (tier 3); client uses this to start phase-3 word display. */
   phase3StartedAt?: string;
+  /** Set when third node is captured (tier 4); client uses this to start phase-4 word display. */
+  phase4StartedAt?: string;
+  /** Server time when response was built; client uses this to keep word timing in sync. */
+  serverTime?: string;
 }
 
 export interface RaceConditionHeistEndRunResponse {
@@ -152,12 +162,12 @@ export const raceConditionHeistApi = createApi({
     }),
     attemptRaceConditionHeistHijack: builder.mutation<
       RaceConditionHeistAttemptResponse,
-      { levelId: string; packetId: string }
+      { levelId: string; packetId: string; displayedWordIndex?: number }
     >({
-      query: ({ levelId, packetId }) => ({
+      query: ({ levelId, packetId, displayedWordIndex }) => ({
         url: '/api/race-condition-heist/attempt-hijack',
         method: 'POST',
-        body: { levelId, packetId },
+        body: { levelId, packetId, ...(typeof displayedWordIndex === 'number' && { displayedWordIndex }) },
       }),
     }),
     endRaceConditionHeistRun: builder.mutation<RaceConditionHeistEndRunResponse, string>({

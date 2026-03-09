@@ -52,11 +52,11 @@ OBJECTIVE
 Figure out the pattern and exploit the server before time runs out. You have one timer: the match clock (e.g. 3 minutes on early levels).
 
 THE PATTERN
-Words rotate one at a time on screen (e.g. Read, Write, Lock — or Log in, Fetch email, Encrypt). The last word in the cycle is always a "secure" word (Lock, Encrypt, or Secure). You must tap Exploit when the word BEFORE that secure word appears — that's your only window. If you tap on any other word, you miss and your combo resets.
+Words rotate one at a time. The last word in each cycle is always a "secure" word (Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, etc.). You must tap the action when the word BEFORE that secure word appears — that's your only window. If you tap on any other word, you miss and your combo resets. Early tiers use 3-word cycles; Tier 4 uses 4-word cycles (one extra action word before the secure word).
 
 ACTIONS
 • Watch the rotating word.
-• Tap Exploit when you see the word that comes right before the secure word (Lock, Encrypt, or Secure) in the cycle.
+• Tap the action for the current node (Exploit, Encrypt, Exfiltrate, or Bypass) when you see the word that comes right before the secure word in the cycle.
 • Steal the packet to score and build combo.
 
 TIER 2 (two nodes)
@@ -64,6 +64,9 @@ TIER 2 (two nodes)
 
 TIER 3 (three nodes)
 • Three user-data nodes: Exploit the first, then Encrypt the second (each triggers a new word set), then Exfiltrate the third when its word set shows the word before the secure word. You must capture all three nodes to pass.
+
+TIER 4 (four nodes, 4-word cycles)
+• Four user-data nodes: Exploit → Encrypt → Exfiltrate → Bypass. Each phase uses a new 4-word cycle (three action words then a secure word). Secure words include Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, Validate, Fortify. You must capture all four nodes to pass.
 
 SCORING
 Score = packet value × exploit multiplier × combo. Combo builds when you steal in quick succession (2 = 1.2×, 4 = 1.5×, 6 = 2×). Failed exploit resets combo.

@@ -10,7 +10,7 @@ export interface LevelParams {
   tier: number;
   /** Match duration in ms. Tier 1 starts at 3 min (180000). */
   matchDurationMs: number;
-  /** Words shown one at a time; last word is a "secure" word (Lock, Encrypt, Secure). Exploit when the word before it is shown. */
+  /** Words shown one at a time; last word is a "secure" word (Lock, Encrypt, Secure, Shield, etc.). Tap when the word before it is shown. Tiers 1–3: 3-word cycle; tier 4: 4-word cycle. */
   wordRotation: string[];
   /** Duration in ms each word is displayed before rotating to the next. */
   wordDurationMs: number;
@@ -21,10 +21,32 @@ export interface LevelParams {
 }
 
 /**
+ * Word array rule: indices 0..length-1. Index length-1 = secure word. Index length-2 = exploit word
+ * (player taps when this word is displayed to capture). Cells 0 and length-3 are just sequence.
+ * Start offset random so the cycle can begin on any cell, keeping the puzzle random.
+ */
+
+/**
+ * Secure words: the last word in each cycle. Player must tap the action when the word *before* this is shown.
+ * Expanded for tier 4+ to include more protect/harden-themed terms (hacking/programming).
+ */
+export const SECURE_WORDS = [
+  'Lock',
+  'Encrypt',
+  'Secure',
+  'Shield',
+  'Harden',
+  'Sanitize',
+  'Seal',
+  'Guard',
+  'Validate',
+  'Fortify',
+] as const;
+
+/**
  * Word groups for Race Condition Heist (tiers 1–3).
  * Each group is a 3-word cycle: [action, action, secureWord].
- * The last word is always a "secure" word (Lock, Encrypt, or Secure). The player must tap Exploit when the word *before* the secure word is displayed.
- * Tiers 1–3 randomly pick one of these groups per run; later tiers will use longer or harder groups.
+ * The last word is always a secure word. The player must tap when the word *before* the secure word is displayed.
  */
 const WORD_GROUPS_TIERS_1_3: readonly string[][] = [
   ['Read', 'Write', 'Lock'],
@@ -36,17 +58,45 @@ const WORD_GROUPS_TIERS_1_3: readonly string[][] = [
   ['Query', 'Write', 'Encrypt'],
   ['Connect', 'Transfer', 'Secure'],
   ['Log in', 'Fetch email', 'Encrypt'],
+  ['Read', 'Query', 'Shield'],
+  ['Connect', 'Transfer', 'Harden'],
+  ['Log in', 'Fetch email', 'Guard'],
 ];
 
-/** Default word rotation for tier 4+ (until we add progressive groups). */
+/**
+ * Tier 4: 4-word cycles [action, action, action, secureWord].
+ * Longer cycle = smaller timing window relative to cycle length. Uses expanded secure words.
+ */
+const WORD_GROUPS_TIER_4: readonly string[][] = [
+  ['Read', 'Write', 'Query', 'Lock'],
+  ['Log in', 'Fetch email', 'Send reply', 'Encrypt'],
+  ['Connect', 'Transfer', 'Query', 'Secure'],
+  ['Read', 'Write', 'Log out', 'Shield'],
+  ['Query', 'Write', 'Connect', 'Harden'],
+  ['Fetch email', 'Log in', 'Send reply', 'Sanitize'],
+  ['Transfer', 'Connect', 'Read', 'Seal'],
+  ['Log out', 'Fetch email', 'Query', 'Guard'],
+  ['Read', 'Connect', 'Transfer', 'Validate'],
+  ['Log in', 'Write', 'Fetch email', 'Fortify'],
+  ['Send reply', 'Query', 'Log out', 'Lock'],
+  ['Connect', 'Read', 'Write', 'Encrypt'],
+];
+
+/** Default word rotation for tier 5+ (until we add more). */
 const WORD_ROTATION_DEFAULT = ['Read', 'Write', 'Lock'];
 const WORD_DURATION_MS = 1500;
 
-/** Return a random word group for tiers 1–3 (3-word cycle; last word = secure). For tier 4+ returns default. */
+/** Return a random word group for the given tier. Tiers 1–3: 3-word cycle. Tier 4: 4-word cycle. Tier 5+ default. */
 export function getRandomWordGroupForTier(tier: number): string[] {
-  if (tier < 1 || tier > 3) return [...WORD_ROTATION_DEFAULT];
-  const idx = Math.floor(Math.random() * WORD_GROUPS_TIERS_1_3.length);
-  return [...WORD_GROUPS_TIERS_1_3[idx]];
+  if (tier === 4) {
+    const idx = Math.floor(Math.random() * WORD_GROUPS_TIER_4.length);
+    return [...WORD_GROUPS_TIER_4[idx]];
+  }
+  if (tier >= 1 && tier <= 3) {
+    const idx = Math.floor(Math.random() * WORD_GROUPS_TIERS_1_3.length);
+    return [...WORD_GROUPS_TIERS_1_3[idx]];
+  }
+  return [...WORD_ROTATION_DEFAULT];
 }
 
 /** Build all 105 levels from tier params. */
@@ -57,8 +107,8 @@ function buildAllLevels(): LevelParams[] {
     const wordRotation = WORD_ROTATION_DEFAULT;
     const wordDurationMs = WORD_DURATION_MS;
     const maxPackets = tier <= 3 ? 1 : tier <= 8 ? 2 : Math.min(5, Math.floor(tier / 3) + 1);
-    /** Tier 1: 50 (one). Tier 2: 100 (two nodes). Tier 3: 150 (three nodes). Tier 4+: 50 for now. */
-    const scoreThreshold = tier === 1 ? 50 : tier === 2 ? 100 : tier === 3 ? 150 : 50;
+    /** Tier 1: 50. Tier 2: 100. Tier 3: 150. Tier 4: 200 (four nodes). Tier 5+: 50 for now. */
+    const scoreThreshold = tier === 1 ? 50 : tier === 2 ? 100 : tier === 3 ? 150 : tier === 4 ? 200 : 50;
     for (let y = 1; y <= 5; y++) {
       levels.push({
         levelId: `${tier}.${y}`,

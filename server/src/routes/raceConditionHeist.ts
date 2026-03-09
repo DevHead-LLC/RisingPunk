@@ -89,6 +89,17 @@ function generateTier3Packets(): { id: string; type: PacketTypeKey; value: numbe
   ];
 }
 
+/** Tier 4: four USER_DATA nodes — Exploit, Encrypt, Exfiltrate, Bypass. */
+function generateTier4Packets(): { id: string; type: PacketTypeKey; value: number }[] {
+  const value = PACKET_TYPES.USER_DATA;
+  return [
+    { id: 'p1', type: 'USER_DATA', value },
+    { id: 'p2', type: 'USER_DATA', value },
+    { id: 'p3', type: 'USER_DATA', value },
+    { id: 'p4', type: 'USER_DATA', value },
+  ];
+}
+
 /** Index in wordRotation when exploit is valid (the word before the secure word: Lock, Encrypt, or Secure). */
 function getPreSecureIndex(wordRotation: string[]): number {
   if (wordRotation.length < 2) return 0;
@@ -178,24 +189,32 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       const wordDurationMs = params.wordDurationMs;
       const isTier2 = params.tier === 2;
       const isTier3 = params.tier === 3;
-      const packets = isTier3
-        ? generateTier3Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-        : isTier2
-          ? generateTier2Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-          : [{ ...generatePass1Packet(), isHijacked: false }];
+      const isTier4 = params.tier === 4;
+      const packets = isTier4
+        ? generateTier4Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+        : isTier3
+          ? generateTier3Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+          : isTier2
+            ? generateTier2Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+            : [{ ...generatePass1Packet(), isHijacked: false }];
       const wordRotation =
-        params.tier <= 3 ? getRandomWordGroupForTier(params.tier) : params.wordRotation;
+        params.tier <= 4 ? getRandomWordGroupForTier(params.tier) : params.wordRotation;
       const wordStartOffset =
         wordRotation.length > 0 ? Math.floor(Math.random() * wordRotation.length) : 0;
-      const wordRotationPhase2 = (isTier2 || isTier3) ? getRandomWordGroupForTier(params.tier) : undefined;
+      const wordRotationPhase2 = (isTier2 || isTier3 || isTier4) ? getRandomWordGroupForTier(params.tier) : undefined;
       const wordStartOffsetPhase2 =
         wordRotationPhase2 && wordRotationPhase2.length > 0
           ? Math.floor(Math.random() * wordRotationPhase2.length)
           : undefined;
-      const wordRotationPhase3 = isTier3 ? getRandomWordGroupForTier(params.tier) : undefined;
+      const wordRotationPhase3 = (isTier3 || isTier4) ? getRandomWordGroupForTier(params.tier) : undefined;
       const wordStartOffsetPhase3 =
         wordRotationPhase3 && wordRotationPhase3.length > 0
           ? Math.floor(Math.random() * wordRotationPhase3.length)
+          : undefined;
+      const wordRotationPhase4 = isTier4 ? getRandomWordGroupForTier(params.tier) : undefined;
+      const wordStartOffsetPhase4 =
+        wordRotationPhase4 && wordRotationPhase4.length > 0
+          ? Math.floor(Math.random() * wordRotationPhase4.length)
           : undefined;
       try {
         await RaceConditionHeistSession.create({
@@ -206,13 +225,17 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
           wordRotation,
           wordDurationMs,
           wordStartOffset,
-          ...((isTier2 || isTier3) && {
+          ...((isTier2 || isTier3 || isTier4) && {
             wordRotationPhase2,
             wordStartOffsetPhase2: wordStartOffsetPhase2 ?? 0,
           }),
-          ...(isTier3 && {
+          ...((isTier3 || isTier4) && {
             wordRotationPhase3,
             wordStartOffsetPhase3: wordStartOffsetPhase3 ?? 0,
+          }),
+          ...(isTier4 && {
+            wordRotationPhase4,
+            wordStartOffsetPhase4: wordStartOffsetPhase4 ?? 0,
           }),
           phase: 'RUNNING',
           packets,
@@ -226,6 +249,7 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
           if (existing) {
             res.json({
               startedAt: existing.startedAt,
+              serverTime: new Date().toISOString(),
               matchDurationMs: existing.matchDurationMs,
               scoreThreshold: params.scoreThreshold,
               wordRotation: existing.wordRotation,
@@ -240,6 +264,11 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
                 wordRotationPhase3: existing.wordRotationPhase3,
                 wordStartOffsetPhase3: existing.wordStartOffsetPhase3 ?? 0,
                 phase3StartedAt: existing.phase3StartedAt,
+              }),
+              ...(existing.wordRotationPhase4 && {
+                wordRotationPhase4: existing.wordRotationPhase4,
+                wordStartOffsetPhase4: existing.wordStartOffsetPhase4 ?? 0,
+                phase4StartedAt: existing.phase4StartedAt,
               }),
               phase: existing.phase,
               packets: existing.packets,
@@ -263,8 +292,10 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
           },
         }
       );
+      const serverTime = new Date().toISOString();
       res.json({
         startedAt: now.toISOString(),
+        serverTime,
         matchDurationMs: params.matchDurationMs,
         scoreThreshold: params.scoreThreshold,
         wordRotation,
@@ -274,9 +305,13 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
           wordRotationPhase2,
           wordStartOffsetPhase2: wordStartOffsetPhase2 ?? 0,
         }),
-        ...(isTier3 && {
+        ...((isTier3 || isTier4) && {
           wordRotationPhase3,
           wordStartOffsetPhase3: wordStartOffsetPhase3 ?? 0,
+        }),
+        ...(isTier4 && {
+          wordRotationPhase4,
+          wordStartOffsetPhase4: wordStartOffsetPhase4 ?? 0,
         }),
         phase: 'RUNNING',
         packets,
@@ -292,6 +327,7 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
     }
     res.json({
       startedAt: sessionDoc.startedAt,
+      serverTime: new Date().toISOString(),
       matchDurationMs: sessionDoc.matchDurationMs,
       scoreThreshold: params.scoreThreshold,
       wordRotation: sessionDoc.wordRotation ?? params.wordRotation,
@@ -307,6 +343,11 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         wordStartOffsetPhase3: sessionDoc.wordStartOffsetPhase3 ?? 0,
         phase3StartedAt: sessionDoc.phase3StartedAt,
       }),
+      ...(sessionDoc.wordRotationPhase4 && {
+        wordRotationPhase4: sessionDoc.wordRotationPhase4,
+        wordStartOffsetPhase4: sessionDoc.wordStartOffsetPhase4 ?? 0,
+        phase4StartedAt: sessionDoc.phase4StartedAt,
+      }),
       phase: sessionDoc.phase,
       packets: sessionDoc.packets,
       score: sessionDoc.score,
@@ -319,11 +360,26 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Word array rule: indices 0..length-1. Index length-1 = secure word. Index length-2 = exploit word
+ * (tap when this word is displayed to capture). We accept when server index === preSecureIndex, or
+ * when client reports displayedWordIndex === preSecureIndex and server index is adjacent (1 word off) for skew tolerance.
+ */
+function isWithinOneWord(serverIndex: number, clientIndex: number, length: number): boolean {
+  if (length <= 0) return false;
+  const d = (serverIndex - clientIndex + length) % length;
+  return d <= 1 || d === length - 1;
+}
+
 /** POST /api/race-condition-heist/attempt-hijack */
 router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!._id.toString();
-    const { levelId, packetId } = req.body as { levelId?: string; packetId?: string };
+    const { levelId, packetId, displayedWordIndex } = req.body as {
+      levelId?: string;
+      packetId?: string;
+      displayedWordIndex?: number;
+    };
     if (!levelId || typeof levelId !== 'string' || !packetId || typeof packetId !== 'string') {
       res.status(400).json({ error: 'levelId and packetId required' });
       return;
@@ -381,7 +437,7 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
         return;
       }
     }
-    /** Tier 3: third node (Exfiltrate) can only be attempted after first two are captured. */
+    /** Tier 3+: third node (Exfiltrate) can only be attempted after first two are captured. */
     if (packetIndex === 2) {
       if (!sessionDoc.packets[0]?.isHijacked || !sessionDoc.packets[1]?.isHijacked) {
         res.status(400).json({
@@ -395,6 +451,27 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       }
       if (!sessionDoc.phase3StartedAt || !sessionDoc.wordRotationPhase3?.length) {
         res.status(400).json({ error: 'Phase 3 not started' });
+        return;
+      }
+    }
+    /** Tier 4: fourth node (Bypass) can only be attempted after first three are captured. */
+    if (packetIndex === 3) {
+      if (
+        !sessionDoc.packets[0]?.isHijacked ||
+        !sessionDoc.packets[1]?.isHijacked ||
+        !sessionDoc.packets[2]?.isHijacked
+      ) {
+        res.status(400).json({
+          error: 'Capture the first three nodes before bypassing the fourth',
+          reason: 'complete_previous_nodes',
+          packets: sessionDoc.packets,
+          score: sessionDoc.score,
+          comboCount: sessionDoc.comboCount,
+        });
+        return;
+      }
+      if (!sessionDoc.phase4StartedAt || !sessionDoc.wordRotationPhase4?.length) {
+        res.status(400).json({ error: 'Phase 4 not started' });
         return;
       }
     }
@@ -415,7 +492,19 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
     let currentIndex: number;
     let wordRotation: string[];
     let inWindow: boolean;
-    if (packetIndex === 2 && sessionDoc.phase3StartedAt && sessionDoc.wordRotationPhase3?.length) {
+    if (packetIndex === 3 && sessionDoc.phase4StartedAt && sessionDoc.wordRotationPhase4?.length) {
+      const phase4ElapsedMs = now.getTime() - new Date(sessionDoc.phase4StartedAt).getTime();
+      wordRotation = sessionDoc.wordRotationPhase4;
+      const wordStartOffsetPhase4 = sessionDoc.wordStartOffsetPhase4 ?? 0;
+      currentIndex = getCurrentWordIndex(
+        phase4ElapsedMs,
+        wordDurationMs,
+        wordRotation.length,
+        wordStartOffsetPhase4
+      );
+      const preSecureIndex = getPreSecureIndex(wordRotation);
+      inWindow = wordRotation.length >= 2 && currentIndex === preSecureIndex;
+    } else if (packetIndex === 2 && sessionDoc.phase3StartedAt && sessionDoc.wordRotationPhase3?.length) {
       const phase3ElapsedMs = now.getTime() - new Date(sessionDoc.phase3StartedAt).getTime();
       wordRotation = sessionDoc.wordRotationPhase3;
       const wordStartOffsetPhase3 = sessionDoc.wordStartOffsetPhase3 ?? 0;
@@ -451,6 +540,12 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       const preSecureIndex = getPreSecureIndex(wordRotation);
       inWindow = wordRotation.length >= 2 && currentIndex === preSecureIndex;
     }
+    const preSecureIndexFinal = getPreSecureIndex(wordRotation);
+    if (!inWindow && typeof displayedWordIndex === 'number') {
+      const clientSawExploitWord = displayedWordIndex === preSecureIndexFinal;
+      const adjacent = isWithinOneWord(currentIndex, displayedWordIndex, wordRotation.length);
+      if (clientSawExploitWord && adjacent) inWindow = true;
+    }
     if (!inWindow) {
       sessionDoc.comboCount = 0;
       await sessionDoc.save();
@@ -476,6 +571,9 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
     if (packetIndex === 1 && sessionDoc.wordRotationPhase3?.length) {
       sessionDoc.phase3StartedAt = now;
     }
+    if (packetIndex === 2 && sessionDoc.wordRotationPhase4?.length) {
+      sessionDoc.phase4StartedAt = now;
+    }
     const pIdx = sessionDoc.packets.findIndex((p) => p.id === packetId);
     if (pIdx !== -1) sessionDoc.packets[pIdx].isHijacked = true;
     await sessionDoc.save();
@@ -486,11 +584,15 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       score: sessionDoc.score,
       comboCount: sessionDoc.comboCount,
       exploitCooldownUntil: sessionDoc.exploitCooldownUntil?.toISOString(),
+      serverTime: new Date().toISOString(),
       ...(sessionDoc.phase2StartedAt && {
         phase2StartedAt: sessionDoc.phase2StartedAt.toISOString(),
       }),
       ...(sessionDoc.phase3StartedAt && {
         phase3StartedAt: sessionDoc.phase3StartedAt.toISOString(),
+      }),
+      ...(sessionDoc.phase4StartedAt && {
+        phase4StartedAt: sessionDoc.phase4StartedAt.toISOString(),
       }),
     });
   } catch (error: unknown) {

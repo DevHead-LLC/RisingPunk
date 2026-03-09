@@ -28,6 +28,10 @@ export interface IRaceConditionHeistSession extends Document {
   wordRotationPhase3?: string[];
   wordStartOffsetPhase3?: number;
   phase3StartedAt?: Date;
+  /** Tier 4: fourth word cycle for the fourth node (Bypass). Starts when third node is captured. */
+  wordRotationPhase4?: string[];
+  wordStartOffsetPhase4?: number;
+  phase4StartedAt?: Date;
   phase: 'RUNNING' | 'LOCKDOWN' | 'RESULTS';
   packets: IRCHPacket[];
   score: number;
@@ -61,6 +65,9 @@ const raceConditionHeistSessionSchema = new Schema(
     wordRotationPhase3: { type: [String], required: false },
     wordStartOffsetPhase3: { type: Number, required: false },
     phase3StartedAt: { type: Date, required: false },
+    wordRotationPhase4: { type: [String], required: false },
+    wordStartOffsetPhase4: { type: Number, required: false },
+    phase4StartedAt: { type: Date, required: false },
     phase: { type: String, enum: ['RUNNING', 'LOCKDOWN', 'RESULTS'], default: 'RUNNING' },
     packets: { type: [rchPacketSchema], default: [] },
     score: { type: Number, default: 0 },

@@ -49,6 +49,8 @@ export function RaceConditionHeistGameScreen({
   const autoCompleteTriggeredRef = useRef(false);
   const victoryAutoCloseTriggeredRef = useRef(false);
   const onCloseRef = useRef(onClose);
+  /** Skew so client word timing matches server: serverNow ≈ Date.now() + timeSkewMsRef.current */
+  const timeSkewMsRef = useRef(0);
   onCloseRef.current = onClose;
 
   const [attemptHijack] = useAttemptRaceConditionHeistHijackMutation();
@@ -59,18 +61,27 @@ export function RaceConditionHeistGameScreen({
   const timeRemainingMs = Math.max(0, matchDurationMs - elapsedMs);
   /** Use server-provided threshold (tier 1 = 50, tier 2 = 100 for two nodes). */
   const scoreThreshold = session?.scoreThreshold ?? 50;
-  /** Tier from levelId (e.g. "2.1" → 2). Tier 2 = two nodes, tier 3 = three nodes. */
+  /** Tier from levelId (e.g. "2.1" → 2). Tier 2 = two nodes, tier 3 = three, tier 4 = four. */
   const tier = levelId.includes('.') ? parseInt(levelId.split('.')[0], 10) : 1;
   const isTier2 = tier === 2;
   const isTier3 = tier === 3;
-  const multiNodeTier = isTier2 || isTier3;
+  const isTier4 = tier === 4;
+  const multiNodeTier = isTier2 || isTier3 || isTier4;
+
+  /** Keep client word timing in sync with server using serverTime from responses. */
+  useEffect(() => {
+    const serverTime = session?.serverTime;
+    if (serverTime != null) {
+      timeSkewMsRef.current = new Date(serverTime).getTime() - Date.now();
+    }
+  }, [session?.serverTime]);
 
   useEffect(() => {
     if (!session?.startedAt || phase !== 'RUNNING') return;
     const startedAt = new Date(session.startedAt).getTime();
     const syncElapsed = () => {
-      const now = Date.now();
-      const elapsed = Math.min(now - startedAt, matchDurationMs);
+      const serverAdjustedNow = Date.now() + timeSkewMsRef.current;
+      const elapsed = Math.min(serverAdjustedNow - startedAt, matchDurationMs);
       setElapsedMs(elapsed);
       return elapsed;
     };
@@ -180,12 +191,16 @@ export function RaceConditionHeistGameScreen({
   }, [phase, won, claimError, claimingInProgress, levelId, claimLevel]);
 
   const handleHijack = useCallback(
-    async (packetId: string) => {
+    async (packetId: string, displayedWordIndex: number) => {
       if (!session || phase !== 'RUNNING') return;
       setHijackFeedback(null);
       setLastAttemptReason(null);
       try {
-        const result = await attemptHijack({ levelId, packetId }).unwrap();
+        const result = await attemptHijack({
+          levelId,
+          packetId,
+          displayedWordIndex,
+        }).unwrap();
         setSession((s) =>
           s
             ? {
@@ -194,8 +209,10 @@ export function RaceConditionHeistGameScreen({
                 score: result.score,
                 comboCount: result.comboCount,
                 exploitCooldownUntil: result.exploitCooldownUntil,
+                ...(result.serverTime != null && { serverTime: result.serverTime }),
                 ...(result.phase2StartedAt != null && { phase2StartedAt: result.phase2StartedAt }),
                 ...(result.phase3StartedAt != null && { phase3StartedAt: result.phase3StartedAt }),
+                ...(result.phase4StartedAt != null && { phase4StartedAt: result.phase4StartedAt }),
               }
             : null
         );
@@ -280,37 +297,60 @@ export function RaceConditionHeistGameScreen({
   const wordRotation = session.wordRotation ?? ['Read', 'Write', 'Lock'];
   const wordDurationMs = session.wordDurationMs ?? 1500;
   const wordStartOffset = session.wordStartOffset ?? 0;
-  /** Tier 2+: after first node captured, display phase-2 words for the second node (Encrypt). */
-  const usePhase2Words =
-    multiNodeTier &&
+  /** Tier 4: after third node captured, display phase-4 words for the fourth node (Bypass). */
+  const usePhase4Words =
+    isTier4 &&
     session.packets[0]?.isHijacked &&
-    (session.wordRotationPhase2?.length ?? 0) > 0 &&
-    session.phase2StartedAt != null &&
-    !(isTier3 && session.packets[1]?.isHijacked && (session.wordRotationPhase3?.length ?? 0) > 0 && session.phase3StartedAt != null);
-  const phase2ElapsedMs = usePhase2Words && session.phase2StartedAt
-    ? Date.now() - new Date(session.phase2StartedAt).getTime()
+    session.packets[1]?.isHijacked &&
+    session.packets[2]?.isHijacked &&
+    (session.wordRotationPhase4?.length ?? 0) > 0 &&
+    session.phase4StartedAt != null;
+  const serverAdjustedNow = Date.now() + timeSkewMsRef.current;
+  const phase4ElapsedMs = usePhase4Words && session.phase4StartedAt
+    ? serverAdjustedNow - new Date(session.phase4StartedAt).getTime()
     : 0;
-  /** Tier 3: after second node captured, display phase-3 words for the third node (Exfiltrate). */
+  /** Tier 3+: after second node captured, display phase-3 words for the third node (Exfiltrate). */
   const usePhase3Words =
-    isTier3 &&
+    !usePhase4Words &&
+    (isTier3 || isTier4) &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
     (session.wordRotationPhase3?.length ?? 0) > 0 &&
     session.phase3StartedAt != null;
   const phase3ElapsedMs = usePhase3Words && session.phase3StartedAt
-    ? Date.now() - new Date(session.phase3StartedAt).getTime()
+    ? serverAdjustedNow - new Date(session.phase3StartedAt).getTime()
     : 0;
-  const activeRotation = usePhase3Words
-    ? (session.wordRotationPhase3 ?? [])
-    : usePhase2Words
-      ? (session.wordRotationPhase2 ?? [])
-      : wordRotation;
-  const activeStartOffset = usePhase3Words
-    ? (session.wordStartOffsetPhase3 ?? 0)
-    : usePhase2Words
-      ? (session.wordStartOffsetPhase2 ?? 0)
-      : wordStartOffset;
-  const activeElapsedMs = usePhase3Words ? phase3ElapsedMs : usePhase2Words ? phase2ElapsedMs : elapsedMs;
+  /** Tier 2+: after first node captured, display phase-2 words for the second node (Encrypt). */
+  const usePhase2Words =
+    !usePhase3Words &&
+    multiNodeTier &&
+    session.packets[0]?.isHijacked &&
+    (session.wordRotationPhase2?.length ?? 0) > 0 &&
+    session.phase2StartedAt != null;
+  const phase2ElapsedMs = usePhase2Words && session.phase2StartedAt
+    ? serverAdjustedNow - new Date(session.phase2StartedAt).getTime()
+    : 0;
+  const activeRotation = usePhase4Words
+    ? (session.wordRotationPhase4 ?? [])
+    : usePhase3Words
+      ? (session.wordRotationPhase3 ?? [])
+      : usePhase2Words
+        ? (session.wordRotationPhase2 ?? [])
+        : wordRotation;
+  const activeStartOffset = usePhase4Words
+    ? (session.wordStartOffsetPhase4 ?? 0)
+    : usePhase3Words
+      ? (session.wordStartOffsetPhase3 ?? 0)
+      : usePhase2Words
+        ? (session.wordStartOffsetPhase2 ?? 0)
+        : wordStartOffset;
+  const activeElapsedMs = usePhase4Words
+    ? phase4ElapsedMs
+    : usePhase3Words
+      ? phase3ElapsedMs
+      : usePhase2Words
+        ? phase2ElapsedMs
+        : elapsedMs;
   const currentWordIndex =
     activeRotation.length > 0
       ? (Math.floor(activeElapsedMs / wordDurationMs) + activeStartOffset) % activeRotation.length
@@ -350,7 +390,7 @@ export function RaceConditionHeistGameScreen({
                 </Text>
                 <Text style={[styles.packetValue, { color: colors.primary }]}>{p.value} pts</Text>
                 <Text style={[styles.stolenLabel, { color: colors.success ?? colors.primary }]}>
-                  {idx === 0 ? 'Stolen' : idx === 1 ? 'Encrypted' : 'Exfiltrated'}
+                  {idx === 0 ? 'Stolen' : idx === 1 ? 'Encrypted' : idx === 2 ? 'Exfiltrated' : 'Bypassed'}
                 </Text>
               </View>
             ))}
@@ -401,8 +441,10 @@ export function RaceConditionHeistGameScreen({
           {lastAttemptReason === 'complete_first_node'
             ? 'Capture the first node before encrypting the second.'
             : lastAttemptReason === 'complete_previous_nodes'
-              ? 'Capture the first two nodes before exfiltrating the third.'
-              : 'Missed! Tap Exploit when the word before the secure word appears.'}
+              ? isTier4
+                ? 'Capture the first three nodes before bypassing the fourth.'
+                : 'Capture the first two nodes before exfiltrating the third.'
+              : 'Missed! Tap when the word before the secure word appears.'}
         </Text>
       )}
 
@@ -419,13 +461,17 @@ export function RaceConditionHeistGameScreen({
       <View style={styles.packetsRow}>
         {session.packets.map((packet: RCHPacket, index: number) => {
           const actionLabel =
-            index === 0 ? 'Exploit' : index === 1 ? 'Encrypt' : 'Exfiltrate';
+            index === 0 ? 'Exploit' : index === 1 ? 'Encrypt' : index === 2 ? 'Exfiltrate' : 'Bypass';
           const canTap =
             index === 0 ||
             (index === 1 && session.packets[0]?.isHijacked) ||
-            (index === 2 && session.packets[0]?.isHijacked && session.packets[1]?.isHijacked);
+            (index === 2 && session.packets[0]?.isHijacked && session.packets[1]?.isHijacked) ||
+            (index === 3 &&
+              session.packets[0]?.isHijacked &&
+              session.packets[1]?.isHijacked &&
+              session.packets[2]?.isHijacked);
           const doneLabel =
-            index === 0 ? 'Stolen' : index === 1 ? 'Encrypted' : 'Exfiltrated';
+            index === 0 ? 'Stolen' : index === 1 ? 'Encrypted' : index === 2 ? 'Exfiltrated' : 'Bypassed';
           return (
             <View
               key={packet.id}
@@ -446,7 +492,7 @@ export function RaceConditionHeistGameScreen({
                     { borderColor: colors.primary },
                     (onCooldown || !canTap) && styles.hijackButtonDisabled,
                   ]}
-                  onPress={() => handleHijack(packet.id)}
+                  onPress={() => handleHijack(packet.id, currentWordIndex)}
                   disabled={onCooldown || !canTap}
                   accessible
                   accessibilityLabel={`${actionLabel} packet`}
