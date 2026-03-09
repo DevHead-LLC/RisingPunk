@@ -6,6 +6,8 @@ import { resetAllApiCaches } from './resetApiCaches';
 import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
 import { balanceApi } from './balanceApi';
+import { updateBalance } from '../slices/balanceSlice';
+import { setProgrammingFacilityUnlocked } from '../slices/authSlice';
 
 export interface LoginRequest {
   handle: string;
@@ -34,6 +36,7 @@ export interface AuthResponse {
     level: number;
     unlockedFeatures: {
       hackRig: boolean;
+      programmingFacility?: boolean;
     };
     onboardingCompleted: boolean;
     needsHandleSelection: boolean;
@@ -53,6 +56,7 @@ export interface ProfileResponse {
   unlockedFeatures: {
     hackRig: boolean;
     researchCenter: boolean;
+    programmingFacility?: boolean;
   };
   profileGender: 'male' | 'female';
   totalGuardiansBuilt?: number;
@@ -94,6 +98,21 @@ export interface UnlockResearchCenterResponse {
   unlockedFeatures: {
     hackRig: boolean;
     researchCenter: boolean;
+    programmingFacility?: boolean;
+  };
+}
+
+export interface UnlockProgrammingFacilityResponse {
+  success: boolean;
+  balance: {
+    total: number;
+    ratePerSecond: number;
+    lastUpdated: string;
+  };
+  unlockedFeatures: {
+    hackRig: boolean;
+    researchCenter: boolean;
+    programmingFacility: boolean;
   };
 }
 
@@ -229,6 +248,7 @@ export interface SpeedupResearchCenterConstructionResponse {
   unlockedFeatures: {
     hackRig: boolean;
     researchCenter: boolean;
+    programmingFacility?: boolean;
   };
 }
 
@@ -340,6 +360,28 @@ export const authApi = createApi({
         url: '/api/users/unlock-research-center',
         method: 'POST',
       }),
+      invalidatesTags: ['User'],
+    }),
+
+    unlockProgrammingFacility: builder.mutation<UnlockProgrammingFacilityResponse, void>({
+      query: () => ({
+        url: '/api/users/unlock-programming-facility',
+        method: 'POST',
+      }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(updateBalance({
+            total: data.balance.total,
+            ratePerSecond: data.balance.ratePerSecond,
+            lastUpdated: data.balance.lastUpdated,
+          }));
+          dispatch(setProgrammingFacilityUnlocked());
+          dispatch(balanceApi.util.invalidateTags(['Balance']));
+        } catch {
+          // Error handled by mutation
+        }
+      },
       invalidatesTags: ['User'],
     }),
 
@@ -810,6 +852,7 @@ export const {
   useLazyLookupUserByHandleQuery,
   useUnlockHackRigMutation,
   useUnlockResearchCenterMutation,
+  useUnlockProgrammingFacilityMutation,
   useGetResearchCenterStatusQuery,
   useSpeedupResearchCenterConstructionMutation,
   useGetRentalHousingStatusQuery,

@@ -5,15 +5,35 @@ export interface BotConfig {
   stats: EffectiveBotStats;
 }
 
+/** Optional infantry (breacher) bonus from e.g. Packet Breach tier rewards; applied only when botType is breacher. */
+export interface ArmyBonus {
+  strength: number;
+  defense: number;
+  speed: number;
+  health: number;
+}
+
 export class BotService {
-  static async getUserBotStats(botType: string, userLevel: number): Promise<BotConfig> {
+  static async getUserBotStats(
+    botType: string,
+    userLevel: number,
+    armyBonus?: ArmyBonus
+  ): Promise<BotConfig> {
     try {
-      const effectiveStats = BotStatsService.computeEffectiveBotStats(botType, userLevel);
+      let effectiveStats = BotStatsService.computeEffectiveBotStats(botType, userLevel);
+      if (botType === 'breacher' && armyBonus) {
+        effectiveStats = {
+          ...effectiveStats,
+          offense: effectiveStats.offense + armyBonus.strength,
+          health: effectiveStats.health + armyBonus.health,
+          defense: effectiveStats.defense + armyBonus.defense,
+          speed: effectiveStats.speed + armyBonus.speed,
+        };
+      }
       const role = BotStatsService.getBotRole(botType);
-      
       return {
         role,
-        stats: effectiveStats
+        stats: effectiveStats,
       };
     } catch (error) {
       console.error(`❌ BotService: Failed to get user bot stats for ${botType} at level ${userLevel}:`, error);

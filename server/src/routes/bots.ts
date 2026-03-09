@@ -53,13 +53,87 @@ router.get('/stats', auth, async (req, res) => {
     const user = await User.findById(req.user._id);
     const userLevel = user?.level || 1;
     
+    const armyBonus = user?.armyBonus;
     const botStats: Record<string, any> = {};
     for (const botType of ['guardian', 'breacher', 'phreak']) {
-      const config = await BotService.getUserBotStats(botType, userLevel);
+      const config = await BotService.getUserBotStats(botType, userLevel, armyBonus);
       botStats[botType] = config;
     }
     
     res.json({ botStats });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/** Stat row shape for breakdown (health, offense, defense, speed, range). */
+interface StatRow {
+  health: number;
+  offense: number;
+  defense: number;
+  speed: number;
+  range: number;
+}
+
+const { computePacketBreachArmyBonus } = require('../config/packetBreachConfig');
+
+// Get bot stats breakdown for profile charts (base, +level, +programming, total)
+router.get('/stats-breakdown', auth, async (req, res) => {
+  try {
+    const BotStatsService = require('../services/BotStatsService').BotStatsService;
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const userLevel = user.level || 1;
+    const levelsCompleted: string[] = Array.isArray(user.packetBreach?.levelsCompleted) ? user.packetBreach!.levelsCompleted : [];
+    const programmingFromLevels = computePacketBreachArmyBonus(levelsCompleted);
+    const storedArmyBonus = user.armyBonus || { strength: 0, defense: 0, speed: 0, health: 0 };
+    const armyBonusMatches =
+      storedArmyBonus.strength === programmingFromLevels.strength &&
+      storedArmyBonus.defense === programmingFromLevels.defense &&
+      storedArmyBonus.speed === programmingFromLevels.speed &&
+      storedArmyBonus.health === programmingFromLevels.health;
+    if (!armyBonusMatches) {
+      await User.updateOne({ _id: user._id }, { $set: { armyBonus: programmingFromLevels } });
+    }
+
+    const zeroRow = (): StatRow => ({ health: 0, offense: 0, defense: 0, speed: 0, range: 0 });
+    const breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> = {};
+
+    for (const botType of ['guardian', 'breacher', 'phreak']) {
+      const base = BotStatsService.getBaseStats(botType);
+      const effective = BotStatsService.computeEffectiveBotStats(botType, userLevel);
+      const levelBonus: StatRow = {
+        health: Math.round((effective.health - base.health) * 100) / 100,
+        offense: Math.round((effective.offense - base.offense) * 100) / 100,
+        defense: Math.round((effective.defense - base.defense) * 1000) / 1000,
+        speed: effective.speed - base.speed,
+        range: effective.range - base.range,
+      };
+      const programmingBonus: StatRow =
+        botType === 'breacher'
+          ? {
+              health: programmingFromLevels.health,
+              offense: programmingFromLevels.strength,
+              defense: programmingFromLevels.defense,
+              speed: programmingFromLevels.speed,
+              range: 0,
+            }
+          : zeroRow();
+      const researchBonus = zeroRow(); // Placeholder for future research bonuses
+      const total: StatRow = {
+        health: Math.round((base.health + levelBonus.health + programmingBonus.health + researchBonus.health) * 100) / 100,
+        offense: Math.round((base.offense + levelBonus.offense + programmingBonus.offense + researchBonus.offense) * 100) / 100,
+        defense: Math.round((base.defense + levelBonus.defense + programmingBonus.defense + researchBonus.defense) * 1000) / 1000,
+        speed: Math.round(base.speed + levelBonus.speed + programmingBonus.speed + researchBonus.speed),
+        range: Math.round(base.range + levelBonus.range + programmingBonus.range + researchBonus.range),
+      };
+      breakdown[botType] = { base, levelBonus, programmingBonus, researchBonus, total };
+    }
+
+    res.json({ userLevel, breakdown });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
