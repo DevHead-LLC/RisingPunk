@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -163,11 +163,29 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
   const colors = useThemeColors();
   const [showRules, setShowRules] = useState(false);
   const [startingLevelId, setStartingLevelId] = useState<string | null>(null);
+  const entryDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const balance = useAppSelector(getCurrentBalance);
   const { data: status, isLoading, error } = useGetPacketBreachStatusQuery(undefined, {
     pollingInterval: 60000,
   });
   const [startSession] = useStartPacketBreachSessionMutation();
+
+  useEffect(() => {
+    return () => {
+      if (entryDelayTimeoutRef.current != null) {
+        clearTimeout(entryDelayTimeoutRef.current);
+        entryDelayTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleClose = useCallback(() => {
+    if (entryDelayTimeoutRef.current != null) {
+      clearTimeout(entryDelayTimeoutRef.current);
+      entryDelayTimeoutRef.current = null;
+    }
+    onClose();
+  }, [onClose]);
 
   const levelConfigs = status?.levelConfigs ?? [];
   const numericBalance = typeof balance === 'number' ? balance : 0;
@@ -182,10 +200,15 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
     async (levelId: string) => {
       const config = (status?.levelConfigs ?? []).find((c) => c.levelId === levelId);
       if (!config?.isUnlocked || config?.isCompleted || numericBalance < (config.cost ?? 0)) return;
+      if (entryDelayTimeoutRef.current != null) {
+        clearTimeout(entryDelayTimeoutRef.current);
+        entryDelayTimeoutRef.current = null;
+      }
       setStartingLevelId(levelId);
       try {
         const result = await startSession(levelId).unwrap();
-        setTimeout(() => {
+        entryDelayTimeoutRef.current = setTimeout(() => {
+          entryDelayTimeoutRef.current = null;
           setStartingLevelId(null);
           onSelectLevel(levelId, result);
         }, ENTRY_DEDUCTION_DELAY_MS);
@@ -205,7 +228,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
   if (error) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <CloseButton onPress={onClose} />
+        <CloseButton onPress={handleClose} />
         <Text style={[styles.errorText, { color: colors.error }]}>Failed to load levels.</Text>
       </View>
     );
@@ -213,7 +236,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <CloseButton onPress={onClose} />
+      <CloseButton onPress={handleClose} />
       <Balance />
       <Text style={[styles.title, { color: colors.primary }]}>Program Infantry for Tiered Awards</Text>
       <TouchableOpacity
