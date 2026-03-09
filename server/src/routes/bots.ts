@@ -78,8 +78,10 @@ interface StatRow {
 const { computePacketBreachArmyBonus } = require('../config/packetBreachConfig');
 
 // Get bot stats breakdown for profile charts (base, +level, +programming, total)
+// Total row comes from BotService.getUserBotStats (same as /stats and battles) so one source of truth.
 router.get('/stats-breakdown', auth, async (req, res) => {
   try {
+    const { BotService } = require('../services/BotService');
     const BotStatsService = require('../services/BotStatsService').BotStatsService;
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -123,12 +125,14 @@ router.get('/stats-breakdown', auth, async (req, res) => {
             }
           : zeroRow();
       const researchBonus = zeroRow(); // Placeholder for future research bonuses
+      const finalConfig = await BotService.getUserBotStats(botType, userLevel, storedArmyBonus);
+      const s = finalConfig.stats;
       const total: StatRow = {
-        health: Math.round((base.health + levelBonus.health + programmingBonus.health + researchBonus.health) * 100) / 100,
-        offense: Math.round((base.offense + levelBonus.offense + programmingBonus.offense + researchBonus.offense) * 100) / 100,
-        defense: Math.round((base.defense + levelBonus.defense + programmingBonus.defense + researchBonus.defense) * 1000) / 1000,
-        speed: Math.round(base.speed + levelBonus.speed + programmingBonus.speed + researchBonus.speed),
-        range: Math.round(base.range + levelBonus.range + programmingBonus.range + researchBonus.range),
+        health: Math.round(s.health * 100) / 100,
+        offense: Math.round(s.offense * 100) / 100,
+        defense: Math.round(s.defense * 1000) / 1000,
+        speed: Math.round(s.speed),
+        range: Math.round(s.range),
       };
       breakdown[botType] = { base, levelBonus, programmingBonus, researchBonus, total };
     }

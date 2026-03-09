@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { User } from '../models/User';
 import { PacketBreachSession } from '../models/PacketBreachSession';
@@ -315,7 +316,7 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       }
       const puzzle = generatePuzzle(levelId);
       const { nodePool, solution, antiSolution } = puzzle;
-      const session: SessionData = {
+      const sessionData: SessionData = {
         solution,
         antiSolution,
         attemptsLeft: params.attempts,
@@ -324,49 +325,66 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         firstAttemptPaid: false, // cost taken above; first submit must skip deduction
         ...(puzzle.decoyNodeId != null && { decoyNodeId: puzzle.decoyNodeId }),
       };
-      try {
-        await PacketBreachSession.create({
-          userId: user._id,
-          levelId,
-          ...session,
-        });
-      } catch (createErr: unknown) {
-        const code = (createErr as { code?: number })?.code;
-        if (code === 11000) {
-          const existing = await PacketBreachSession.findOne({ userId: user._id, levelId }).lean();
-          if (existing) {
-            const existingSession = docToSessionData(existing);
-            res.json({
-              nodePool: existingSession.nodePool,
-              slots: existingSession.slots,
-              attemptsLeft: existingSession.attemptsLeft,
-            });
-            return;
-          }
-        }
-        throw createErr;
-      }
       const newTotal = accrued.total - cost;
+      const mongoSession = await mongoose.startSession();
+      type DuplicateSessionError = Error & { __duplicateSession: true; existingSessionData: SessionData };
       try {
-        await User.updateOne(
-          { _id: userId },
-          {
-            $set: {
-              'balance.total': newTotal,
-              'balance.lastUpdated': accrued.lastUpdated,
-              'balance.fractionalRemainder': accrued.fractionalRemainder,
-            },
+        await mongoSession.withTransaction(async () => {
+          try {
+            await PacketBreachSession.create(
+              { userId: user._id, levelId, ...sessionData },
+              { session: mongoSession }
+            );
+          } catch (createErr: unknown) {
+            const code = (createErr as { code?: number })?.code;
+            if (code === 11000) {
+              const existing = await PacketBreachSession.findOne({
+                userId: user._id,
+                levelId,
+              })
+                .session(mongoSession)
+                .lean();
+              if (existing) {
+                const existingSessionData = docToSessionData(existing);
+                const err = new Error('Duplicate session') as DuplicateSessionError;
+                err.__duplicateSession = true;
+                err.existingSessionData = existingSessionData;
+                throw err;
+              }
+            }
+            throw createErr;
           }
-        );
-      } catch {
-        await PacketBreachSession.deleteOne({ userId: user._id, levelId });
-        res.status(500).json({ error: 'Server error' });
-        return;
+          await User.updateOne(
+            { _id: userId },
+            {
+              $set: {
+                'balance.total': newTotal,
+                'balance.lastUpdated': accrued.lastUpdated,
+                'balance.fractionalRemainder': accrued.fractionalRemainder,
+              },
+            },
+            { session: mongoSession }
+          );
+        });
+      } catch (txErr: unknown) {
+        const dupErr = txErr as DuplicateSessionError;
+        if (dupErr?.__duplicateSession && dupErr.existingSessionData) {
+          const existing = dupErr.existingSessionData;
+          res.json({
+            nodePool: existing.nodePool,
+            slots: existing.slots,
+            attemptsLeft: existing.attemptsLeft,
+          });
+          return;
+        }
+        throw txErr;
+      } finally {
+        await mongoSession.endSession();
       }
       res.json({
-        nodePool: session.nodePool,
-        slots: session.slots,
-        attemptsLeft: session.attemptsLeft,
+        nodePool: sessionData.nodePool,
+        slots: sessionData.slots,
+        attemptsLeft: sessionData.attemptsLeft,
         balance: {
           total: newTotal,
           ratePerSecond: bal?.ratePerSecond ?? 0,
@@ -474,9 +492,7 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
         lostAllAttempts: true,
         antiSolutionTriggered: true,
         attemptsLeft: 0,
-        routed: 0,
-        misrouted: 0,
-        rejected: 0,
+        // Omit routed/misrouted/rejected so client gets result.routed === undefined and shows feedback withheld
         balance: {
           total: newTotal,
           ratePerSecond: bal?.ratePerSecond ?? 0,
