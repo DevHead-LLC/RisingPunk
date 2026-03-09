@@ -67,7 +67,7 @@ const DIGIT_IMAGES: Record<string, number> = {
   tcp: require('../assets/images/miniGame/tcp.png'),
   udp: require('../assets/images/miniGame/udp.png'),
   ssh: require('../assets/images/miniGame/ssh.png'),
-  http: require('../assets/images/miniGame/https.png'),
+  http: require('../assets/images/miniGame/http.png'),
   https: require('../assets/images/miniGame/https.png'),
   dns: require('../assets/images/miniGame/dns.png'),
 };

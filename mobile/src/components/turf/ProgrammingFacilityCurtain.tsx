@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useThemeColors } from '../../hooks/useThemeColors';
 import { useAppSelector } from '../../store/hooks';
 import { useUnlockProgrammingFacilityMutation } from '../../store/api/authApi';
 import { SIZING } from '../../styles/theme';
@@ -30,7 +29,6 @@ type ProgrammingFacilityCurtainProps = {
 export const ProgrammingFacilityCurtain = memo(function ProgrammingFacilityCurtain({
   showUnlockPrice,
 }: ProgrammingFacilityCurtainProps) {
-  const colors = useThemeColors();
   const balanceTotal = useAppSelector((state) => state.balance?.total ?? 0);
   const [unlock, { isLoading }] = useUnlockProgrammingFacilityMutation();
 
