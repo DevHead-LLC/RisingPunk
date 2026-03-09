@@ -164,6 +164,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
   const [showRules, setShowRules] = useState(false);
   const [startingLevelId, setStartingLevelId] = useState<string | null>(null);
   const entryDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSelectingLevelRef = useRef(false);
   const balance = useAppSelector(getCurrentBalance);
   const { data: status, isLoading, error } = useGetPacketBreachStatusQuery(undefined, {
     pollingInterval: 60000,
@@ -184,6 +185,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
       clearTimeout(entryDelayTimeoutRef.current);
       entryDelayTimeoutRef.current = null;
     }
+    isSelectingLevelRef.current = false;
     onClose();
   }, [onClose]);
 
@@ -198,8 +200,10 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
 
   const handleSelectLevel = useCallback(
     async (levelId: string) => {
+      if (isSelectingLevelRef.current) return;
       const config = (status?.levelConfigs ?? []).find((c) => c.levelId === levelId);
       if (!config?.isUnlocked || config?.isCompleted || numericBalance < (config.cost ?? 0)) return;
+      isSelectingLevelRef.current = true;
       if (entryDelayTimeoutRef.current != null) {
         clearTimeout(entryDelayTimeoutRef.current);
         entryDelayTimeoutRef.current = null;
@@ -209,10 +213,12 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
         const result = await startSession(levelId).unwrap();
         entryDelayTimeoutRef.current = setTimeout(() => {
           entryDelayTimeoutRef.current = null;
+          isSelectingLevelRef.current = false;
           setStartingLevelId(null);
           onSelectLevel(levelId, result);
         }, ENTRY_DEDUCTION_DELAY_MS);
       } catch (err: unknown) {
+        isSelectingLevelRef.current = false;
         setStartingLevelId(null);
         const statusCode = (err as { status?: number })?.status;
         if (statusCode === 402) {

@@ -105,6 +105,7 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
       setWin(false);
       setLostAll(false);
       setAntiSolutionTriggered(false);
+      setInsufficientFunds(false);
       setClaimError(false);
       lostOrWonRef.current = false;
       return;
@@ -122,6 +123,7 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
           setWin(false);
           setLostAll(false);
           setAntiSolutionTriggered(false);
+          setInsufficientFunds(false);
           setClaimError(false);
           lostOrWonRef.current = false;
         }
@@ -129,6 +131,7 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
         if (!cancelled) {
           setLostAll(false);
           setWin(false);
+          setInsufficientFunds(false);
           setClaimError(false);
         }
       }
