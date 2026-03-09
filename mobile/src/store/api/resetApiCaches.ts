@@ -15,4 +15,5 @@ export const resetAllApiCaches = (api: any) => {
   api.dispatch({ type: 'researchFeaturesApi/resetApiState' });
   api.dispatch({ type: 'privateMessagesApi/resetApiState' });
   api.dispatch({ type: 'packetBreachApi/resetApiState' });
+  api.dispatch({ type: 'raceConditionHeistApi/resetApiState' });
 };

@@ -21,10 +21,12 @@ const ICON_SIZE = 100;
 
 type ProgrammingFacilityLocationProps = {
   onSelectPacketBreach: () => void;
+  onSelectRaceConditionHeist: () => void;
 };
 
 export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLocation({
   onSelectPacketBreach,
+  onSelectRaceConditionHeist,
 }: ProgrammingFacilityLocationProps) {
   const colors = useThemeColors();
   const { width: winWidth, height: winHeight } = useWindowDimensions();
@@ -37,6 +39,11 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
   const handleOpenPacketBreach = () => {
     setShowModal(false);
     onSelectPacketBreach();
+  };
+
+  const handleOpenRaceConditionHeist = () => {
+    setShowModal(false);
+    onSelectRaceConditionHeist();
   };
 
   const modalWidth = winWidth * 0.5;
@@ -110,6 +117,20 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
                 <Text style={[styles.gameOptionTitle, { color: colors.primary }]}>Packet Breach</Text>
                 <Text style={[styles.gameOptionDesc, { color: colors.text?.secondary ?? colors.primary }]}>
                   Infantry · Breach the node
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.gameOption, { borderColor: colors.primary }]}
+                onPress={handleOpenRaceConditionHeist}
+                activeOpacity={0.7}
+                accessible
+                accessibilityLabel="Race Condition Heist. Tap to play."
+                accessibilityRole="button"
+              >
+                <Text style={[styles.gameOptionTitle, { color: colors.primary }]}>Race Condition Heist</Text>
+                <Text style={[styles.gameOptionDesc, { color: colors.text?.secondary ?? colors.primary }]}>
+                  Cavalry · Hijack the packet
                 </Text>
               </TouchableOpacity>
 

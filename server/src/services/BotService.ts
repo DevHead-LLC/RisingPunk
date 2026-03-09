@@ -13,11 +13,15 @@ export interface ArmyBonus {
   health: number;
 }
 
+/** Optional Cavalry (Guardian) bonus from e.g. Race Condition Heist tier rewards; applied only when botType is guardian. */
+export type GuardianBonus = ArmyBonus;
+
 export class BotService {
   static async getUserBotStats(
     botType: string,
     userLevel: number,
-    armyBonus?: ArmyBonus
+    armyBonus?: ArmyBonus,
+    guardianBonus?: GuardianBonus
   ): Promise<BotConfig> {
     try {
       let effectiveStats = BotStatsService.computeEffectiveBotStats(botType, userLevel);
@@ -28,6 +32,15 @@ export class BotService {
           health: effectiveStats.health + armyBonus.health,
           defense: effectiveStats.defense + armyBonus.defense,
           speed: effectiveStats.speed + armyBonus.speed,
+        };
+      }
+      if (botType === 'guardian' && guardianBonus) {
+        effectiveStats = {
+          ...effectiveStats,
+          offense: effectiveStats.offense + guardianBonus.strength,
+          health: effectiveStats.health + guardianBonus.health,
+          defense: effectiveStats.defense + guardianBonus.defense,
+          speed: effectiveStats.speed + guardianBonus.speed,
         };
       }
       const role = BotStatsService.getBotRole(botType);

@@ -52,14 +52,13 @@ router.get('/stats', auth, async (req, res) => {
     const { BotService } = require('../services/BotService');
     const user = await User.findById(req.user._id);
     const userLevel = user?.level || 1;
-    
     const armyBonus = user?.armyBonus;
+    const guardianBonus = user?.guardianBonus;
     const botStats: Record<string, any> = {};
     for (const botType of ['guardian', 'breacher', 'phreak']) {
-      const config = await BotService.getUserBotStats(botType, userLevel, armyBonus);
+      const config = await BotService.getUserBotStats(botType, userLevel, armyBonus, guardianBonus);
       botStats[botType] = config;
     }
-    
     res.json({ botStats });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -76,7 +75,7 @@ interface StatRow {
 }
 
 const { computePacketBreachArmyBonus } = require('../config/packetBreachConfig');
-
+const { computeRaceConditionHeistGuardianBonus } = require('../config/raceConditionHeistConfig');
 // Get bot stats breakdown for profile charts (base, +level, +programming, total)
 // Total row comes from BotService.getUserBotStats (same as /stats and battles) so one source of truth.
 router.get('/stats-breakdown', auth, async (req, res) => {
@@ -89,8 +88,8 @@ router.get('/stats-breakdown', auth, async (req, res) => {
       return;
     }
     const userLevel = user.level || 1;
-    const levelsCompleted: string[] = Array.isArray(user.packetBreach?.levelsCompleted) ? user.packetBreach!.levelsCompleted : [];
-    const programmingFromLevels = computePacketBreachArmyBonus(levelsCompleted);
+    const packetBreachLevels: string[] = Array.isArray(user.packetBreach?.levelsCompleted) ? user.packetBreach!.levelsCompleted : [];
+    const programmingFromLevels = computePacketBreachArmyBonus(packetBreachLevels);
     const storedArmyBonus = user.armyBonus || { strength: 0, defense: 0, speed: 0, health: 0 };
     const armyBonusMatches =
       storedArmyBonus.strength === programmingFromLevels.strength &&
@@ -101,6 +100,8 @@ router.get('/stats-breakdown', auth, async (req, res) => {
       await User.updateOne({ _id: user._id }, { $set: { armyBonus: programmingFromLevels } });
     }
     const armyBonusForStats = armyBonusMatches ? storedArmyBonus : programmingFromLevels;
+    const rchLevels: string[] = Array.isArray(user.raceConditionHeist?.levelsCompleted) ? user.raceConditionHeist!.levelsCompleted : [];
+    const programmingGuardianFromLevels = computeRaceConditionHeistGuardianBonus(rchLevels);
 
     const zeroRow = (): StatRow => ({ health: 0, offense: 0, defense: 0, speed: 0, range: 0 });
     const breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> = {};
@@ -124,7 +125,15 @@ router.get('/stats-breakdown', auth, async (req, res) => {
               speed: programmingFromLevels.speed,
               range: 0,
             }
-          : zeroRow();
+          : botType === 'guardian'
+            ? {
+                health: programmingGuardianFromLevels.health,
+                offense: programmingGuardianFromLevels.strength,
+                defense: programmingGuardianFromLevels.defense,
+                speed: programmingGuardianFromLevels.speed,
+                range: 0,
+              }
+            : zeroRow();
       const researchBonus = zeroRow(); // Placeholder for future research bonuses
       const finalConfig = await BotService.getUserBotStats(botType, userLevel, armyBonusForStats);
       const s = finalConfig.stats;

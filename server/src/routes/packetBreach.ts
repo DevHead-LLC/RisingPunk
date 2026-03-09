@@ -549,6 +549,7 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       res.json({
         ...feedback,
         attemptsLeft: session.attemptsLeft,
+        ...(session.attemptsLeft === 0 && { lostAllAttempts: true }),
         win: win || undefined,
         balance: {
           total: newTotal,
