@@ -100,9 +100,18 @@ router.get('/stats-breakdown', auth, async (req, res) => {
       await User.updateOne({ _id: user._id }, { $set: { armyBonus: programmingFromLevels } });
     }
     const armyBonusForStats = armyBonusMatches ? storedArmyBonus : programmingFromLevels;
-    const guardianBonusForStats = user.guardianBonus;
     const rchLevels: string[] = Array.isArray(user.raceConditionHeist?.levelsCompleted) ? user.raceConditionHeist!.levelsCompleted : [];
     const programmingGuardianFromLevels = computeRaceConditionHeistGuardianBonus(rchLevels);
+    const storedGuardianBonus = user.guardianBonus || { strength: 0, defense: 0, speed: 0, health: 0 };
+    const guardianBonusMatches =
+      storedGuardianBonus.strength === programmingGuardianFromLevels.strength &&
+      storedGuardianBonus.defense === programmingGuardianFromLevels.defense &&
+      storedGuardianBonus.speed === programmingGuardianFromLevels.speed &&
+      storedGuardianBonus.health === programmingGuardianFromLevels.health;
+    if (!guardianBonusMatches) {
+      await User.updateOne({ _id: user._id }, { $set: { guardianBonus: programmingGuardianFromLevels } });
+    }
+    const guardianBonusForStats = guardianBonusMatches ? storedGuardianBonus : programmingGuardianFromLevels;
 
     const zeroRow = (): StatRow => ({ health: 0, offense: 0, defense: 0, speed: 0, range: 0 });
     const breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> = {};

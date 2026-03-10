@@ -49,24 +49,21 @@ const TIER_CONFIGS: { tier: number; rewardLabel: string; levelRange: string }[] 
 const GAME_RULES_TEXT = `RACE CONDITION HEIST — HOW TO PLAY
 
 OBJECTIVE
-Figure out the pattern and exploit the server before time runs out. You have one timer: the match clock (e.g. 3 minutes on early levels).
+Figure out the pattern and exploit the server before time runs out. You have one timer: the match clock. Later tiers have less time and faster word cycles.
 
 THE PATTERN
-Words rotate one at a time. The last word in each cycle is always a "secure" word (Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, etc.). You must tap the action when the word BEFORE that secure word appears — that's your only window. If you tap on any other word, you miss and your combo resets. Early tiers use 3-word cycles; Tier 4 uses 4-word cycles (one extra action word before the secure word).
+Words rotate one at a time. The last word in each cycle is always a "secure" word (Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, etc.). Tap the action when the word BEFORE that secure word appears — that's your only window. If you tap on any other word (except the secure word on tiers 5+), you miss and your combo resets. Early tiers use 3-word cycles; tiers 4 and 5 use 4-word cycles.
 
 ACTIONS
 • Watch the rotating word.
 • Tap the action for the current node (Exploit, Encrypt, Exfiltrate, or Bypass) when you see the word that comes right before the secure word in the cycle.
-• Steal the packet to score and build combo.
+• Never tap when the secure word is showing (tiers 5 and above — see FATAL FAILURE below).
 
-TIER 2 (two nodes)
-• Two user-data nodes: capture the first with Exploit, then a new word set appears — tap Encrypt on the second node when the word before the secure word appears. You must capture both nodes to pass.
+MULTI-NODE TIERS (2, 3, 4, 5)
+• Tier 2: two nodes (Exploit, then Encrypt). Tier 3: three (Exploit → Encrypt → Exfiltrate). Tiers 4 and 5: four nodes (Exploit → Encrypt → Exfiltrate → Bypass). Each phase gets a new word set; capture all nodes to pass. Tier 5 has a faster word cycle and less time than tier 4.
 
-TIER 3 (three nodes)
-• Three user-data nodes: Exploit the first, then Encrypt the second (each triggers a new word set), then Exfiltrate the third when its word set shows the word before the secure word. You must capture all three nodes to pass.
-
-TIER 4 (four nodes, 4-word cycles)
-• Four user-data nodes: Exploit → Encrypt → Exfiltrate → Bypass. Each phase uses a new 4-word cycle (three action words then a secure word). Secure words include Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, Validate, Fortify. You must capture all four nodes to pass.
+FATAL FAILURE (tiers 5 and above)
+• If you tap when the secure word is displayed, you are traced immediately: "You've been traced! FATAL FAILURE." The run ends and you are returned to level select. No second chances — start a new run to try again.
 
 SCORING
 Score = packet value × exploit multiplier × combo. Combo builds when you steal in quick succession (2 = 1.2×, 4 = 1.5×, 6 = 2×). Failed exploit resets combo.

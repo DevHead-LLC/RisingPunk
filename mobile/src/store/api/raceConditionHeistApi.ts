@@ -97,9 +97,26 @@ export interface RaceConditionHeistSessionResponse {
   };
 }
 
+/** Client viewpoint at tap (onPressIn) for server comparison; see taskItems/problemSolvingTempFile.md */
+export interface RaceConditionHeistClientViewpoint {
+  clientTimestampMs: number;
+  displayedWordIndex: number;
+  displayedWordLabel: string;
+  clientPhaseElapsedMs: number;
+  wordDurationMs: number;
+  wordCount: number;
+}
+
+export interface RaceConditionHeistAttemptHijackRequest {
+  levelId: string;
+  packetId: string;
+  displayedWordIndex?: number;
+  clientViewpoint?: RaceConditionHeistClientViewpoint;
+}
+
 export interface RaceConditionHeistAttemptResponse {
   success: boolean;
-  reason?: 'cooldown' | 'missed_window' | 'match_ended' | 'complete_first_node' | 'complete_previous_nodes';
+  reason?: 'cooldown' | 'missed_window' | 'match_ended' | 'complete_first_node' | 'complete_previous_nodes' | 'fatal_secure_word';
   addedScore?: number;
   packets: RCHPacket[];
   score: number;
@@ -107,10 +124,16 @@ export interface RaceConditionHeistAttemptResponse {
   exploitCooldownUntil?: string;
   /** Set when first node is captured (tier 2+); client uses this to start phase-2 word display. */
   phase2StartedAt?: string;
+  wordRotationPhase2?: string[];
+  wordStartOffsetPhase2?: number;
   /** Set when second node is captured (tier 3); client uses this to start phase-3 word display. */
   phase3StartedAt?: string;
+  wordRotationPhase3?: string[];
+  wordStartOffsetPhase3?: number;
   /** Set when third node is captured (tier 4); client uses this to start phase-4 word display. */
   phase4StartedAt?: string;
+  wordRotationPhase4?: string[];
+  wordStartOffsetPhase4?: number;
   /** Server time when response was built; client uses this to keep word timing in sync. */
   serverTime?: string;
 }
@@ -162,12 +185,17 @@ export const raceConditionHeistApi = createApi({
     }),
     attemptRaceConditionHeistHijack: builder.mutation<
       RaceConditionHeistAttemptResponse,
-      { levelId: string; packetId: string; displayedWordIndex?: number }
+      RaceConditionHeistAttemptHijackRequest
     >({
-      query: ({ levelId, packetId, displayedWordIndex }) => ({
+      query: ({ levelId, packetId, displayedWordIndex, clientViewpoint }) => ({
         url: '/api/race-condition-heist/attempt-hijack',
         method: 'POST',
-        body: { levelId, packetId, ...(typeof displayedWordIndex === 'number' && { displayedWordIndex }) },
+        body: {
+          levelId,
+          packetId,
+          ...(typeof displayedWordIndex === 'number' && { displayedWordIndex }),
+          ...(clientViewpoint && { clientViewpoint }),
+        },
       }),
     }),
     endRaceConditionHeistRun: builder.mutation<RaceConditionHeistEndRunResponse, string>({

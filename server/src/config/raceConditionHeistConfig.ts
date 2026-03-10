@@ -86,9 +86,9 @@ const WORD_GROUPS_TIER_4: readonly string[][] = [
 const WORD_ROTATION_DEFAULT = ['Read', 'Write', 'Lock'];
 const WORD_DURATION_MS = 1500;
 
-/** Return a random word group for the given tier. Tiers 1–3: 3-word cycle. Tier 4: 4-word cycle. Tier 5+ default. */
+/** Return a random word group for the given tier. Tiers 1–3: 3-word. Tiers 4–5: 4-word. Tier 6+ default. */
 export function getRandomWordGroupForTier(tier: number): string[] {
-  if (tier === 4) {
+  if (tier === 4 || tier === 5) {
     const idx = Math.floor(Math.random() * WORD_GROUPS_TIER_4.length);
     return [...WORD_GROUPS_TIER_4[idx]];
   }
@@ -103,12 +103,19 @@ export function getRandomWordGroupForTier(tier: number): string[] {
 function buildAllLevels(): LevelParams[] {
   const levels: LevelParams[] = [];
   for (let tier = 1; tier <= 21; tier++) {
-    const matchDurationMs = tier === 1 ? 180000 : Math.max(90000, 180000 - (tier - 1) * 2000);
+    const matchDurationMs =
+      tier === 1
+        ? 180000
+        : tier === 5
+          ? 150000
+          : Math.max(90000, 180000 - (tier - 1) * 2000);
     const wordRotation = WORD_ROTATION_DEFAULT;
-    const wordDurationMs = WORD_DURATION_MS;
+    /** Tier 5: faster cycle (1200 ms per word). Other tiers: 1500 ms. */
+    const wordDurationMs = tier >= 5 ? 1200 : WORD_DURATION_MS;
     const maxPackets = tier <= 3 ? 1 : tier <= 8 ? 2 : Math.min(5, Math.floor(tier / 3) + 1);
-    /** Tier 1: 50. Tier 2: 100. Tier 3: 150. Tier 4: 200 (four nodes). Tier 5+: 50 for now. */
-    const scoreThreshold = tier === 1 ? 50 : tier === 2 ? 100 : tier === 3 ? 150 : tier === 4 ? 200 : 50;
+    /** Tier 1: 50. Tier 2: 100. Tier 3: 150. Tiers 4–5: 200 (four nodes). Tier 6+: 50 for now. */
+    const scoreThreshold =
+      tier === 1 ? 50 : tier === 2 ? 100 : tier === 3 ? 150 : tier === 4 || tier === 5 ? 200 : 50;
     for (let y = 1; y <= 5; y++) {
       levels.push({
         levelId: `${tier}.${y}`,
