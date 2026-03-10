@@ -124,12 +124,40 @@ const WORD_GROUPS_TIER_7: readonly string[][] = [
 /** Cooldown (ms) after tapping a wrong word (array[0], [1], [2], or [3]) on tier 7. Slightly longer than tier 6 (1000). */
 export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_7 = 1100;
 
-/** Default word rotation for tier 8+ (until we add more). */
+/** Cooldown (ms) after tapping a wrong word (array[0]–[4]) on tier 8. Same as tier 7 for 7-word sets (slightly gentler than tier 9’s 1200). */
+export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_8 = 1100;
+
+/**
+ * Tier 9: 7-word cycles. array[0]–[4] = other words (tap = incorrect + cooldown); array[5] = success word; array[6] = secure word (tap = fatal).
+ */
+const WORD_GROUPS_TIER_9: readonly string[][] = [
+  ['Read', 'Query', 'Log in', 'Connect', 'Fetch email', 'Write', 'Lock'],
+  ['Connect', 'Transfer', 'Send reply', 'Log out', 'Query', 'Capture', 'Secure'],
+  ['Log in', 'Read', 'Query', 'Transfer', 'Connect', 'Exfiltrate', 'Shield'],
+  ['Query', 'Log out', 'Fetch email', 'Read', 'Send reply', 'Bypass', 'Harden'],
+  ['Fetch email', 'Read', 'Transfer', 'Log in', 'Connect', 'Write', 'Sanitize'],
+  ['Transfer', 'Query', 'Log in', 'Read', 'Log out', 'Patch', 'Seal'],
+  ['Read', 'Connect', 'Send reply', 'Log out', 'Fetch email', 'Exfiltrate', 'Guard'],
+  ['Log out', 'Fetch email', 'Query', 'Transfer', 'Read', 'Bypass', 'Validate'],
+  ['Send reply', 'Read', 'Log in', 'Connect', 'Query', 'Write', 'Fortify'],
+  ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Inject', 'Lock'],
+  ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Exfiltrate', 'Encrypt'],
+  ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Bypass', 'Secure'],
+];
+
+/** Cooldown (ms) after tapping a wrong word (array[0]–[4]) on tier 9. Slightly longer than tier 8 (1100). */
+export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_9 = 1200;
+
+/** Default word rotation for tier 10+ (until we add more). */
 const WORD_ROTATION_DEFAULT = ['Read', 'Write', 'Lock'];
 const WORD_DURATION_MS = 1500;
 
-/** Return a random word group for the given tier. Tiers 1–3: 3-word. Tiers 4–5: 4-word. Tier 6: 5-word. Tier 7: 6-word. Tier 8+ default. */
+/** Return a random word group for the given tier. Tiers 1–3: 3-word. Tiers 4–5: 4-word. Tier 6: 5-word. Tier 7: 6-word. Tiers 8–9: 7-word. Tier 10+ default. */
 export function getRandomWordGroupForTier(tier: number): string[] {
+  if (tier === 9 || tier === 8) {
+    const idx = Math.floor(Math.random() * WORD_GROUPS_TIER_9.length);
+    return [...WORD_GROUPS_TIER_9[idx]];
+  }
   if (tier === 7) {
     const idx = Math.floor(Math.random() * WORD_GROUPS_TIER_7.length);
     return [...WORD_GROUPS_TIER_7[idx]];
@@ -162,15 +190,17 @@ function buildAllLevels(): LevelParams[] {
             ? 140000
             : tier === 7
               ? 130000
-              : Math.max(90000, 180000 - (tier - 1) * 2000);
+              : tier === 8 || tier === 9
+                ? tier === 8 ? 130000 : 120000
+                : Math.max(90000, 180000 - (tier - 1) * 2000);
     const wordRotation = WORD_ROTATION_DEFAULT;
-    /** Tier 5: 1200 ms. Tier 6: 1100 ms. Tier 7: 1000 ms. Tier 8+: 1200. Other tiers: 1500 ms. */
+    /** Tier 5: 1200 ms. Tier 6: 1100 ms. Tier 7: 1000 ms. Tier 8: 975 ms (faster than 7). Tier 9: 950 ms. Tier 10+: 1200. Other tiers: 1500 ms. */
     const wordDurationMs =
-      tier === 5 ? 1200 : tier === 6 ? 1100 : tier === 7 ? 1000 : tier >= 8 ? 1200 : WORD_DURATION_MS;
-    const maxPackets = tier <= 3 ? 1 : tier <= 8 ? 2 : Math.min(5, Math.floor(tier / 3) + 1);
-    /** Tier 1: 50. Tier 2: 100. Tier 3: 150. Tiers 4–5: 200 (four nodes). Tier 6: 250 (five nodes). Tier 7: 300 (six nodes). Tier 8+: 50 for now. */
+      tier === 5 ? 1200 : tier === 6 ? 1100 : tier === 7 ? 1000 : tier === 8 ? 975 : tier === 9 ? 950 : tier >= 10 ? 1200 : WORD_DURATION_MS;
+    const maxPackets = tier <= 3 ? 1 : tier <= 9 ? 2 : Math.min(5, Math.floor(tier / 3) + 1);
+    /** Tier 1: 50. Tier 2: 100. Tier 3: 150. Tiers 4–5: 200 (four nodes). Tier 6: 250 (five nodes). Tier 7: 300 (six nodes). Tiers 8–9: 350 (seven nodes). Tier 10+: 50 for now. */
     const scoreThreshold =
-      tier === 1 ? 50 : tier === 2 ? 100 : tier === 3 ? 150 : tier === 4 || tier === 5 ? 200 : tier === 6 ? 250 : tier === 7 ? 300 : 50;
+      tier === 1 ? 50 : tier === 2 ? 100 : tier === 3 ? 150 : tier === 4 || tier === 5 ? 200 : tier === 6 ? 250 : tier === 7 ? 300 : tier === 8 || tier === 9 ? 350 : 50;
     for (let y = 1; y <= 5; y++) {
       levels.push({
         levelId: `${tier}.${y}`,
