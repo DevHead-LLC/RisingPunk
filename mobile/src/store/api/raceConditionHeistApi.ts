@@ -89,6 +89,10 @@ export interface RaceConditionHeistSessionResponse {
   wordRotationPhase5?: string[];
   wordStartOffsetPhase5?: number;
   phase5StartedAt?: string;
+  /** Tier 7: sixth word cycle and start time for sixth node (Offload). */
+  wordRotationPhase6?: string[];
+  wordStartOffsetPhase6?: number;
+  phase6StartedAt?: string;
   phase: 'RUNNING' | 'LOCKDOWN' | 'RESULTS';
   packets: RCHPacket[];
   score: number;
@@ -142,6 +146,10 @@ export interface RaceConditionHeistAttemptResponse {
   phase5StartedAt?: string;
   wordRotationPhase5?: string[];
   wordStartOffsetPhase5?: number;
+  /** Set when fifth node is captured (tier 7); client uses this to start phase-6 word display. */
+  phase6StartedAt?: string;
+  wordRotationPhase6?: string[];
+  wordStartOffsetPhase6?: number;
   /** Server time when response was built; client uses this to keep word timing in sync. */
   serverTime?: string;
 }

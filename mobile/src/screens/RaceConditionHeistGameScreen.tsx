@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   InteractionManager,
+  ScrollView,
 } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { SIZING } from '../styles/theme';
@@ -74,15 +75,17 @@ export function RaceConditionHeistGameScreen({
   const timeRemainingMs = Math.max(0, matchDurationMs - elapsedMs);
   /** Use server-provided threshold (tier 1 = 50, tier 2 = 100 for two nodes). */
   const scoreThreshold = session?.scoreThreshold ?? 50;
-  /** Tier from levelId. Tier 2 = two nodes, 3 = three, 4–5 = four nodes, 6 = five nodes. */
+  /** Tier from levelId. Tier 2 = two nodes, 3 = three, 4–5 = four nodes, 6 = five nodes, 7 = six nodes. */
   const tier = levelId.includes('.') ? parseInt(levelId.split('.')[0], 10) : 1;
   const isTier2 = tier === 2;
   const isTier3 = tier === 3;
   const isTier4 = tier === 4;
   const isTier5 = tier === 5;
   const isTier6 = tier === 6;
+  const isTier7 = tier === 7;
   const fivePacketTier = isTier6;
-  const multiNodeTier = isTier2 || isTier3 || isTier4 || isTier5 || isTier6;
+  const sixPacketTier = isTier7;
+  const multiNodeTier = isTier2 || isTier3 || isTier4 || isTier5 || isTier6 || isTier7;
 
   /** Keep client word timing in sync with server using serverTime from responses. */
   useEffect(() => {
@@ -278,6 +281,11 @@ export function RaceConditionHeistGameScreen({
             next.wordStartOffsetPhase5 = typeof result.wordStartOffsetPhase5 === 'number' ? result.wordStartOffsetPhase5 : 0;
             if (result.phase5StartedAt != null) next.phase5StartedAt = result.phase5StartedAt;
           }
+          if (result.wordRotationPhase6 && result.wordRotationPhase6.length > 0) {
+            next.wordRotationPhase6 = result.wordRotationPhase6;
+            next.wordStartOffsetPhase6 = typeof result.wordStartOffsetPhase6 === 'number' ? result.wordStartOffsetPhase6 : 0;
+            if (result.phase6StartedAt != null) next.phase6StartedAt = result.phase6StartedAt;
+          }
           return next;
         });
         if (result.reason === 'fatal_secure_word') {
@@ -351,7 +359,8 @@ export function RaceConditionHeistGameScreen({
       if (packetIndex === 1) return s.phase2StartedAt ?? s.startedAt;
       if (packetIndex === 2) return s.phase3StartedAt ?? s.startedAt;
       if (packetIndex === 3) return s.phase4StartedAt ?? s.phase3StartedAt ?? s.startedAt;
-      return s.phase5StartedAt ?? s.phase4StartedAt ?? s.startedAt;
+      if (packetIndex === 4) return s.phase5StartedAt ?? s.phase4StartedAt ?? s.startedAt;
+      return s.phase6StartedAt ?? s.phase5StartedAt ?? s.phase4StartedAt ?? s.startedAt;
     },
     []
   );
@@ -393,17 +402,31 @@ export function RaceConditionHeistGameScreen({
   }
 
   const activePackets = session.packets.filter((p) => !p.isHijacked);
+  const serverAdjustedNow = Date.now() + timeSkewMsRef.current;
   const onCooldown =
     session.exploitCooldownUntil &&
-    new Date(session.exploitCooldownUntil).getTime() > Date.now();
+    new Date(session.exploitCooldownUntil).getTime() > serverAdjustedNow;
 
   const wordRotation = session.wordRotation ?? ['Read', 'Write', 'Lock'];
   const wordDurationMs = session.wordDurationMs ?? 1500;
   const wordStartOffset = session.wordStartOffset ?? 0;
-  const serverAdjustedNow = Date.now() + timeSkewMsRef.current;
-  /** Tier 6: after fourth node captured, display phase-5 words for the fifth node (Extract). */
+  /** Tier 7: after fifth node captured, display phase-6 words for the sixth node (Offload). */
+  const usePhase6Words =
+    sixPacketTier &&
+    session.packets[0]?.isHijacked &&
+    session.packets[1]?.isHijacked &&
+    session.packets[2]?.isHijacked &&
+    session.packets[3]?.isHijacked &&
+    session.packets[4]?.isHijacked &&
+    (session.wordRotationPhase6?.length ?? 0) > 0 &&
+    session.phase6StartedAt != null;
+  const phase6ElapsedMs = usePhase6Words && session.phase6StartedAt
+    ? serverAdjustedNow - new Date(session.phase6StartedAt).getTime()
+    : 0;
+  /** Tier 6–7: after fourth node captured, display phase-5 words for the fifth node (Extract). */
   const usePhase5Words =
-    fivePacketTier &&
+    (fivePacketTier || sixPacketTier) &&
+    !usePhase6Words &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
     session.packets[2]?.isHijacked &&
@@ -413,10 +436,10 @@ export function RaceConditionHeistGameScreen({
   const phase5ElapsedMs = usePhase5Words && session.phase5StartedAt
     ? serverAdjustedNow - new Date(session.phase5StartedAt).getTime()
     : 0;
-  /** Tiers 4–6: after third node captured, display phase-4 words for the fourth node (Bypass). */
+  /** Tiers 4–7: after third node captured, display phase-4 words for the fourth node (Bypass). */
   const usePhase4Words =
     !usePhase5Words &&
-    (isTier4 || isTier5 || isTier6) &&
+    (isTier4 || isTier5 || isTier6 || isTier7) &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
     session.packets[2]?.isHijacked &&
@@ -428,7 +451,7 @@ export function RaceConditionHeistGameScreen({
   /** Tier 3+: after second node captured, display phase-3 words for the third node (Exfiltrate). */
   const usePhase3Words =
     !usePhase4Words &&
-    (isTier3 || isTier4 || isTier5 || isTier6) &&
+    (isTier3 || isTier4 || isTier5 || isTier6 || isTier7) &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
     (session.wordRotationPhase3?.length ?? 0) > 0 &&
@@ -446,33 +469,39 @@ export function RaceConditionHeistGameScreen({
   const phase2ElapsedMs = usePhase2Words && session.phase2StartedAt
     ? serverAdjustedNow - new Date(session.phase2StartedAt).getTime()
     : 0;
-  const activeRotation = usePhase5Words
-    ? (session.wordRotationPhase5 ?? [])
-    : usePhase4Words
-      ? (session.wordRotationPhase4 ?? [])
-      : usePhase3Words
-        ? (session.wordRotationPhase3 ?? [])
-        : usePhase2Words
-          ? (session.wordRotationPhase2 ?? [])
-          : wordRotation;
-  const activeStartOffset = usePhase5Words
-    ? (session.wordStartOffsetPhase5 ?? 0)
-    : usePhase4Words
-      ? (session.wordStartOffsetPhase4 ?? 0)
-      : usePhase3Words
-        ? (session.wordStartOffsetPhase3 ?? 0)
-        : usePhase2Words
-          ? (session.wordStartOffsetPhase2 ?? 0)
-          : wordStartOffset;
-  const activeElapsedMs = usePhase5Words
-    ? phase5ElapsedMs
-    : usePhase4Words
-      ? phase4ElapsedMs
-      : usePhase3Words
-        ? phase3ElapsedMs
-        : usePhase2Words
-          ? phase2ElapsedMs
-          : elapsedMs;
+  const activeRotation = usePhase6Words
+    ? (session.wordRotationPhase6 ?? [])
+    : usePhase5Words
+      ? (session.wordRotationPhase5 ?? [])
+      : usePhase4Words
+        ? (session.wordRotationPhase4 ?? [])
+        : usePhase3Words
+          ? (session.wordRotationPhase3 ?? [])
+          : usePhase2Words
+            ? (session.wordRotationPhase2 ?? [])
+            : wordRotation;
+  const activeStartOffset = usePhase6Words
+    ? (session.wordStartOffsetPhase6 ?? 0)
+    : usePhase5Words
+      ? (session.wordStartOffsetPhase5 ?? 0)
+      : usePhase4Words
+        ? (session.wordStartOffsetPhase4 ?? 0)
+        : usePhase3Words
+          ? (session.wordStartOffsetPhase3 ?? 0)
+          : usePhase2Words
+            ? (session.wordStartOffsetPhase2 ?? 0)
+            : wordStartOffset;
+  const activeElapsedMs = usePhase6Words
+    ? phase6ElapsedMs
+    : usePhase5Words
+      ? phase5ElapsedMs
+      : usePhase4Words
+        ? phase4ElapsedMs
+        : usePhase3Words
+          ? phase3ElapsedMs
+          : usePhase2Words
+            ? phase2ElapsedMs
+            : elapsedMs;
   /** Delay display by 250ms so "tap when word first appears" lands in server's window (client was ahead). */
   const DISPLAY_DELAY_MS = 250;
   const displayElapsedMs = Math.max(0, activeElapsedMs - DISPLAY_DELAY_MS);
@@ -483,15 +512,17 @@ export function RaceConditionHeistGameScreen({
   const displayedWord = activeRotation[currentWordIndex] ?? '—';
   /** Phase start (ISO string) for the active word display. */
   const phaseStart =
-    usePhase5Words && session.phase5StartedAt
-      ? session.phase5StartedAt
-      : usePhase4Words && session.phase4StartedAt
-        ? session.phase4StartedAt
-        : usePhase3Words && session.phase3StartedAt
-          ? session.phase3StartedAt
-          : usePhase2Words && session.phase2StartedAt
-            ? session.phase2StartedAt
-            : session.startedAt;
+    usePhase6Words && session.phase6StartedAt
+      ? session.phase6StartedAt
+      : usePhase5Words && session.phase5StartedAt
+        ? session.phase5StartedAt
+        : usePhase4Words && session.phase4StartedAt
+          ? session.phase4StartedAt
+          : usePhase3Words && session.phase3StartedAt
+            ? session.phase3StartedAt
+            : usePhase2Words && session.phase2StartedAt
+              ? session.phase2StartedAt
+              : session.startedAt;
 
   /** Lost run: show "Run complete" and "Back to levels" only. */
   if ((phase === 'LOCKDOWN' || phase === 'RESULTS') && !won) {
@@ -526,7 +557,7 @@ export function RaceConditionHeistGameScreen({
                 </Text>
                 <Text style={[styles.packetValue, { color: colors.primary }]}>{p.value} pts</Text>
                 <Text style={[styles.stolenLabel, { color: colors.success ?? colors.primary }]}>
-                  {idx === 0 ? 'Stolen' : idx === 1 ? 'Encrypted' : idx === 2 ? 'Exfiltrated' : idx === 3 ? 'Bypassed' : 'Extracted'}
+                  {idx === 0 ? 'Stolen' : idx === 1 ? 'Encrypted' : idx === 2 ? 'Exfiltrated' : idx === 3 ? 'Bypassed' : idx === 4 ? 'Extracted' : 'Offloaded'}
                 </Text>
               </View>
             ))}
@@ -577,11 +608,13 @@ export function RaceConditionHeistGameScreen({
           {lastAttemptReason === 'complete_first_node'
             ? 'Capture the first node before encrypting the second.'
             : lastAttemptReason === 'complete_previous_nodes'
-              ? fivePacketTier
-                ? 'Capture the first four nodes before extracting the fifth.'
-                : isTier4 || isTier5 || isTier6
-                  ? 'Capture the first three nodes before bypassing the fourth.'
-                  : 'Capture the first two nodes before exfiltrating the third.'
+              ? sixPacketTier
+                ? 'Capture the first five nodes before offloading the sixth.'
+                : fivePacketTier
+                  ? 'Capture the first four nodes before extracting the fifth.'
+                  : isTier4 || isTier5 || isTier6 || isTier7
+                    ? 'Capture the first three nodes before bypassing the fourth.'
+                    : 'Capture the first two nodes before exfiltrating the third.'
               : lastAttemptReason === 'wrong_word'
                 ? 'Wrong word! Tap when the word before the secure word appears.'
                 : 'Missed! Tap when the word before the secure word appears.'}
@@ -598,6 +631,93 @@ export function RaceConditionHeistGameScreen({
         <Text style={[styles.feedbackText, { color: colors.success ?? colors.primary }]}>Stolen!</Text>
       )}
 
+      {sixPacketTier ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={true}
+          contentContainerStyle={styles.packetsScrollContent}
+          style={styles.packetsScroll}
+        >
+          {session.packets.map((packet: RCHPacket, index: number) => {
+            const actionLabel =
+              index === 0 ? 'Exploit' : index === 1 ? 'Encrypt' : index === 2 ? 'Exfiltrate' : index === 3 ? 'Bypass' : index === 4 ? 'Extract' : 'Offload';
+            const canTap =
+              index === 0 ||
+              (index === 1 && session.packets[0]?.isHijacked) ||
+              (index === 2 && session.packets[0]?.isHijacked && session.packets[1]?.isHijacked) ||
+              (index === 3 &&
+                session.packets[0]?.isHijacked &&
+                session.packets[1]?.isHijacked &&
+                session.packets[2]?.isHijacked) ||
+              (index === 4 &&
+                session.packets[0]?.isHijacked &&
+                session.packets[1]?.isHijacked &&
+                session.packets[2]?.isHijacked &&
+                session.packets[3]?.isHijacked) ||
+              (index === 5 &&
+                session.packets[0]?.isHijacked &&
+                session.packets[1]?.isHijacked &&
+                session.packets[2]?.isHijacked &&
+                session.packets[3]?.isHijacked &&
+                session.packets[4]?.isHijacked);
+            const doneLabel =
+              index === 0 ? 'Stolen' : index === 1 ? 'Encrypted' : index === 2 ? 'Exfiltrated' : index === 3 ? 'Bypassed' : index === 4 ? 'Extracted' : 'Offloaded';
+            return (
+              <View
+                key={packet.id}
+                style={[
+                  styles.packetBox,
+                  { borderColor: colors.primary },
+                  packet.isHijacked && styles.packetHijacked,
+                ]}
+              >
+                <Text style={[styles.packetType, { color: colors.text?.secondary ?? colors.primary }]}>
+                  {packet.type.replace('_', ' ')}
+                </Text>
+                <Text style={[styles.packetValue, { color: colors.primary }]}>{packet.value} pts</Text>
+                {!packet.isHijacked && (
+                  <TouchableOpacity
+                    style={[
+                      styles.hijackButton,
+                      { borderColor: colors.primary },
+                      (onCooldown || !canTap) && styles.hijackButtonDisabled,
+                    ]}
+                    onPressIn={() => {
+                      const now = Date.now();
+                      const serverAdjustedNow = now + timeSkewMsRef.current;
+                      const phaseStartForPacket = getPhaseStartForPacket(index, session);
+                      const clientPhaseElapsedMs = Math.max(
+                        0,
+                        serverAdjustedNow - new Date(phaseStartForPacket).getTime()
+                      );
+                      clientViewpointAtTapRef.current = {
+                        clientTimestampMs: now,
+                        displayedWordIndex: currentWordIndex,
+                        displayedWordLabel: displayedWord,
+                        clientPhaseElapsedMs,
+                        wordDurationMs,
+                        wordCount: activeRotation.length,
+                      };
+                    }}
+                    onPress={() => handleHijack(packet.id, clientViewpointAtTapRef.current)}
+                    disabled={onCooldown || !canTap}
+                    accessible
+                    accessibilityLabel={`${actionLabel} packet`}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.hijackButtonText, { color: colors.primary }]}>{actionLabel}</Text>
+                  </TouchableOpacity>
+                )}
+                {packet.isHijacked && (
+                  <Text style={[styles.stolenLabel, { color: colors.success ?? colors.primary }]}>
+                    {doneLabel}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </ScrollView>
+      ) : (
       <View style={styles.packetsRow}>
         {session.packets.map((packet: RCHPacket, index: number) => {
           const actionLabel =
@@ -672,6 +792,7 @@ export function RaceConditionHeistGameScreen({
           );
         })}
       </View>
+      )}
 
       {onCooldown && (
         <Text style={[styles.cooldownHint, { color: colors.text?.secondary ?? colors.primary }]}>
@@ -702,6 +823,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: SIZING.spacing.md,
+  },
+  packetsScroll: { maxHeight: 220, marginHorizontal: SIZING.spacing.sm },
+  packetsScrollContent: {
+    flexDirection: 'row',
+    gap: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.md,
   },
   packetBox: {
     borderWidth: 1,
