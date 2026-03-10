@@ -82,12 +82,37 @@ const WORD_GROUPS_TIER_4: readonly string[][] = [
   ['Connect', 'Read', 'Write', 'Encrypt'],
 ];
 
-/** Default word rotation for tier 5+ (until we add more). */
+/**
+ * Tier 6: 5-word cycles. array[0]–[2] = other words (tap = incorrect + cooldown); array[3] = success word; array[4] = secure word (tap = fatal).
+ */
+const WORD_GROUPS_TIER_6: readonly string[][] = [
+  ['Read', 'Query', 'Log in', 'Write', 'Lock'],
+  ['Connect', 'Transfer', 'Fetch email', 'Encrypt', 'Secure'],
+  ['Log in', 'Send reply', 'Read', 'Exfiltrate', 'Shield'],
+  ['Query', 'Log out', 'Connect', 'Bypass', 'Harden'],
+  ['Fetch email', 'Read', 'Transfer', 'Write', 'Sanitize'],
+  ['Transfer', 'Query', 'Log in', 'Encrypt', 'Seal'],
+  ['Read', 'Connect', 'Send reply', 'Exfiltrate', 'Guard'],
+  ['Log out', 'Fetch email', 'Query', 'Bypass', 'Validate'],
+  ['Send reply', 'Read', 'Log in', 'Write', 'Fortify'],
+  ['Connect', 'Transfer', 'Log out', 'Encrypt', 'Lock'],
+  ['Query', 'Fetch email', 'Read', 'Exfiltrate', 'Encrypt'],
+  ['Log in', 'Connect', 'Send reply', 'Bypass', 'Secure'],
+];
+
+/** Cooldown (ms) after tapping a wrong word (array[0], [1], or [2]) on tier 6. Slightly longer than missed_window cooldown (800). */
+export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_6 = 1000;
+
+/** Default word rotation for tier 7+ (until we add more). */
 const WORD_ROTATION_DEFAULT = ['Read', 'Write', 'Lock'];
 const WORD_DURATION_MS = 1500;
 
-/** Return a random word group for the given tier. Tiers 1–3: 3-word. Tiers 4–5: 4-word. Tier 6+ default. */
+/** Return a random word group for the given tier. Tiers 1–3: 3-word. Tiers 4–5: 4-word. Tier 6: 5-word. Tier 7+ default. */
 export function getRandomWordGroupForTier(tier: number): string[] {
+  if (tier === 6) {
+    const idx = Math.floor(Math.random() * WORD_GROUPS_TIER_6.length);
+    return [...WORD_GROUPS_TIER_6[idx]];
+  }
   if (tier === 4 || tier === 5) {
     const idx = Math.floor(Math.random() * WORD_GROUPS_TIER_4.length);
     return [...WORD_GROUPS_TIER_4[idx]];
@@ -108,14 +133,17 @@ function buildAllLevels(): LevelParams[] {
         ? 180000
         : tier === 5
           ? 150000
-          : Math.max(90000, 180000 - (tier - 1) * 2000);
+          : tier === 6
+            ? 140000
+            : Math.max(90000, 180000 - (tier - 1) * 2000);
     const wordRotation = WORD_ROTATION_DEFAULT;
-    /** Tier 5: faster cycle (1200 ms per word). Other tiers: 1500 ms. */
-    const wordDurationMs = tier >= 5 ? 1200 : WORD_DURATION_MS;
+    /** Tier 5: 1200 ms. Tier 6: 1100 ms (slightly faster). Tier 7+: 1200. Other tiers: 1500 ms. */
+    const wordDurationMs =
+      tier === 5 ? 1200 : tier === 6 ? 1100 : tier >= 7 ? 1200 : WORD_DURATION_MS;
     const maxPackets = tier <= 3 ? 1 : tier <= 8 ? 2 : Math.min(5, Math.floor(tier / 3) + 1);
-    /** Tier 1: 50. Tier 2: 100. Tier 3: 150. Tiers 4–5: 200 (four nodes). Tier 6+: 50 for now. */
+    /** Tier 1: 50. Tier 2: 100. Tier 3: 150. Tiers 4–5: 200 (four nodes). Tier 6: 250 (five nodes). Tier 7+: 50 for now. */
     const scoreThreshold =
-      tier === 1 ? 50 : tier === 2 ? 100 : tier === 3 ? 150 : tier === 4 || tier === 5 ? 200 : 50;
+      tier === 1 ? 50 : tier === 2 ? 100 : tier === 3 ? 150 : tier === 4 || tier === 5 ? 200 : tier === 6 ? 250 : 50;
     for (let y = 1; y <= 5; y++) {
       levels.push({
         levelId: `${tier}.${y}`,

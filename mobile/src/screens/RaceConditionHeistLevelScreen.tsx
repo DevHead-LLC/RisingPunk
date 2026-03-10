@@ -52,15 +52,15 @@ OBJECTIVE
 Figure out the pattern and exploit the server before time runs out. You have one timer: the match clock. Later tiers have less time and faster word cycles.
 
 THE PATTERN
-Words rotate one at a time. The last word in each cycle is always a "secure" word (Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, etc.). Tap the action when the word BEFORE that secure word appears — that's your only window. If you tap on any other word (except the secure word on tiers 5+), you miss and your combo resets. Early tiers use 3-word cycles; tiers 4 and 5 use 4-word cycles.
+Words rotate one at a time. The last word in each cycle is always a "secure" word (Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, etc.). Tap the action when the word BEFORE that secure word appears — that's your only window. If you tap on any other word (except the secure word on tiers 5+), you miss and your combo resets. Early tiers use 3-word cycles; tiers 4 and 5 use 4-word cycles; tier 6 uses 5-word cycles.
 
 ACTIONS
 • Watch the rotating word.
-• Tap the action for the current node (Exploit, Encrypt, Exfiltrate, or Bypass) when you see the word that comes right before the secure word in the cycle.
+• Tap the action for the current node (Exploit, Encrypt, Exfiltrate, Bypass, or Extract on tier 6) when you see the word that comes right before the secure word in the cycle.
 • Never tap when the secure word is showing (tiers 5 and above — see FATAL FAILURE below).
 
-MULTI-NODE TIERS (2, 3, 4, 5)
-• Tier 2: two nodes (Exploit, then Encrypt). Tier 3: three (Exploit → Encrypt → Exfiltrate). Tiers 4 and 5: four nodes (Exploit → Encrypt → Exfiltrate → Bypass). Each phase gets a new word set; capture all nodes to pass. Tier 5 has a faster word cycle and less time than tier 4.
+MULTI-NODE TIERS (2, 3, 4, 5, 6)
+• Tier 2: two nodes (Exploit, then Encrypt). Tier 3: three (Exploit → Encrypt → Exfiltrate). Tiers 4 and 5: four nodes (Exploit → Encrypt → Exfiltrate → Bypass). Tier 6: five nodes (Exploit → Encrypt → Exfiltrate → Bypass → Extract). Each phase gets a new word set; capture all nodes to pass. Tiers 5 and 6 have a faster word cycle and less time than tier 4. Tier 6 uses 5-word cycles and a slightly longer cooldown if you tap a wrong word (not the success word and not the secure word).
 
 FATAL FAILURE (tiers 5 and above)
 • If you tap when the secure word is displayed, you are traced immediately: "You've been traced! FATAL FAILURE." The run ends and you are returned to level select. No second chances — start a new run to try again.

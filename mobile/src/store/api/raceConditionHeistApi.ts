@@ -85,6 +85,10 @@ export interface RaceConditionHeistSessionResponse {
   wordRotationPhase4?: string[];
   wordStartOffsetPhase4?: number;
   phase4StartedAt?: string;
+  /** Tier 6: fifth word cycle and start time for fifth node (Extract). */
+  wordRotationPhase5?: string[];
+  wordStartOffsetPhase5?: number;
+  phase5StartedAt?: string;
   phase: 'RUNNING' | 'LOCKDOWN' | 'RESULTS';
   packets: RCHPacket[];
   score: number;
@@ -116,7 +120,7 @@ export interface RaceConditionHeistAttemptHijackRequest {
 
 export interface RaceConditionHeistAttemptResponse {
   success: boolean;
-  reason?: 'cooldown' | 'missed_window' | 'match_ended' | 'complete_first_node' | 'complete_previous_nodes' | 'fatal_secure_word';
+  reason?: 'cooldown' | 'missed_window' | 'match_ended' | 'complete_first_node' | 'complete_previous_nodes' | 'fatal_secure_word' | 'wrong_word';
   addedScore?: number;
   packets: RCHPacket[];
   score: number;
@@ -134,6 +138,10 @@ export interface RaceConditionHeistAttemptResponse {
   phase4StartedAt?: string;
   wordRotationPhase4?: string[];
   wordStartOffsetPhase4?: number;
+  /** Set when fourth node is captured (tier 6); client uses this to start phase-5 word display. */
+  phase5StartedAt?: string;
+  wordRotationPhase5?: string[];
+  wordStartOffsetPhase5?: number;
   /** Server time when response was built; client uses this to keep word timing in sync. */
   serverTime?: string;
 }

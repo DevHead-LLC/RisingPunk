@@ -74,13 +74,15 @@ export function RaceConditionHeistGameScreen({
   const timeRemainingMs = Math.max(0, matchDurationMs - elapsedMs);
   /** Use server-provided threshold (tier 1 = 50, tier 2 = 100 for two nodes). */
   const scoreThreshold = session?.scoreThreshold ?? 50;
-  /** Tier from levelId (e.g. "2.1" → 2). Tier 2 = two nodes, tier 3 = three, tier 4 and 5 = four nodes. */
+  /** Tier from levelId. Tier 2 = two nodes, 3 = three, 4–5 = four nodes, 6 = five nodes. */
   const tier = levelId.includes('.') ? parseInt(levelId.split('.')[0], 10) : 1;
   const isTier2 = tier === 2;
   const isTier3 = tier === 3;
   const isTier4 = tier === 4;
   const isTier5 = tier === 5;
-  const multiNodeTier = isTier2 || isTier3 || isTier4 || isTier5;
+  const isTier6 = tier === 6;
+  const fivePacketTier = isTier6;
+  const multiNodeTier = isTier2 || isTier3 || isTier4 || isTier5 || isTier6;
 
   /** Keep client word timing in sync with server using serverTime from responses. */
   useEffect(() => {
@@ -134,7 +136,7 @@ export function RaceConditionHeistGameScreen({
   }, [fatalFailure]);
 
   useEffect(() => {
-    if (phase !== 'RUNNING' || elapsedMs < matchDurationMs || timerExpireTriggeredRef.current) return;
+    if (phase !== 'RUNNING' || !session || matchDurationMs <= 0 || elapsedMs < matchDurationMs || timerExpireTriggeredRef.current) return;
     timerExpireTriggeredRef.current = true;
     (async () => {
       try {
@@ -147,7 +149,7 @@ export function RaceConditionHeistGameScreen({
         setWon(false);
       }
     })();
-  }, [phase, elapsedMs, matchDurationMs, levelId, endRun]);
+  }, [phase, session, elapsedMs, matchDurationMs, levelId, endRun]);
 
   useEffect(() => {
     if (
@@ -271,6 +273,11 @@ export function RaceConditionHeistGameScreen({
             next.wordStartOffsetPhase4 = typeof result.wordStartOffsetPhase4 === 'number' ? result.wordStartOffsetPhase4 : 0;
             if (result.phase4StartedAt != null) next.phase4StartedAt = result.phase4StartedAt;
           }
+          if (result.wordRotationPhase5 && result.wordRotationPhase5.length > 0) {
+            next.wordRotationPhase5 = result.wordRotationPhase5;
+            next.wordStartOffsetPhase5 = typeof result.wordStartOffsetPhase5 === 'number' ? result.wordStartOffsetPhase5 : 0;
+            if (result.phase5StartedAt != null) next.phase5StartedAt = result.phase5StartedAt;
+          }
           return next;
         });
         if (result.reason === 'fatal_secure_word') {
@@ -290,8 +297,11 @@ export function RaceConditionHeistGameScreen({
         } else if (result.reason === 'complete_previous_nodes') {
           setHijackFeedback('missed');
           setLastAttemptReason('complete_previous_nodes');
+        } else if (result.reason === 'wrong_word') {
+          setHijackFeedback('missed');
+          setLastAttemptReason('wrong_word');
         }
-        if (result.success || result.reason === 'missed_window' || result.reason === 'complete_first_node' || result.reason === 'complete_previous_nodes') {
+        if (result.success || result.reason === 'missed_window' || result.reason === 'complete_first_node' || result.reason === 'complete_previous_nodes' || result.reason === 'wrong_word') {
           setTimeout(() => {
             setHijackFeedback(null);
             setLastAttemptReason(null);
@@ -340,7 +350,8 @@ export function RaceConditionHeistGameScreen({
       if (packetIndex === 0) return s.startedAt;
       if (packetIndex === 1) return s.phase2StartedAt ?? s.startedAt;
       if (packetIndex === 2) return s.phase3StartedAt ?? s.startedAt;
-      return s.phase4StartedAt ?? s.phase3StartedAt ?? s.startedAt;
+      if (packetIndex === 3) return s.phase4StartedAt ?? s.phase3StartedAt ?? s.startedAt;
+      return s.phase5StartedAt ?? s.phase4StartedAt ?? s.startedAt;
     },
     []
   );
@@ -389,22 +400,35 @@ export function RaceConditionHeistGameScreen({
   const wordRotation = session.wordRotation ?? ['Read', 'Write', 'Lock'];
   const wordDurationMs = session.wordDurationMs ?? 1500;
   const wordStartOffset = session.wordStartOffset ?? 0;
-  /** Tier 4 and 5: after third node captured, display phase-4 words for the fourth node (Bypass). */
+  const serverAdjustedNow = Date.now() + timeSkewMsRef.current;
+  /** Tier 6: after fourth node captured, display phase-5 words for the fifth node (Extract). */
+  const usePhase5Words =
+    fivePacketTier &&
+    session.packets[0]?.isHijacked &&
+    session.packets[1]?.isHijacked &&
+    session.packets[2]?.isHijacked &&
+    session.packets[3]?.isHijacked &&
+    (session.wordRotationPhase5?.length ?? 0) > 0 &&
+    session.phase5StartedAt != null;
+  const phase5ElapsedMs = usePhase5Words && session.phase5StartedAt
+    ? serverAdjustedNow - new Date(session.phase5StartedAt).getTime()
+    : 0;
+  /** Tiers 4–6: after third node captured, display phase-4 words for the fourth node (Bypass). */
   const usePhase4Words =
-    (isTier4 || isTier5) &&
+    !usePhase5Words &&
+    (isTier4 || isTier5 || isTier6) &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
     session.packets[2]?.isHijacked &&
     (session.wordRotationPhase4?.length ?? 0) > 0 &&
     session.phase4StartedAt != null;
-  const serverAdjustedNow = Date.now() + timeSkewMsRef.current;
   const phase4ElapsedMs = usePhase4Words && session.phase4StartedAt
     ? serverAdjustedNow - new Date(session.phase4StartedAt).getTime()
     : 0;
   /** Tier 3+: after second node captured, display phase-3 words for the third node (Exfiltrate). */
   const usePhase3Words =
     !usePhase4Words &&
-    (isTier3 || isTier4 || isTier5) &&
+    (isTier3 || isTier4 || isTier5 || isTier6) &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
     (session.wordRotationPhase3?.length ?? 0) > 0 &&
@@ -422,27 +446,33 @@ export function RaceConditionHeistGameScreen({
   const phase2ElapsedMs = usePhase2Words && session.phase2StartedAt
     ? serverAdjustedNow - new Date(session.phase2StartedAt).getTime()
     : 0;
-  const activeRotation = usePhase4Words
-    ? (session.wordRotationPhase4 ?? [])
-    : usePhase3Words
-      ? (session.wordRotationPhase3 ?? [])
-      : usePhase2Words
-        ? (session.wordRotationPhase2 ?? [])
-        : wordRotation;
-  const activeStartOffset = usePhase4Words
-    ? (session.wordStartOffsetPhase4 ?? 0)
-    : usePhase3Words
-      ? (session.wordStartOffsetPhase3 ?? 0)
-      : usePhase2Words
-        ? (session.wordStartOffsetPhase2 ?? 0)
-        : wordStartOffset;
-  const activeElapsedMs = usePhase4Words
-    ? phase4ElapsedMs
-    : usePhase3Words
-      ? phase3ElapsedMs
-      : usePhase2Words
-        ? phase2ElapsedMs
-        : elapsedMs;
+  const activeRotation = usePhase5Words
+    ? (session.wordRotationPhase5 ?? [])
+    : usePhase4Words
+      ? (session.wordRotationPhase4 ?? [])
+      : usePhase3Words
+        ? (session.wordRotationPhase3 ?? [])
+        : usePhase2Words
+          ? (session.wordRotationPhase2 ?? [])
+          : wordRotation;
+  const activeStartOffset = usePhase5Words
+    ? (session.wordStartOffsetPhase5 ?? 0)
+    : usePhase4Words
+      ? (session.wordStartOffsetPhase4 ?? 0)
+      : usePhase3Words
+        ? (session.wordStartOffsetPhase3 ?? 0)
+        : usePhase2Words
+          ? (session.wordStartOffsetPhase2 ?? 0)
+          : wordStartOffset;
+  const activeElapsedMs = usePhase5Words
+    ? phase5ElapsedMs
+    : usePhase4Words
+      ? phase4ElapsedMs
+      : usePhase3Words
+        ? phase3ElapsedMs
+        : usePhase2Words
+          ? phase2ElapsedMs
+          : elapsedMs;
   /** Delay display by 250ms so "tap when word first appears" lands in server's window (client was ahead). */
   const DISPLAY_DELAY_MS = 250;
   const displayElapsedMs = Math.max(0, activeElapsedMs - DISPLAY_DELAY_MS);
@@ -453,13 +483,15 @@ export function RaceConditionHeistGameScreen({
   const displayedWord = activeRotation[currentWordIndex] ?? '—';
   /** Phase start (ISO string) for the active word display. */
   const phaseStart =
-    usePhase4Words && session.phase4StartedAt
-      ? session.phase4StartedAt
-      : usePhase3Words && session.phase3StartedAt
-        ? session.phase3StartedAt
-        : usePhase2Words && session.phase2StartedAt
-          ? session.phase2StartedAt
-          : session.startedAt;
+    usePhase5Words && session.phase5StartedAt
+      ? session.phase5StartedAt
+      : usePhase4Words && session.phase4StartedAt
+        ? session.phase4StartedAt
+        : usePhase3Words && session.phase3StartedAt
+          ? session.phase3StartedAt
+          : usePhase2Words && session.phase2StartedAt
+            ? session.phase2StartedAt
+            : session.startedAt;
 
   /** Lost run: show "Run complete" and "Back to levels" only. */
   if ((phase === 'LOCKDOWN' || phase === 'RESULTS') && !won) {
@@ -494,7 +526,7 @@ export function RaceConditionHeistGameScreen({
                 </Text>
                 <Text style={[styles.packetValue, { color: colors.primary }]}>{p.value} pts</Text>
                 <Text style={[styles.stolenLabel, { color: colors.success ?? colors.primary }]}>
-                  {idx === 0 ? 'Stolen' : idx === 1 ? 'Encrypted' : idx === 2 ? 'Exfiltrated' : 'Bypassed'}
+                  {idx === 0 ? 'Stolen' : idx === 1 ? 'Encrypted' : idx === 2 ? 'Exfiltrated' : idx === 3 ? 'Bypassed' : 'Extracted'}
                 </Text>
               </View>
             ))}
@@ -544,11 +576,15 @@ export function RaceConditionHeistGameScreen({
         <Text style={[styles.feedbackText, { color: colors.error }]}>
           {lastAttemptReason === 'complete_first_node'
             ? 'Capture the first node before encrypting the second.'
-            :             lastAttemptReason === 'complete_previous_nodes'
-              ? isTier4 || isTier5
-                ? 'Capture the first three nodes before bypassing the fourth.'
-                : 'Capture the first two nodes before exfiltrating the third.'
-              : 'Missed! Tap when the word before the secure word appears.'}
+            : lastAttemptReason === 'complete_previous_nodes'
+              ? fivePacketTier
+                ? 'Capture the first four nodes before extracting the fifth.'
+                : isTier4 || isTier5 || isTier6
+                  ? 'Capture the first three nodes before bypassing the fourth.'
+                  : 'Capture the first two nodes before exfiltrating the third.'
+              : lastAttemptReason === 'wrong_word'
+                ? 'Wrong word! Tap when the word before the secure word appears.'
+                : 'Missed! Tap when the word before the secure word appears.'}
         </Text>
       )}
 
@@ -565,7 +601,7 @@ export function RaceConditionHeistGameScreen({
       <View style={styles.packetsRow}>
         {session.packets.map((packet: RCHPacket, index: number) => {
           const actionLabel =
-            index === 0 ? 'Exploit' : index === 1 ? 'Encrypt' : index === 2 ? 'Exfiltrate' : 'Bypass';
+            index === 0 ? 'Exploit' : index === 1 ? 'Encrypt' : index === 2 ? 'Exfiltrate' : index === 3 ? 'Bypass' : 'Extract';
           const canTap =
             index === 0 ||
             (index === 1 && session.packets[0]?.isHijacked) ||
@@ -573,9 +609,14 @@ export function RaceConditionHeistGameScreen({
             (index === 3 &&
               session.packets[0]?.isHijacked &&
               session.packets[1]?.isHijacked &&
-              session.packets[2]?.isHijacked);
+              session.packets[2]?.isHijacked) ||
+            (index === 4 &&
+              session.packets[0]?.isHijacked &&
+              session.packets[1]?.isHijacked &&
+              session.packets[2]?.isHijacked &&
+              session.packets[3]?.isHijacked);
           const doneLabel =
-            index === 0 ? 'Stolen' : index === 1 ? 'Encrypted' : index === 2 ? 'Exfiltrated' : 'Bypassed';
+            index === 0 ? 'Stolen' : index === 1 ? 'Encrypted' : index === 2 ? 'Exfiltrated' : index === 3 ? 'Bypassed' : 'Extracted';
           return (
             <View
               key={packet.id}
