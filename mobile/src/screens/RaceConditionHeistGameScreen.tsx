@@ -56,6 +56,8 @@ export function RaceConditionHeistGameScreen({
   const fatalFailureTriggeredRef = useRef(false);
   const victoryAutoCloseTriggeredRef = useRef(false);
   const onCloseRef = useRef(onClose);
+  /** Pending timeout that clears hijackFeedback/lastAttemptReason; cancelled when a new attempt runs so rapid taps don't clear later feedback. */
+  const hijackFeedbackClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Skew so client word timing matches server: serverNow ≈ Date.now() + timeSkewMsRef.current */
   const timeSkewMsRef = useRef(0);
   /** Client viewpoint at touch-down per packet id (so rapid taps on different packets don't overwrite). */
@@ -243,12 +245,16 @@ export function RaceConditionHeistGameScreen({
     /* Intentionally no cleanup here: we set the ref true before creating the timeout, so cleanup would never clear. Not clearing ensures a late session update (e.g. hijack response) re-running this effect does not cancel the in-flight endRun/claimLevel. Unmount effect below clears the timeout. */
   }, [session?.score, session?.packets, phase, scoreThreshold, levelId, endRun, claimLevel]);
 
-  /** Clear auto-complete timeout on unmount so we don't run endRun/claimLevel after unmount. */
+  /** Clear auto-complete and hijack-feedback timeouts on unmount so we don't run after unmount. */
   useEffect(() => {
     return () => {
       if (autoCompleteTimeoutIdRef.current != null) {
         clearTimeout(autoCompleteTimeoutIdRef.current);
         autoCompleteTimeoutIdRef.current = null;
+      }
+      if (hijackFeedbackClearTimeoutRef.current != null) {
+        clearTimeout(hijackFeedbackClearTimeoutRef.current);
+        hijackFeedbackClearTimeoutRef.current = null;
       }
     };
   }, []);
@@ -276,6 +282,10 @@ export function RaceConditionHeistGameScreen({
   const handleHijack = useCallback(
     async (packetId: string, viewpoint: RaceConditionHeistClientViewpoint | null) => {
       if (!session || phase !== 'RUNNING') return;
+      if (hijackFeedbackClearTimeoutRef.current != null) {
+        clearTimeout(hijackFeedbackClearTimeoutRef.current);
+        hijackFeedbackClearTimeoutRef.current = null;
+      }
       setHijackFeedback(null);
       setLastAttemptReason(null);
       const displayedWordIndex = viewpoint?.displayedWordIndex ?? 0;
@@ -349,7 +359,9 @@ export function RaceConditionHeistGameScreen({
           setLastAttemptReason('wrong_word');
         }
         if (result.success || result.reason === 'missed_window' || result.reason === 'complete_first_node' || result.reason === 'complete_previous_nodes' || result.reason === 'wrong_word') {
-          setTimeout(() => {
+          if (hijackFeedbackClearTimeoutRef.current != null) clearTimeout(hijackFeedbackClearTimeoutRef.current);
+          hijackFeedbackClearTimeoutRef.current = setTimeout(() => {
+            hijackFeedbackClearTimeoutRef.current = null;
             setHijackFeedback(null);
             setLastAttemptReason(null);
           }, 1500);
@@ -365,14 +377,20 @@ export function RaceConditionHeistGameScreen({
               s ? { ...s, packets: data.packets, score: data.score, comboCount: data.comboCount } : null
             );
           }
-          setTimeout(() => {
+          if (hijackFeedbackClearTimeoutRef.current != null) clearTimeout(hijackFeedbackClearTimeoutRef.current);
+          hijackFeedbackClearTimeoutRef.current = setTimeout(() => {
+            hijackFeedbackClearTimeoutRef.current = null;
             setHijackFeedback(null);
             setLastAttemptReason(null);
           }, 1500);
         } else {
           setHijackFeedback('missed');
           setLastAttemptReason(null);
-          setTimeout(() => setHijackFeedback(null), 1500);
+          if (hijackFeedbackClearTimeoutRef.current != null) clearTimeout(hijackFeedbackClearTimeoutRef.current);
+          hijackFeedbackClearTimeoutRef.current = setTimeout(() => {
+            hijackFeedbackClearTimeoutRef.current = null;
+            setHijackFeedback(null);
+          }, 1500);
         }
       }
     },
