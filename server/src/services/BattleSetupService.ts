@@ -21,7 +21,8 @@ export class BattleSetupService {
   static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
-    // Get attacker level and army/guardian bonus (e.g. Packet Breach, Race Condition Heist) for bot stat calculations
+    // Get attacker level and army/guardian bonus (e.g. Packet Breach, Race Condition Heist) for bot stat calculations.
+    // Bugbot: guardian bonus is passed to BotService.getUserBotStats (userTotal loop) and to BattalionService.createUserBattalions below.
     let userLevel = 1;
     let attackerArmyBonus: { strength: number; defense: number; speed: number; health: number } | undefined;
     let attackerGuardianBonus: { strength: number; defense: number; speed: number; health: number } | undefined;

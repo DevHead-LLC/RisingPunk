@@ -243,6 +243,7 @@ export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_9 = 2100;
 /**
  * Tier 10–21: 10-word cycles. array[0]–[7] = other words; array[8] = success word; array[9] = secure word (tap = fatal).
  * Each row must have exactly 10 elements so getPreSecureIndex = 8 and wrong_word = 0–7.
+ * Each row must have unique words (no duplicates); server fallback uses wordRotation.indexOf(labelFromClient).
  */
 const WORD_GROUPS_TIER_10: readonly string[][] = [
   ['Read', 'Query', 'Log in', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Transfer', 'Write', 'Lock'],
@@ -250,25 +251,25 @@ const WORD_GROUPS_TIER_10: readonly string[][] = [
   ['Log in', 'Read', 'Query', 'Transfer', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Exfiltrate', 'Shield'],
   ['Query', 'Log out', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Connect', 'Log in', 'Bypass', 'Harden'],
   ['Fetch email', 'Read', 'Transfer', 'Log in', 'Connect', 'Query', 'Log out', 'Send reply', 'Write', 'Sanitize'],
-  ['Transfer', 'Query', 'Log in', 'Read', 'Log out', 'Connect', 'Fetch email', 'Read', 'Patch', 'Seal'],
+  ['Transfer', 'Query', 'Log in', 'Read', 'Log out', 'Connect', 'Fetch email', 'Send reply', 'Patch', 'Seal'],
   ['Read', 'Connect', 'Send reply', 'Log out', 'Fetch email', 'Query', 'Transfer', 'Log in', 'Exfiltrate', 'Guard'],
   ['Log out', 'Fetch email', 'Query', 'Transfer', 'Read', 'Send reply', 'Log in', 'Connect', 'Bypass', 'Validate'],
   ['Send reply', 'Read', 'Log in', 'Connect', 'Query', 'Transfer', 'Fetch email', 'Log out', 'Write', 'Fortify'],
   ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Read', 'Send reply', 'Fetch email', 'Inject', 'Lock'],
   ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Log out', 'Connect', 'Log in', 'Exfiltrate', 'Encrypt'],
-  ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Transfer', 'Query', 'Send reply', 'Bypass', 'Secure'],
+  ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Transfer', 'Query', 'Log out', 'Bypass', 'Secure'],
   ['Read', 'Query', 'Log in', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Transfer', 'Hijack', 'Defend'],
   ['Connect', 'Transfer', 'Send reply', 'Log out', 'Query', 'Log in', 'Read', 'Fetch email', 'Sniff', 'Protect'],
   ['Log in', 'Read', 'Query', 'Transfer', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Replay', 'Isolate'],
   ['Query', 'Log out', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Connect', 'Log in', 'Decrypt', 'Throttle'],
   ['Fetch email', 'Read', 'Transfer', 'Log in', 'Connect', 'Query', 'Log out', 'Send reply', 'Dump', 'Filter'],
-  ['Transfer', 'Query', 'Log in', 'Read', 'Log out', 'Connect', 'Fetch email', 'Read', 'Clone', 'Seal'],
+  ['Transfer', 'Query', 'Log in', 'Read', 'Log out', 'Connect', 'Fetch email', 'Send reply', 'Clone', 'Seal'],
   ['Read', 'Connect', 'Send reply', 'Log out', 'Fetch email', 'Query', 'Transfer', 'Log in', 'Escalate', 'Guard'],
   ['Log out', 'Fetch email', 'Query', 'Transfer', 'Read', 'Send reply', 'Log in', 'Connect', 'Overflow', 'Fortify'],
   ['Send reply', 'Read', 'Log in', 'Connect', 'Query', 'Transfer', 'Fetch email', 'Log out', 'Pivot', 'Validate'],
   ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Read', 'Send reply', 'Fetch email', 'Tunnel', 'Lock'],
   ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Log out', 'Connect', 'Log in', 'Scrape', 'Encrypt'],
-  ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Transfer', 'Query', 'Send reply', 'Forge', 'Secure'],
+  ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Transfer', 'Query', 'Log out', 'Forge', 'Secure'],
   ['Read', 'Query', 'Log in', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Transfer', 'Impersonate', 'Defend'],
   ['Connect', 'Transfer', 'Send reply', 'Log out', 'Query', 'Log in', 'Read', 'Fetch email', 'Probe', 'Protect'],
   ['Log in', 'Read', 'Query', 'Transfer', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Spoof', 'Isolate'],
