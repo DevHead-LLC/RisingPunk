@@ -41,6 +41,11 @@ export const SECURE_WORDS = [
   'Guard',
   'Validate',
   'Fortify',
+  'Defend',
+  'Protect',
+  'Isolate',
+  'Throttle',
+  'Filter',
 ] as const;
 
 /**
@@ -61,6 +66,14 @@ const WORD_GROUPS_TIERS_1_3: readonly string[][] = [
   ['Read', 'Query', 'Shield'],
   ['Connect', 'Transfer', 'Harden'],
   ['Log in', 'Fetch email', 'Guard'],
+  ['Read', 'Hijack', 'Defend'],
+  ['Query', 'Sniff', 'Protect'],
+  ['Connect', 'Replay', 'Isolate'],
+  ['Log in', 'Decrypt', 'Throttle'],
+  ['Fetch email', 'Clone', 'Filter'],
+  ['Transfer', 'Escalate', 'Lock'],
+  ['Log out', 'Pivot', 'Shield'],
+  ['Send reply', 'Tunnel', 'Guard'],
 ];
 
 /**
@@ -80,6 +93,16 @@ const WORD_GROUPS_TIER_4: readonly string[][] = [
   ['Log in', 'Write', 'Fetch email', 'Fortify'],
   ['Send reply', 'Query', 'Log out', 'Lock'],
   ['Connect', 'Read', 'Write', 'Encrypt'],
+  ['Read', 'Query', 'Hijack', 'Defend'],
+  ['Connect', 'Transfer', 'Sniff', 'Protect'],
+  ['Log in', 'Fetch email', 'Replay', 'Isolate'],
+  ['Query', 'Log out', 'Decrypt', 'Throttle'],
+  ['Fetch email', 'Read', 'Dump', 'Filter'],
+  ['Transfer', 'Query', 'Clone', 'Seal'],
+  ['Read', 'Connect', 'Escalate', 'Guard'],
+  ['Log out', 'Fetch email', 'Overflow', 'Fortify'],
+  ['Send reply', 'Read', 'Pivot', 'Validate'],
+  ['Connect', 'Transfer', 'Scrape', 'Lock'],
 ];
 
 /**
@@ -98,13 +121,25 @@ const WORD_GROUPS_TIER_6: readonly string[][] = [
   ['Connect', 'Transfer', 'Log out', 'Inject', 'Lock'],
   ['Query', 'Fetch email', 'Read', 'Exfiltrate', 'Encrypt'],
   ['Log in', 'Connect', 'Send reply', 'Bypass', 'Secure'],
+  ['Read', 'Query', 'Log in', 'Hijack', 'Defend'],
+  ['Connect', 'Transfer', 'Fetch email', 'Sniff', 'Protect'],
+  ['Log in', 'Send reply', 'Read', 'Replay', 'Isolate'],
+  ['Query', 'Log out', 'Connect', 'Decrypt', 'Throttle'],
+  ['Fetch email', 'Read', 'Transfer', 'Dump', 'Filter'],
+  ['Transfer', 'Query', 'Log in', 'Clone', 'Seal'],
+  ['Read', 'Connect', 'Send reply', 'Escalate', 'Guard'],
+  ['Log out', 'Fetch email', 'Query', 'Overflow', 'Fortify'],
+  ['Send reply', 'Read', 'Log in', 'Pivot', 'Validate'],
+  ['Connect', 'Transfer', 'Log out', 'Tunnel', 'Lock'],
+  ['Query', 'Fetch email', 'Read', 'Scrape', 'Encrypt'],
+  ['Log in', 'Connect', 'Send reply', 'Forge', 'Secure'],
 ];
 
-/** Cooldown (ms) after tapping a wrong word (array[0] or [1]) on tier 5. 4-word cycles; index 2 = exploit, 3 = secure. Slightly longer than missed_window (800). */
-export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_5 = 900;
+/** Cooldown (ms) after tapping a wrong word (array[0] or [1]) on tier 5. 4-word cycles; index 2 = exploit, 3 = secure. */
+export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_5 = 1500;
 
-/** Cooldown (ms) after tapping a wrong word (array[0], [1], or [2]) on tier 6. Slightly longer than missed_window cooldown (800). */
-export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_6 = 1000;
+/** Cooldown (ms) after tapping a wrong word (array[0], [1], or [2]) on tier 6. */
+export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_6 = 1650;
 
 /**
  * Tier 7: 6-word cycles. array[0]–[3] = other words (tap = incorrect + cooldown); array[4] = success word; array[5] = secure word (tap = fatal).
@@ -122,13 +157,25 @@ const WORD_GROUPS_TIER_7: readonly string[][] = [
   ['Connect', 'Transfer', 'Log out', 'Query', 'Inject', 'Lock'],
   ['Query', 'Fetch email', 'Read', 'Send reply', 'Exfiltrate', 'Encrypt'],
   ['Log in', 'Connect', 'Send reply', 'Read', 'Bypass', 'Secure'],
+  ['Read', 'Query', 'Log in', 'Connect', 'Hijack', 'Defend'],
+  ['Connect', 'Transfer', 'Fetch email', 'Send reply', 'Sniff', 'Protect'],
+  ['Log in', 'Read', 'Log out', 'Query', 'Replay', 'Isolate'],
+  ['Query', 'Log out', 'Connect', 'Fetch email', 'Decrypt', 'Throttle'],
+  ['Fetch email', 'Read', 'Transfer', 'Log in', 'Dump', 'Filter'],
+  ['Transfer', 'Query', 'Log in', 'Read', 'Clone', 'Seal'],
+  ['Read', 'Connect', 'Send reply', 'Log out', 'Escalate', 'Guard'],
+  ['Log out', 'Fetch email', 'Query', 'Transfer', 'Overflow', 'Fortify'],
+  ['Send reply', 'Read', 'Log in', 'Connect', 'Pivot', 'Validate'],
+  ['Connect', 'Transfer', 'Log out', 'Query', 'Tunnel', 'Lock'],
+  ['Query', 'Fetch email', 'Read', 'Send reply', 'Scrape', 'Encrypt'],
+  ['Log in', 'Connect', 'Send reply', 'Read', 'Forge', 'Secure'],
 ];
 
-/** Cooldown (ms) after tapping a wrong word (array[0], [1], [2], or [3]) on tier 7. Slightly longer than tier 6 (1000). */
-export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_7 = 1100;
+/** Cooldown (ms) after tapping a wrong word (array[0], [1], [2], or [3]) on tier 7. */
+export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_7 = 1800;
 
 /** Cooldown (ms) after tapping a wrong word (array[0]–[4]) on tier 8. Same as tier 7 for 7-word sets (slightly gentler than tier 9’s 1200). */
-export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_8 = 1100;
+export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_8 = 1950;
 
 /**
  * Tier 8: 7-word cycles. array[0]–[4] = other words; array[5] = success word; array[6] = secure word (tap = fatal).
@@ -146,6 +193,18 @@ const WORD_GROUPS_TIER_8: readonly string[][] = [
   ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Inject', 'Lock'],
   ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Exfiltrate', 'Encrypt'],
   ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Bypass', 'Secure'],
+  ['Read', 'Query', 'Log in', 'Connect', 'Fetch email', 'Hijack', 'Defend'],
+  ['Connect', 'Transfer', 'Send reply', 'Log out', 'Query', 'Sniff', 'Protect'],
+  ['Log in', 'Read', 'Query', 'Transfer', 'Connect', 'Replay', 'Isolate'],
+  ['Query', 'Log out', 'Fetch email', 'Read', 'Send reply', 'Decrypt', 'Throttle'],
+  ['Fetch email', 'Read', 'Transfer', 'Log in', 'Connect', 'Dump', 'Filter'],
+  ['Transfer', 'Query', 'Log in', 'Read', 'Log out', 'Clone', 'Seal'],
+  ['Read', 'Connect', 'Send reply', 'Log out', 'Fetch email', 'Escalate', 'Guard'],
+  ['Log out', 'Fetch email', 'Query', 'Transfer', 'Read', 'Overflow', 'Fortify'],
+  ['Send reply', 'Read', 'Log in', 'Connect', 'Query', 'Pivot', 'Validate'],
+  ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Tunnel', 'Lock'],
+  ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Scrape', 'Encrypt'],
+  ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Forge', 'Secure'],
 ];
 
 /**
@@ -164,10 +223,22 @@ const WORD_GROUPS_TIER_9: readonly string[][] = [
   ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Read', 'Inject', 'Lock'],
   ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Log out', 'Exfiltrate', 'Encrypt'],
   ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Transfer', 'Bypass', 'Secure'],
+  ['Read', 'Query', 'Log in', 'Connect', 'Fetch email', 'Send reply', 'Hijack', 'Defend'],
+  ['Connect', 'Transfer', 'Send reply', 'Log out', 'Query', 'Log in', 'Sniff', 'Protect'],
+  ['Log in', 'Read', 'Query', 'Transfer', 'Connect', 'Fetch email', 'Replay', 'Isolate'],
+  ['Query', 'Log out', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Decrypt', 'Throttle'],
+  ['Fetch email', 'Read', 'Transfer', 'Log in', 'Connect', 'Query', 'Dump', 'Filter'],
+  ['Transfer', 'Query', 'Log in', 'Read', 'Log out', 'Connect', 'Clone', 'Seal'],
+  ['Read', 'Connect', 'Send reply', 'Log out', 'Fetch email', 'Query', 'Escalate', 'Guard'],
+  ['Log out', 'Fetch email', 'Query', 'Transfer', 'Read', 'Send reply', 'Overflow', 'Fortify'],
+  ['Send reply', 'Read', 'Log in', 'Connect', 'Query', 'Transfer', 'Pivot', 'Validate'],
+  ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Read', 'Tunnel', 'Lock'],
+  ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Log out', 'Scrape', 'Encrypt'],
+  ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Transfer', 'Forge', 'Secure'],
 ];
 
 /** Cooldown (ms) after tapping a wrong word (array[0]–[5]) on tier 9. */
-export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_9 = 1200;
+export const RCH_WRONG_WORD_COOLDOWN_MS_TIER_9 = 2100;
 
 /**
  * Tier 10–21: 10-word cycles. array[0]–[7] = other words; array[8] = success word; array[9] = secure word (tap = fatal).
@@ -186,16 +257,28 @@ const WORD_GROUPS_TIER_10: readonly string[][] = [
   ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Read', 'Send reply', 'Fetch email', 'Inject', 'Lock'],
   ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Log out', 'Connect', 'Log in', 'Exfiltrate', 'Encrypt'],
   ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Transfer', 'Query', 'Send reply', 'Bypass', 'Secure'],
+  ['Read', 'Query', 'Log in', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Transfer', 'Hijack', 'Defend'],
+  ['Connect', 'Transfer', 'Send reply', 'Log out', 'Query', 'Log in', 'Read', 'Fetch email', 'Sniff', 'Protect'],
+  ['Log in', 'Read', 'Query', 'Transfer', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Replay', 'Isolate'],
+  ['Query', 'Log out', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Connect', 'Log in', 'Decrypt', 'Throttle'],
+  ['Fetch email', 'Read', 'Transfer', 'Log in', 'Connect', 'Query', 'Log out', 'Send reply', 'Dump', 'Filter'],
+  ['Transfer', 'Query', 'Log in', 'Read', 'Log out', 'Connect', 'Fetch email', 'Read', 'Clone', 'Seal'],
+  ['Read', 'Connect', 'Send reply', 'Log out', 'Fetch email', 'Query', 'Transfer', 'Log in', 'Escalate', 'Guard'],
+  ['Log out', 'Fetch email', 'Query', 'Transfer', 'Read', 'Send reply', 'Log in', 'Connect', 'Overflow', 'Fortify'],
+  ['Send reply', 'Read', 'Log in', 'Connect', 'Query', 'Transfer', 'Fetch email', 'Log out', 'Pivot', 'Validate'],
+  ['Connect', 'Transfer', 'Log out', 'Query', 'Log in', 'Read', 'Send reply', 'Fetch email', 'Tunnel', 'Lock'],
+  ['Query', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Log out', 'Connect', 'Log in', 'Scrape', 'Encrypt'],
+  ['Log in', 'Connect', 'Send reply', 'Read', 'Fetch email', 'Transfer', 'Query', 'Send reply', 'Forge', 'Secure'],
+  ['Read', 'Query', 'Log in', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Transfer', 'Impersonate', 'Defend'],
+  ['Connect', 'Transfer', 'Send reply', 'Log out', 'Query', 'Log in', 'Read', 'Fetch email', 'Probe', 'Protect'],
+  ['Log in', 'Read', 'Query', 'Transfer', 'Connect', 'Fetch email', 'Send reply', 'Log out', 'Spoof', 'Isolate'],
+  ['Query', 'Log out', 'Fetch email', 'Read', 'Send reply', 'Transfer', 'Connect', 'Log in', 'Relay', 'Throttle'],
 ];
 
-/** Wrong-word cooldown (ms) for tiers 10–21 per rotation chart. */
+/** Wrong-word cooldown (ms) for tiers 10–21. Tier 10 = 2250 ms, +150 ms per tier through 21 (21 = 3900 ms). */
 export function getWrongWordCooldownMsTier10Plus(tier: number): number {
   if (tier >= 10 && tier <= 21) {
-    const table: Record<number, number> = {
-      10: 1300, 11: 1300, 12: 1300, 13: 1300, 14: 1400, 15: 1400, 16: 1400, 17: 1400,
-      18: 1500, 19: 1500, 20: 1500, 21: 1600,
-    };
-    return table[tier] ?? 1300;
+    return 1500 + (tier - 5) * 150;
   }
   throw new Error(`getWrongWordCooldownMsTier10Plus only supports tier 10–21, got ${tier}`);
 }
@@ -237,66 +320,68 @@ export function getRandomWordGroupForTier(tier: number): string[] {
   return [...WORD_ROTATION_DEFAULT];
 }
 
+/** Packet count per tier (matches packet generators in raceConditionHeist routes). Score threshold = this * 50. */
+export function getPacketCountForTier(tier: number): number {
+  if (tier === 1) return 1;
+  if (tier === 2) return 2;
+  if (tier === 3) return 3;
+  if (tier === 4 || tier === 5) return 4;
+  if (tier === 6) return 5;
+  if (tier === 7) return 6;
+  if (tier === 8) return 7;
+  if (tier === 9 || tier === 10 || tier === 11) return 8;
+  if (tier === 12 || tier === 13) return 9;
+  if (tier === 14 || tier === 15) return 10;
+  if (tier === 16 || tier === 17) return 11;
+  if (tier === 18 || tier === 19) return 12;
+  if (tier === 20 || tier === 21) return 13;
+  return 1;
+}
+
+const SCORE_PER_PACKET = 50;
+
 /** Build all 105 levels from tier params. */
 function buildAllLevels(): LevelParams[] {
   const levels: LevelParams[] = [];
   for (let tier = 1; tier <= 21; tier++) {
+    /** Match duration (ms) per tier: 2–4 = 3:00, 5 = 2:30, 6 = 2:00, 7 = 1:50, 8 = 1:45, 9–12 = 1:40, 13–16 = 1:35, 17 = 1:30, 18 = 1:25, 19 = 1:20, 20 = 1:15, 21 = 1:10. */
     const matchDurationMs =
       tier === 1
         ? 180000
-        : tier === 5
-          ? 150000
-          : tier === 6
-            ? 140000
-            : tier === 7
-              ? 130000
-              : tier === 8
-                ? 130000
-                : tier === 9
-                  ? 120000
-                  : tier === 10
-                    ? 115000
-                    : tier === 11
-                      ? 110000
-                      : tier === 12 || tier === 13 || tier === 14
-                        ? 110000
-                        : tier === 15
-                          ? 105000
-                          : tier === 16 || tier === 17 || tier === 18
-                            ? 105000
-                            : tier === 19
-                              ? 100000
-                              : tier === 20
-                                ? 100000
-                                : tier === 21
-                                  ? 95000
-                                  : Math.max(90000, 180000 - (tier - 1) * 2000);
+        : tier === 2 || tier === 3 || tier === 4
+          ? 180000
+          : tier === 5
+            ? 150000
+            : tier === 6
+              ? 120000
+              : tier === 7
+                ? 110000
+                : tier === 8
+                  ? 105000
+                  : tier === 9 || tier === 10 || tier === 11 || tier === 12
+                    ? 100000
+                    : tier === 13 || tier === 14 || tier === 15 || tier === 16
+                      ? 95000
+                      : tier === 17
+                        ? 90000
+                        : tier === 18
+                          ? 85000
+                          : tier === 19
+                            ? 80000
+                            : tier === 20
+                              ? 75000
+                              : tier === 21
+                                ? 70000
+                                : Math.max(70000, 180000 - (tier - 1) * 2000);
     const wordRotation = WORD_ROTATION_DEFAULT;
-    /** Tier 5: 1200. Tier 6: 1100. Tier 7–8: 1000. Tier 9–11: 950. Tier 12–14: 950. Tier 15–16: 900. Tier 17–19: 850. Tier 20–21: 800. Other: 1500. */
+    /** Word duration (ms) per tier: 1–2 = 1500, then −50 ms per tier (3=1450, 4=1400, … 21=550). */
     const wordDurationMs =
-      tier === 5 ? 1200
-        : tier === 6 ? 1100
-        : tier === 7 || tier === 8 ? 1000
-        : tier === 9 || tier === 10 || tier === 11 ? 950
-        : tier === 12 ? 950
-        : tier === 13 || tier === 14 || tier === 15 || tier === 16 ? 900
-        : tier === 17 || tier === 18 || tier === 19 ? 850
-        : tier === 20 || tier === 21 ? 800
+      tier >= 2 && tier <= 21
+        ? 1600 - 50 * tier
         : WORD_DURATION_MS;
     const maxPackets = tier <= 3 ? 1 : tier <= 21 ? 2 : Math.min(5, Math.floor(tier / 3) + 1);
-    /** Tier 1: 50. Tier 2: 100. Tier 3: 150. Tiers 4–5: 200. Tier 6: 250. Tier 7: 300. Tiers 8: 350. Tier 9–11: 400. Tiers 12–15: 450. Tiers 16–21: 500. */
-    const scoreThreshold =
-      tier === 1 ? 50
-        : tier === 2 ? 100
-        : tier === 3 ? 150
-        : tier === 4 || tier === 5 ? 200
-        : tier === 6 ? 250
-        : tier === 7 ? 300
-        : tier === 8 ? 350
-        : tier === 9 || tier === 10 || tier === 11 ? 400
-        : tier === 12 || tier === 13 || tier === 14 || tier === 15 ? 450
-        : tier >= 16 && tier <= 21 ? 500
-        : 50;
+    /** Score threshold = packets for this tier × 50 (one-to-one with packet count). */
+    const scoreThreshold = getPacketCountForTier(tier) * SCORE_PER_PACKET;
     for (let y = 1; y <= 5; y++) {
       levels.push({
         levelId: `${tier}.${y}`,

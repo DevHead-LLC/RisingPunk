@@ -105,10 +105,22 @@ export interface RaceConditionHeistSessionResponse {
   wordRotationPhase9?: string[];
   wordStartOffsetPhase9?: number;
   phase9StartedAt?: string;
-  /** Tier 16+: tenth word cycle and start time for tenth node (Flush). */
+  /** Tier 14+: tenth word cycle and start time for tenth node (Flush). */
   wordRotationPhase10?: string[];
   wordStartOffsetPhase10?: number;
   phase10StartedAt?: string;
+  /** Tier 16+: eleventh word cycle and start time for eleventh node (Dump). */
+  wordRotationPhase11?: string[];
+  wordStartOffsetPhase11?: number;
+  phase11StartedAt?: string;
+  /** Tier 18+: twelfth word cycle and start time for twelfth node (Clear). */
+  wordRotationPhase12?: string[];
+  wordStartOffsetPhase12?: number;
+  phase12StartedAt?: string;
+  /** Tier 20+: thirteenth word cycle and start time for thirteenth node (Reset). */
+  wordRotationPhase13?: string[];
+  wordStartOffsetPhase13?: number;
+  phase13StartedAt?: string;
   phase: 'RUNNING' | 'LOCKDOWN' | 'RESULTS';
   packets: RCHPacket[];
   score: number;
@@ -180,10 +192,22 @@ export interface RaceConditionHeistAttemptResponse {
   phase9StartedAt?: string;
   wordRotationPhase9?: string[];
   wordStartOffsetPhase9?: number;
-  /** Set when ninth node is captured (tier 16+); client uses this to start phase-10 word display. */
+  /** Set when ninth node is captured (tier 14+); client uses this to start phase-10 word display. */
   phase10StartedAt?: string;
   wordRotationPhase10?: string[];
   wordStartOffsetPhase10?: number;
+  /** Set when tenth node is captured (tier 16+); client uses this to start phase-11 word display. */
+  phase11StartedAt?: string;
+  wordRotationPhase11?: string[];
+  wordStartOffsetPhase11?: number;
+  /** Set when eleventh node is captured (tier 18+); client uses this to start phase-12 word display. */
+  phase12StartedAt?: string;
+  wordRotationPhase12?: string[];
+  wordStartOffsetPhase12?: number;
+  /** Set when twelfth node is captured (tier 20+); client uses this to start phase-13 word display. */
+  phase13StartedAt?: string;
+  wordRotationPhase13?: string[];
+  wordStartOffsetPhase13?: number;
   /** Server time when response was built; client uses this to keep word timing in sync. */
   serverTime?: string;
 }

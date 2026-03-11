@@ -160,7 +160,7 @@ function generateTier9Packets(): { id: string; type: PacketTypeKey; value: numbe
   ];
 }
 
-/** Tier 12–15: nine USER_DATA nodes — … Purge, Wipe, Scrub. */
+/** Tier 12–13: nine USER_DATA nodes — … Purge, Wipe, Scrub. */
 function generateTier12Packets(): { id: string; type: PacketTypeKey; value: number }[] {
   const value = PACKET_TYPES.USER_DATA;
   return [
@@ -176,7 +176,24 @@ function generateTier12Packets(): { id: string; type: PacketTypeKey; value: numb
   ];
 }
 
-/** Tier 16–21: ten USER_DATA nodes — … Wipe, Scrub, Flush. */
+/** Tier 14–15: ten USER_DATA nodes — … Wipe, Scrub, Flush. */
+function generateTier14Packets(): { id: string; type: PacketTypeKey; value: number }[] {
+  const value = PACKET_TYPES.USER_DATA;
+  return [
+    { id: 'p1', type: 'USER_DATA', value },
+    { id: 'p2', type: 'USER_DATA', value },
+    { id: 'p3', type: 'USER_DATA', value },
+    { id: 'p4', type: 'USER_DATA', value },
+    { id: 'p5', type: 'USER_DATA', value },
+    { id: 'p6', type: 'USER_DATA', value },
+    { id: 'p7', type: 'USER_DATA', value },
+    { id: 'p8', type: 'USER_DATA', value },
+    { id: 'p9', type: 'USER_DATA', value },
+    { id: 'p10', type: 'USER_DATA', value },
+  ];
+}
+
+/** Tier 16–17: eleven USER_DATA nodes. */
 function generateTier16Packets(): { id: string; type: PacketTypeKey; value: number }[] {
   const value = PACKET_TYPES.USER_DATA;
   return [
@@ -190,6 +207,46 @@ function generateTier16Packets(): { id: string; type: PacketTypeKey; value: numb
     { id: 'p8', type: 'USER_DATA', value },
     { id: 'p9', type: 'USER_DATA', value },
     { id: 'p10', type: 'USER_DATA', value },
+    { id: 'p11', type: 'USER_DATA', value },
+  ];
+}
+
+/** Tier 18–19: twelve USER_DATA nodes. */
+function generateTier18Packets(): { id: string; type: PacketTypeKey; value: number }[] {
+  const value = PACKET_TYPES.USER_DATA;
+  return [
+    { id: 'p1', type: 'USER_DATA', value },
+    { id: 'p2', type: 'USER_DATA', value },
+    { id: 'p3', type: 'USER_DATA', value },
+    { id: 'p4', type: 'USER_DATA', value },
+    { id: 'p5', type: 'USER_DATA', value },
+    { id: 'p6', type: 'USER_DATA', value },
+    { id: 'p7', type: 'USER_DATA', value },
+    { id: 'p8', type: 'USER_DATA', value },
+    { id: 'p9', type: 'USER_DATA', value },
+    { id: 'p10', type: 'USER_DATA', value },
+    { id: 'p11', type: 'USER_DATA', value },
+    { id: 'p12', type: 'USER_DATA', value },
+  ];
+}
+
+/** Tier 20–21: thirteen USER_DATA nodes. */
+function generateTier20Packets(): { id: string; type: PacketTypeKey; value: number }[] {
+  const value = PACKET_TYPES.USER_DATA;
+  return [
+    { id: 'p1', type: 'USER_DATA', value },
+    { id: 'p2', type: 'USER_DATA', value },
+    { id: 'p3', type: 'USER_DATA', value },
+    { id: 'p4', type: 'USER_DATA', value },
+    { id: 'p5', type: 'USER_DATA', value },
+    { id: 'p6', type: 'USER_DATA', value },
+    { id: 'p7', type: 'USER_DATA', value },
+    { id: 'p8', type: 'USER_DATA', value },
+    { id: 'p9', type: 'USER_DATA', value },
+    { id: 'p10', type: 'USER_DATA', value },
+    { id: 'p11', type: 'USER_DATA', value },
+    { id: 'p12', type: 'USER_DATA', value },
+    { id: 'p13', type: 'USER_DATA', value },
   ];
 }
 
@@ -289,15 +346,24 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       const isTier8 = params.tier === 8;
       const isTier9 = params.tier === 9;
       const tier10to11 = params.tier === 10 || params.tier === 11;
-      const tier12to15 = params.tier >= 12 && params.tier <= 15;
-      const tier16to21 = params.tier >= 16 && params.tier <= 21;
-      const packets = tier16to21
-        ? generateTier16Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-        : tier12to15
-          ? generateTier12Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-          : isTier9 || tier10to11
-            ? generateTier9Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-            : isTier8
+      const tier12to13 = params.tier >= 12 && params.tier <= 13;
+      const tier14to15 = params.tier >= 14 && params.tier <= 15;
+      const tier16to17 = params.tier >= 16 && params.tier <= 17;
+      const tier18to19 = params.tier >= 18 && params.tier <= 19;
+      const tier20to21 = params.tier >= 20 && params.tier <= 21;
+      const packets = tier20to21
+        ? generateTier20Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+        : tier18to19
+          ? generateTier18Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+          : tier16to17
+            ? generateTier16Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+            : tier14to15
+              ? generateTier14Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+              : tier12to13
+                ? generateTier12Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+                : isTier9 || tier10to11
+                  ? generateTier9Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+                  : isTier8
               ? generateTier8Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
               : isTier7
                 ? generateTier7Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
@@ -386,6 +452,21 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
                 wordRotationPhase10: existing.wordRotationPhase10,
                 wordStartOffsetPhase10: existing.wordStartOffsetPhase10 ?? 0,
                 phase10StartedAt: existing.phase10StartedAt,
+              }),
+              ...(existing.wordRotationPhase11 && {
+                wordRotationPhase11: existing.wordRotationPhase11,
+                wordStartOffsetPhase11: existing.wordStartOffsetPhase11 ?? 0,
+                phase11StartedAt: existing.phase11StartedAt,
+              }),
+              ...(existing.wordRotationPhase12 && {
+                wordRotationPhase12: existing.wordRotationPhase12,
+                wordStartOffsetPhase12: existing.wordStartOffsetPhase12 ?? 0,
+                phase12StartedAt: existing.phase12StartedAt,
+              }),
+              ...(existing.wordRotationPhase13 && {
+                wordRotationPhase13: existing.wordRotationPhase13,
+                wordStartOffsetPhase13: existing.wordStartOffsetPhase13 ?? 0,
+                phase13StartedAt: existing.phase13StartedAt,
               }),
               phase: existing.phase,
               packets: existing.packets,
@@ -482,6 +563,21 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         wordRotationPhase10: sessionDoc.wordRotationPhase10,
         wordStartOffsetPhase10: sessionDoc.wordStartOffsetPhase10 ?? 0,
         phase10StartedAt: sessionDoc.phase10StartedAt,
+      }),
+      ...(sessionDoc.wordRotationPhase11 && {
+        wordRotationPhase11: sessionDoc.wordRotationPhase11,
+        wordStartOffsetPhase11: sessionDoc.wordStartOffsetPhase11 ?? 0,
+        phase11StartedAt: sessionDoc.phase11StartedAt,
+      }),
+      ...(sessionDoc.wordRotationPhase12 && {
+        wordRotationPhase12: sessionDoc.wordRotationPhase12,
+        wordStartOffsetPhase12: sessionDoc.wordStartOffsetPhase12 ?? 0,
+        phase12StartedAt: sessionDoc.phase12StartedAt,
+      }),
+      ...(sessionDoc.wordRotationPhase13 && {
+        wordRotationPhase13: sessionDoc.wordRotationPhase13,
+        wordStartOffsetPhase13: sessionDoc.wordStartOffsetPhase13 ?? 0,
+        phase13StartedAt: sessionDoc.phase13StartedAt,
       }),
       phase: sessionDoc.phase,
       packets: sessionDoc.packets,
@@ -739,7 +835,7 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
         return;
       }
     }
-    /** Tier 16+: tenth node (Flush) can only be attempted after first nine are captured. */
+    /** Tier 14+: tenth node (Flush) can only be attempted after first nine are captured. */
     if (packetIndex === 9) {
       if (
         !sessionDoc.packets[0]?.isHijacked ||
@@ -766,6 +862,75 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
         return;
       }
     }
+    /** Tier 16+: eleventh node can only be attempted after first ten are captured. */
+    if (packetIndex === 10) {
+      if (
+        sessionDoc.packets.length < 11 ||
+        !sessionDoc.packets[0]?.isHijacked ||
+        !sessionDoc.packets[1]?.isHijacked ||
+        !sessionDoc.packets[2]?.isHijacked ||
+        !sessionDoc.packets[3]?.isHijacked ||
+        !sessionDoc.packets[4]?.isHijacked ||
+        !sessionDoc.packets[5]?.isHijacked ||
+        !sessionDoc.packets[6]?.isHijacked ||
+        !sessionDoc.packets[7]?.isHijacked ||
+        !sessionDoc.packets[8]?.isHijacked ||
+        !sessionDoc.packets[9]?.isHijacked
+      ) {
+        res.status(400).json({
+          error: 'Capture the first ten nodes before attempting the eleventh',
+          reason: 'complete_previous_nodes',
+          packets: sessionDoc.packets,
+          score: sessionDoc.score,
+          comboCount: sessionDoc.comboCount,
+        });
+        return;
+      }
+      if (!sessionDoc.phase11StartedAt || !sessionDoc.wordRotationPhase11?.length) {
+        res.status(400).json({ error: 'Phase 11 not started' });
+        return;
+      }
+    }
+    /** Tier 18+: twelfth node can only be attempted after first eleven are captured. */
+    if (packetIndex === 11) {
+      if (
+        sessionDoc.packets.length < 12 ||
+        !sessionDoc.packets.slice(0, 11).every((p) => p.isHijacked)
+      ) {
+        res.status(400).json({
+          error: 'Capture the first eleven nodes before attempting the twelfth',
+          reason: 'complete_previous_nodes',
+          packets: sessionDoc.packets,
+          score: sessionDoc.score,
+          comboCount: sessionDoc.comboCount,
+        });
+        return;
+      }
+      if (!sessionDoc.phase12StartedAt || !sessionDoc.wordRotationPhase12?.length) {
+        res.status(400).json({ error: 'Phase 12 not started' });
+        return;
+      }
+    }
+    /** Tier 20+: thirteenth node can only be attempted after first twelve are captured. */
+    if (packetIndex === 12) {
+      if (
+        sessionDoc.packets.length < 13 ||
+        !sessionDoc.packets.slice(0, 12).every((p) => p.isHijacked)
+      ) {
+        res.status(400).json({
+          error: 'Capture the first twelve nodes before attempting the thirteenth',
+          reason: 'complete_previous_nodes',
+          packets: sessionDoc.packets,
+          score: sessionDoc.score,
+          comboCount: sessionDoc.comboCount,
+        });
+        return;
+      }
+      if (!sessionDoc.phase13StartedAt || !sessionDoc.wordRotationPhase13?.length) {
+        res.status(400).json({ error: 'Phase 13 not started' });
+        return;
+      }
+    }
     const cooldownMs = EXPLOIT_TYPES.BUFFER_OVERFLOW.cooldownMs;
     const multiplier = EXPLOIT_TYPES.BUFFER_OVERFLOW.multiplier;
     if (sessionDoc.exploitCooldownUntil && new Date(sessionDoc.exploitCooldownUntil).getTime() > now.getTime()) {
@@ -785,7 +950,43 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
     let inWindow: boolean;
     /** Server phase elapsed at request time; used to compare with clientViewpoint.clientPhaseElapsedMs. */
     let serverPhaseElapsedMs: number;
-    if (packetIndex === 9 && sessionDoc.phase10StartedAt && sessionDoc.wordRotationPhase10?.length) {
+    if (packetIndex === 12 && sessionDoc.phase13StartedAt && sessionDoc.wordRotationPhase13?.length) {
+      serverPhaseElapsedMs = now.getTime() - new Date(sessionDoc.phase13StartedAt).getTime();
+      wordRotation = sessionDoc.wordRotationPhase13;
+      const wordStartOffsetPhase13 = sessionDoc.wordStartOffsetPhase13 ?? 0;
+      currentIndex = getCurrentWordIndex(
+        serverPhaseElapsedMs,
+        wordDurationMs,
+        wordRotation.length,
+        wordStartOffsetPhase13
+      );
+      const preSecureIndex = getPreSecureIndex(wordRotation);
+      inWindow = wordRotation.length >= 2 && currentIndex === preSecureIndex;
+    } else if (packetIndex === 11 && sessionDoc.phase12StartedAt && sessionDoc.wordRotationPhase12?.length) {
+      serverPhaseElapsedMs = now.getTime() - new Date(sessionDoc.phase12StartedAt).getTime();
+      wordRotation = sessionDoc.wordRotationPhase12;
+      const wordStartOffsetPhase12 = sessionDoc.wordStartOffsetPhase12 ?? 0;
+      currentIndex = getCurrentWordIndex(
+        serverPhaseElapsedMs,
+        wordDurationMs,
+        wordRotation.length,
+        wordStartOffsetPhase12
+      );
+      const preSecureIndex = getPreSecureIndex(wordRotation);
+      inWindow = wordRotation.length >= 2 && currentIndex === preSecureIndex;
+    } else if (packetIndex === 10 && sessionDoc.phase11StartedAt && sessionDoc.wordRotationPhase11?.length) {
+      serverPhaseElapsedMs = now.getTime() - new Date(sessionDoc.phase11StartedAt).getTime();
+      wordRotation = sessionDoc.wordRotationPhase11;
+      const wordStartOffsetPhase11 = sessionDoc.wordStartOffsetPhase11 ?? 0;
+      currentIndex = getCurrentWordIndex(
+        serverPhaseElapsedMs,
+        wordDurationMs,
+        wordRotation.length,
+        wordStartOffsetPhase11
+      );
+      const preSecureIndex = getPreSecureIndex(wordRotation);
+      inWindow = wordRotation.length >= 2 && currentIndex === preSecureIndex;
+    } else if (packetIndex === 9 && sessionDoc.phase10StartedAt && sessionDoc.wordRotationPhase10?.length) {
       serverPhaseElapsedMs = now.getTime() - new Date(sessionDoc.phase10StartedAt).getTime();
       wordRotation = sessionDoc.wordRotationPhase10;
       const wordStartOffsetPhase10 = sessionDoc.wordStartOffsetPhase10 ?? 0;
@@ -1164,12 +1365,33 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       sessionDoc.wordStartOffsetPhase9 =
         rot9.length > 0 ? Math.floor(Math.random() * rot9.length) : 0;
     }
-    if (packetIndex === 8 && tier >= 16) {
+    if (packetIndex === 8 && tier >= 14) {
       sessionDoc.phase10StartedAt = now;
       const rot10 = getRandomWordGroupForTier(tier);
       sessionDoc.wordRotationPhase10 = rot10;
       sessionDoc.wordStartOffsetPhase10 =
         rot10.length > 0 ? Math.floor(Math.random() * rot10.length) : 0;
+    }
+    if (packetIndex === 9 && tier >= 16) {
+      sessionDoc.phase11StartedAt = now;
+      const rot11 = getRandomWordGroupForTier(tier);
+      sessionDoc.wordRotationPhase11 = rot11;
+      sessionDoc.wordStartOffsetPhase11 =
+        rot11.length > 0 ? Math.floor(Math.random() * rot11.length) : 0;
+    }
+    if (packetIndex === 10 && tier >= 18) {
+      sessionDoc.phase12StartedAt = now;
+      const rot12 = getRandomWordGroupForTier(tier);
+      sessionDoc.wordRotationPhase12 = rot12;
+      sessionDoc.wordStartOffsetPhase12 =
+        rot12.length > 0 ? Math.floor(Math.random() * rot12.length) : 0;
+    }
+    if (packetIndex === 11 && tier >= 20) {
+      sessionDoc.phase13StartedAt = now;
+      const rot13 = getRandomWordGroupForTier(tier);
+      sessionDoc.wordRotationPhase13 = rot13;
+      sessionDoc.wordStartOffsetPhase13 =
+        rot13.length > 0 ? Math.floor(Math.random() * rot13.length) : 0;
     }
     const pIdx = sessionDoc.packets.findIndex((p) => p.id === packetId);
     if (pIdx !== -1) sessionDoc.packets[pIdx].isHijacked = true;
@@ -1247,6 +1469,30 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
             wordStartOffsetPhase10: sessionDoc.wordStartOffsetPhase10 ?? 0,
           }
         : undefined;
+    const phase11 =
+      sessionDoc.phase11StartedAt && Array.isArray(sessionDoc.wordRotationPhase11) && sessionDoc.wordRotationPhase11.length > 0
+        ? {
+            phase11StartedAt: sessionDoc.phase11StartedAt.toISOString(),
+            wordRotationPhase11: [...sessionDoc.wordRotationPhase11],
+            wordStartOffsetPhase11: sessionDoc.wordStartOffsetPhase11 ?? 0,
+          }
+        : undefined;
+    const phase12 =
+      sessionDoc.phase12StartedAt && Array.isArray(sessionDoc.wordRotationPhase12) && sessionDoc.wordRotationPhase12.length > 0
+        ? {
+            phase12StartedAt: sessionDoc.phase12StartedAt.toISOString(),
+            wordRotationPhase12: [...sessionDoc.wordRotationPhase12],
+            wordStartOffsetPhase12: sessionDoc.wordStartOffsetPhase12 ?? 0,
+          }
+        : undefined;
+    const phase13 =
+      sessionDoc.phase13StartedAt && Array.isArray(sessionDoc.wordRotationPhase13) && sessionDoc.wordRotationPhase13.length > 0
+        ? {
+            phase13StartedAt: sessionDoc.phase13StartedAt.toISOString(),
+            wordRotationPhase13: [...sessionDoc.wordRotationPhase13],
+            wordStartOffsetPhase13: sessionDoc.wordStartOffsetPhase13 ?? 0,
+          }
+        : undefined;
     res.json({
       success: true,
       addedScore,
@@ -1264,6 +1510,9 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       ...phase8,
       ...phase9,
       ...phase10,
+      ...phase11,
+      ...phase12,
+      ...phase13,
     });
   } catch (error: unknown) {
     console.error('Race Condition Heist attempt-hijack error:', error);

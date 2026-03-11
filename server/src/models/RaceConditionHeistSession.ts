@@ -52,10 +52,22 @@ export interface IRaceConditionHeistSession extends Document {
   wordRotationPhase9?: string[];
   wordStartOffsetPhase9?: number;
   phase9StartedAt?: Date;
-  /** Tiers 16+: tenth word cycle for the tenth node (Flush). Starts when ninth node is captured. */
+  /** Tiers 14+: tenth word cycle for the tenth node (Flush). Starts when ninth node is captured. */
   wordRotationPhase10?: string[];
   wordStartOffsetPhase10?: number;
   phase10StartedAt?: Date;
+  /** Tiers 16+: eleventh word cycle for the eleventh node. Starts when tenth node is captured. */
+  wordRotationPhase11?: string[];
+  wordStartOffsetPhase11?: number;
+  phase11StartedAt?: Date;
+  /** Tiers 18+: twelfth word cycle for the twelfth node. Starts when eleventh node is captured. */
+  wordRotationPhase12?: string[];
+  wordStartOffsetPhase12?: number;
+  phase12StartedAt?: Date;
+  /** Tiers 20+: thirteenth word cycle for the thirteenth node. Starts when twelfth node is captured. */
+  wordRotationPhase13?: string[];
+  wordStartOffsetPhase13?: number;
+  phase13StartedAt?: Date;
   phase: 'RUNNING' | 'LOCKDOWN' | 'RESULTS';
   packets: IRCHPacket[];
   score: number;
@@ -110,6 +122,15 @@ const raceConditionHeistSessionSchema = new Schema(
     wordRotationPhase10: { type: [String], required: false },
     wordStartOffsetPhase10: { type: Number, required: false },
     phase10StartedAt: { type: Date, required: false },
+    wordRotationPhase11: { type: [String], required: false },
+    wordStartOffsetPhase11: { type: Number, required: false },
+    phase11StartedAt: { type: Date, required: false },
+    wordRotationPhase12: { type: [String], required: false },
+    wordStartOffsetPhase12: { type: Number, required: false },
+    phase12StartedAt: { type: Date, required: false },
+    wordRotationPhase13: { type: [String], required: false },
+    wordStartOffsetPhase13: { type: Number, required: false },
+    phase13StartedAt: { type: Date, required: false },
     phase: { type: String, enum: ['RUNNING', 'LOCKDOWN', 'RESULTS'], default: 'RUNNING' },
     packets: { type: [rchPacketSchema], default: [] },
     score: { type: Number, default: 0 },
