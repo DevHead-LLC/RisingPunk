@@ -706,9 +706,17 @@ export function RaceConditionHeistGameScreen({
   const phase5ElapsedMs = usePhase5Words && session.phase5StartedAt
     ? serverAdjustedNow - new Date(session.phase5StartedAt).getTime()
     : 0;
-  /** Tiers 4+: after third node captured, display phase-4 words for the fourth node (Bypass). */
+  /** Tiers 4+: after third node captured, display phase-4 words for the fourth node (Bypass). Exclude when any higher phase active (match phases 5–9). */
   const usePhase4Words =
     !usePhase5Words &&
+    !usePhase6Words &&
+    !usePhase7Words &&
+    !usePhase8Words &&
+    !usePhase9Words &&
+    !usePhase10Words &&
+    !usePhase11Words &&
+    !usePhase12Words &&
+    !usePhase13Words &&
     (isTier4 || isTier5 || isTier6 || isTier7 || isTier8 || isTier9 || tier >= 10) &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
@@ -718,9 +726,18 @@ export function RaceConditionHeistGameScreen({
   const phase4ElapsedMs = usePhase4Words && session.phase4StartedAt
     ? serverAdjustedNow - new Date(session.phase4StartedAt).getTime()
     : 0;
-  /** Tier 3+: after second node captured, display phase-3 words for the third node (Exfiltrate). */
+  /** Tier 3+: after second node captured, display phase-3 words for the third node (Exfiltrate). Exclude when any higher phase active. */
   const usePhase3Words =
     !usePhase4Words &&
+    !usePhase5Words &&
+    !usePhase6Words &&
+    !usePhase7Words &&
+    !usePhase8Words &&
+    !usePhase9Words &&
+    !usePhase10Words &&
+    !usePhase11Words &&
+    !usePhase12Words &&
+    !usePhase13Words &&
     (isTier3 || isTier4 || isTier5 || isTier6 || isTier7 || isTier8 || isTier9 || tier >= 10) &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
@@ -729,9 +746,19 @@ export function RaceConditionHeistGameScreen({
   const phase3ElapsedMs = usePhase3Words && session.phase3StartedAt
     ? serverAdjustedNow - new Date(session.phase3StartedAt).getTime()
     : 0;
-  /** Tier 2+: after first node captured, display phase-2 words for the second node (Encrypt). */
+  /** Tier 2+: after first node captured, display phase-2 words for the second node (Encrypt). Exclude when any higher phase active. */
   const usePhase2Words =
     !usePhase3Words &&
+    !usePhase4Words &&
+    !usePhase5Words &&
+    !usePhase6Words &&
+    !usePhase7Words &&
+    !usePhase8Words &&
+    !usePhase9Words &&
+    !usePhase10Words &&
+    !usePhase11Words &&
+    !usePhase12Words &&
+    !usePhase13Words &&
     multiNodeTier &&
     session.packets[0]?.isHijacked &&
     (session.wordRotationPhase2?.length ?? 0) > 0 &&
