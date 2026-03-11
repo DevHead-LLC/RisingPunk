@@ -150,7 +150,15 @@ export function RaceConditionHeistGameScreen({
   }, [fatalFailure]);
 
   useEffect(() => {
-    if (phase !== 'RUNNING' || !session || matchDurationMs <= 0 || elapsedMs < matchDurationMs || timerExpireTriggeredRef.current) return;
+    if (
+      phase !== 'RUNNING' ||
+      !session ||
+      matchDurationMs <= 0 ||
+      elapsedMs < matchDurationMs ||
+      timerExpireTriggeredRef.current ||
+      autoCompleteTriggeredRef.current
+    )
+      return;
     timerExpireTriggeredRef.current = true;
     autoCompleteTriggeredRef.current = true;
     (async () => {

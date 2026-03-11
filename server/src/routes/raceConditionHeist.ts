@@ -1109,7 +1109,7 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
     }
     const preSecureIndexFinal = getPreSecureIndex(wordRotation);
     const secureWordIndex = wordRotation.length - 1;
-    /** Resolve what the user saw: prefer value (label) so we compare array[8]=correct, array[9]=fatal, array[0–7]=wrong. */
+    /** Resolve what the user saw. Prefer client's numeric index when in range (avoids indexOf duplicate-word bug); fall back to label→index when no valid index. */
     const labelFromClient =
       typeof displayedWordLabel === 'string' && displayedWordLabel.trim() !== ''
         ? displayedWordLabel.trim()
@@ -1118,14 +1118,13 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       labelFromClient != null && labelFromClient !== ''
         ? wordRotation.indexOf(labelFromClient)
         : -1;
-    const clientReportedIndex =
-      indexFromLabel >= 0
-        ? indexFromLabel
-        : typeof displayedWordIndex === 'number'
-          ? displayedWordIndex
-          : clientViewpoint && typeof clientViewpoint.displayedWordIndex === 'number'
-            ? clientViewpoint.displayedWordIndex
-            : undefined;
+    const numericIndex =
+      typeof displayedWordIndex === 'number' && displayedWordIndex >= 0 && displayedWordIndex < wordRotation.length
+        ? displayedWordIndex
+        : clientViewpoint && typeof clientViewpoint.displayedWordIndex === 'number' && clientViewpoint.displayedWordIndex >= 0 && clientViewpoint.displayedWordIndex < wordRotation.length
+          ? clientViewpoint.displayedWordIndex
+          : undefined;
+    const clientReportedIndex = numericIndex !== undefined ? numericIndex : (indexFromLabel >= 0 ? indexFromLabel : undefined);
     /** Tiers 6+: validate success purely from client-reported word at click. No server timer; no leniency. */
     const tierUsesClientOnlySuccess = params.tier >= 6;
     if (tierUsesClientOnlySuccess) {
