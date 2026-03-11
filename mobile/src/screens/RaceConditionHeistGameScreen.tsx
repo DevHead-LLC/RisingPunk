@@ -51,6 +51,7 @@ export function RaceConditionHeistGameScreen({
   const [fatalFailure, setFatalFailure] = useState(false);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoCompleteTriggeredRef = useRef(false);
+  const autoCompleteTimeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerExpireTriggeredRef = useRef(false);
   const victoryAutoCloseTriggeredRef = useRef(false);
   const onCloseRef = useRef(onClose);
@@ -183,6 +184,7 @@ export function RaceConditionHeistGameScreen({
     autoCompleteTriggeredRef.current = true;
     setAutoCompleting(true);
     const t = setTimeout(async () => {
+      autoCompleteTimeoutIdRef.current = null;
       if (timerExpireTriggeredRef.current) {
         setAutoCompleting(false);
         return;
@@ -220,8 +222,24 @@ export function RaceConditionHeistGameScreen({
         setWon(false);
       }
     }, 1200);
-    return () => clearTimeout(t);
+    autoCompleteTimeoutIdRef.current = t;
+    return () => {
+      if (!autoCompleteTriggeredRef.current && autoCompleteTimeoutIdRef.current != null) {
+        clearTimeout(autoCompleteTimeoutIdRef.current);
+        autoCompleteTimeoutIdRef.current = null;
+      }
+    };
   }, [session?.score, session?.packets, phase, scoreThreshold, levelId, endRun, claimLevel]);
+
+  /** Clear auto-complete timeout on unmount so we don't run endRun/claimLevel after unmount. */
+  useEffect(() => {
+    return () => {
+      if (autoCompleteTimeoutIdRef.current != null) {
+        clearTimeout(autoCompleteTimeoutIdRef.current);
+        autoCompleteTimeoutIdRef.current = null;
+      }
+    };
+  }, []);
 
   /** When we've won (LOCKDOWN + won), show brief success then auto-claim and navigate back. No "Run complete" / "Back to levels" for win. */
   useEffect(() => {
@@ -709,7 +727,7 @@ export function RaceConditionHeistGameScreen({
   const phaseOffsets = [session.wordStartOffsetPhase2 ?? 0, session.wordStartOffsetPhase3 ?? 0, session.wordStartOffsetPhase4 ?? 0, session.wordStartOffsetPhase5 ?? 0, session.wordStartOffsetPhase6 ?? 0, session.wordStartOffsetPhase7 ?? 0, session.wordStartOffsetPhase8 ?? 0, session.wordStartOffsetPhase9 ?? 0, session.wordStartOffsetPhase10 ?? 0, session.wordStartOffsetPhase11 ?? 0, session.wordStartOffsetPhase12 ?? 0, session.wordStartOffsetPhase13 ?? 0];
   const phaseElapsed = [phase2ElapsedMs, phase3ElapsedMs, phase4ElapsedMs, phase5ElapsedMs, phase6ElapsedMs, phase7ElapsedMs, phase8ElapsedMs, phase9ElapsedMs, phase10ElapsedMs, phase11ElapsedMs, phase12ElapsedMs, phase13ElapsedMs];
   let activePhaseIndex = -1;
-  for (let i = 12; i >= 0; i--) if (usePhaseFlags[i]) { activePhaseIndex = i; break; }
+  for (let i = 11; i >= 0; i--) if (usePhaseFlags[i]) { activePhaseIndex = i; break; }
   const activeRotation = activePhaseIndex >= 0 ? phaseRotations[activePhaseIndex] : wordRotation;
   const activeStartOffset = activePhaseIndex >= 0 ? phaseOffsets[activePhaseIndex] : wordStartOffset;
   const activeElapsedMs = activePhaseIndex >= 0 ? phaseElapsed[activePhaseIndex] : elapsedMs;
