@@ -320,7 +320,7 @@ export function getRandomWordGroupForTier(tier: number): string[] {
   return [...WORD_ROTATION_DEFAULT];
 }
 
-/** Packet count per tier (matches packet generators in raceConditionHeist routes). Score threshold = this * 50. */
+/** Packet count per tier (matches packet generators in raceConditionHeist routes). */
 export function getPacketCountForTier(tier: number): number {
   if (tier === 1) return 1;
   if (tier === 2) return 2;
@@ -338,7 +338,13 @@ export function getPacketCountForTier(tier: number): number {
   return 1;
 }
 
-const SCORE_PER_PACKET = 50;
+/** Points per packet (must match PACKET_TYPES.USER_DATA — all RCH packets use USER_DATA). Required score = packets × this. */
+export const RCH_SCORE_PER_PACKET = 50;
+
+/** Required score to pass = packet count × points per packet. Matches the score earned when all packets are hijacked (base, no combo). */
+export function getScoreThresholdForTier(tier: number): number {
+  return getPacketCountForTier(tier) * RCH_SCORE_PER_PACKET;
+}
 
 /** Build all 105 levels from tier params. */
 function buildAllLevels(): LevelParams[] {
@@ -380,8 +386,7 @@ function buildAllLevels(): LevelParams[] {
         ? 1600 - 50 * tier
         : WORD_DURATION_MS;
     const maxPackets = tier <= 3 ? 1 : tier <= 21 ? 2 : Math.min(5, Math.floor(tier / 3) + 1);
-    /** Score threshold = packets for this tier × 50 (one-to-one with packet count). */
-    const scoreThreshold = getPacketCountForTier(tier) * SCORE_PER_PACKET;
+    const scoreThreshold = getScoreThresholdForTier(tier);
     for (let y = 1; y <= 5; y++) {
       levels.push({
         levelId: `${tier}.${y}`,

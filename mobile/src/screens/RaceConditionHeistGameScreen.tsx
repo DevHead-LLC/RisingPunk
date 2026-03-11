@@ -526,69 +526,9 @@ export function RaceConditionHeistGameScreen({
   const wordRotation = session.wordRotation ?? ['Read', 'Write', 'Lock'];
   const wordDurationMs = session.wordDurationMs ?? 1500;
   const wordStartOffset = session.wordStartOffset ?? 0;
-  /** Tier 14+: after ninth node captured, display phase-10 words for the tenth node (Flush). */
-  const usePhase10Words =
-    (tenPacketTier || elevenPacketTier || twelvePacketTier || thirteenPacketTier) &&
-    session.packets[0]?.isHijacked &&
-    session.packets[1]?.isHijacked &&
-    session.packets[2]?.isHijacked &&
-    session.packets[3]?.isHijacked &&
-    session.packets[4]?.isHijacked &&
-    session.packets[5]?.isHijacked &&
-    session.packets[6]?.isHijacked &&
-    session.packets[7]?.isHijacked &&
-    session.packets[8]?.isHijacked &&
-    (session.wordRotationPhase10?.length ?? 0) > 0 &&
-    session.phase10StartedAt != null;
-  const phase10ElapsedMs = usePhase10Words && session.phase10StartedAt
-    ? serverAdjustedNow - new Date(session.phase10StartedAt).getTime()
-    : 0;
-  /** Tier 16+: after tenth node captured, display phase-11 words for the eleventh node (Dump). */
-  const usePhase11Words =
-    (elevenPacketTier || twelvePacketTier || thirteenPacketTier) &&
-    !usePhase10Words &&
-    session.packets[0]?.isHijacked &&
-    session.packets[1]?.isHijacked &&
-    session.packets[2]?.isHijacked &&
-    session.packets[3]?.isHijacked &&
-    session.packets[4]?.isHijacked &&
-    session.packets[5]?.isHijacked &&
-    session.packets[6]?.isHijacked &&
-    session.packets[7]?.isHijacked &&
-    session.packets[8]?.isHijacked &&
-    session.packets[9]?.isHijacked &&
-    (session.wordRotationPhase11?.length ?? 0) > 0 &&
-    session.phase11StartedAt != null;
-  const phase11ElapsedMs = usePhase11Words && session.phase11StartedAt
-    ? serverAdjustedNow - new Date(session.phase11StartedAt).getTime()
-    : 0;
-  /** Tier 18+: after eleventh node captured, display phase-12 words for the twelfth node (Clear). */
-  const usePhase12Words =
-    (twelvePacketTier || thirteenPacketTier) &&
-    !usePhase10Words &&
-    !usePhase11Words &&
-    session.packets[0]?.isHijacked &&
-    session.packets[1]?.isHijacked &&
-    session.packets[2]?.isHijacked &&
-    session.packets[3]?.isHijacked &&
-    session.packets[4]?.isHijacked &&
-    session.packets[5]?.isHijacked &&
-    session.packets[6]?.isHijacked &&
-    session.packets[7]?.isHijacked &&
-    session.packets[8]?.isHijacked &&
-    session.packets[9]?.isHijacked &&
-    session.packets[10]?.isHijacked &&
-    (session.wordRotationPhase12?.length ?? 0) > 0 &&
-    session.phase12StartedAt != null;
-  const phase12ElapsedMs = usePhase12Words && session.phase12StartedAt
-    ? serverAdjustedNow - new Date(session.phase12StartedAt).getTime()
-    : 0;
-  /** Tier 20+: after twelfth node captured, display phase-13 words for the thirteenth node (Reset). */
+  /** Tier 20+: after twelfth node captured, display phase-13 words for the thirteenth node (Reset). Defined first so lower phases can exclude it. */
   const usePhase13Words =
     thirteenPacketTier &&
-    !usePhase10Words &&
-    !usePhase11Words &&
-    !usePhase12Words &&
     session.packets[0]?.isHijacked &&
     session.packets[1]?.isHijacked &&
     session.packets[2]?.isHijacked &&
@@ -605,6 +545,66 @@ export function RaceConditionHeistGameScreen({
     session.phase13StartedAt != null;
   const phase13ElapsedMs = usePhase13Words && session.phase13StartedAt
     ? serverAdjustedNow - new Date(session.phase13StartedAt).getTime()
+    : 0;
+  /** Tier 18+: after eleventh node captured, display phase-12 words for the twelfth node (Clear). Exclude when phase 13 active (match phases 2–9 pattern). */
+  const usePhase12Words =
+    (twelvePacketTier || thirteenPacketTier) &&
+    !usePhase13Words &&
+    session.packets[0]?.isHijacked &&
+    session.packets[1]?.isHijacked &&
+    session.packets[2]?.isHijacked &&
+    session.packets[3]?.isHijacked &&
+    session.packets[4]?.isHijacked &&
+    session.packets[5]?.isHijacked &&
+    session.packets[6]?.isHijacked &&
+    session.packets[7]?.isHijacked &&
+    session.packets[8]?.isHijacked &&
+    session.packets[9]?.isHijacked &&
+    session.packets[10]?.isHijacked &&
+    (session.wordRotationPhase12?.length ?? 0) > 0 &&
+    session.phase12StartedAt != null;
+  const phase12ElapsedMs = usePhase12Words && session.phase12StartedAt
+    ? serverAdjustedNow - new Date(session.phase12StartedAt).getTime()
+    : 0;
+  /** Tier 16+: after tenth node captured, display phase-11 words for the eleventh node (Dump). Exclude when phase 12/13 active. */
+  const usePhase11Words =
+    (elevenPacketTier || twelvePacketTier || thirteenPacketTier) &&
+    !usePhase12Words &&
+    !usePhase13Words &&
+    session.packets[0]?.isHijacked &&
+    session.packets[1]?.isHijacked &&
+    session.packets[2]?.isHijacked &&
+    session.packets[3]?.isHijacked &&
+    session.packets[4]?.isHijacked &&
+    session.packets[5]?.isHijacked &&
+    session.packets[6]?.isHijacked &&
+    session.packets[7]?.isHijacked &&
+    session.packets[8]?.isHijacked &&
+    session.packets[9]?.isHijacked &&
+    (session.wordRotationPhase11?.length ?? 0) > 0 &&
+    session.phase11StartedAt != null;
+  const phase11ElapsedMs = usePhase11Words && session.phase11StartedAt
+    ? serverAdjustedNow - new Date(session.phase11StartedAt).getTime()
+    : 0;
+  /** Tier 14+: after ninth node captured, display phase-10 words for the tenth node (Flush). Exclude when phase 11/12/13 active so display advances. */
+  const usePhase10Words =
+    (tenPacketTier || elevenPacketTier || twelvePacketTier || thirteenPacketTier) &&
+    !usePhase11Words &&
+    !usePhase12Words &&
+    !usePhase13Words &&
+    session.packets[0]?.isHijacked &&
+    session.packets[1]?.isHijacked &&
+    session.packets[2]?.isHijacked &&
+    session.packets[3]?.isHijacked &&
+    session.packets[4]?.isHijacked &&
+    session.packets[5]?.isHijacked &&
+    session.packets[6]?.isHijacked &&
+    session.packets[7]?.isHijacked &&
+    session.packets[8]?.isHijacked &&
+    (session.wordRotationPhase10?.length ?? 0) > 0 &&
+    session.phase10StartedAt != null;
+  const phase10ElapsedMs = usePhase10Words && session.phase10StartedAt
+    ? serverAdjustedNow - new Date(session.phase10StartedAt).getTime()
     : 0;
   /** Tier 12+: after seventh node captured, display phase-9 words for the ninth node (Scrub). Must match server (packet 8 → phase 9). */
   const usePhase9Words =

@@ -60,7 +60,7 @@ ACTIONS
 • Never tap when the secure word is showing (tiers 5 and above — see FATAL FAILURE below).
 
 MULTI-NODE TIERS (2–21)
-• Tier 2: two nodes. Tier 3: three. Tiers 4–5: four nodes. Tier 6: five. Tier 7: six. Tier 8: seven (… Offload → Purge). Tier 9–11: eight nodes (… Purge → Wipe). Tier 12–15: nine nodes (… Wipe → Scrub). Tier 16–21: ten nodes (… Scrub → Flush). The packet row scrolls when there are 6 or more nodes. Each phase gets a new word set; capture all nodes to pass. Tiers 5+ have faster word cycles and less time; tiers 9+ use 8- or 10-word cycles and longer wrong-word cooldowns.
+• Tier 2: two nodes. Tier 3: three. Tiers 4–5: four nodes. Tier 6: five. Tier 7: six. Tier 8: seven (… Offload → Purge). Tier 9–11: eight nodes (… Purge → Wipe). Tier 12–13: nine nodes (… Wipe → Scrub). Tier 14–15: ten nodes (… Scrub → Flush). Tier 16–17: eleven. Tier 18–19: twelve. Tier 20–21: thirteen. The packet row scrolls when there are 6 or more nodes. Each phase gets a new word set; capture all nodes to pass. Required score = number of nodes × 50 (e.g. tier 15 = 10 nodes, need 500). Tiers 5+ have faster word cycles and less time; tiers 9+ use 8- or 10-word cycles and longer wrong-word cooldowns.
 
 FATAL FAILURE (tiers 5 and above)
 • If you tap when the secure word is displayed, you are traced immediately: "You've been traced! FATAL FAILURE." The run ends and you are returned to level select. No second chances — start a new run to try again.
