@@ -223,12 +223,7 @@ export function RaceConditionHeistGameScreen({
       }
     }, 1200);
     autoCompleteTimeoutIdRef.current = t;
-    return () => {
-      if (!autoCompleteTriggeredRef.current && autoCompleteTimeoutIdRef.current != null) {
-        clearTimeout(autoCompleteTimeoutIdRef.current);
-        autoCompleteTimeoutIdRef.current = null;
-      }
-    };
+    /* Intentionally no cleanup here: we set the ref true before creating the timeout, so cleanup would never clear. Not clearing ensures a late session update (e.g. hijack response) re-running this effect does not cancel the in-flight endRun/claimLevel. Unmount effect below clears the timeout. */
   }, [session?.score, session?.packets, phase, scoreThreshold, levelId, endRun, claimLevel]);
 
   /** Clear auto-complete timeout on unmount so we don't run endRun/claimLevel after unmount. */
@@ -990,17 +985,21 @@ export function RaceConditionHeistGameScreen({
                         0,
                         serverAdjustedNow - new Date(phaseStartForPacket).getTime()
                       );
-                      const { rotation } = getRotationAndOffsetForPacket(index, session);
-                      /** Capture the word the user sees (value-based). Server resolves label → index in its rotation. */
-                      const label = displayedWord;
-                      const indexInPacketRotation = rotation.indexOf(label);
+                      const { rotation, startOffset } = getRotationAndOffsetForPacket(index, session);
+                      /** Use this packet's phase rotation and 250ms display delay so index/label match what server validates. */
+                      const displayElapsedMsForPacket = Math.max(0, clientPhaseElapsedMs - DISPLAY_DELAY_MS);
+                      const displayedWordIndexForPacket =
+                        rotation.length > 0
+                          ? (Math.floor(displayElapsedMsForPacket / wordDurationMs) + startOffset) % rotation.length
+                          : 0;
+                      const label = rotation[displayedWordIndexForPacket] ?? '—';
                       clientViewpointAtTapRef.current = {
                         clientTimestampMs: now,
-                        displayedWordIndex: indexInPacketRotation >= 0 ? indexInPacketRotation : 0,
+                        displayedWordIndex: displayedWordIndexForPacket,
                         displayedWordLabel: label,
                         clientPhaseElapsedMs,
                         wordDurationMs,
-                        wordCount: activeRotation.length,
+                        wordCount: rotation.length,
                       };
                     }}
                     onPress={() => handleHijack(packet.id, clientViewpointAtTapRef.current)}
@@ -1069,17 +1068,21 @@ export function RaceConditionHeistGameScreen({
                       0,
                       serverAdjustedNow - new Date(phaseStartForPacket).getTime()
                     );
-                    const { rotation } = getRotationAndOffsetForPacket(index, session);
-                    /** Capture the word the user sees (value-based). Server resolves label → index in its rotation. */
-                    const label = displayedWord;
-                    const indexInPacketRotation = rotation.indexOf(label);
+                    const { rotation, startOffset } = getRotationAndOffsetForPacket(index, session);
+                    /** Use this packet's phase rotation and 250ms display delay so index/label match what server validates. */
+                    const displayElapsedMsForPacket = Math.max(0, clientPhaseElapsedMs - DISPLAY_DELAY_MS);
+                    const displayedWordIndexForPacket =
+                      rotation.length > 0
+                        ? (Math.floor(displayElapsedMsForPacket / wordDurationMs) + startOffset) % rotation.length
+                        : 0;
+                    const label = rotation[displayedWordIndexForPacket] ?? '—';
                     clientViewpointAtTapRef.current = {
                       clientTimestampMs: now,
-                      displayedWordIndex: indexInPacketRotation >= 0 ? indexInPacketRotation : 0,
+                      displayedWordIndex: displayedWordIndexForPacket,
                       displayedWordLabel: label,
                       clientPhaseElapsedMs,
                       wordDurationMs,
-                      wordCount: activeRotation.length,
+                      wordCount: rotation.length,
                     };
                   }}
                   onPress={() => handleHijack(packet.id, clientViewpointAtTapRef.current)}
