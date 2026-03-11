@@ -28,6 +28,19 @@ type RaceConditionHeistGameScreenProps = {
 
 const TICK_MS = 100;
 
+/** Action labels per packet index (0–12). Shared by scrollable and non-scrollable packet lists. */
+const PACKET_ACTION_LABELS = ['Exploit', 'Encrypt', 'Exfiltrate', 'Bypass', 'Extract', 'Offload', 'Purge', 'Wipe', 'Scrub', 'Flush', 'Dump', 'Clear', 'Reset'] as const;
+/** Done labels per packet index (0–12). */
+const PACKET_DONE_LABELS = ['Stolen', 'Encrypted', 'Exfiltrated', 'Bypassed', 'Extracted', 'Offloaded', 'Purged', 'Wiped', 'Scrubbed', 'Flushed', 'Dumped', 'Cleared', 'Reset'] as const;
+
+function canTapPacket(index: number, packets: { isHijacked?: boolean }[]): boolean {
+  if (index === 0) return true;
+  for (let i = 0; i < index; i++) {
+    if (!packets[i]?.isHijacked) return false;
+  }
+  return true;
+}
+
 export function RaceConditionHeistGameScreen({
   levelId,
   initialSession,
@@ -906,194 +919,11 @@ export function RaceConditionHeistGameScreen({
         <Text style={[styles.feedbackText, { color: colors.success ?? colors.primary }]}>Stolen!</Text>
       )}
 
-      {scrollablePacketTier ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={true}
-          contentContainerStyle={styles.packetsScrollContent}
-          style={styles.packetsScroll}
-        >
-          {session.packets.map((packet: RCHPacket, index: number) => {
-            const actionLabel =
-              index === 0 ? 'Exploit' : index === 1 ? 'Encrypt' : index === 2 ? 'Exfiltrate' : index === 3 ? 'Bypass' : index === 4 ? 'Extract' : index === 5 ? 'Offload' : index === 6 ? 'Purge' : index === 7 ? 'Wipe' : index === 8 ? 'Scrub' : index === 9 ? 'Flush' : index === 10 ? 'Dump' : index === 11 ? 'Clear' : 'Reset';
-            const canTap =
-              index === 0 ||
-              (index === 1 && session.packets[0]?.isHijacked) ||
-              (index === 2 && session.packets[0]?.isHijacked && session.packets[1]?.isHijacked) ||
-              (index === 3 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked) ||
-              (index === 4 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked) ||
-              (index === 5 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked &&
-                session.packets[4]?.isHijacked) ||
-              (index === 6 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked &&
-                session.packets[4]?.isHijacked &&
-                session.packets[5]?.isHijacked) ||
-              (index === 7 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked &&
-                session.packets[4]?.isHijacked &&
-                session.packets[5]?.isHijacked &&
-                session.packets[6]?.isHijacked) ||
-              (index === 8 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked &&
-                session.packets[4]?.isHijacked &&
-                session.packets[5]?.isHijacked &&
-                session.packets[6]?.isHijacked &&
-                session.packets[7]?.isHijacked) ||
-              (index === 9 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked &&
-                session.packets[4]?.isHijacked &&
-                session.packets[5]?.isHijacked &&
-                session.packets[6]?.isHijacked &&
-                session.packets[7]?.isHijacked &&
-                session.packets[8]?.isHijacked) ||
-              (index === 10 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked &&
-                session.packets[4]?.isHijacked &&
-                session.packets[5]?.isHijacked &&
-                session.packets[6]?.isHijacked &&
-                session.packets[7]?.isHijacked &&
-                session.packets[8]?.isHijacked &&
-                session.packets[9]?.isHijacked) ||
-              (index === 11 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked &&
-                session.packets[4]?.isHijacked &&
-                session.packets[5]?.isHijacked &&
-                session.packets[6]?.isHijacked &&
-                session.packets[7]?.isHijacked &&
-                session.packets[8]?.isHijacked &&
-                session.packets[9]?.isHijacked &&
-                session.packets[10]?.isHijacked) ||
-              (index === 12 &&
-                session.packets[0]?.isHijacked &&
-                session.packets[1]?.isHijacked &&
-                session.packets[2]?.isHijacked &&
-                session.packets[3]?.isHijacked &&
-                session.packets[4]?.isHijacked &&
-                session.packets[5]?.isHijacked &&
-                session.packets[6]?.isHijacked &&
-                session.packets[7]?.isHijacked &&
-                session.packets[8]?.isHijacked &&
-                session.packets[9]?.isHijacked &&
-                session.packets[10]?.isHijacked &&
-                session.packets[11]?.isHijacked);
-            const doneLabel =
-              index === 0 ? 'Stolen' : index === 1 ? 'Encrypted' : index === 2 ? 'Exfiltrated' : index === 3 ? 'Bypassed' : index === 4 ? 'Extracted' : index === 5 ? 'Offloaded' : index === 6 ? 'Purged' : index === 7 ? 'Wiped' : index === 8 ? 'Scrubbed' : index === 9 ? 'Flushed' : index === 10 ? 'Dumped' : index === 11 ? 'Cleared' : 'Reset';
-            return (
-              <View
-                key={packet.id}
-                style={[
-                  styles.packetBox,
-                  { borderColor: colors.primary },
-                  packet.isHijacked && styles.packetHijacked,
-                ]}
-              >
-                <Text style={[styles.packetType, { color: colors.text?.secondary ?? colors.primary }]}>
-                  {packet.type.replace('_', ' ')}
-                </Text>
-                <Text style={[styles.packetValue, { color: colors.primary }]}>{packet.value} pts</Text>
-                {!packet.isHijacked && (
-                  <TouchableOpacity
-                    style={[
-                      styles.hijackButton,
-                      { borderColor: colors.primary },
-                      (onCooldown || !canTap) && styles.hijackButtonDisabled,
-                    ]}
-                    onPressIn={() => {
-                      const now = Date.now();
-                      const serverAdjustedNow = now + timeSkewMsRef.current;
-                      const phaseStartForPacket = getPhaseStartForPacket(index, session);
-                      const clientPhaseElapsedMs = Math.max(
-                        0,
-                        serverAdjustedNow - new Date(phaseStartForPacket).getTime()
-                      );
-                      const { rotation, startOffset } = getRotationAndOffsetForPacket(index, session);
-                      /** Use this packet's phase rotation and 250ms display delay so index/label match what server validates. */
-                      const displayElapsedMsForPacket = Math.max(0, clientPhaseElapsedMs - DISPLAY_DELAY_MS);
-                      const displayedWordIndexForPacket =
-                        rotation.length > 0
-                          ? (Math.floor(displayElapsedMsForPacket / wordDurationMs) + startOffset) % rotation.length
-                          : 0;
-                      const label = rotation[displayedWordIndexForPacket] ?? '—';
-                      clientViewpointAtTapRef.current[packet.id] = {
-                        clientTimestampMs: now,
-                        displayedWordIndex: displayedWordIndexForPacket,
-                        displayedWordLabel: label,
-                        clientPhaseElapsedMs,
-                        wordDurationMs,
-                        wordCount: rotation.length,
-                      };
-                    }}
-                    onPress={() => {
-                      const viewpoint = clientViewpointAtTapRef.current[packet.id] ?? null;
-                      delete clientViewpointAtTapRef.current[packet.id];
-                      handleHijack(packet.id, viewpoint);
-                    }}
-                    disabled={onCooldown || !canTap}
-                    accessible
-                    accessibilityLabel={`${actionLabel} packet`}
-                    accessibilityRole="button"
-                  >
-                    <Text style={[styles.hijackButtonText, { color: colors.primary }]}>{actionLabel}</Text>
-                  </TouchableOpacity>
-                )}
-                {packet.isHijacked && (
-                  <Text style={[styles.stolenLabel, { color: colors.success ?? colors.primary }]}>
-                    {doneLabel}
-                  </Text>
-                )}
-              </View>
-            );
-          })}
-        </ScrollView>
-      ) : (
-      <View style={styles.packetsRow}>
-        {session.packets.map((packet: RCHPacket, index: number) => {
-          const actionLabel =
-            index === 0 ? 'Exploit' : index === 1 ? 'Encrypt' : index === 2 ? 'Exfiltrate' : index === 3 ? 'Bypass' : 'Extract';
-          const canTap =
-            index === 0 ||
-            (index === 1 && session.packets[0]?.isHijacked) ||
-            (index === 2 && session.packets[0]?.isHijacked && session.packets[1]?.isHijacked) ||
-            (index === 3 &&
-              session.packets[0]?.isHijacked &&
-              session.packets[1]?.isHijacked &&
-              session.packets[2]?.isHijacked) ||
-            (index === 4 &&
-              session.packets[0]?.isHijacked &&
-              session.packets[1]?.isHijacked &&
-              session.packets[2]?.isHijacked &&
-              session.packets[3]?.isHijacked);
-          const doneLabel =
-            index === 0 ? 'Stolen' : index === 1 ? 'Encrypted' : index === 2 ? 'Exfiltrated' : index === 3 ? 'Bypassed' : 'Extracted';
+      {(() => {
+        const getActionLabel = (i: number) => PACKET_ACTION_LABELS[i] ?? 'Exploit';
+        const getDoneLabel = (i: number) => PACKET_DONE_LABELS[i] ?? 'Stolen';
+        const renderPacketCard = (packet: RCHPacket, index: number) => {
+          const canTap = canTapPacket(index, session.packets);
           return (
             <View
               key={packet.id}
@@ -1123,7 +953,6 @@ export function RaceConditionHeistGameScreen({
                       serverAdjustedNow - new Date(phaseStartForPacket).getTime()
                     );
                     const { rotation, startOffset } = getRotationAndOffsetForPacket(index, session);
-                    /** Use this packet's phase rotation and 250ms display delay so index/label match what server validates. */
                     const displayElapsedMsForPacket = Math.max(0, clientPhaseElapsedMs - DISPLAY_DELAY_MS);
                     const displayedWordIndexForPacket =
                       rotation.length > 0
@@ -1146,22 +975,35 @@ export function RaceConditionHeistGameScreen({
                   }}
                   disabled={onCooldown || !canTap}
                   accessible
-                  accessibilityLabel={`${actionLabel} packet`}
+                  accessibilityLabel={`${getActionLabel(index)} packet`}
                   accessibilityRole="button"
                 >
-                  <Text style={[styles.hijackButtonText, { color: colors.primary }]}>{actionLabel}</Text>
+                  <Text style={[styles.hijackButtonText, { color: colors.primary }]}>{getActionLabel(index)}</Text>
                 </TouchableOpacity>
               )}
               {packet.isHijacked && (
                 <Text style={[styles.stolenLabel, { color: colors.success ?? colors.primary }]}>
-                  {doneLabel}
+                  {getDoneLabel(index)}
                 </Text>
               )}
             </View>
           );
-        })}
-      </View>
-      )}
+        };
+        return scrollablePacketTier ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={true}
+            contentContainerStyle={styles.packetsScrollContent}
+            style={styles.packetsScroll}
+          >
+            {session.packets.map((packet: RCHPacket, index: number) => renderPacketCard(packet, index))}
+          </ScrollView>
+        ) : (
+          <View style={styles.packetsRow}>
+            {session.packets.map((packet: RCHPacket, index: number) => renderPacketCard(packet, index))}
+          </View>
+        );
+      })()}
 
       {onCooldown && (
         <Text style={[styles.cooldownHint, { color: colors.text?.secondary ?? colors.primary }]}>
