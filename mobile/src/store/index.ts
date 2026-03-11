@@ -24,6 +24,7 @@ import { privateMessagesApi } from './api/privateMessagesApi';
 import { dailyHaulApi } from './api/dailyHaulApi';
 import { packetBreachApi } from './api/packetBreachApi';
 import { raceConditionHeistApi } from './api/raceConditionHeistApi';
+import { binaryBankCrackApi } from './api/binaryBankCrackApi';
 
 export const store = configureStore({
   reducer: {
@@ -51,6 +52,7 @@ export const store = configureStore({
     [dailyHaulApi.reducerPath]: dailyHaulApi.reducer,
     [packetBreachApi.reducerPath]: packetBreachApi.reducer,
     [raceConditionHeistApi.reducerPath]: raceConditionHeistApi.reducer,
+    [binaryBankCrackApi.reducerPath]: binaryBankCrackApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -74,7 +76,8 @@ export const store = configureStore({
     .concat(privateMessagesApi.middleware)
     .concat(dailyHaulApi.middleware)
     .concat(packetBreachApi.middleware)
-    .concat(raceConditionHeistApi.middleware),
+    .concat(raceConditionHeistApi.middleware)
+    .concat(binaryBankCrackApi.middleware),
   devTools: __DEV__,
 });
 

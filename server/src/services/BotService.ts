@@ -16,12 +16,18 @@ export interface ArmyBonus {
 /** Optional Cavalry (Guardian) bonus from e.g. Race Condition Heist tier rewards; applied only when botType is guardian. */
 export type GuardianBonus = ArmyBonus;
 
+/** Optional Phreak (Range) bonus from Binary Bank Crack tier rewards; applied only when botType is phreak. */
+export interface PhreakBonus {
+  range: number;
+}
+
 export class BotService {
   static async getUserBotStats(
     botType: string,
     userLevel: number,
     armyBonus?: ArmyBonus,
-    guardianBonus?: GuardianBonus
+    guardianBonus?: GuardianBonus,
+    phreakBonus?: PhreakBonus
   ): Promise<BotConfig> {
     try {
       let effectiveStats = BotStatsService.computeEffectiveBotStats(botType, userLevel);
@@ -41,6 +47,12 @@ export class BotService {
           health: effectiveStats.health + guardianBonus.health,
           defense: effectiveStats.defense + guardianBonus.defense,
           speed: effectiveStats.speed + guardianBonus.speed,
+        };
+      }
+      if (botType === 'phreak' && phreakBonus) {
+        effectiveStats = {
+          ...effectiveStats,
+          range: effectiveStats.range + phreakBonus.range,
         };
       }
       const role = BotStatsService.getBotRole(botType);

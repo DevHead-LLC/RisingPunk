@@ -31,7 +31,9 @@ export type TurfScreenName =
   | 'packetBreachLevels'
   | 'packetBreachGame'
   | 'raceConditionHeistLevels'
-  | 'raceConditionHeistGame';
+  | 'raceConditionHeistGame'
+  | 'binaryBankCrackLevels'
+  | 'binaryBankCrackGame';
 
 const VALID_SCREENS: TurfScreenName[] = [
   'turf',
@@ -48,10 +50,12 @@ const VALID_SCREENS: TurfScreenName[] = [
   'packetBreachGame',
   'raceConditionHeistLevels',
   'raceConditionHeistGame',
+  'binaryBankCrackLevels',
+  'binaryBankCrackGame',
 ];
 
-/** Screens that depend on transient state (battleId, pendingDefenderUserId, pendingNpcSlug, packetBreachLevelId, raceConditionHeistLevelId) not persisted. */
-const TRANSIENT_SCREENS: TurfScreenName[] = ['battlePrep', 'battle', 'packetBreachGame', 'raceConditionHeistGame'];
+/** Screens that depend on transient state (battleId, pendingDefenderUserId, pendingNpcSlug, packetBreachLevelId, raceConditionHeistLevelId, binaryBankCrackLevelId) not persisted. */
+const TRANSIENT_SCREENS: TurfScreenName[] = ['battlePrep', 'battle', 'packetBreachGame', 'raceConditionHeistGame', 'binaryBankCrackGame'];
 
 export interface TurfNavState {
   currentScreen: TurfScreenName;

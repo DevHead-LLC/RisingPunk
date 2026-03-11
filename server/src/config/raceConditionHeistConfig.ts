@@ -14,7 +14,7 @@ export interface LevelParams {
   wordRotation: string[];
   /** Duration in ms each word is displayed before rotating to the next. */
   wordDurationMs: number;
-  /** Max packets on screen at once (Pass 1: 1). */
+  /** Packet count for this tier (1–13). Matches getPacketCountForTier; used for display/docs. Session packet list is built by route generators. */
   maxPackets: number;
   /** Score required to complete level (claim). */
   scoreThreshold: number;
@@ -321,6 +321,18 @@ export function getRandomWordGroupForTier(tier: number): string[] {
   return [...WORD_ROTATION_DEFAULT];
 }
 
+/** Deterministic word group for a tier (first group). Used in LevelParams so fallback sessionDoc.wordRotation ?? params.wordRotation is valid per tier. */
+function getDefaultWordGroupForTier(tier: number): string[] {
+  if (tier >= 10 && tier <= 21) return [...WORD_GROUPS_TIER_10[0]];
+  if (tier === 9) return [...WORD_GROUPS_TIER_9[0]];
+  if (tier === 8) return [...WORD_GROUPS_TIER_8[0]];
+  if (tier === 7) return [...WORD_GROUPS_TIER_7[0]];
+  if (tier === 6) return [...WORD_GROUPS_TIER_6[0]];
+  if (tier === 4 || tier === 5) return [...WORD_GROUPS_TIER_4[0]];
+  if (tier >= 1 && tier <= 3) return [...WORD_GROUPS_TIERS_1_3[0]];
+  return [...WORD_ROTATION_DEFAULT];
+}
+
 /** Packet count per tier (matches packet generators in raceConditionHeist routes). */
 export function getPacketCountForTier(tier: number): number {
   if (tier === 1) return 1;
@@ -377,16 +389,16 @@ function buildAllLevels(): LevelParams[] {
                             ? 80000
                             : tier === 20
                               ? 75000
-                              : tier === 21
+                                : tier === 21
                                 ? 70000
                                 : Math.max(70000, 180000 - (tier - 1) * 2000);
-    const wordRotation = WORD_ROTATION_DEFAULT;
+    const wordRotation = getDefaultWordGroupForTier(tier);
     /** Word duration (ms) per tier: 1–2 = 1500, then −50 ms per tier (3=1450, 4=1400, … 21=550). */
     const wordDurationMs =
       tier >= 2 && tier <= 21
         ? 1600 - 50 * tier
         : WORD_DURATION_MS;
-    const maxPackets = tier <= 3 ? 1 : tier <= 21 ? 2 : Math.min(5, Math.floor(tier / 3) + 1);
+    const maxPackets = getPacketCountForTier(tier);
     const scoreThreshold = getScoreThresholdForTier(tier);
     for (let y = 1; y <= 5; y++) {
       levels.push({

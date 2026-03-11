@@ -24,8 +24,11 @@ import {PacketBreachLevelScreen} from './PacketBreachLevelScreen';
 import {PacketBreachGameScreen} from './PacketBreachGameScreen';
 import {RaceConditionHeistLevelScreen} from './RaceConditionHeistLevelScreen';
 import {RaceConditionHeistGameScreen} from './RaceConditionHeistGameScreen';
+import {BinaryBankCrackLevelScreen} from './BinaryBankCrackLevelScreen';
+import {BinaryBankCrackGameScreen} from './BinaryBankCrackGameScreen';
 import type { PacketBreachSessionResponse } from '../store/api/packetBreachApi';
 import type { RaceConditionHeistSessionResponse } from '../store/api/raceConditionHeistApi';
+import type { BinaryBankCrackSessionResponse } from '../store/api/binaryBankCrackApi';
 import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
 import {fetchInitialData, setOnboardingCompleted, setShowOnboarding, setShowEmailVerification, setEmailVerificationPrompted, refreshUserDataSilent} from '../store/slices/authSlice';
@@ -190,6 +193,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [packetBreachInitialSession, setPacketBreachInitialSession] = useState<PacketBreachSessionResponse | null>(null);
   const [raceConditionHeistLevelId, setRaceConditionHeistLevelId] = useState<string | null>(null);
   const [raceConditionHeistInitialSession, setRaceConditionHeistInitialSession] = useState<RaceConditionHeistSessionResponse | null>(null);
+  const [binaryBankCrackLevelId, setBinaryBankCrackLevelId] = useState<string | null>(null);
+  const [binaryBankCrackInitialSession, setBinaryBankCrackInitialSession] = useState<BinaryBankCrackSessionResponse | null>(null);
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
@@ -1245,6 +1250,41 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             }}
           />
         );
+      case 'binaryBankCrackLevels':
+        return (
+          <BinaryBankCrackLevelScreen
+            onClose={() => navigateToScreen('turf')}
+            onSelectLevel={(levelId, session) => {
+              setBinaryBankCrackLevelId(levelId);
+              setBinaryBankCrackInitialSession(session ?? null);
+              navigateToScreen('binaryBankCrackGame');
+            }}
+          />
+        );
+      case 'binaryBankCrackGame':
+        if (!binaryBankCrackLevelId) {
+          return (
+            <BinaryBankCrackLevelScreen
+              onClose={() => navigateToScreen('turf')}
+              onSelectLevel={(levelId, session) => {
+                setBinaryBankCrackLevelId(levelId);
+                setBinaryBankCrackInitialSession(session ?? null);
+                navigateToScreen('binaryBankCrackGame');
+              }}
+            />
+          );
+        }
+        return (
+          <BinaryBankCrackGameScreen
+            levelId={binaryBankCrackLevelId}
+            initialSession={binaryBankCrackInitialSession}
+            onClose={() => {
+              setBinaryBankCrackLevelId(null);
+              setBinaryBankCrackInitialSession(null);
+              navigateToScreen('binaryBankCrackLevels');
+            }}
+          />
+        );
       default:
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1367,6 +1407,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                     <ProgrammingFacilityLocation
                       onSelectPacketBreach={() => navigateToScreen('packetBreachLevels')}
                       onSelectRaceConditionHeist={() => navigateToScreen('raceConditionHeistLevels')}
+                      onSelectBinaryBankCrack={() => navigateToScreen('binaryBankCrackLevels')}
                     />
                     <DevelopmentZone buildingProperties={buildingProperties}>
                       {/* Property 2: Conditionally render based on Property 1's unlock status */}
@@ -1461,6 +1502,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                   <ProgrammingFacilityLocation
                     onSelectPacketBreach={() => navigateToScreen('packetBreachLevels')}
                     onSelectRaceConditionHeist={() => navigateToScreen('raceConditionHeistLevels')}
+                    onSelectBinaryBankCrack={() => navigateToScreen('binaryBankCrackLevels')}
                   />
                   <DevelopmentZone buildingProperties={buildingProperties}>
                     {/* Property 2: Conditionally render based on Property 1's unlock status */}

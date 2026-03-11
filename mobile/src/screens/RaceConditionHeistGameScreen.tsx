@@ -425,6 +425,10 @@ export function RaceConditionHeistGameScreen({
 
   /** Close during auto-complete: end run, claim level (so win is credited), then close. Prevents losing credit when user taps X while "Hijacked System!" is showing. */
   const handleCloseDuringAutoComplete = useCallback(async () => {
+    if (autoCompleteTimeoutIdRef.current != null) {
+      clearTimeout(autoCompleteTimeoutIdRef.current);
+      autoCompleteTimeoutIdRef.current = null;
+    }
     setClaimingInProgress(true);
     try {
       await endRun(levelId).unwrap();

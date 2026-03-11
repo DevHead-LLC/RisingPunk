@@ -146,7 +146,8 @@ export class BattalionService {
     userLevel: number,
     userBattalions?: Array<{ type: string; quantity: number }>,
     armyBonus?: ArmyBonus,
-    guardianBonus?: ArmyBonus
+    guardianBonus?: ArmyBonus,
+    phreakBonus?: { range: number }
   ): Promise<IBattalion[]> {
     if (!userBattalions || userBattalions.length === 0) {
       return [];
@@ -165,8 +166,8 @@ export class BattalionService {
       }
       const validatedBotType = this.validateBotType(battalion.type);
       
-      // Get stats from BotService (army bonus for breacher, guardian bonus for guardian)
-      const botConfig = await BotService.getUserBotStats(validatedBotType, userLevel, armyBonus, guardianBonus);
+      // Get stats from BotService (army bonus for breacher, guardian bonus for guardian, phreak bonus for phreak)
+      const botConfig = await BotService.getUserBotStats(validatedBotType, userLevel, armyBonus, guardianBonus, phreakBonus);
       
       // Random node selection from available user nodes
       // Multiple battalions can share the same node

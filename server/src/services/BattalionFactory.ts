@@ -58,7 +58,8 @@ export class BattalionFactory {
     defenderLevel: number,
     nodes: INode[],
     armyBonus?: { strength: number; defense: number; speed: number; health: number },
-    guardianBonus?: { strength: number; defense: number; speed: number; health: number }
+    guardianBonus?: { strength: number; defense: number; speed: number; health: number },
+    phreakBonus?: { range: number }
   ): Promise<IBattalion> {
     // Find all suitable spawn nodes (enemy-owned nodes)
     const enemyNodes = nodes.filter(node => node.owner === 'enemy');
@@ -70,8 +71,8 @@ export class BattalionFactory {
     const randomIndex = Math.floor(Math.random() * enemyNodes.length);
     const spawnNode = enemyNodes[randomIndex];
 
-    // Get actual bot stats from database (army bonus for breacher, guardian bonus for guardian)
-    const botConfig = await BotService.getUserBotStats(type, defenderLevel, armyBonus, guardianBonus);
+    // Get actual bot stats from database (army bonus for breacher, guardian bonus for guardian, phreak bonus for phreak)
+    const botConfig = await BotService.getUserBotStats(type, defenderLevel, armyBonus, guardianBonus, phreakBonus);
     
     if (!botConfig || !botConfig.stats) {
       throw new Error(`No bot stats found for type: ${type} at level ${defenderLevel}`);
