@@ -53,19 +53,23 @@ export function RaceConditionHeistGameScreen({
   const autoCompleteTriggeredRef = useRef(false);
   const autoCompleteTimeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const timerExpireTriggeredRef = useRef(false);
+  const fatalFailureTriggeredRef = useRef(false);
   const victoryAutoCloseTriggeredRef = useRef(false);
   const onCloseRef = useRef(onClose);
   /** Skew so client word timing matches server: serverNow ≈ Date.now() + timeSkewMsRef.current */
   const timeSkewMsRef = useRef(0);
-  /** Client viewpoint at touch-down (ms-precision) for server comparison; see taskItems/problemSolvingTempFile.md */
-  const clientViewpointAtTapRef = useRef<{
-    clientTimestampMs: number;
-    displayedWordIndex: number;
-    displayedWordLabel: string;
-    clientPhaseElapsedMs: number;
-    wordDurationMs: number;
-    wordCount: number;
-  } | null>(null);
+  /** Client viewpoint at touch-down per packet id (so rapid taps on different packets don't overwrite). */
+  const clientViewpointAtTapRef = useRef<Record<
+    string,
+    {
+      clientTimestampMs: number;
+      displayedWordIndex: number;
+      displayedWordLabel: string;
+      clientPhaseElapsedMs: number;
+      wordDurationMs: number;
+      wordCount: number;
+    }
+  >>({});
   onCloseRef.current = onClose;
 
   const [attemptHijack] = useAttemptRaceConditionHeistHijackMutation();
@@ -131,11 +135,12 @@ export function RaceConditionHeistGameScreen({
     };
   }, [session?.startedAt, phase, matchDurationMs]);
 
-  /** Reset auto-complete and timer-expire refs when level or run changes so each run can trigger (e.g. level 1.2 after 1.1). */
+  /** Reset auto-complete, timer-expire, and fatal refs when level or run changes so each run can trigger (e.g. level 1.2 after 1.1). */
   useEffect(() => {
     autoCompleteTriggeredRef.current = false;
     timerExpireTriggeredRef.current = false;
     victoryAutoCloseTriggeredRef.current = false;
+    fatalFailureTriggeredRef.current = false;
   }, [levelId, session?.startedAt]);
 
   /** Tier 5+ fatal: show message then kick back to level select after delay. */
@@ -194,6 +199,10 @@ export function RaceConditionHeistGameScreen({
     const t = setTimeout(async () => {
       autoCompleteTimeoutIdRef.current = null;
       if (timerExpireTriggeredRef.current) {
+        setAutoCompleting(false);
+        return;
+      }
+      if (fatalFailureTriggeredRef.current) {
         setAutoCompleting(false);
         return;
       }
@@ -294,6 +303,7 @@ export function RaceConditionHeistGameScreen({
       try {
         const result = await attemptHijack(body).unwrap();
         if (result.reason === 'fatal_secure_word') {
+          fatalFailureTriggeredRef.current = true;
           setSession(null);
           setFatalFailure(true);
           return;
@@ -1001,7 +1011,7 @@ export function RaceConditionHeistGameScreen({
                           ? (Math.floor(displayElapsedMsForPacket / wordDurationMs) + startOffset) % rotation.length
                           : 0;
                       const label = rotation[displayedWordIndexForPacket] ?? '—';
-                      clientViewpointAtTapRef.current = {
+                      clientViewpointAtTapRef.current[packet.id] = {
                         clientTimestampMs: now,
                         displayedWordIndex: displayedWordIndexForPacket,
                         displayedWordLabel: label,
@@ -1010,7 +1020,11 @@ export function RaceConditionHeistGameScreen({
                         wordCount: rotation.length,
                       };
                     }}
-                    onPress={() => handleHijack(packet.id, clientViewpointAtTapRef.current)}
+                    onPress={() => {
+                      const viewpoint = clientViewpointAtTapRef.current[packet.id] ?? null;
+                      delete clientViewpointAtTapRef.current[packet.id];
+                      handleHijack(packet.id, viewpoint);
+                    }}
                     disabled={onCooldown || !canTap}
                     accessible
                     accessibilityLabel={`${actionLabel} packet`}
@@ -1084,7 +1098,7 @@ export function RaceConditionHeistGameScreen({
                         ? (Math.floor(displayElapsedMsForPacket / wordDurationMs) + startOffset) % rotation.length
                         : 0;
                     const label = rotation[displayedWordIndexForPacket] ?? '—';
-                    clientViewpointAtTapRef.current = {
+                    clientViewpointAtTapRef.current[packet.id] = {
                       clientTimestampMs: now,
                       displayedWordIndex: displayedWordIndexForPacket,
                       displayedWordLabel: label,
@@ -1093,7 +1107,11 @@ export function RaceConditionHeistGameScreen({
                       wordCount: rotation.length,
                     };
                   }}
-                  onPress={() => handleHijack(packet.id, clientViewpointAtTapRef.current)}
+                  onPress={() => {
+                    const viewpoint = clientViewpointAtTapRef.current[packet.id] ?? null;
+                    delete clientViewpointAtTapRef.current[packet.id];
+                    handleHijack(packet.id, viewpoint);
+                  }}
                   disabled={onCooldown || !canTap}
                   accessible
                   accessibilityLabel={`${actionLabel} packet`}
