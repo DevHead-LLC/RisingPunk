@@ -52,15 +52,15 @@ OBJECTIVE
 Figure out the pattern and exploit the server before time runs out. You have one timer: the match clock. Later tiers have less time and faster word cycles.
 
 THE PATTERN
-Words rotate one at a time. The last word in each cycle is always a "secure" word (Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, etc.). Tap the action when the word BEFORE that secure word appears — that's your only window. If you tap on any other word (except the secure word on tiers 5+), you miss and your combo resets. Early tiers use 3-word cycles; tiers 4 and 5 use 4-word cycles; tier 6 uses 5-word cycles; tier 7 uses 6-word cycles; tiers 8 and 9 use 7-word cycles.
+Words rotate one at a time. The last word in each cycle is always a "secure" word (Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, etc.). Tap the action when the word BEFORE that secure word appears — that's your only window. If you tap on any other word (except the secure word on tiers 5+), you miss and your combo resets. Word cycles: tiers 1–3 = 3 words; tiers 4–5 = 4 words; tier 6 = 5 words; tier 7 = 6 words; tier 8 = 7 words; tier 9 = 8 words; tiers 10–21 = 10 words (max).
 
 ACTIONS
 • Watch the rotating word.
-• Tap the action for the current node (Exploit, Encrypt, Exfiltrate, Bypass, Extract, Offload on tier 7, or Offload/Purge on tiers 8–9) when you see the word that comes right before the secure word in the cycle.
+• Tap the action for the current node (Exploit, Encrypt, Exfiltrate, Bypass, Extract, Offload, Purge, and on higher tiers Wipe, Scrub, Flush) when you see the word that comes right before the secure word in the cycle.
 • Never tap when the secure word is showing (tiers 5 and above — see FATAL FAILURE below).
 
-MULTI-NODE TIERS (2, 3, 4, 5, 6, 7, 8, 9)
-• Tier 2: two nodes (Exploit, then Encrypt). Tier 3: three (Exploit → Encrypt → Exfiltrate). Tiers 4 and 5: four nodes (Exploit → Encrypt → Exfiltrate → Bypass). Tier 6: five nodes (Exploit → Encrypt → Exfiltrate → Bypass → Extract). Tier 7: six nodes (Exploit → Encrypt → Exfiltrate → Bypass → Extract → Offload). Tiers 8–9: seven nodes (Exploit → Encrypt → Exfiltrate → Bypass → Extract → Offload → Purge); the packet row scrolls so all six or seven are visible. Each phase gets a new word set; capture all nodes to pass. Tiers 5–9 have a faster word cycle and less time than tier 4. Tier 6 uses 5-word cycles; tier 7 uses 6-word cycles; tiers 8–9 use 7-word cycles and a slightly longer cooldown if you tap a wrong word (not the success word and not the secure word).
+MULTI-NODE TIERS (2–21)
+• Tier 2: two nodes. Tier 3: three. Tiers 4–5: four nodes. Tier 6: five. Tier 7: six. Tier 8: seven (… Offload → Purge). Tier 9–11: eight nodes (… Purge → Wipe). Tier 12–15: nine nodes (… Wipe → Scrub). Tier 16–21: ten nodes (… Scrub → Flush). The packet row scrolls when there are 6 or more nodes. Each phase gets a new word set; capture all nodes to pass. Tiers 5+ have faster word cycles and less time; tiers 9+ use 8- or 10-word cycles and longer wrong-word cooldowns.
 
 FATAL FAILURE (tiers 5 and above)
 • If you tap when the secure word is displayed, you are traced immediately: "You've been traced! FATAL FAILURE." The run ends and you are returned to level select. No second chances — start a new run to try again.

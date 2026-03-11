@@ -36,14 +36,26 @@ export interface IRaceConditionHeistSession extends Document {
   wordRotationPhase5?: string[];
   wordStartOffsetPhase5?: number;
   phase5StartedAt?: Date;
-  /** Tier 7–8: sixth word cycle for the sixth node (Offload). Starts when fifth node is captured. */
+  /** Tier 7–9: sixth word cycle for the sixth node (Offload). Starts when fifth node is captured. */
   wordRotationPhase6?: string[];
   wordStartOffsetPhase6?: number;
   phase6StartedAt?: Date;
-  /** Tier 9: seventh word cycle for the seventh node (Purge). Starts when sixth node is captured. */
+  /** Tier 8–9: seventh word cycle for the seventh node (Purge). Starts when sixth node is captured. */
   wordRotationPhase7?: string[];
   wordStartOffsetPhase7?: number;
   phase7StartedAt?: Date;
+  /** Tier 9: eighth word cycle for the eighth node (Wipe). Starts when seventh node is captured. */
+  wordRotationPhase8?: string[];
+  wordStartOffsetPhase8?: number;
+  phase8StartedAt?: Date;
+  /** Tiers 12+: ninth word cycle for the ninth node (Scrub). Starts when eighth node is captured. */
+  wordRotationPhase9?: string[];
+  wordStartOffsetPhase9?: number;
+  phase9StartedAt?: Date;
+  /** Tiers 16+: tenth word cycle for the tenth node (Flush). Starts when ninth node is captured. */
+  wordRotationPhase10?: string[];
+  wordStartOffsetPhase10?: number;
+  phase10StartedAt?: Date;
   phase: 'RUNNING' | 'LOCKDOWN' | 'RESULTS';
   packets: IRCHPacket[];
   score: number;
@@ -89,6 +101,15 @@ const raceConditionHeistSessionSchema = new Schema(
     wordRotationPhase7: { type: [String], required: false },
     wordStartOffsetPhase7: { type: Number, required: false },
     phase7StartedAt: { type: Date, required: false },
+    wordRotationPhase8: { type: [String], required: false },
+    wordStartOffsetPhase8: { type: Number, required: false },
+    phase8StartedAt: { type: Date, required: false },
+    wordRotationPhase9: { type: [String], required: false },
+    wordStartOffsetPhase9: { type: Number, required: false },
+    phase9StartedAt: { type: Date, required: false },
+    wordRotationPhase10: { type: [String], required: false },
+    wordStartOffsetPhase10: { type: Number, required: false },
+    phase10StartedAt: { type: Date, required: false },
     phase: { type: String, enum: ['RUNNING', 'LOCKDOWN', 'RESULTS'], default: 'RUNNING' },
     packets: { type: [rchPacketSchema], default: [] },
     score: { type: Number, default: 0 },

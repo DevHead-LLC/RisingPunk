@@ -89,14 +89,26 @@ export interface RaceConditionHeistSessionResponse {
   wordRotationPhase5?: string[];
   wordStartOffsetPhase5?: number;
   phase5StartedAt?: string;
-  /** Tier 7–8: sixth word cycle and start time for sixth node (Offload). */
+  /** Tier 7–9: sixth word cycle and start time for sixth node (Offload). */
   wordRotationPhase6?: string[];
   wordStartOffsetPhase6?: number;
   phase6StartedAt?: string;
-  /** Tier 9: seventh word cycle and start time for seventh node (Purge). */
+  /** Tier 8–9: seventh word cycle and start time for seventh node (Purge). */
   wordRotationPhase7?: string[];
   wordStartOffsetPhase7?: number;
   phase7StartedAt?: string;
+  /** Tier 9+: eighth word cycle and start time for eighth node (Wipe). */
+  wordRotationPhase8?: string[];
+  wordStartOffsetPhase8?: number;
+  phase8StartedAt?: string;
+  /** Tier 12+: ninth word cycle and start time for ninth node (Scrub). */
+  wordRotationPhase9?: string[];
+  wordStartOffsetPhase9?: number;
+  phase9StartedAt?: string;
+  /** Tier 16+: tenth word cycle and start time for tenth node (Flush). */
+  wordRotationPhase10?: string[];
+  wordStartOffsetPhase10?: number;
+  phase10StartedAt?: string;
   phase: 'RUNNING' | 'LOCKDOWN' | 'RESULTS';
   packets: RCHPacket[];
   score: number;
@@ -123,6 +135,8 @@ export interface RaceConditionHeistAttemptHijackRequest {
   levelId: string;
   packetId: string;
   displayedWordIndex?: number;
+  /** Word the user saw when they tapped; server resolves to index in packet rotation (value-based validation). */
+  displayedWordLabel?: string;
   clientViewpoint?: RaceConditionHeistClientViewpoint;
 }
 
@@ -150,14 +164,26 @@ export interface RaceConditionHeistAttemptResponse {
   phase5StartedAt?: string;
   wordRotationPhase5?: string[];
   wordStartOffsetPhase5?: number;
-  /** Set when fifth node is captured (tiers 7–8); client uses this to start phase-6 word display. */
+  /** Set when fifth node is captured (tiers 7–9); client uses this to start phase-6 word display. */
   phase6StartedAt?: string;
   wordRotationPhase6?: string[];
   wordStartOffsetPhase6?: number;
-  /** Set when sixth node is captured (tier 9); client uses this to start phase-7 word display. */
+  /** Set when sixth node is captured (tiers 8–9); client uses this to start phase-7 word display. */
   phase7StartedAt?: string;
   wordRotationPhase7?: string[];
   wordStartOffsetPhase7?: number;
+  /** Set when seventh node is captured (tier 9+); client uses this to start phase-8 word display. */
+  phase8StartedAt?: string;
+  wordRotationPhase8?: string[];
+  wordStartOffsetPhase8?: number;
+  /** Set when eighth node is captured (tier 12+); client uses this to start phase-9 word display. */
+  phase9StartedAt?: string;
+  wordRotationPhase9?: string[];
+  wordStartOffsetPhase9?: number;
+  /** Set when ninth node is captured (tier 16+); client uses this to start phase-10 word display. */
+  phase10StartedAt?: string;
+  wordRotationPhase10?: string[];
+  wordStartOffsetPhase10?: number;
   /** Server time when response was built; client uses this to keep word timing in sync. */
   serverTime?: string;
 }
@@ -211,13 +237,14 @@ export const raceConditionHeistApi = createApi({
       RaceConditionHeistAttemptResponse,
       RaceConditionHeistAttemptHijackRequest
     >({
-      query: ({ levelId, packetId, displayedWordIndex, clientViewpoint }) => ({
+      query: ({ levelId, packetId, displayedWordIndex, displayedWordLabel, clientViewpoint }) => ({
         url: '/api/race-condition-heist/attempt-hijack',
         method: 'POST',
         body: {
           levelId,
           packetId,
           ...(typeof displayedWordIndex === 'number' && { displayedWordIndex }),
+          ...(typeof displayedWordLabel === 'string' && displayedWordLabel !== '' && { displayedWordLabel }),
           ...(clientViewpoint && { clientViewpoint }),
         },
       }),

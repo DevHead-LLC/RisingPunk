@@ -10,6 +10,8 @@ import {
   getComboMultiplier,
   computeRaceConditionHeistGuardianBonus,
   getRandomWordGroupForTier,
+  getWrongWordCooldownMsTier10Plus,
+  RCH_WRONG_WORD_COOLDOWN_MS_TIER_5,
   RCH_WRONG_WORD_COOLDOWN_MS_TIER_6,
   RCH_WRONG_WORD_COOLDOWN_MS_TIER_7,
   RCH_WRONG_WORD_COOLDOWN_MS_TIER_8,
@@ -129,7 +131,21 @@ function generateTier7Packets(): { id: string; type: PacketTypeKey; value: numbe
   ];
 }
 
-/** Tier 9: seven USER_DATA nodes — Exploit, Encrypt, Exfiltrate, Bypass, Extract, Offload, Purge. */
+/** Tier 8: seven USER_DATA nodes — Exploit, Encrypt, Exfiltrate, Bypass, Extract, Offload, Purge. */
+function generateTier8Packets(): { id: string; type: PacketTypeKey; value: number }[] {
+  const value = PACKET_TYPES.USER_DATA;
+  return [
+    { id: 'p1', type: 'USER_DATA', value },
+    { id: 'p2', type: 'USER_DATA', value },
+    { id: 'p3', type: 'USER_DATA', value },
+    { id: 'p4', type: 'USER_DATA', value },
+    { id: 'p5', type: 'USER_DATA', value },
+    { id: 'p6', type: 'USER_DATA', value },
+    { id: 'p7', type: 'USER_DATA', value },
+  ];
+}
+
+/** Tier 9–11: eight USER_DATA nodes — Exploit, Encrypt, Exfiltrate, Bypass, Extract, Offload, Purge, Wipe. */
 function generateTier9Packets(): { id: string; type: PacketTypeKey; value: number }[] {
   const value = PACKET_TYPES.USER_DATA;
   return [
@@ -140,6 +156,40 @@ function generateTier9Packets(): { id: string; type: PacketTypeKey; value: numbe
     { id: 'p5', type: 'USER_DATA', value },
     { id: 'p6', type: 'USER_DATA', value },
     { id: 'p7', type: 'USER_DATA', value },
+    { id: 'p8', type: 'USER_DATA', value },
+  ];
+}
+
+/** Tier 12–15: nine USER_DATA nodes — … Purge, Wipe, Scrub. */
+function generateTier12Packets(): { id: string; type: PacketTypeKey; value: number }[] {
+  const value = PACKET_TYPES.USER_DATA;
+  return [
+    { id: 'p1', type: 'USER_DATA', value },
+    { id: 'p2', type: 'USER_DATA', value },
+    { id: 'p3', type: 'USER_DATA', value },
+    { id: 'p4', type: 'USER_DATA', value },
+    { id: 'p5', type: 'USER_DATA', value },
+    { id: 'p6', type: 'USER_DATA', value },
+    { id: 'p7', type: 'USER_DATA', value },
+    { id: 'p8', type: 'USER_DATA', value },
+    { id: 'p9', type: 'USER_DATA', value },
+  ];
+}
+
+/** Tier 16–21: ten USER_DATA nodes — … Wipe, Scrub, Flush. */
+function generateTier16Packets(): { id: string; type: PacketTypeKey; value: number }[] {
+  const value = PACKET_TYPES.USER_DATA;
+  return [
+    { id: 'p1', type: 'USER_DATA', value },
+    { id: 'p2', type: 'USER_DATA', value },
+    { id: 'p3', type: 'USER_DATA', value },
+    { id: 'p4', type: 'USER_DATA', value },
+    { id: 'p5', type: 'USER_DATA', value },
+    { id: 'p6', type: 'USER_DATA', value },
+    { id: 'p7', type: 'USER_DATA', value },
+    { id: 'p8', type: 'USER_DATA', value },
+    { id: 'p9', type: 'USER_DATA', value },
+    { id: 'p10', type: 'USER_DATA', value },
   ];
 }
 
@@ -238,21 +288,30 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       const isTier7 = params.tier === 7;
       const isTier8 = params.tier === 8;
       const isTier9 = params.tier === 9;
-      const packets = isTier9 || isTier8
-        ? generateTier9Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-        : isTier7
-          ? generateTier7Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-          : isTier6
-          ? generateTier6Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-          : isTier4 || isTier5
-          ? generateTier4Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-          : isTier3
-          ? generateTier3Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-          : isTier2
-            ? generateTier2Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
-            : [{ ...generatePass1Packet(), isHijacked: false }];
+      const tier10to11 = params.tier === 10 || params.tier === 11;
+      const tier12to15 = params.tier >= 12 && params.tier <= 15;
+      const tier16to21 = params.tier >= 16 && params.tier <= 21;
+      const packets = tier16to21
+        ? generateTier16Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+        : tier12to15
+          ? generateTier12Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+          : isTier9 || tier10to11
+            ? generateTier9Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+            : isTier8
+              ? generateTier8Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+              : isTier7
+                ? generateTier7Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+                : isTier6
+                  ? generateTier6Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+                  : isTier4 || isTier5
+                    ? generateTier4Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+                    : isTier3
+                      ? generateTier3Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+                      : isTier2
+                        ? generateTier2Packets().map((p) => ({ id: p.id, type: p.type, value: p.value, isHijacked: false }))
+                        : [{ ...generatePass1Packet(), isHijacked: false }];
       const wordRotation =
-        params.tier <= 9 ? getRandomWordGroupForTier(params.tier) : params.wordRotation;
+        params.tier <= 21 ? getRandomWordGroupForTier(params.tier) : params.wordRotation;
       const wordStartOffset =
         wordRotation.length > 0 ? Math.floor(Math.random() * wordRotation.length) : 0;
       /** Phase 2/3/4 word sets are chosen when that node becomes active (on hijack success), not at session start. */
@@ -312,6 +371,21 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
                 wordRotationPhase7: existing.wordRotationPhase7,
                 wordStartOffsetPhase7: existing.wordStartOffsetPhase7 ?? 0,
                 phase7StartedAt: existing.phase7StartedAt,
+              }),
+              ...(existing.wordRotationPhase8 && {
+                wordRotationPhase8: existing.wordRotationPhase8,
+                wordStartOffsetPhase8: existing.wordStartOffsetPhase8 ?? 0,
+                phase8StartedAt: existing.phase8StartedAt,
+              }),
+              ...(existing.wordRotationPhase9 && {
+                wordRotationPhase9: existing.wordRotationPhase9,
+                wordStartOffsetPhase9: existing.wordStartOffsetPhase9 ?? 0,
+                phase9StartedAt: existing.phase9StartedAt,
+              }),
+              ...(existing.wordRotationPhase10 && {
+                wordRotationPhase10: existing.wordRotationPhase10,
+                wordStartOffsetPhase10: existing.wordStartOffsetPhase10 ?? 0,
+                phase10StartedAt: existing.phase10StartedAt,
               }),
               phase: existing.phase,
               packets: existing.packets,
@@ -394,6 +468,21 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         wordStartOffsetPhase7: sessionDoc.wordStartOffsetPhase7 ?? 0,
         phase7StartedAt: sessionDoc.phase7StartedAt,
       }),
+      ...(sessionDoc.wordRotationPhase8 && {
+        wordRotationPhase8: sessionDoc.wordRotationPhase8,
+        wordStartOffsetPhase8: sessionDoc.wordStartOffsetPhase8 ?? 0,
+        phase8StartedAt: sessionDoc.phase8StartedAt,
+      }),
+      ...(sessionDoc.wordRotationPhase9 && {
+        wordRotationPhase9: sessionDoc.wordRotationPhase9,
+        wordStartOffsetPhase9: sessionDoc.wordStartOffsetPhase9 ?? 0,
+        phase9StartedAt: sessionDoc.phase9StartedAt,
+      }),
+      ...(sessionDoc.wordRotationPhase10 && {
+        wordRotationPhase10: sessionDoc.wordRotationPhase10,
+        wordStartOffsetPhase10: sessionDoc.wordStartOffsetPhase10 ?? 0,
+        phase10StartedAt: sessionDoc.phase10StartedAt,
+      }),
       phase: sessionDoc.phase,
       packets: sessionDoc.packets,
       score: sessionDoc.score,
@@ -421,10 +510,11 @@ function isWithinOneWord(serverIndex: number, clientIndex: number, length: numbe
 router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!._id.toString();
-    const { levelId, packetId, displayedWordIndex, clientViewpoint } = req.body as {
+    const { levelId, packetId, displayedWordIndex, displayedWordLabel, clientViewpoint } = req.body as {
       levelId?: string;
       packetId?: string;
       displayedWordIndex?: number;
+      displayedWordLabel?: string;
       clientViewpoint?: {
         clientTimestampMs: number;
         displayedWordIndex: number;
@@ -598,6 +688,84 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
         return;
       }
     }
+    /** Tier 9+: eighth node (Wipe) can only be attempted after first seven are captured. */
+    if (packetIndex === 7) {
+      if (
+        !sessionDoc.packets[0]?.isHijacked ||
+        !sessionDoc.packets[1]?.isHijacked ||
+        !sessionDoc.packets[2]?.isHijacked ||
+        !sessionDoc.packets[3]?.isHijacked ||
+        !sessionDoc.packets[4]?.isHijacked ||
+        !sessionDoc.packets[5]?.isHijacked ||
+        !sessionDoc.packets[6]?.isHijacked
+      ) {
+        res.status(400).json({
+          error: 'Capture the first seven nodes before wiping the eighth',
+          reason: 'complete_previous_nodes',
+          packets: sessionDoc.packets,
+          score: sessionDoc.score,
+          comboCount: sessionDoc.comboCount,
+        });
+        return;
+      }
+      if (!sessionDoc.phase8StartedAt || !sessionDoc.wordRotationPhase8?.length) {
+        res.status(400).json({ error: 'Phase 8 not started' });
+        return;
+      }
+    }
+    /** Tier 12+: ninth node (Scrub) can only be attempted after first eight are captured. */
+    if (packetIndex === 8) {
+      if (
+        !sessionDoc.packets[0]?.isHijacked ||
+        !sessionDoc.packets[1]?.isHijacked ||
+        !sessionDoc.packets[2]?.isHijacked ||
+        !sessionDoc.packets[3]?.isHijacked ||
+        !sessionDoc.packets[4]?.isHijacked ||
+        !sessionDoc.packets[5]?.isHijacked ||
+        !sessionDoc.packets[6]?.isHijacked ||
+        !sessionDoc.packets[7]?.isHijacked
+      ) {
+        res.status(400).json({
+          error: 'Capture the first eight nodes before scrubbing the ninth',
+          reason: 'complete_previous_nodes',
+          packets: sessionDoc.packets,
+          score: sessionDoc.score,
+          comboCount: sessionDoc.comboCount,
+        });
+        return;
+      }
+      if (!sessionDoc.phase9StartedAt || !sessionDoc.wordRotationPhase9?.length) {
+        res.status(400).json({ error: 'Phase 9 not started' });
+        return;
+      }
+    }
+    /** Tier 16+: tenth node (Flush) can only be attempted after first nine are captured. */
+    if (packetIndex === 9) {
+      if (
+        !sessionDoc.packets[0]?.isHijacked ||
+        !sessionDoc.packets[1]?.isHijacked ||
+        !sessionDoc.packets[2]?.isHijacked ||
+        !sessionDoc.packets[3]?.isHijacked ||
+        !sessionDoc.packets[4]?.isHijacked ||
+        !sessionDoc.packets[5]?.isHijacked ||
+        !sessionDoc.packets[6]?.isHijacked ||
+        !sessionDoc.packets[7]?.isHijacked ||
+        !sessionDoc.packets[8]?.isHijacked
+      ) {
+        res.status(400).json({
+          error: 'Capture the first nine nodes before flushing the tenth',
+          reason: 'complete_previous_nodes',
+          packets: sessionDoc.packets,
+          score: sessionDoc.score,
+          comboCount: sessionDoc.comboCount,
+        });
+        return;
+      }
+      if (!sessionDoc.phase10StartedAt || !sessionDoc.wordRotationPhase10?.length) {
+        res.status(400).json({ error: 'Phase 10 not started' });
+        return;
+      }
+    }
     const cooldownMs = EXPLOIT_TYPES.BUFFER_OVERFLOW.cooldownMs;
     const multiplier = EXPLOIT_TYPES.BUFFER_OVERFLOW.multiplier;
     if (sessionDoc.exploitCooldownUntil && new Date(sessionDoc.exploitCooldownUntil).getTime() > now.getTime()) {
@@ -617,7 +785,43 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
     let inWindow: boolean;
     /** Server phase elapsed at request time; used to compare with clientViewpoint.clientPhaseElapsedMs. */
     let serverPhaseElapsedMs: number;
-    if (packetIndex === 6 && sessionDoc.phase7StartedAt && sessionDoc.wordRotationPhase7?.length) {
+    if (packetIndex === 9 && sessionDoc.phase10StartedAt && sessionDoc.wordRotationPhase10?.length) {
+      serverPhaseElapsedMs = now.getTime() - new Date(sessionDoc.phase10StartedAt).getTime();
+      wordRotation = sessionDoc.wordRotationPhase10;
+      const wordStartOffsetPhase10 = sessionDoc.wordStartOffsetPhase10 ?? 0;
+      currentIndex = getCurrentWordIndex(
+        serverPhaseElapsedMs,
+        wordDurationMs,
+        wordRotation.length,
+        wordStartOffsetPhase10
+      );
+      const preSecureIndex = getPreSecureIndex(wordRotation);
+      inWindow = wordRotation.length >= 2 && currentIndex === preSecureIndex;
+    } else if (packetIndex === 8 && sessionDoc.phase9StartedAt && sessionDoc.wordRotationPhase9?.length) {
+      serverPhaseElapsedMs = now.getTime() - new Date(sessionDoc.phase9StartedAt).getTime();
+      wordRotation = sessionDoc.wordRotationPhase9;
+      const wordStartOffsetPhase9 = sessionDoc.wordStartOffsetPhase9 ?? 0;
+      currentIndex = getCurrentWordIndex(
+        serverPhaseElapsedMs,
+        wordDurationMs,
+        wordRotation.length,
+        wordStartOffsetPhase9
+      );
+      const preSecureIndex = getPreSecureIndex(wordRotation);
+      inWindow = wordRotation.length >= 2 && currentIndex === preSecureIndex;
+    } else if (packetIndex === 7 && sessionDoc.phase8StartedAt && sessionDoc.wordRotationPhase8?.length) {
+      serverPhaseElapsedMs = now.getTime() - new Date(sessionDoc.phase8StartedAt).getTime();
+      wordRotation = sessionDoc.wordRotationPhase8;
+      const wordStartOffsetPhase8 = sessionDoc.wordStartOffsetPhase8 ?? 0;
+      currentIndex = getCurrentWordIndex(
+        serverPhaseElapsedMs,
+        wordDurationMs,
+        wordRotation.length,
+        wordStartOffsetPhase8
+      );
+      const preSecureIndex = getPreSecureIndex(wordRotation);
+      inWindow = wordRotation.length >= 2 && currentIndex === preSecureIndex;
+    } else if (packetIndex === 6 && sessionDoc.phase7StartedAt && sessionDoc.wordRotationPhase7?.length) {
       serverPhaseElapsedMs = now.getTime() - new Date(sessionDoc.phase7StartedAt).getTime();
       wordRotation = sessionDoc.wordRotationPhase7;
       const wordStartOffsetPhase7 = sessionDoc.wordStartOffsetPhase7 ?? 0;
@@ -704,16 +908,26 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
     }
     const preSecureIndexFinal = getPreSecureIndex(wordRotation);
     const secureWordIndex = wordRotation.length - 1;
-    /** Tier 5+: fatal only when the word the user saw when they clicked is the secure word. Use client-reported index (displayedWordIndex or clientViewpoint.displayedWordIndex). */
+    /** Resolve what the user saw: prefer value (label) so we compare array[8]=correct, array[9]=fatal, array[0–7]=wrong. */
+    const labelFromClient =
+      typeof displayedWordLabel === 'string' && displayedWordLabel.trim() !== ''
+        ? displayedWordLabel.trim()
+        : clientViewpoint?.displayedWordLabel?.trim();
+    const indexFromLabel =
+      labelFromClient != null && labelFromClient !== ''
+        ? wordRotation.indexOf(labelFromClient)
+        : -1;
     const clientReportedIndex =
-      typeof displayedWordIndex === 'number'
-        ? displayedWordIndex
-        : clientViewpoint && typeof clientViewpoint.displayedWordIndex === 'number'
-          ? clientViewpoint.displayedWordIndex
-          : undefined;
-    /** Tiers 6–9: validate success purely from client-reported word at click. No server timer; no leniency. */
-    const tier6or7or8or9 = params.tier === 6 || params.tier === 7 || params.tier === 8 || params.tier === 9;
-    if (tier6or7or8or9) {
+      indexFromLabel >= 0
+        ? indexFromLabel
+        : typeof displayedWordIndex === 'number'
+          ? displayedWordIndex
+          : clientViewpoint && typeof clientViewpoint.displayedWordIndex === 'number'
+            ? clientViewpoint.displayedWordIndex
+            : undefined;
+    /** Tiers 6+: validate success purely from client-reported word at click. No server timer; no leniency. */
+    const tierUsesClientOnlySuccess = params.tier >= 6;
+    if (tierUsesClientOnlySuccess) {
       inWindow = typeof clientReportedIndex === 'number' && clientReportedIndex === preSecureIndexFinal;
       console.log('[RCH-attempt] tier=%d packetIndex=%d clientReportedIndex=%s successIndex=%d secureIndex=%d inWindow=%s wordRotation.length=%d', params.tier, packetIndex, clientReportedIndex === undefined ? 'undefined' : String(clientReportedIndex), preSecureIndexFinal, secureWordIndex, String(inWindow), wordRotation.length);
     } else {
@@ -727,6 +941,25 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
         packets: sessionDoc.packets,
         score: sessionDoc.score,
         comboCount: 0,
+      });
+      return;
+    }
+    /** Tier 5: 4-word cycles. Tap on array[0] or [1] = wrong word — longer cooldown (no fatal). */
+    if (
+      params.tier === 5 &&
+      typeof clientReportedIndex === 'number' &&
+      (clientReportedIndex === 0 || clientReportedIndex === 1)
+    ) {
+      sessionDoc.comboCount = 0;
+      sessionDoc.exploitCooldownUntil = new Date(now.getTime() + RCH_WRONG_WORD_COOLDOWN_MS_TIER_5);
+      await sessionDoc.save();
+      res.json({
+        success: false,
+        reason: 'wrong_word',
+        packets: sessionDoc.packets,
+        score: sessionDoc.score,
+        comboCount: 0,
+        exploitCooldownUntil: sessionDoc.exploitCooldownUntil.toISOString(),
       });
       return;
     }
@@ -768,15 +1001,14 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       });
       return;
     }
-    /** Tiers 8–9: tap on array[0], [1], [2], [3], or [4] = wrong word (7-word sets). */
+    /** Tier 8: tap on array[0]–[4] = wrong word (7-word sets). */
     if (
-      (params.tier === 8 || params.tier === 9) &&
+      params.tier === 8 &&
       typeof clientReportedIndex === 'number' &&
       (clientReportedIndex === 0 || clientReportedIndex === 1 || clientReportedIndex === 2 || clientReportedIndex === 3 || clientReportedIndex === 4)
     ) {
       sessionDoc.comboCount = 0;
-      const wrongWordCooldownMs = params.tier === 8 ? RCH_WRONG_WORD_COOLDOWN_MS_TIER_8 : RCH_WRONG_WORD_COOLDOWN_MS_TIER_9;
-      sessionDoc.exploitCooldownUntil = new Date(now.getTime() + wrongWordCooldownMs);
+      sessionDoc.exploitCooldownUntil = new Date(now.getTime() + RCH_WRONG_WORD_COOLDOWN_MS_TIER_8);
       await sessionDoc.save();
       res.json({
         success: false,
@@ -788,14 +1020,54 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       });
       return;
     }
-    /** Require client to agree with exploit word when we have client data — prevents "random word" success when server clock says exploit but user tapped something else. (Tiers 6–9 use client-only validation above; this only affects other tiers.) */
-    if (!tier6or7or8or9 && inWindow && typeof clientReportedIndex === 'number' && clientReportedIndex !== preSecureIndexFinal) {
+    /** Tier 9: tap on array[0]–[5] = wrong word (8-word sets). */
+    if (
+      params.tier === 9 &&
+      typeof clientReportedIndex === 'number' &&
+      (clientReportedIndex === 0 || clientReportedIndex === 1 || clientReportedIndex === 2 || clientReportedIndex === 3 || clientReportedIndex === 4 || clientReportedIndex === 5)
+    ) {
+      sessionDoc.comboCount = 0;
+      sessionDoc.exploitCooldownUntil = new Date(now.getTime() + RCH_WRONG_WORD_COOLDOWN_MS_TIER_9);
+      await sessionDoc.save();
+      res.json({
+        success: false,
+        reason: 'wrong_word',
+        packets: sessionDoc.packets,
+        score: sessionDoc.score,
+        comboCount: 0,
+        exploitCooldownUntil: sessionDoc.exploitCooldownUntil.toISOString(),
+      });
+      return;
+    }
+    /** Tiers 10–21: tap on array[0]–[7] = wrong word (10-word sets). */
+    if (
+      params.tier >= 10 &&
+      params.tier <= 21 &&
+      typeof clientReportedIndex === 'number' &&
+      (clientReportedIndex === 0 || clientReportedIndex === 1 || clientReportedIndex === 2 || clientReportedIndex === 3 ||
+       clientReportedIndex === 4 || clientReportedIndex === 5 || clientReportedIndex === 6 || clientReportedIndex === 7)
+    ) {
+      sessionDoc.comboCount = 0;
+      sessionDoc.exploitCooldownUntil = new Date(now.getTime() + getWrongWordCooldownMsTier10Plus(params.tier));
+      await sessionDoc.save();
+      res.json({
+        success: false,
+        reason: 'wrong_word',
+        packets: sessionDoc.packets,
+        score: sessionDoc.score,
+        comboCount: 0,
+        exploitCooldownUntil: sessionDoc.exploitCooldownUntil.toISOString(),
+      });
+      return;
+    }
+    /** Require client to agree with exploit word when we have client data. (Tiers 6+ use client-only validation above.) */
+    if (!tierUsesClientOnlySuccess && inWindow && typeof clientReportedIndex === 'number' && clientReportedIndex !== preSecureIndexFinal) {
       inWindow = false;
     }
     const serverNotOnSecure = currentIndex !== secureWordIndex;
-    /** Leniency for non–tier-6/7/8/9: client said they saw the exploit word and server index is adjacent (index skew). Tiers 6–9 do not use timer or leniency — success is purely client-reported word at click. */
+    /** Leniency for tiers 1–5: client said they saw the exploit word and server index is adjacent. Tiers 6+ use client-only success. */
     let leniencyUsed: string | null = null;
-    if (!tier6or7or8or9 && !inWindow && typeof displayedWordIndex === 'number') {
+    if (!tierUsesClientOnlySuccess && !inWindow && typeof displayedWordIndex === 'number') {
       const clientSawExploitWord = displayedWordIndex === preSecureIndexFinal;
       const adjacent = isWithinOneWord(currentIndex, displayedWordIndex, wordRotation.length);
       if (clientSawExploitWord && serverNotOnSecure && adjacent) {
@@ -804,7 +1076,7 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       }
     }
     if (
-      !tier6or7or8or9 &&
+      !tierUsesClientOnlySuccess &&
       !inWindow &&
       clientViewpoint &&
       typeof clientViewpoint.displayedWordIndex === 'number' &&
@@ -836,47 +1108,68 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
     sessionDoc.exploitCooldownUntil = new Date(now.getTime() + cooldownMs);
     const tier = params.tier;
     /** Each User Data node gets a fresh random word set and random start when that phase begins. */
-    if (packetIndex === 0 && (tier === 2 || tier === 3 || tier === 4 || tier === 5 || tier === 6 || tier === 7 || tier === 8 || tier === 9)) {
+    if (packetIndex === 0 && tier >= 2) {
       sessionDoc.phase2StartedAt = now;
       const rot2 = getRandomWordGroupForTier(tier);
       sessionDoc.wordRotationPhase2 = rot2;
       sessionDoc.wordStartOffsetPhase2 =
         rot2.length > 0 ? Math.floor(Math.random() * rot2.length) : 0;
     }
-    if (packetIndex === 1 && (tier === 3 || tier === 4 || tier === 5 || tier === 6 || tier === 7 || tier === 8 || tier === 9)) {
+    if (packetIndex === 1 && tier >= 3) {
       sessionDoc.phase3StartedAt = now;
       const rot3 = getRandomWordGroupForTier(tier);
       sessionDoc.wordRotationPhase3 = rot3;
       sessionDoc.wordStartOffsetPhase3 =
         rot3.length > 0 ? Math.floor(Math.random() * rot3.length) : 0;
     }
-    if (packetIndex === 2 && (tier === 4 || tier === 5 || tier === 6 || tier === 7 || tier === 8 || tier === 9)) {
+    if (packetIndex === 2 && tier >= 4) {
       sessionDoc.phase4StartedAt = now;
       const rot4 = getRandomWordGroupForTier(tier);
       sessionDoc.wordRotationPhase4 = rot4;
       sessionDoc.wordStartOffsetPhase4 =
         rot4.length > 0 ? Math.floor(Math.random() * rot4.length) : 0;
     }
-    if (packetIndex === 3 && (tier === 6 || tier === 7 || tier === 8 || tier === 9)) {
+    if (packetIndex === 3 && tier >= 6) {
       sessionDoc.phase5StartedAt = now;
       const rot5 = getRandomWordGroupForTier(tier);
       sessionDoc.wordRotationPhase5 = rot5;
       sessionDoc.wordStartOffsetPhase5 =
         rot5.length > 0 ? Math.floor(Math.random() * rot5.length) : 0;
     }
-    if (packetIndex === 4 && (tier === 7 || tier === 8 || tier === 9)) {
+    if (packetIndex === 4 && tier >= 7) {
       sessionDoc.phase6StartedAt = now;
       const rot6 = getRandomWordGroupForTier(tier);
       sessionDoc.wordRotationPhase6 = rot6;
       sessionDoc.wordStartOffsetPhase6 =
         rot6.length > 0 ? Math.floor(Math.random() * rot6.length) : 0;
     }
-    if (packetIndex === 5 && (tier === 8 || tier === 9)) {
+    if (packetIndex === 5 && tier >= 8) {
       sessionDoc.phase7StartedAt = now;
       const rot7 = getRandomWordGroupForTier(tier);
       sessionDoc.wordRotationPhase7 = rot7;
       sessionDoc.wordStartOffsetPhase7 =
         rot7.length > 0 ? Math.floor(Math.random() * rot7.length) : 0;
+    }
+    if (packetIndex === 6 && tier >= 9) {
+      sessionDoc.phase8StartedAt = now;
+      const rot8 = getRandomWordGroupForTier(tier);
+      sessionDoc.wordRotationPhase8 = rot8;
+      sessionDoc.wordStartOffsetPhase8 =
+        rot8.length > 0 ? Math.floor(Math.random() * rot8.length) : 0;
+    }
+    if (packetIndex === 7 && tier >= 12) {
+      sessionDoc.phase9StartedAt = now;
+      const rot9 = getRandomWordGroupForTier(tier);
+      sessionDoc.wordRotationPhase9 = rot9;
+      sessionDoc.wordStartOffsetPhase9 =
+        rot9.length > 0 ? Math.floor(Math.random() * rot9.length) : 0;
+    }
+    if (packetIndex === 8 && tier >= 16) {
+      sessionDoc.phase10StartedAt = now;
+      const rot10 = getRandomWordGroupForTier(tier);
+      sessionDoc.wordRotationPhase10 = rot10;
+      sessionDoc.wordStartOffsetPhase10 =
+        rot10.length > 0 ? Math.floor(Math.random() * rot10.length) : 0;
     }
     const pIdx = sessionDoc.packets.findIndex((p) => p.id === packetId);
     if (pIdx !== -1) sessionDoc.packets[pIdx].isHijacked = true;
@@ -930,6 +1223,30 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
             wordStartOffsetPhase7: sessionDoc.wordStartOffsetPhase7 ?? 0,
           }
         : undefined;
+    const phase8 =
+      sessionDoc.phase8StartedAt && Array.isArray(sessionDoc.wordRotationPhase8) && sessionDoc.wordRotationPhase8.length > 0
+        ? {
+            phase8StartedAt: sessionDoc.phase8StartedAt.toISOString(),
+            wordRotationPhase8: [...sessionDoc.wordRotationPhase8],
+            wordStartOffsetPhase8: sessionDoc.wordStartOffsetPhase8 ?? 0,
+          }
+        : undefined;
+    const phase9 =
+      sessionDoc.phase9StartedAt && Array.isArray(sessionDoc.wordRotationPhase9) && sessionDoc.wordRotationPhase9.length > 0
+        ? {
+            phase9StartedAt: sessionDoc.phase9StartedAt.toISOString(),
+            wordRotationPhase9: [...sessionDoc.wordRotationPhase9],
+            wordStartOffsetPhase9: sessionDoc.wordStartOffsetPhase9 ?? 0,
+          }
+        : undefined;
+    const phase10 =
+      sessionDoc.phase10StartedAt && Array.isArray(sessionDoc.wordRotationPhase10) && sessionDoc.wordRotationPhase10.length > 0
+        ? {
+            phase10StartedAt: sessionDoc.phase10StartedAt.toISOString(),
+            wordRotationPhase10: [...sessionDoc.wordRotationPhase10],
+            wordStartOffsetPhase10: sessionDoc.wordStartOffsetPhase10 ?? 0,
+          }
+        : undefined;
     res.json({
       success: true,
       addedScore,
@@ -944,6 +1261,9 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
       ...phase5,
       ...phase6,
       ...phase7,
+      ...phase8,
+      ...phase9,
+      ...phase10,
     });
   } catch (error: unknown) {
     console.error('Race Condition Heist attempt-hijack error:', error);
@@ -969,7 +1289,11 @@ router.post('/end-run', auth, async (req: Request, res: Response) => {
     await sessionDoc.save();
     const params = getLevelParams(levelId);
     const scoreThreshold = params?.scoreThreshold ?? 50;
-    const won = sessionDoc.score >= scoreThreshold;
+    const allPacketsHijacked =
+      sessionDoc.packets.length > 0 &&
+      sessionDoc.packets.every((p) => p.isHijacked);
+    const won =
+      sessionDoc.score >= scoreThreshold && allPacketsHijacked;
     if (won) {
       await User.updateOne(
         { _id: userId },
