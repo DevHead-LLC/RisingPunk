@@ -288,65 +288,16 @@ export function RaceConditionHeistGameScreen({
             ...(result.serverTime != null && { serverTime: result.serverTime }),
           };
           /** Merge phase word data whenever server sends it so display rotates per node. */
-          if (result.wordRotationPhase2 && result.wordRotationPhase2.length > 0) {
-            next.wordRotationPhase2 = result.wordRotationPhase2;
-            next.wordStartOffsetPhase2 = typeof result.wordStartOffsetPhase2 === 'number' ? result.wordStartOffsetPhase2 : 0;
-            if (result.phase2StartedAt != null) next.phase2StartedAt = result.phase2StartedAt;
-          }
-          if (result.wordRotationPhase3 && result.wordRotationPhase3.length > 0) {
-            next.wordRotationPhase3 = result.wordRotationPhase3;
-            next.wordStartOffsetPhase3 = typeof result.wordStartOffsetPhase3 === 'number' ? result.wordStartOffsetPhase3 : 0;
-            if (result.phase3StartedAt != null) next.phase3StartedAt = result.phase3StartedAt;
-          }
-          if (result.wordRotationPhase4 && result.wordRotationPhase4.length > 0) {
-            next.wordRotationPhase4 = result.wordRotationPhase4;
-            next.wordStartOffsetPhase4 = typeof result.wordStartOffsetPhase4 === 'number' ? result.wordStartOffsetPhase4 : 0;
-            if (result.phase4StartedAt != null) next.phase4StartedAt = result.phase4StartedAt;
-          }
-          if (result.wordRotationPhase5 && result.wordRotationPhase5.length > 0) {
-            next.wordRotationPhase5 = result.wordRotationPhase5;
-            next.wordStartOffsetPhase5 = typeof result.wordStartOffsetPhase5 === 'number' ? result.wordStartOffsetPhase5 : 0;
-            if (result.phase5StartedAt != null) next.phase5StartedAt = result.phase5StartedAt;
-          }
-          if (result.wordRotationPhase6 && result.wordRotationPhase6.length > 0) {
-            next.wordRotationPhase6 = result.wordRotationPhase6;
-            next.wordStartOffsetPhase6 = typeof result.wordStartOffsetPhase6 === 'number' ? result.wordStartOffsetPhase6 : 0;
-            if (result.phase6StartedAt != null) next.phase6StartedAt = result.phase6StartedAt;
-          }
-          if (result.wordRotationPhase7 && result.wordRotationPhase7.length > 0) {
-            next.wordRotationPhase7 = result.wordRotationPhase7;
-            next.wordStartOffsetPhase7 = typeof result.wordStartOffsetPhase7 === 'number' ? result.wordStartOffsetPhase7 : 0;
-            if (result.phase7StartedAt != null) next.phase7StartedAt = result.phase7StartedAt;
-          }
-          if (result.wordRotationPhase8 && result.wordRotationPhase8.length > 0) {
-            next.wordRotationPhase8 = result.wordRotationPhase8;
-            next.wordStartOffsetPhase8 = typeof result.wordStartOffsetPhase8 === 'number' ? result.wordStartOffsetPhase8 : 0;
-            if (result.phase8StartedAt != null) next.phase8StartedAt = result.phase8StartedAt;
-          }
-          if (result.wordRotationPhase9 && result.wordRotationPhase9.length > 0) {
-            next.wordRotationPhase9 = result.wordRotationPhase9;
-            next.wordStartOffsetPhase9 = typeof result.wordStartOffsetPhase9 === 'number' ? result.wordStartOffsetPhase9 : 0;
-            if (result.phase9StartedAt != null) next.phase9StartedAt = result.phase9StartedAt;
-          }
-          if (result.wordRotationPhase10 && result.wordRotationPhase10.length > 0) {
-            next.wordRotationPhase10 = result.wordRotationPhase10;
-            next.wordStartOffsetPhase10 = typeof result.wordStartOffsetPhase10 === 'number' ? result.wordStartOffsetPhase10 : 0;
-            if (result.phase10StartedAt != null) next.phase10StartedAt = result.phase10StartedAt;
-          }
-          if (result.wordRotationPhase11 && result.wordRotationPhase11.length > 0) {
-            next.wordRotationPhase11 = result.wordRotationPhase11;
-            next.wordStartOffsetPhase11 = typeof result.wordStartOffsetPhase11 === 'number' ? result.wordStartOffsetPhase11 : 0;
-            if (result.phase11StartedAt != null) next.phase11StartedAt = result.phase11StartedAt;
-          }
-          if (result.wordRotationPhase12 && result.wordRotationPhase12.length > 0) {
-            next.wordRotationPhase12 = result.wordRotationPhase12;
-            next.wordStartOffsetPhase12 = typeof result.wordStartOffsetPhase12 === 'number' ? result.wordStartOffsetPhase12 : 0;
-            if (result.phase12StartedAt != null) next.phase12StartedAt = result.phase12StartedAt;
-          }
-          if (result.wordRotationPhase13 && result.wordRotationPhase13.length > 0) {
-            next.wordRotationPhase13 = result.wordRotationPhase13;
-            next.wordStartOffsetPhase13 = typeof result.wordStartOffsetPhase13 === 'number' ? result.wordStartOffsetPhase13 : 0;
-            if (result.phase13StartedAt != null) next.phase13StartedAt = result.phase13StartedAt;
+          const res = result as unknown as Record<string, unknown>;
+          const out = next as unknown as Record<string, unknown>;
+          for (let n = 2; n <= 13; n++) {
+            const rot = res[`wordRotationPhase${n}`] as string[] | undefined;
+            if (Array.isArray(rot) && rot.length > 0) {
+              out[`wordRotationPhase${n}`] = rot;
+              out[`wordStartOffsetPhase${n}`] = typeof res[`wordStartOffsetPhase${n}`] === 'number' ? res[`wordStartOffsetPhase${n}`] : 0;
+              const started = res[`phase${n}StartedAt`];
+              if (started != null) out[`phase${n}StartedAt`] = started;
+            }
           }
           return next;
         });
@@ -396,20 +347,6 @@ export function RaceConditionHeistGameScreen({
     },
     [session, phase, levelId, attemptHijack]
   );
-
-  const handleClaim = useCallback(async () => {
-    setClaimingInProgress(true);
-    setClaimError(false);
-    try {
-      await claimLevel(levelId).unwrap();
-      setClaimError(false);
-      InteractionManager.runAfterInteractions(() => onCloseRef.current());
-    } catch (_) {
-      setClaimError(true);
-    } finally {
-      setClaimingInProgress(false);
-    }
-  }, [levelId, claimLevel]);
 
   /** Claim then close (e.g. when user taps X during victory overlay so level is marked complete). */
   const handleClaimThenClose = useCallback(async () => {
@@ -766,81 +703,16 @@ export function RaceConditionHeistGameScreen({
   const phase2ElapsedMs = usePhase2Words && session.phase2StartedAt
     ? serverAdjustedNow - new Date(session.phase2StartedAt).getTime()
     : 0;
-  const activeRotation = usePhase13Words
-    ? (session.wordRotationPhase13 ?? [])
-    : usePhase12Words
-      ? (session.wordRotationPhase12 ?? [])
-      : usePhase11Words
-        ? (session.wordRotationPhase11 ?? [])
-        : usePhase10Words
-          ? (session.wordRotationPhase10 ?? [])
-          : usePhase9Words
-                    ? (session.wordRotationPhase9 ?? [])
-          : usePhase8Words
-            ? (session.wordRotationPhase8 ?? [])
-            : usePhase7Words
-              ? (session.wordRotationPhase7 ?? [])
-              : usePhase6Words
-                ? (session.wordRotationPhase6 ?? [])
-                : usePhase5Words
-                  ? (session.wordRotationPhase5 ?? [])
-                  : usePhase4Words
-                    ? (session.wordRotationPhase4 ?? [])
-                    : usePhase3Words
-                      ? (session.wordRotationPhase3 ?? [])
-                      : usePhase2Words
-                        ? (session.wordRotationPhase2 ?? [])
-                        : wordRotation;
-  const activeStartOffset = usePhase13Words
-    ? (session.wordStartOffsetPhase13 ?? 0)
-    : usePhase12Words
-      ? (session.wordStartOffsetPhase12 ?? 0)
-      : usePhase11Words
-        ? (session.wordStartOffsetPhase11 ?? 0)
-        : usePhase10Words
-          ? (session.wordStartOffsetPhase10 ?? 0)
-          : usePhase9Words
-      ? (session.wordStartOffsetPhase9 ?? 0)
-      : usePhase8Words
-        ? (session.wordStartOffsetPhase8 ?? 0)
-        : usePhase7Words
-          ? (session.wordStartOffsetPhase7 ?? 0)
-          : usePhase6Words
-            ? (session.wordStartOffsetPhase6 ?? 0)
-            : usePhase5Words
-              ? (session.wordStartOffsetPhase5 ?? 0)
-              : usePhase4Words
-                ? (session.wordStartOffsetPhase4 ?? 0)
-                : usePhase3Words
-                  ? (session.wordStartOffsetPhase3 ?? 0)
-                  : usePhase2Words
-                    ? (session.wordStartOffsetPhase2 ?? 0)
-                    : wordStartOffset;
-  const activeElapsedMs = usePhase13Words
-    ? phase13ElapsedMs
-    : usePhase12Words
-      ? phase12ElapsedMs
-      : usePhase11Words
-        ? phase11ElapsedMs
-        : usePhase10Words
-          ? phase10ElapsedMs
-          : usePhase9Words
-      ? phase9ElapsedMs
-      : usePhase8Words
-        ? phase8ElapsedMs
-        : usePhase7Words
-          ? phase7ElapsedMs
-          : usePhase6Words
-            ? phase6ElapsedMs
-            : usePhase5Words
-              ? phase5ElapsedMs
-              : usePhase4Words
-                ? phase4ElapsedMs
-                : usePhase3Words
-                  ? phase3ElapsedMs
-                  : usePhase2Words
-                    ? phase2ElapsedMs
-                    : elapsedMs;
+  /** Resolve active phase (highest usePhaseNWords that is true) then pick rotation/offset/elapsed/start from arrays. */
+  const usePhaseFlags = [usePhase2Words, usePhase3Words, usePhase4Words, usePhase5Words, usePhase6Words, usePhase7Words, usePhase8Words, usePhase9Words, usePhase10Words, usePhase11Words, usePhase12Words, usePhase13Words];
+  const phaseRotations: string[][] = [session.wordRotationPhase2 ?? [], session.wordRotationPhase3 ?? [], session.wordRotationPhase4 ?? [], session.wordRotationPhase5 ?? [], session.wordRotationPhase6 ?? [], session.wordRotationPhase7 ?? [], session.wordRotationPhase8 ?? [], session.wordRotationPhase9 ?? [], session.wordRotationPhase10 ?? [], session.wordRotationPhase11 ?? [], session.wordRotationPhase12 ?? [], session.wordRotationPhase13 ?? []];
+  const phaseOffsets = [session.wordStartOffsetPhase2 ?? 0, session.wordStartOffsetPhase3 ?? 0, session.wordStartOffsetPhase4 ?? 0, session.wordStartOffsetPhase5 ?? 0, session.wordStartOffsetPhase6 ?? 0, session.wordStartOffsetPhase7 ?? 0, session.wordStartOffsetPhase8 ?? 0, session.wordStartOffsetPhase9 ?? 0, session.wordStartOffsetPhase10 ?? 0, session.wordStartOffsetPhase11 ?? 0, session.wordStartOffsetPhase12 ?? 0, session.wordStartOffsetPhase13 ?? 0];
+  const phaseElapsed = [phase2ElapsedMs, phase3ElapsedMs, phase4ElapsedMs, phase5ElapsedMs, phase6ElapsedMs, phase7ElapsedMs, phase8ElapsedMs, phase9ElapsedMs, phase10ElapsedMs, phase11ElapsedMs, phase12ElapsedMs, phase13ElapsedMs];
+  let activePhaseIndex = -1;
+  for (let i = 12; i >= 0; i--) if (usePhaseFlags[i]) { activePhaseIndex = i; break; }
+  const activeRotation = activePhaseIndex >= 0 ? phaseRotations[activePhaseIndex] : wordRotation;
+  const activeStartOffset = activePhaseIndex >= 0 ? phaseOffsets[activePhaseIndex] : wordStartOffset;
+  const activeElapsedMs = activePhaseIndex >= 0 ? phaseElapsed[activePhaseIndex] : elapsedMs;
   /** Delay display by 250ms so "tap when word first appears" lands in server's window (client was ahead). */
   const DISPLAY_DELAY_MS = 250;
   const displayElapsedMs = Math.max(0, activeElapsedMs - DISPLAY_DELAY_MS);
@@ -849,33 +721,6 @@ export function RaceConditionHeistGameScreen({
       ? (Math.floor(displayElapsedMs / wordDurationMs) + activeStartOffset) % activeRotation.length
       : 0;
   const displayedWord = activeRotation[currentWordIndex] ?? '—';
-  /** Phase start (ISO string) for the active word display. */
-  const phaseStart =
-    usePhase13Words && session.phase13StartedAt
-      ? session.phase13StartedAt
-      : usePhase12Words && session.phase12StartedAt
-        ? session.phase12StartedAt
-        : usePhase11Words && session.phase11StartedAt
-          ? session.phase11StartedAt
-          : usePhase10Words && session.phase10StartedAt
-            ? session.phase10StartedAt
-            : usePhase9Words && session.phase9StartedAt
-        ? session.phase9StartedAt
-        : usePhase8Words && session.phase8StartedAt
-          ? session.phase8StartedAt
-          : usePhase7Words && session.phase7StartedAt
-            ? session.phase7StartedAt
-            : usePhase6Words && session.phase6StartedAt
-              ? session.phase6StartedAt
-              : usePhase5Words && session.phase5StartedAt
-                ? session.phase5StartedAt
-                : usePhase4Words && session.phase4StartedAt
-                  ? session.phase4StartedAt
-                  : usePhase3Words && session.phase3StartedAt
-                    ? session.phase3StartedAt
-                    : usePhase2Words && session.phase2StartedAt
-                      ? session.phase2StartedAt
-                      : session.startedAt;
 
   /** Lost run: show "Run complete" and "Back to levels" only. */
   if ((phase === 'LOCKDOWN' || phase === 'RESULTS') && !won) {
