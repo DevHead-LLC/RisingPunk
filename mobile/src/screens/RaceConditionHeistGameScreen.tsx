@@ -410,6 +410,20 @@ export function RaceConditionHeistGameScreen({
     }
   }, [levelId, claimLevel]);
 
+  /** Close during auto-complete: end run, claim level (so win is credited), then close. Prevents losing credit when user taps X while "Hijacked System!" is showing. */
+  const handleCloseDuringAutoComplete = useCallback(async () => {
+    setClaimingInProgress(true);
+    try {
+      await endRun(levelId).unwrap();
+      await claimLevel(levelId).unwrap();
+      InteractionManager.runAfterInteractions(() => onCloseRef.current());
+    } catch (_) {
+      setClaimError(true);
+    } finally {
+      setClaimingInProgress(false);
+    }
+  }, [levelId, endRun, claimLevel]);
+
   /** Close game: end run on server so session is deleted and next attempt gets full clock, then navigate back. */
   const handleClose = useCallback(async () => {
     if (session && phase === 'RUNNING') {
@@ -832,7 +846,7 @@ export function RaceConditionHeistGameScreen({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <CloseButton onPress={handleClose} />
+      <CloseButton onPress={autoCompleting ? handleCloseDuringAutoComplete : handleClose} />
       <Text style={[styles.title, { color: colors.primary }]}>Race Condition Heist — {levelId}</Text>
       <View style={styles.statsRow}>
         <Text style={[styles.stat, { color: colors.text?.secondary ?? colors.primary }]}>
