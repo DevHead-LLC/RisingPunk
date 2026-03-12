@@ -66,7 +66,7 @@ export function ProgrammingFacilityLevelCell({
       ? `Level ${config.levelId}, starting...`
       : canAfford
         ? `Level ${config.levelId}, ${costLabel}${costLabelSuffix}. Tap to play.`
-        : `Level ${config.levelId}, ${costLabel}. Insufficient funds.`;
+        : `Level ${config.levelId}, ${costLabel}${costLabelSuffix}. Insufficient funds.`;
 
   if (config.isUnlocked && !config.isCompleted) {
     return (

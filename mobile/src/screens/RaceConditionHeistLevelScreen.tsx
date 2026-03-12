@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import {
 import { balanceApi } from '../store/api/balanceApi';
 import { TIER_CONFIGS } from '../utils/programmingFacilityTierConfig';
 import { ProgrammingFacilityLevelCell } from '../components/programmingFacility/ProgrammingFacilityLevelCell';
+import { useProgrammingFacilityLevelScreen } from '../hooks/useProgrammingFacilityLevelScreen';
 
 const GAME_RULES_TEXT = `RACE CONDITION HEIST — HOW TO PLAY
 
@@ -61,74 +62,39 @@ export function RaceConditionHeistLevelScreen({ onClose, onSelectLevel }: RaceCo
   const colors = useThemeColors();
   const dispatch = useAppDispatch();
   const [showRules, setShowRules] = useState(false);
-  const [startingLevelId, setStartingLevelId] = useState<string | null>(null);
-  const entryDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isSelectingLevelRef = useRef(false);
   const balance = useAppSelector(getCurrentBalance);
   const { data: status, isLoading, error } = useGetRaceConditionHeistStatusQuery(undefined, {
     pollingInterval: 60000,
     refetchOnFocus: true,
   });
-  const [startSession] = useStartRaceConditionHeistSessionMutation();
+  const [startSessionMutation] = useStartRaceConditionHeistSessionMutation();
 
   useEffect(() => {
     dispatch(balanceApi.util.invalidateTags(['Balance']));
   }, [dispatch]);
 
-  useEffect(() => {
-    return () => {
-      if (entryDelayTimeoutRef.current != null) {
-        clearTimeout(entryDelayTimeoutRef.current);
-        entryDelayTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleClose = useCallback(() => {
-    if (entryDelayTimeoutRef.current != null) {
-      clearTimeout(entryDelayTimeoutRef.current);
-      entryDelayTimeoutRef.current = null;
-    }
-    isSelectingLevelRef.current = false;
-    onClose();
-  }, [onClose]);
-
   const levelConfigs = status?.levelConfigs ?? [];
   const numericBalance = typeof balance === 'number' ? balance : 0;
+
+  const { startingLevelId, handleClose, handleSelectLevel } = useProgrammingFacilityLevelScreen<RaceConditionHeistSessionResponse>({
+    levelConfigs,
+    numericBalance,
+    startSession: (levelId) => startSessionMutation(levelId).unwrap(),
+    onSelectLevel,
+    onClose,
+    entryDeductionDelayMs: ENTRY_DEDUCTION_DELAY_MS,
+    onStartSessionError: (err) => {
+      if ((err as { status?: number })?.status === 402) {
+        // Insufficient funds; no further handling
+      }
+    },
+  });
 
   const getTierLevels = (tier: number) => levelConfigs.filter((c) => c.tier === tier);
   const isTierAchieved = (tier: number) => {
     const levels = getTierLevels(tier);
     return levels.length === 5 && levels.every((c) => c.isCompleted);
   };
-
-  const handleSelectLevel = useCallback(
-    async (levelId: string) => {
-      if (isSelectingLevelRef.current) return;
-      const config = (status?.levelConfigs ?? []).find((c) => c.levelId === levelId);
-      if (!config?.isUnlocked || config?.isCompleted || numericBalance < (config.cost ?? 0)) return;
-      isSelectingLevelRef.current = true;
-      if (entryDelayTimeoutRef.current != null) {
-        clearTimeout(entryDelayTimeoutRef.current);
-        entryDelayTimeoutRef.current = null;
-      }
-      setStartingLevelId(levelId);
-      try {
-        const result = await startSession(levelId).unwrap();
-        entryDelayTimeoutRef.current = setTimeout(() => {
-          entryDelayTimeoutRef.current = null;
-          isSelectingLevelRef.current = false;
-          setStartingLevelId(null);
-          onSelectLevel(levelId, result);
-        }, ENTRY_DEDUCTION_DELAY_MS);
-      } catch (err: unknown) {
-        isSelectingLevelRef.current = false;
-        setStartingLevelId(null);
-        if ((err as { status?: number })?.status === 402) return;
-      }
-    },
-    [status?.levelConfigs, numericBalance, startSession, onSelectLevel]
-  );
 
   if (error) {
     return (

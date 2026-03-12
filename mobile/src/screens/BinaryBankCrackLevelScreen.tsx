@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ import {
 import { balanceApi } from '../store/api/balanceApi';
 import { TIER_CONFIGS } from '../utils/programmingFacilityTierConfig';
 import { ProgrammingFacilityLevelCell } from '../components/programmingFacility/ProgrammingFacilityLevelCell';
+import { useProgrammingFacilityLevelScreen } from '../hooks/useProgrammingFacilityLevelScreen';
 
 const GAME_RULES_TEXT = `BINARY BANK CRACK — HOW TO PLAY
 
@@ -58,66 +59,27 @@ export function BinaryBankCrackLevelScreen({ onClose, onSelectLevel }: BinaryBan
   const colors = useThemeColors();
   const dispatch = useAppDispatch();
   const [showRules, setShowRules] = useState(false);
-  const [startingLevelId, setStartingLevelId] = useState<string | null>(null);
-  const entryDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isSelectingLevelRef = useRef(false);
   const balance = useAppSelector(getCurrentBalance);
   const { data: status, isLoading, error } = useGetBinaryBankCrackStatusQuery(undefined, {
     pollingInterval: 60000,
   });
-  const [startSession] = useStartBinaryBankCrackSessionMutation();
+  const [startSessionMutation] = useStartBinaryBankCrackSessionMutation();
 
   useEffect(() => {
     dispatch(balanceApi.util.invalidateTags(['Balance']));
   }, [dispatch]);
 
-  useEffect(() => {
-    return () => {
-      if (entryDelayTimeoutRef.current != null) {
-        clearTimeout(entryDelayTimeoutRef.current);
-        entryDelayTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-  const handleClose = useCallback(() => {
-    if (entryDelayTimeoutRef.current != null) {
-      clearTimeout(entryDelayTimeoutRef.current);
-      entryDelayTimeoutRef.current = null;
-    }
-    isSelectingLevelRef.current = false;
-    onClose();
-  }, [onClose]);
-
   const levelConfigs = status?.levelConfigs ?? [];
   const numericBalance = typeof balance === 'number' ? balance : 0;
 
-  const handleSelectLevel = useCallback(
-    async (levelId: string) => {
-      if (isSelectingLevelRef.current) return;
-      const config = levelConfigs.find((c) => c.levelId === levelId);
-      if (!config?.isUnlocked || config?.isCompleted || numericBalance < (config.cost ?? 0)) return;
-      isSelectingLevelRef.current = true;
-      if (entryDelayTimeoutRef.current != null) {
-        clearTimeout(entryDelayTimeoutRef.current);
-        entryDelayTimeoutRef.current = null;
-      }
-      setStartingLevelId(levelId);
-      try {
-        const result = await startSession(levelId).unwrap();
-        entryDelayTimeoutRef.current = setTimeout(() => {
-          entryDelayTimeoutRef.current = null;
-          isSelectingLevelRef.current = false;
-          setStartingLevelId(null);
-          onSelectLevel(levelId, result);
-        }, ENTRY_DEDUCTION_DELAY_MS);
-      } catch {
-        isSelectingLevelRef.current = false;
-        setStartingLevelId(null);
-      }
-    },
-    [levelConfigs, numericBalance, startSession, onSelectLevel]
-  );
+  const { startingLevelId, handleClose, handleSelectLevel } = useProgrammingFacilityLevelScreen<BinaryBankCrackSessionResponse>({
+    levelConfigs,
+    numericBalance,
+    startSession: (levelId) => startSessionMutation(levelId).unwrap(),
+    onSelectLevel,
+    onClose,
+    entryDeductionDelayMs: ENTRY_DEDUCTION_DELAY_MS,
+  });
 
   if (error) {
     return (
