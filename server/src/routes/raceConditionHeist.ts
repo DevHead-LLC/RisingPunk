@@ -1129,9 +1129,6 @@ router.post('/attempt-hijack', auth, async (req: Request, res: Response) => {
     const tierUsesClientOnlySuccess = params.tier >= 6;
     if (tierUsesClientOnlySuccess) {
       inWindow = typeof clientReportedIndex === 'number' && clientReportedIndex === preSecureIndexFinal;
-      console.log('[RCH-attempt] tier=%d packetIndex=%d clientReportedIndex=%s successIndex=%d secureIndex=%d inWindow=%s wordRotation.length=%d', params.tier, packetIndex, clientReportedIndex === undefined ? 'undefined' : String(clientReportedIndex), preSecureIndexFinal, secureWordIndex, String(inWindow), wordRotation.length);
-    } else {
-      console.log('[RCH-attempt] tier=%d packetIndex=%d serverCurrentIndex=%d clientReportedIndex=%s preSecureIndex=%d secureIndex=%d inWindow=%s', params.tier, packetIndex, currentIndex, clientReportedIndex === undefined ? 'undefined' : String(clientReportedIndex), preSecureIndexFinal, secureWordIndex, String(inWindow));
     }
     if (params.tier >= 5 && typeof clientReportedIndex === 'number' && clientReportedIndex === secureWordIndex) {
       await RaceConditionHeistSession.deleteOne({ userId: req.user!._id, levelId });

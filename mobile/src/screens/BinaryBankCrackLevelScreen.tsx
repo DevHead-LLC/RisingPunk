@@ -22,11 +22,7 @@ import {
   type BinaryBankCrackSessionResponse,
 } from '../store/api/binaryBankCrackApi';
 import { balanceApi } from '../store/api/balanceApi';
-import {
-  TIER_COUNT,
-  getTierRewardLabel,
-  getTierLevelRange,
-} from '../utils/programmingFacilityTierConfig';
+import { TIER_CONFIGS } from '../utils/programmingFacilityTierConfig';
 import { ProgrammingFacilityLevelCell } from '../components/programmingFacility/ProgrammingFacilityLevelCell';
 
 const GAME_RULES_TEXT = `BINARY BANK CRACK — HOW TO PLAY
@@ -151,7 +147,7 @@ export function BinaryBankCrackLevelScreen({ onClose, onSelectLevel }: BinaryBan
         <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
       ) : (
         <ScrollView style={styles.tierScroll} contentContainerStyle={styles.tierScrollContent} showsVerticalScrollIndicator>
-          {Array.from({ length: TIER_COUNT }, (_, i) => i + 1).map((tier) => {
+          {TIER_CONFIGS.map(({ tier, rewardLabel, levelRange }) => {
             const tierLevels = levelConfigs.filter((c) => c.tier === tier);
             const isTierAchieved = tierLevels.length === 5 && tierLevels.every((c) => c.isCompleted);
             return (
@@ -194,7 +190,7 @@ export function BinaryBankCrackLevelScreen({ onClose, onSelectLevel }: BinaryBan
                       },
                     ]}
                   >
-                    {getTierRewardLabel(tier)}
+                    {rewardLabel}
                   </Text>
                   <Text
                     style={[
@@ -206,7 +202,7 @@ export function BinaryBankCrackLevelScreen({ onClose, onSelectLevel }: BinaryBan
                       },
                     ]}
                   >
-                    {isTierAchieved ? '✓ Unlocked' : `Complete ${getTierLevelRange(tier)} to unlock`}
+                    {isTierAchieved ? '✓ Unlocked' : `Complete ${levelRange} to unlock`}
                   </Text>
                 </View>
               </View>

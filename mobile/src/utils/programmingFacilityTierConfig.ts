@@ -28,18 +28,6 @@ export const TIER_CONFIGS: { tier: number; rewardLabel: string; levelRange: stri
   { tier: 21, rewardLabel: 'Defense +1.30%', levelRange: '21.1–21.5' },
 ];
 
-export const TIER_COUNT = TIER_CONFIGS.length;
-
 export function formatCost(cost: number): string {
   return `$${cost.toLocaleString()}`;
-}
-
-export function getTierRewardLabel(tier: number): string {
-  const config = TIER_CONFIGS.find((c) => c.tier === tier);
-  return config?.rewardLabel ?? `Tier ${tier}`;
-}
-
-export function getTierLevelRange(tier: number): string {
-  const config = TIER_CONFIGS.find((c) => c.tier === tier);
-  return config?.levelRange ?? `${tier}.1–${tier}.5`;
 }

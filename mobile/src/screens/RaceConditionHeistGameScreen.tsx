@@ -308,20 +308,6 @@ export function RaceConditionHeistGameScreen({
         ...(viewpoint?.displayedWordLabel != null && { displayedWordLabel: viewpoint.displayedWordLabel }),
         ...(viewpoint && { clientViewpoint: viewpoint }),
       };
-      if (__DEV__) {
-        if (viewpoint) {
-          console.log('[RCH-attempt client]', JSON.stringify({
-            displayedWordIndex: viewpoint.displayedWordIndex,
-            displayedWordLabel: viewpoint.displayedWordLabel,
-            clientTimestampMs: viewpoint.clientTimestampMs,
-            clientPhaseElapsedMs: viewpoint.clientPhaseElapsedMs,
-            wordDurationMs: viewpoint.wordDurationMs,
-            wordCount: viewpoint.wordCount,
-          }));
-        } else {
-          console.log('[RCH-attempt client] viewpoint=null (using displayedWordIndex=', displayedWordIndex, ')');
-        }
-      }
       try {
         const result = await attemptHijack(body).unwrap();
         if (result.reason === 'fatal_secure_word') {
