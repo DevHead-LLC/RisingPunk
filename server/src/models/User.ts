@@ -137,8 +137,8 @@ export interface IUser extends Document {
     levelsCompleted: string[];
     pendingClaimLevelIds?: string[];
   };
-  /** Phreak (Range) bonus from Binary Bank Crack tier completion; computed on claim and stored like armyBonus/guardianBonus. */
-  phreakBonus?: { range: number };
+  /** Phreak (Ranged) bonus from Binary Bank Crack tier completion; same shape as armyBonus/guardianBonus (Attack/Health/Defense cycle). */
+  phreakBonus?: { strength: number; defense: number; speed: number; health: number };
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
   blockedUserIds?: mongoose.Types.ObjectId[];
   /** Set by schema timestamps: true. */
@@ -525,7 +525,10 @@ const userSchema = new Schema({
     pendingClaimLevelIds: { type: [String], default: [] }
   },
   phreakBonus: {
-    range: { type: Number, default: 0 }
+    strength: { type: Number, default: 0 },
+    defense: { type: Number, default: 0 },
+    speed: { type: Number, default: 0 },
+    health: { type: Number, default: 0 }
   },
   blockedUserIds: {
     type: [Schema.Types.ObjectId],

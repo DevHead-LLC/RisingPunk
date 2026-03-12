@@ -16,9 +16,12 @@ export interface ArmyBonus {
 /** Optional Cavalry (Guardian) bonus from e.g. Race Condition Heist tier rewards; applied only when botType is guardian. */
 export type GuardianBonus = ArmyBonus;
 
-/** Optional Phreak (Range) bonus from Binary Bank Crack tier rewards; applied only when botType is phreak. */
+/** Programming bonus for Range bot type (Phreaks) from Binary Bank Crack. Same stats as Infantry/Cavalry: strength, defense, speed, health. Applied in battle, Digital Barracks, and Profile > Stats. */
 export interface PhreakBonus {
-  range: number;
+  strength: number;
+  defense: number;
+  speed: number;
+  health: number;
 }
 
 export class BotService {
@@ -49,11 +52,20 @@ export class BotService {
           speed: effectiveStats.speed + guardianBonus.speed,
         };
       }
+      // Range bot type (Phreaks): programming bonus is Attack/Health/Defense/Speed, same as Infantry/Cavalry. Not "attack range" stat.
       if (botType === 'phreak' && phreakBonus) {
-        effectiveStats = {
-          ...effectiveStats,
-          range: effectiveStats.range + phreakBonus.range,
-        };
+        const p = phreakBonus as PhreakBonus & { range?: number };
+        if (typeof p.strength === 'number' || typeof p.health === 'number') {
+          effectiveStats = {
+            ...effectiveStats,
+            offense: effectiveStats.offense + (p.strength ?? 0),
+            health: effectiveStats.health + (p.health ?? 0),
+            defense: effectiveStats.defense + (p.defense ?? 0),
+            speed: effectiveStats.speed + (p.speed ?? 0),
+          };
+        } else if (typeof p.range === 'number') {
+          effectiveStats = { ...effectiveStats, range: effectiveStats.range + p.range };
+        }
       }
       const role = BotStatsService.getBotRole(botType);
       return {

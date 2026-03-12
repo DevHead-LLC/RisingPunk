@@ -97,28 +97,60 @@ export function getTierLevels(tier: number): LevelId[] {
   return ALL_LEVELS.filter((l) => l.tier === tier).map((l) => l.levelId);
 }
 
-/** Phreak (Range) tier rewards: complete all 5 levels in a tier. */
+/** Tier rewards for the Range bot type (Phreaks). Same stats as other games: Attack, Health, Defense, Speed — not "attack range". */
 export interface PhreakBonusDelta {
-  range: number;
+  strength: number;
+  defense: number;
+  speed: number;
+  health: number;
 }
 
-const TIER_REWARDS: PhreakBonusDelta[] = Array.from({ length: 21 }, (_, i) => ({
-  range: 0.5 + i * 0.25,
-}));
+/** Same tier reward values as packetBreachConfig and raceConditionHeistConfig. Tier 1 = Attack +0.5, Tier 2 = Health +1, Tier 3 = Defense +0.10%, etc. */
+const BBC_TIER_REWARDS: PhreakBonusDelta[] = [
+  { strength: 0.5, defense: 0, speed: 0, health: 0 },
+  { strength: 0, defense: 0, speed: 0, health: 1 },
+  { strength: 0, defense: 0.001, speed: 0, health: 0 },
+  { strength: 1, defense: 0, speed: 0, health: 0 },
+  { strength: 0, defense: 0, speed: 0, health: 2 },
+  { strength: 0, defense: 0.003, speed: 0, health: 0 },
+  { strength: 1.5, defense: 0, speed: 0, health: 0 },
+  { strength: 0, defense: 0, speed: 0, health: 3 },
+  { strength: 0, defense: 0.005, speed: 0, health: 0 },
+  { strength: 2, defense: 0, speed: 0, health: 0 },
+  { strength: 0, defense: 0, speed: 0, health: 4 },
+  { strength: 0, defense: 0.007, speed: 0, health: 0 },
+  { strength: 2.5, defense: 0, speed: 0, health: 0 },
+  { strength: 0, defense: 0, speed: 0, health: 5 },
+  { strength: 0, defense: 0.009, speed: 0, health: 0 },
+  { strength: 3, defense: 0, speed: 0, health: 0 },
+  { strength: 0, defense: 0, speed: 0, health: 6 },
+  { strength: 0, defense: 0.011, speed: 0, health: 0 },
+  { strength: 3.5, defense: 0, speed: 0, health: 0 },
+  { strength: 0, defense: 0, speed: 0, health: 7 },
+  { strength: 0, defense: 0.013, speed: 0, health: 0 },
+];
 
 /**
- * Compute Binary Bank Crack contribution to phreakBonus (Range) from levelsCompleted.
+ * Compute Binary Bank Crack contribution to phreakBonus from levelsCompleted.
+ * Same logic as PB (Infantry) and RCH (Cavalry): improves Attack/Health/Defense/Speed for the Range bot type (Phreaks).
  */
 export function computeBinaryBankCrackPhreakBonus(levelsCompleted: string[]): PhreakBonusDelta {
   const set = new Set(levelsCompleted);
-  let range = 0;
-  for (let tier = 1; tier <= TIER_REWARDS.length; tier++) {
+  let strength = 0;
+  let defense = 0;
+  let speed = 0;
+  let health = 0;
+  for (let tier = 1; tier <= BBC_TIER_REWARDS.length; tier++) {
     const required = getTierLevels(tier);
     if (required.length > 0 && required.every((id) => set.has(id))) {
-      range += TIER_REWARDS[tier - 1].range;
+      const r = BBC_TIER_REWARDS[tier - 1];
+      strength += r.strength;
+      defense += r.defense;
+      speed += r.speed;
+      health += r.health;
     }
   }
-  return { range };
+  return { strength, defense, speed, health };
 }
 
 /** Max value for an N-bit register (0 to 2^N - 1). */

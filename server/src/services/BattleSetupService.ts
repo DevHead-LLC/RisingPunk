@@ -26,7 +26,7 @@ export class BattleSetupService {
     let userLevel = 1;
     let attackerArmyBonus: { strength: number; defense: number; speed: number; health: number } | undefined;
     let attackerGuardianBonus: { strength: number; defense: number; speed: number; health: number } | undefined;
-    let attackerPhreakBonus: { range: number } | undefined;
+    let attackerPhreakBonus: { strength: number; defense: number; speed: number; health: number } | undefined;
     if (attackerId !== 'computer-opponent') {
       try {
         const attacker = await User.findById(attackerId);

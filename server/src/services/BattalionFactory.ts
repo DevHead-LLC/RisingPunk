@@ -59,7 +59,7 @@ export class BattalionFactory {
     nodes: INode[],
     armyBonus?: { strength: number; defense: number; speed: number; health: number },
     guardianBonus?: { strength: number; defense: number; speed: number; health: number },
-    phreakBonus?: { range: number }
+    phreakBonus?: { strength: number; defense: number; speed: number; health: number }
   ): Promise<IBattalion> {
     // Find all suitable spawn nodes (enemy-owned nodes)
     const enemyNodes = nodes.filter(node => node.owner === 'enemy');

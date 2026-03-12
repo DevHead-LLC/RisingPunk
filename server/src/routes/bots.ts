@@ -46,11 +46,12 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// Get bot stats from server (single source of truth)
+// Get bot stats from server (single source of truth). Used by Digital Barracks and elsewhere.
+// Range bot type (Phreaks) get Binary Bank Crack tier bonus (Attack/Health/Defense/Speed) applied here, in battle, and in stats-breakdown.
 router.get('/stats', auth, async (req, res) => {
   try {
     const { BotService } = require('../services/BotService');
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('level armyBonus guardianBonus phreakBonus');
     const userLevel = user?.level || 1;
     const armyBonus = user?.armyBonus;
     const guardianBonus = user?.guardianBonus;
@@ -80,11 +81,13 @@ const { computeRaceConditionHeistGuardianBonus } = require('../config/raceCondit
 const { computeBinaryBankCrackPhreakBonus } = require('../config/binaryBankCrackConfig');
 // Get bot stats breakdown for profile charts (base, +level, +programming, total)
 // Total row comes from BotService.getUserBotStats (same as /stats and battles) so one source of truth.
+// Range bot type (Phreaks): programming bonus from Binary Bank Crack (Attack/Health/Defense/Speed), same pattern as PB → Infantry (breacher), RCH → Cavalry (guardian).
 router.get('/stats-breakdown', auth, async (req, res) => {
   try {
     const { BotService } = require('../services/BotService');
     const BotStatsService = require('../services/BotStatsService').BotStatsService;
-    const user = await User.findById(req.user._id);
+    await BotStatsService.loadConfigs();
+    const user = await User.findById(req.user._id).select('level packetBreach raceConditionHeist binaryBankCrack armyBonus guardianBonus phreakBonus');
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -116,8 +119,12 @@ router.get('/stats-breakdown', auth, async (req, res) => {
     const guardianBonusForStats = guardianBonusMatches ? storedGuardianBonus : programmingGuardianFromLevels;
     const bbcLevels: string[] = Array.isArray(user.binaryBankCrack?.levelsCompleted) ? user.binaryBankCrack!.levelsCompleted : [];
     const programmingPhreakFromLevels = computeBinaryBankCrackPhreakBonus(bbcLevels);
-    const storedPhreakBonus = user.phreakBonus ?? { range: 0 };
-    const phreakBonusMatches = storedPhreakBonus.range === programmingPhreakFromLevels.range;
+    const storedPhreakBonus = user.phreakBonus ?? { strength: 0, defense: 0, speed: 0, health: 0 };
+    const phreakBonusMatches =
+      storedPhreakBonus.strength === programmingPhreakFromLevels.strength &&
+      storedPhreakBonus.defense === programmingPhreakFromLevels.defense &&
+      storedPhreakBonus.speed === programmingPhreakFromLevels.speed &&
+      storedPhreakBonus.health === programmingPhreakFromLevels.health;
     if (!phreakBonusMatches) {
       await User.updateOne({ _id: user._id }, { $set: { phreakBonus: programmingPhreakFromLevels } });
     }
@@ -155,11 +162,11 @@ router.get('/stats-breakdown', auth, async (req, res) => {
               }
             : botType === 'phreak'
               ? {
-                  health: 0,
-                  offense: 0,
-                  defense: 0,
-                  speed: 0,
-                  range: phreakBonusForStats.range,
+                  health: (phreakBonusForStats as any).health ?? 0,
+                  offense: (phreakBonusForStats as any).strength ?? 0,
+                  defense: (phreakBonusForStats as any).defense ?? 0,
+                  speed: (phreakBonusForStats as any).speed ?? 0,
+                  range: (phreakBonusForStats as any).range ?? 0,
                 }
               : zeroRow();
       const researchBonus = zeroRow(); // Placeholder for future research bonuses
@@ -170,7 +177,7 @@ router.get('/stats-breakdown', auth, async (req, res) => {
         offense: Math.round(s.offense * 100) / 100,
         defense: Math.round(s.defense * 1000) / 1000,
         speed: Math.round(s.speed),
-        range: Math.round(s.range),
+        range: Math.round(s.range * 100) / 100,
       };
       breakdown[botType] = { base, levelBonus, programmingBonus, researchBonus, total };
     }

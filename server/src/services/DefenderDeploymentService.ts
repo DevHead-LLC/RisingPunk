@@ -218,7 +218,7 @@ export class DefenderDeploymentService {
     defenderLevel: number,
     defenderArmyBonus?: { strength: number; defense: number; speed: number; health: number },
     defenderGuardianBonus?: { strength: number; defense: number; speed: number; health: number },
-    defenderPhreakBonus?: { range: number }
+    defenderPhreakBonus?: { strength: number; defense: number; speed: number; health: number }
   ): Promise<{ success: boolean; battalion?: IBattalion; botType?: 'guardian' | 'breacher' | 'phreak'; quantity?: number }> {
     try {
       // Find available bot types with remaining quantities
@@ -278,7 +278,7 @@ export class DefenderDeploymentService {
     defenderLevel: number,
     defenderArmyBonus?: { strength: number; defense: number; speed: number; health: number },
     defenderGuardianBonus?: { strength: number; defense: number; speed: number; health: number },
-    defenderPhreakBonus?: { range: number }
+    defenderPhreakBonus?: { strength: number; defense: number; speed: number; health: number }
   ): Promise<IBattalion> {
     // Generate unique battalion ID
     const battalionId = `defender-battalion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

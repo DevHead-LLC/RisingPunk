@@ -147,7 +147,7 @@ export class BattalionService {
     userBattalions?: Array<{ type: string; quantity: number }>,
     armyBonus?: ArmyBonus,
     guardianBonus?: ArmyBonus,
-    phreakBonus?: { range: number }
+    phreakBonus?: { strength: number; defense: number; speed: number; health: number }
   ): Promise<IBattalion[]> {
     if (!userBattalions || userBattalions.length === 0) {
       return [];
