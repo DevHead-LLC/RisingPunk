@@ -192,6 +192,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
           setWin(true);
           setClaimError(false);
         } catch {
+          setWin(true);
           setClaimError(true);
         }
       } else if (result.lostAllFlips) {
