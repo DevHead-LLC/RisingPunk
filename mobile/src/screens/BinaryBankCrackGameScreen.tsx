@@ -14,7 +14,6 @@ import {
   useStartBinaryBankCrackSessionMutation,
   useSubmitBinaryBankCrackRegistersMutation,
   useClaimBinaryBankCrackLevelMutation,
-  useGetBinaryBankCrackStatusQuery,
 } from '../store/api/binaryBankCrackApi';
 import type { BinaryBankCrackSessionResponse } from '../store/api/binaryBankCrackApi';
 
@@ -76,7 +75,6 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
   const [startSession, { isLoading: starting }] = useStartBinaryBankCrackSessionMutation();
   const [submitRegisters, { isLoading: submitting }] = useSubmitBinaryBankCrackRegistersMutation();
   const [claimLevel] = useClaimBinaryBankCrackLevelMutation();
-  useGetBinaryBankCrackStatusQuery(undefined, { refetchOnMountOrArgChange: true });
 
   const registerSize = registersBits[0]?.length ?? 4;
   const bitWeights = getBitWeights(registerSize);
