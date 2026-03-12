@@ -57,7 +57,6 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
   const [flipsRemaining, setFlipsRemaining] = useState(0);
   /** Toggles since session load or last submit; each flip (0→1 or 1→0) counts. */
   const [flipsUsedThisRun, setFlipsUsedThisRun] = useState(0);
-  const [timeLimitSeconds, setTimeLimitSeconds] = useState(30);
   const [showDecimalAssist, setShowDecimalAssist] = useState(true);
   const [timeLeft, setTimeLeft] = useState(30);
   const [registerResults, setRegisterResults] = useState<boolean[] | null>(null);
@@ -67,6 +66,8 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
   const [claimError, setClaimError] = useState(false);
   const [claimingInProgress, setClaimingInProgress] = useState(false);
   const lostOrWonRef = useRef(false);
+  /** Tracks flips used this run for the toggleBit guard; updated synchronously so rapid taps cannot bypass the limit. */
+  const flipsUsedThisRunRef = useRef(0);
 
   const [startSession, { isLoading: starting }] = useStartBinaryBankCrackSessionMutation();
   const [submitRegisters, { isLoading: submitting }] = useSubmitBinaryBankCrackRegistersMutation();
@@ -84,7 +85,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       setRegistersBits(initialRegisters(count, size));
       setFlipsRemaining(initialSession.flipsRemaining);
       setFlipsUsedThisRun(0);
-      setTimeLimitSeconds(initialSession.timeLimitSeconds);
+      flipsUsedThisRunRef.current = 0;
       setTimeLeft(initialSession.timeLimitSeconds);
       setShowDecimalAssist(initialSession.showDecimalAssist ?? true);
       setRegisterResults(null);
@@ -107,7 +108,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
           setRegistersBits(initialRegisters(count, size));
           setFlipsRemaining(result.flipsRemaining);
           setFlipsUsedThisRun(0);
-          setTimeLimitSeconds(result.timeLimitSeconds);
+          flipsUsedThisRunRef.current = 0;
           setTimeLeft(result.timeLimitSeconds);
           setShowDecimalAssist(result.showDecimalAssist ?? true);
           setRegisterResults(null);
@@ -147,7 +148,9 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
   const toggleBit = useCallback(
     (registerIndex: number, bitIndex: number) => {
       if (win || lostByTime || lostByFlips || lostOrWonRef.current) return;
-      if (flipsDisplay <= 0) return;
+      const flipsLeft = Math.max(0, flipsRemaining - flipsUsedThisRunRef.current);
+      if (flipsLeft <= 0) return;
+      flipsUsedThisRunRef.current += 1;
       setFlipsUsedThisRun((prev) => prev + 1);
       setRegistersBits((prev) => {
         const next = prev.map((r) => [...r]);
@@ -158,7 +161,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       });
       setRegisterResults(null);
     },
-    [win, lostByTime, lostByFlips, flipsDisplay]
+    [win, lostByTime, lostByFlips, flipsRemaining]
   );
 
   /** Fail only when flips are 0 AND the combination is still wrong (not solved). */
@@ -182,6 +185,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       const result = await submitRegisters({ levelId, registers: registersBits, flipsUsed: used }).unwrap();
       setFlipsRemaining(result.flipsRemaining);
       setFlipsUsedThisRun(0);
+      flipsUsedThisRunRef.current = 0;
       if (result.registerResults) setRegisterResults(result.registerResults);
       if (result.win) {
         lostOrWonRef.current = true;

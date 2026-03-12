@@ -97,7 +97,6 @@ export function RaceConditionHeistGameScreen({
   const scoreThreshold = session?.scoreThreshold ?? 50;
   /** Tier from levelId. Tier 2–5 = 2–4 nodes, 6 = five, 7 = six, 8 = seven, 9–11 = eight, 12–13 = nine, 14–15 = ten, 16–17 = eleven, 18–19 = twelve, 20–21 = thirteen nodes. */
   const tier = levelId.includes('.') ? parseInt(levelId.split('.')[0], 10) : 1;
-  const isTier2 = tier === 2;
   const isTier3 = tier === 3;
   const isTier4 = tier === 4;
   const isTier5 = tier === 5;
