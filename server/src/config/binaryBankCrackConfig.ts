@@ -62,7 +62,7 @@ function buildAllLevels(): LevelParams[] {
         accidentalFlips: rule.accidentalFlips,
         flipLimit: 10, // legacy display; actual from computeFlipLimitForVault
         timeLimitSeconds: rule.timeSeconds,
-        showDecimalAssist: tier === 1,
+        showDecimalAssist: true,
       });
     }
   }

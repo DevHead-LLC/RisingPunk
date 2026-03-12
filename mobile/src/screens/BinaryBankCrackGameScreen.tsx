@@ -65,9 +65,13 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
   const [lostByFlips, setLostByFlips] = useState(false);
   const [claimError, setClaimError] = useState(false);
   const [claimingInProgress, setClaimingInProgress] = useState(false);
+  /** Incremented when a new session starts so the countdown effect re-runs (same vault count would otherwise not restart timer). */
+  const [sessionKey, setSessionKey] = useState(0);
   const lostOrWonRef = useRef(false);
   /** Tracks flips used this run for the toggleBit guard; updated synchronously so rapid taps cannot bypass the limit. */
   const flipsUsedThisRunRef = useRef(0);
+  /** Countdown interval id; cleared when time hits 0 so we don't depend on timeLeft in the timer effect (avoids drift). */
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [startSession, { isLoading: starting }] = useStartBinaryBankCrackSessionMutation();
   const [submitRegisters, { isLoading: submitting }] = useSubmitBinaryBankCrackRegistersMutation();
@@ -95,6 +99,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       setClaimError(false);
       setClaimingInProgress(false);
       lostOrWonRef.current = false;
+      setSessionKey((k) => k + 1);
       return;
     }
     let cancelled = false;
@@ -118,6 +123,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
           setClaimError(false);
           setClaimingInProgress(false);
           lostOrWonRef.current = false;
+          setSessionKey((k) => k + 1);
         }
       } catch {
         if (!cancelled) setWin(false);
@@ -126,21 +132,29 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
     return () => { cancelled = true; };
   }, [levelId, startSession, initialSession]);
 
+  /** Countdown: one interval per session; timeLeft not in deps to avoid clearing/recreating every tick (drift). sessionKey restarts timer when new run begins. */
   useEffect(() => {
-    if (vaultTargets.length === 0 || lostOrWonRef.current || timeLeft <= 0) return;
-    const t = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          if (!lostOrWonRef.current) {
-            lostOrWonRef.current = true;
-            setLostByTime(true);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
+    if (vaultTargets.length === 0 || lostOrWonRef.current) return;
+    countdownIntervalRef.current = setInterval(() => {
+      setTimeLeft((prev) => (prev <= 1 ? 0 : prev - 1));
     }, 1000);
-    return () => clearInterval(t);
+    return () => {
+      if (countdownIntervalRef.current != null) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [vaultTargets.length, sessionKey]);
+
+  /** When countdown hits 0, mark lost-by-time and stop the interval. */
+  useEffect(() => {
+    if (vaultTargets.length === 0 || timeLeft !== 0 || lostOrWonRef.current) return;
+    lostOrWonRef.current = true;
+    setLostByTime(true);
+    if (countdownIntervalRef.current != null) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
   }, [vaultTargets.length, timeLeft]);
 
   const flipsDisplay = Math.max(0, flipsRemaining - flipsUsedThisRun);
