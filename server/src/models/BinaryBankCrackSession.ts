@@ -11,6 +11,8 @@ export interface IBinaryBankCrackSession extends Document {
   currentRegisterIndex: number;
   /** Whether cost was already deducted at session start. */
   firstAttemptPaid: boolean;
+  /** Last register state we accepted on submit; used to compute server-authoritative flip count (not trusted from client). */
+  lastAcceptedRegisters?: number[][];
 }
 
 const binaryBankCrackSessionSchema = new Schema(
@@ -21,6 +23,7 @@ const binaryBankCrackSessionSchema = new Schema(
     flipsRemaining: { type: Number, required: true },
     currentRegisterIndex: { type: Number, required: true, default: 0 },
     firstAttemptPaid: { type: Boolean, required: true, default: false },
+    lastAcceptedRegisters: { type: [[Number]], required: false },
   },
   { collection: 'binarybankcrack_sessions', timestamps: true }
 );

@@ -26,6 +26,25 @@ function bitsToDecimal(bits: number[], registerSize: number): number {
   return n;
 }
 
+/** Minimum number of bit flips to get from last state to current (server-authoritative; do not trust client flipsUsed). */
+function minFlipsBetween(last: number[][], current: number[][]): number {
+  if (!Array.isArray(last) || !Array.isArray(current) || last.length !== current.length) return 0;
+  let count = 0;
+  for (let r = 0; r < last.length; r++) {
+    const a = last[r];
+    const b = current[r];
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) continue;
+    for (let i = 0; i < a.length; i++) {
+      if ((a[i] === 1 ? 1 : 0) !== (b[i] === 1 ? 1 : 0)) count++;
+    }
+  }
+  return count;
+}
+
+function initialRegistersBits(registerCount: number, registerSize: number): number[][] {
+  return Array.from({ length: registerCount }, () => Array.from({ length: registerSize }, () => 0));
+}
+
 /** GET /api/binary-bank-crack/status — levels completed, level configs, tier levels. */
 router.get('/status', auth, async (req: Request, res: Response) => {
   try {
@@ -162,6 +181,7 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
           flipsRemaining,
           currentRegisterIndex: 0,
           firstAttemptPaid: false,
+          lastAcceptedRegisters: initialRegistersBits(params.registerCount, params.registerSize),
         });
       } catch (createErr: unknown) {
         const code = (createErr as { code?: number })?.code;
@@ -345,7 +365,12 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       });
       return;
     }
-    const used = typeof flipsUsed === 'number' && flipsUsed >= 0 ? Math.min(flipsUsed, sessionDoc.flipsRemaining) : 0;
+    /** Server-authoritative flip count: do not trust client flipsUsed (would allow unlimited retries). */
+    const lastState =
+      sessionDoc.lastAcceptedRegisters && sessionDoc.lastAcceptedRegisters.length === params.registerCount
+        ? sessionDoc.lastAcceptedRegisters
+        : initialRegistersBits(params.registerCount, params.registerSize);
+    const used = Math.min(minFlipsBetween(lastState, registers), sessionDoc.flipsRemaining);
     const newFlipsRemaining = Math.max(0, sessionDoc.flipsRemaining - used);
 
     const vaultTargets = sessionDoc.vaultTargets;
@@ -413,7 +438,7 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
     }
     await BinaryBankCrackSession.updateOne(
       { userId: req.user!._id, levelId },
-      { $set: { flipsRemaining: newFlipsRemaining } }
+      { $set: { flipsRemaining: newFlipsRemaining, lastAcceptedRegisters: registers } }
     );
     res.json({
       win: false,
