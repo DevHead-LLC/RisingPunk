@@ -33,6 +33,39 @@ const PACKET_ACTION_LABELS = ['Exploit', 'Encrypt', 'Exfiltrate', 'Bypass', 'Ext
 /** Done labels per packet index (0–12). */
 const PACKET_DONE_LABELS = ['Stolen', 'Encrypted', 'Exfiltrated', 'Bypassed', 'Extracted', 'Offloaded', 'Purged', 'Wiped', 'Scrubbed', 'Flushed', 'Dumped', 'Cleared', 'Reset'] as const;
 
+/** "Complete previous nodes" hint per packet count (3–13). Key = packet count for this tier. */
+const COMPLETE_PREVIOUS_NODES_MESSAGES: Record<number, string> = {
+  3: 'Capture the first two nodes before exfiltrating the third.',
+  4: 'Capture the first three nodes before bypassing the fourth.',
+  5: 'Capture the first four nodes before extracting the fifth.',
+  6: 'Capture the first five nodes before offloading the sixth.',
+  7: 'Capture the first six nodes before purging the seventh.',
+  8: 'Capture the first seven nodes before wiping the eighth.',
+  9: 'Capture the first eight nodes before scrubbing the ninth.',
+  10: 'Capture the first nine nodes before flushing the tenth.',
+  11: 'Capture the first ten nodes before dumping the eleventh.',
+  12: 'Capture the first eleven nodes before clearing the twelfth.',
+  13: 'Capture the first twelve nodes before resetting the thirteenth.',
+};
+
+/** Packet count for tier (matches server getPacketCountForTier). Used for feedback message lookup. */
+function getPacketCountForTier(tier: number): number {
+  if (tier === 1) return 1;
+  if (tier === 2) return 2;
+  if (tier === 3) return 3;
+  if (tier === 4 || tier === 5) return 4;
+  if (tier === 6) return 5;
+  if (tier === 7) return 6;
+  if (tier === 8) return 7;
+  if (tier === 9 || tier === 10 || tier === 11) return 8;
+  if (tier === 12 || tier === 13) return 9;
+  if (tier === 14 || tier === 15) return 10;
+  if (tier === 16 || tier === 17) return 11;
+  if (tier === 18 || tier === 19) return 12;
+  if (tier === 20 || tier === 21) return 13;
+  return 1;
+}
+
 function canTapPacket(index: number, packets: { isHijacked?: boolean }[]): boolean {
   if (index === 0) return true;
   for (let i = 0; i < index; i++) {
@@ -660,27 +693,7 @@ export function RaceConditionHeistGameScreen({
           {lastAttemptReason === 'complete_first_node'
             ? 'Capture the first node before encrypting the second.'
             : lastAttemptReason === 'complete_previous_nodes'
-              ? thirteenPacketTier
-                ? 'Capture the first twelve nodes before resetting the thirteenth.'
-                : twelvePacketTier
-                  ? 'Capture the first eleven nodes before clearing the twelfth.'
-                  : elevenPacketTier
-                    ? 'Capture the first ten nodes before dumping the eleventh.'
-                    : tenPacketTier
-                      ? 'Capture the first nine nodes before flushing the tenth.'
-                      : ninePacketTier
-                        ? 'Capture the first eight nodes before scrubbing the ninth.'
-                        : eightPacketTier
-                          ? 'Capture the first seven nodes before wiping the eighth.'
-                          : sevenPacketTier
-                            ? 'Capture the first six nodes before purging the seventh.'
-                            : sixPacketTier
-                              ? 'Capture the first five nodes before offloading the sixth.'
-                              : fivePacketTier
-                                ? 'Capture the first four nodes before extracting the fifth.'
-                                : tier >= 4
-                                  ? 'Capture the first three nodes before bypassing the fourth.'
-                                  : 'Capture the first two nodes before exfiltrating the third.'
+              ? (COMPLETE_PREVIOUS_NODES_MESSAGES[getPacketCountForTier(tier)] ?? 'Capture the previous nodes first.')
               : lastAttemptReason === 'wrong_word'
                 ? 'Wrong word! Tap when the word before the secure word appears.'
                 : 'Missed! Tap when the word before the secure word appears.'}
