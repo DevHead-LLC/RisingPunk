@@ -162,13 +162,6 @@ export const binaryBankCrackApi = createApi({
         } catch (_) {}
       },
     }),
-    resetBinaryBankCrackSession: builder.mutation<{ success: boolean }, string>({
-      query: (levelId) => ({
-        url: '/api/binary-bank-crack/session/reset',
-        method: 'POST',
-        body: { levelId },
-      }),
-    }),
   }),
 });
 
@@ -177,5 +170,4 @@ export const {
   useStartBinaryBankCrackSessionMutation,
   useSubmitBinaryBankCrackRegistersMutation,
   useClaimBinaryBankCrackLevelMutation,
-  useResetBinaryBankCrackSessionMutation,
 } = binaryBankCrackApi;

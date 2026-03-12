@@ -13,7 +13,7 @@ import { CloseButton } from '../components/common/CloseButton';
 import { Balance } from '../components/common/Balance';
 import { SIZING } from '../styles/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { useAppSelector } from '../store/hooks';
+import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
 import {
   useGetRaceConditionHeistStatusQuery,
@@ -21,6 +21,7 @@ import {
   type RaceConditionHeistLevelConfig,
   type RaceConditionHeistSessionResponse,
 } from '../store/api/raceConditionHeistApi';
+import { balanceApi } from '../store/api/balanceApi';
 import { TIER_CONFIGS } from '../utils/programmingFacilityTierConfig';
 import { ProgrammingFacilityLevelCell } from '../components/programmingFacility/ProgrammingFacilityLevelCell';
 
@@ -58,6 +59,7 @@ const ENTRY_DEDUCTION_DELAY_MS = 1000;
 
 export function RaceConditionHeistLevelScreen({ onClose, onSelectLevel }: RaceConditionHeistLevelScreenProps) {
   const colors = useThemeColors();
+  const dispatch = useAppDispatch();
   const [showRules, setShowRules] = useState(false);
   const [startingLevelId, setStartingLevelId] = useState<string | null>(null);
   const entryDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -68,6 +70,10 @@ export function RaceConditionHeistLevelScreen({ onClose, onSelectLevel }: RaceCo
     refetchOnFocus: true,
   });
   const [startSession] = useStartRaceConditionHeistSessionMutation();
+
+  useEffect(() => {
+    dispatch(balanceApi.util.invalidateTags(['Balance']));
+  }, [dispatch]);
 
   useEffect(() => {
     return () => {
