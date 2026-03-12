@@ -450,12 +450,21 @@ export function RaceConditionHeistGameScreen({
     setClaimingInProgress(true);
     try {
       await endRun(levelId).unwrap();
-      await claimLevel(levelId).unwrap();
-      InteractionManager.runAfterInteractions(() => onCloseRef.current());
     } catch (_) {
-      setClaimError(true);
+      // Session may already be ended by in-flight auto-complete timeout; still try claim
+    }
+    try {
+      await claimLevel(levelId).unwrap();
+      setClaimError(false);
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      // 400/409 may mean already claimed by auto-complete path; avoid spurious claim error
+      if (status !== 400 && status !== 409) {
+        setClaimError(true);
+      }
     } finally {
       setClaimingInProgress(false);
+      InteractionManager.runAfterInteractions(() => onCloseRef.current());
     }
   }, [levelId, endRun, claimLevel]);
 

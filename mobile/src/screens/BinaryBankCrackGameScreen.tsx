@@ -258,7 +258,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
   }
 
   const lost = lostByTime || lostByFlips;
-  const gameOver = win || lost;
+  const gameOver = win || lost || claimingInProgress;
   /** Submit allowed with 0 flips when combination is correct; lostByFlips only when 0 flips and wrong combo. */
   const canSubmit = !gameOver && !submitting && !lostOrWonRef.current;
   const noFlipsLeft = flipsDisplay <= 0;
@@ -333,7 +333,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
         </ScrollView>
       )}
 
-      {win && (
+      {(win || claimingInProgress) && (
         <View style={styles.resultBox}>
           <Text style={[styles.resultTitle, { color: colors.success ?? colors.primary }]}>VAULT CRACKED</Text>
           <Text style={[styles.resultSub, { color: colors.text?.secondary ?? colors.primary }]}>ACCOUNT BREACH SUCCESSFUL</Text>
