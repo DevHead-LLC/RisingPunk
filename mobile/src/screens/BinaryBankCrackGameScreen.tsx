@@ -90,7 +90,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       setFlipsRemaining(initialSession.flipsRemaining);
       setFlipsUsedThisRun(0);
       flipsUsedThisRunRef.current = 0;
-      setTimeLeft(initialSession.timeLimitSeconds);
+      setTimeLeft(initialSession.timeRemainingSeconds ?? initialSession.timeLimitSeconds);
       setShowDecimalAssist(initialSession.showDecimalAssist ?? true);
       setRegisterResults(null);
       setWin(false);
@@ -114,7 +114,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
           setFlipsRemaining(result.flipsRemaining);
           setFlipsUsedThisRun(0);
           flipsUsedThisRunRef.current = 0;
-          setTimeLeft(result.timeLimitSeconds);
+          setTimeLeft(result.timeRemainingSeconds ?? result.timeLimitSeconds);
           setShowDecimalAssist(result.showDecimalAssist ?? true);
           setRegisterResults(null);
           setWin(false);
@@ -232,6 +232,14 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
         }
         setLostByTime(false);
         setLostByFlips(true);
+      } else if (result.lostByTime) {
+        lostOrWonRef.current = true;
+        if (countdownIntervalRef.current != null) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
+        setLostByTime(true);
+        setLostByFlips(false);
       }
     } catch {
       // Handled by API

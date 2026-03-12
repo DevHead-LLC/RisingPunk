@@ -64,6 +64,8 @@ export interface BinaryBankCrackSessionResponse {
   registerCount: number;
   registerSize: number;
   timeLimitSeconds: number;
+  /** Server-computed seconds left in this run (from session start); use this on reopen so timer does not reset. */
+  timeRemainingSeconds?: number;
   showDecimalAssist?: boolean;
   balance?: {
     total: number;
@@ -79,6 +81,8 @@ export interface BinaryBankCrackSubmitResponse {
   registerResults?: boolean[];
   flipsRemaining: number;
   lostAllFlips?: boolean;
+  /** True when server rejected submit because session time expired (time limit enforced on server). */
+  lostByTime?: boolean;
   balance?: {
     total: number;
     ratePerSecond: number;

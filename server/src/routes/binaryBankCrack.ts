@@ -186,13 +186,19 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
                     paramsExisting.accidentalFlips
                   )
                 : existing.flipsRemaining;
+            const limitDup = paramsExisting?.timeLimitSeconds ?? 30;
+            const createdDup = (existing as { createdAt?: Date }).createdAt;
+            const elapsedDup = createdDup
+              ? Math.floor((nowDup.getTime() - new Date(createdDup).getTime()) / 1000)
+              : 0;
             res.json({
               vaultTargets: existing.vaultTargets,
               flipsRemaining: canonicalFlipsDup,
               currentRegisterIndex: existing.currentRegisterIndex,
               registerCount: paramsExisting?.registerCount ?? existing.vaultTargets.length,
               registerSize: paramsExisting?.registerSize ?? 4,
-              timeLimitSeconds: paramsExisting?.timeLimitSeconds ?? 30,
+              timeLimitSeconds: limitDup,
+              timeRemainingSeconds: Math.max(0, limitDup - elapsedDup),
               showDecimalAssist: paramsExisting?.showDecimalAssist ?? true,
               balance: {
                 total: accruedDup.total,
@@ -229,6 +235,7 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         registerCount: params.registerCount,
         registerSize: params.registerSize,
         timeLimitSeconds: params.timeLimitSeconds,
+        timeRemainingSeconds: params.timeLimitSeconds,
         showDecimalAssist: params.showDecimalAssist,
         balance: {
           total: newTotal,
@@ -248,14 +255,21 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       balExisting?.fractionalRemainder ?? 0,
       nowExisting
     );
-    /** Resume: return stored flipsRemaining. Do not reset to full budget (would allow unlimited retries by close/reopen). */
+    /** Resume: return stored flipsRemaining and server-computed time remaining (no timer reset on reopen). */
+    const limitResume = paramsResume?.timeLimitSeconds ?? 30;
+    const createdResume = (sessionDoc as { createdAt?: Date }).createdAt;
+    const elapsedResume = createdResume
+      ? Math.floor((nowExisting.getTime() - new Date(createdResume).getTime()) / 1000)
+      : 0;
+    const timeRemainingResume = Math.max(0, limitResume - elapsedResume);
     res.json({
       vaultTargets: sessionDoc.vaultTargets,
       flipsRemaining: sessionDoc.flipsRemaining,
       currentRegisterIndex: sessionDoc.currentRegisterIndex,
       registerCount: paramsResume?.registerCount ?? sessionDoc.vaultTargets.length,
       registerSize: paramsResume?.registerSize ?? 4,
-      timeLimitSeconds: paramsResume?.timeLimitSeconds ?? 30,
+      timeLimitSeconds: limitResume,
+      timeRemainingSeconds: timeRemainingResume,
       showDecimalAssist: paramsResume?.showDecimalAssist ?? true,
       balance: {
         total: accruedExisting.total,
@@ -299,6 +313,36 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
     const sessionDoc = await BinaryBankCrackSession.findOne({ userId: req.user!._id, levelId });
     if (!sessionDoc) {
       res.status(400).json({ error: 'No active session; start a session first' });
+      return;
+    }
+    /** Enforce time limit on server so delayed or scripted requests cannot win after timer expired. */
+    const createdSubmit = (sessionDoc as { createdAt?: Date }).createdAt;
+    const elapsedSubmit = createdSubmit
+      ? Math.floor((Date.now() - new Date(createdSubmit).getTime()) / 1000)
+      : 0;
+    if (elapsedSubmit >= params.timeLimitSeconds) {
+      await BinaryBankCrackSession.deleteOne({ userId: req.user!._id, levelId });
+      const userForBal = await User.findById(userId);
+      const bal = userForBal?.balance;
+      const nowExpired = new Date();
+      const accruedExpired = accrueBalanceToTime(
+        bal?.total ?? 0,
+        bal?.ratePerSecond ?? 0,
+        bal?.lastUpdated ?? nowExpired,
+        bal?.fractionalRemainder ?? 0,
+        nowExpired
+      );
+      res.json({
+        win: false,
+        lostByTime: true,
+        registerResults: undefined,
+        flipsRemaining: sessionDoc.flipsRemaining,
+        balance: {
+          total: accruedExpired.total,
+          ratePerSecond: bal?.ratePerSecond ?? 0,
+          lastUpdated: accruedExpired.lastUpdated.toISOString(),
+        },
+      });
       return;
     }
     const used = typeof flipsUsed === 'number' && flipsUsed >= 0 ? Math.min(flipsUsed, sessionDoc.flipsRemaining) : 0;
