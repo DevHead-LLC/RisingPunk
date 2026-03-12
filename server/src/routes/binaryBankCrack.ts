@@ -248,24 +248,10 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
       balExisting?.fractionalRemainder ?? 0,
       nowExisting
     );
-    /** Use canonical flip limit from current tier config so levels (e.g. 5.2) always get correct spare flips. */
-    const canonicalFlips =
-      paramsResume && sessionDoc.vaultTargets?.length
-        ? computeFlipLimitForVault(
-            sessionDoc.vaultTargets,
-            paramsResume.registerSize,
-            paramsResume.accidentalFlips
-          )
-        : sessionDoc.flipsRemaining;
-    if (canonicalFlips !== sessionDoc.flipsRemaining) {
-      await BinaryBankCrackSession.updateOne(
-        { userId: user._id, levelId },
-        { $set: { flipsRemaining: canonicalFlips } }
-      );
-    }
+    /** Resume: return stored flipsRemaining. Do not reset to full budget (would allow unlimited retries by close/reopen). */
     res.json({
       vaultTargets: sessionDoc.vaultTargets,
-      flipsRemaining: canonicalFlips,
+      flipsRemaining: sessionDoc.flipsRemaining,
       currentRegisterIndex: sessionDoc.currentRegisterIndex,
       registerCount: paramsResume?.registerCount ?? sessionDoc.vaultTargets.length,
       registerSize: paramsResume?.registerSize ?? 4,
