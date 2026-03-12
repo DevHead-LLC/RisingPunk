@@ -21,10 +21,14 @@ const ICON_SIZE = 100;
 
 type ProgrammingFacilityLocationProps = {
   onSelectPacketBreach: () => void;
+  onSelectRaceConditionHeist: () => void;
+  onSelectBinaryBankCrack: () => void;
 };
 
 export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLocation({
   onSelectPacketBreach,
+  onSelectRaceConditionHeist,
+  onSelectBinaryBankCrack,
 }: ProgrammingFacilityLocationProps) {
   const colors = useThemeColors();
   const { width: winWidth, height: winHeight } = useWindowDimensions();
@@ -37,6 +41,16 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
   const handleOpenPacketBreach = () => {
     setShowModal(false);
     onSelectPacketBreach();
+  };
+
+  const handleOpenRaceConditionHeist = () => {
+    setShowModal(false);
+    onSelectRaceConditionHeist();
+  };
+
+  const handleOpenBinaryBankCrack = () => {
+    setShowModal(false);
+    onSelectBinaryBankCrack();
   };
 
   const modalWidth = winWidth * 0.5;
@@ -113,22 +127,33 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
                 </Text>
               </TouchableOpacity>
 
-              <View style={[styles.gameOption, styles.gameOptionLocked, { borderColor: colors.primary }]}>
-                <Text style={[styles.gameOptionTitle, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Locked
-                </Text>
+              <TouchableOpacity
+                style={[styles.gameOption, { borderColor: colors.primary }]}
+                onPress={handleOpenRaceConditionHeist}
+                activeOpacity={0.7}
+                accessible
+                accessibilityLabel="Race Condition Heist. Tap to play."
+                accessibilityRole="button"
+              >
+                <Text style={[styles.gameOptionTitle, { color: colors.primary }]}>Race Condition Heist</Text>
                 <Text style={[styles.gameOptionDesc, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Coming soon
+                  Cavalry · Hijack the packet
                 </Text>
-              </View>
-              <View style={[styles.gameOption, styles.gameOptionLocked, { borderColor: colors.primary }]}>
-                <Text style={[styles.gameOptionTitle, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Locked
-                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.gameOption, { borderColor: colors.primary }]}
+                onPress={handleOpenBinaryBankCrack}
+                activeOpacity={0.7}
+                accessible
+                accessibilityLabel="Binary Bank Crack. Tap to play."
+                accessibilityRole="button"
+              >
+                <Text style={[styles.gameOptionTitle, { color: colors.primary }]}>Binary Bank Crack</Text>
                 <Text style={[styles.gameOptionDesc, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Coming soon
+                  Range · Phreaks
                 </Text>
-              </View>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -208,9 +233,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: SIZING.spacing.md,
     marginBottom: SIZING.spacing.sm,
-  },
-  gameOptionLocked: {
-    opacity: 0.6,
   },
   gameOptionTitle: {
     fontSize: SIZING.font.body,

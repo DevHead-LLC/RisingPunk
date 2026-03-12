@@ -29,7 +29,11 @@ export type TurfScreenName =
   | 'research'
   | 'investmentProperty'
   | 'packetBreachLevels'
-  | 'packetBreachGame';
+  | 'packetBreachGame'
+  | 'raceConditionHeistLevels'
+  | 'raceConditionHeistGame'
+  | 'binaryBankCrackLevels'
+  | 'binaryBankCrackGame';
 
 const VALID_SCREENS: TurfScreenName[] = [
   'turf',
@@ -44,10 +48,14 @@ const VALID_SCREENS: TurfScreenName[] = [
   'investmentProperty',
   'packetBreachLevels',
   'packetBreachGame',
+  'raceConditionHeistLevels',
+  'raceConditionHeistGame',
+  'binaryBankCrackLevels',
+  'binaryBankCrackGame',
 ];
 
-/** Screens that depend on transient state (battleId, pendingDefenderUserId, pendingNpcSlug, packetBreachLevelId) not persisted. We do not persist these and fall back to 'turf' on restore to avoid restoring into a broken context. */
-const TRANSIENT_SCREENS: TurfScreenName[] = ['battlePrep', 'battle', 'packetBreachGame'];
+/** Screens that depend on transient state (battleId, pendingDefenderUserId, pendingNpcSlug, packetBreachLevelId, raceConditionHeistLevelId, binaryBankCrackLevelId) not persisted. */
+const TRANSIENT_SCREENS: TurfScreenName[] = ['battlePrep', 'battle', 'packetBreachGame', 'raceConditionHeistGame', 'binaryBankCrackGame'];
 
 export interface TurfNavState {
   currentScreen: TurfScreenName;

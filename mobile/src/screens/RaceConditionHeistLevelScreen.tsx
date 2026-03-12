@@ -16,63 +16,58 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
 import {
-  useGetPacketBreachStatusQuery,
-  useStartPacketBreachSessionMutation,
-  type PacketBreachLevelConfig,
-  type PacketBreachSessionResponse,
-} from '../store/api/packetBreachApi';
+  useGetRaceConditionHeistStatusQuery,
+  useStartRaceConditionHeistSessionMutation,
+  type RaceConditionHeistLevelConfig,
+  type RaceConditionHeistSessionResponse,
+} from '../store/api/raceConditionHeistApi';
 import { balanceApi } from '../store/api/balanceApi';
 import { TIER_CONFIGS } from '../utils/programmingFacilityTierConfig';
 import { ProgrammingFacilityLevelCell } from '../components/programmingFacility/ProgrammingFacilityLevelCell';
 import { useProgrammingFacilityLevelScreen } from '../hooks/useProgrammingFacilityLevelScreen';
 
-const GAME_RULES_TEXT = `PACKET BREACH — HOW TO PLAY
+const GAME_RULES_TEXT = `RACE CONDITION HEIST — HOW TO PLAY
 
 OBJECTIVE
-Breach a secure data node by sending the correct sequence of packets (nodes). When your sequence exactly matches the hidden solution, you complete the level.
+Figure out the pattern and exploit the server before time runs out. You have one timer: the match clock. Later tiers have less time and faster word cycles.
 
-NODE POOL
-A grid of nodes is shown for each level. Each node has:
-• Protocol (e.g. TCP, UDP, SSH)
-• Port number
-Tap nodes to build your sequence, then submit one guess at a time.
+THE PATTERN
+Words rotate one at a time. The last word in each cycle is always a "secure" word (Lock, Encrypt, Secure, Shield, Harden, Sanitize, Seal, Guard, etc.). Tap the action when the word BEFORE that secure word appears — that's your only window. If you tap on any other word (except the secure word on tiers 5+), you miss and your combo resets. Word cycles: tiers 1–3 = 3 words; tiers 4–5 = 4 words; tier 6 = 5 words; tier 7 = 6 words; tier 8 = 7 words; tier 9 = 8 words; tiers 10–21 = 10 words (max).
 
-ATTEMPTS
-Each level gives you a limited number of guess attempts. You pick a sequence of nodes (same length as the solution) and submit it as one guess. Each attempt costs the level's fee, deducted from your balance when you submit. When you run out of attempts or balance, the level ends for that session.
+ACTIONS
+• Watch the rotating word.
+• Tap the action for the current node (Exploit, Encrypt, Exfiltrate, Bypass, Extract, Offload, Purge, and on higher tiers Wipe, Scrub, Flush) when you see the word that comes right before the secure word in the cycle.
+• Never tap when the secure word is showing (tiers 5 and above — see FATAL FAILURE below).
 
-GUESS RESPONSES (HINTS)
-After each guess you get counts only — which slot is which is not revealed:
-• Routed — A packet that is correct and in the correct position in the sequence.
-• Misrouted — A packet that is correct but in the wrong position.
-• Rejected — A packet that does not belong in the solution (wrong choice or breaks the rule).
-Use these counts to narrow down the solution on your next guess.
+MULTI-NODE TIERS (2–21)
+• Tier 2: two nodes. Tier 3: three. Tiers 4–5: four nodes. Tier 6: five. Tier 7: six. Tier 8: seven (… Offload → Purge). Tier 9–11: eight nodes (… Purge → Wipe). Tier 12–13: nine nodes (… Wipe → Scrub). Tier 14–15: ten nodes (… Scrub → Flush). Tier 16–17: eleven. Tier 18–19: twelve. Tier 20–21: thirteen. The packet row scrolls when there are 6 or more nodes. Each phase gets a new word set; capture all nodes to pass. Required score = number of nodes × 50 (e.g. tier 15 = 10 nodes, need 500). Tiers 5+ have faster word cycles and less time; tiers 9+ use 8- or 10-word cycles and longer wrong-word cooldowns.
 
-RULES BY TIER
-• From level 1: Every level has a hidden trap (anti-solution) sequence. If your guess exactly matches this trap sequence, you lose all remaining attempts for that run ("You've Been Traced!"). Use the Routed / Misrouted / Rejected hints to avoid the trap and find the real solution.
-• Tiers 1–6: The solution is a hidden sequence of three nodes from a pool of three. It is randomized each time you start or retry a level.
-• Tier 7–12: The node pool has four nodes; one is a decoy (you don't know which). The solution uses only three of them. If you include the decoy in your sequence, that attempt returns no hint (no Routed/Misrouted/Rejected). The anti-solution (trap) still applies.
-• Tier 13 and above: The node pool has five nodes; one is a decoy. The solution uses three of the other four. Same decoy rule: including the decoy gives no hint. The anti-solution (trap) still applies.
+FATAL FAILURE (tiers 5 and above)
+• If you tap when the secure word is displayed, you are traced immediately: "You've been traced! FATAL FAILURE." The run ends and you are returned to level select. No second chances — start a new run to try again.
 
-WIN
-Your sequence exactly matches the solution → you breach the node and complete the level. Complete all levels in a tier to unlock that tier's Infantry reward.`;
+SCORING
+Score = packet value × exploit multiplier × combo. Combo builds when you steal in quick succession (2 = 1.2×, 4 = 1.5×, 6 = 2×). Failed exploit resets combo.
 
-type PacketBreachLevelScreenProps = {
+TIER REWARDS
+Complete all 5 levels in a tier to unlock that tier's Cavalry (Guardian) stat reward.`;
+
+type RaceConditionHeistLevelScreenProps = {
   onClose: () => void;
-  /** levelId and optional session from startSession (avoids game screen calling startSession again and double-charging). */
-  onSelectLevel: (levelId: string, session?: PacketBreachSessionResponse) => void;
+  onSelectLevel: (levelId: string, session?: RaceConditionHeistSessionResponse) => void;
 };
 
 const ENTRY_DEDUCTION_DELAY_MS = 1000;
 
-export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreachLevelScreenProps) {
+export function RaceConditionHeistLevelScreen({ onClose, onSelectLevel }: RaceConditionHeistLevelScreenProps) {
   const colors = useThemeColors();
   const dispatch = useAppDispatch();
   const [showRules, setShowRules] = useState(false);
   const balance = useAppSelector(getCurrentBalance);
-  const { data: status, isLoading, error } = useGetPacketBreachStatusQuery(undefined, {
+  const { data: status, isLoading, error } = useGetRaceConditionHeistStatusQuery(undefined, {
     pollingInterval: 60000,
+    refetchOnFocus: true,
   });
-  const [startSessionMutation] = useStartPacketBreachSessionMutation();
+  const [startSessionMutation] = useStartRaceConditionHeistSessionMutation();
 
   useEffect(() => {
     dispatch(balanceApi.util.invalidateTags(['Balance']));
@@ -81,7 +76,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
   const levelConfigs = status?.levelConfigs ?? [];
   const numericBalance = typeof balance === 'number' ? balance : 0;
 
-  const { startingLevelId, handleClose, handleSelectLevel } = useProgrammingFacilityLevelScreen<PacketBreachSessionResponse>({
+  const { startingLevelId, handleClose, handleSelectLevel } = useProgrammingFacilityLevelScreen<RaceConditionHeistSessionResponse>({
     levelConfigs,
     numericBalance,
     startSession: (levelId) => startSessionMutation(levelId).unwrap(),
@@ -90,7 +85,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
     entryDeductionDelayMs: ENTRY_DEDUCTION_DELAY_MS,
     onStartSessionError: (err) => {
       if ((err as { status?: number })?.status === 402) {
-        // Insufficient funds (e.g. balance changed); no further handling
+        // Insufficient funds; no further handling
       }
     },
   });
@@ -114,7 +109,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={handleClose} />
       <Balance />
-      <Text style={[styles.title, { color: colors.primary }]}>Program Infantry for Tiered Awards</Text>
+      <Text style={[styles.title, { color: colors.primary }]}>Program Cavalry for Tiered Awards</Text>
       <TouchableOpacity
         onPress={() => setShowRules(true)}
         style={[styles.rulesButton, { borderColor: colors.primary }]}
@@ -148,7 +143,6 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
                         canAfford={numericBalance >= (config.cost ?? 0)}
                         isSessionStarting={startingLevelId !== null}
                         isThisLevelStarting={startingLevelId === config.levelId}
-                        costLabelSuffix=" per attempt"
                       />
                     ))}
                   </View>
@@ -160,7 +154,11 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
                     achieved && { borderColor: colors.success ?? colors.matrix ?? colors.primary },
                   ]}
                   accessible
-                  accessibilityLabel={achieved ? `Tier ${tier} reward unlocked: ${rewardLabel}` : `Tier ${tier} reward: complete levels ${levelRange} to unlock ${rewardLabel}`}
+                  accessibilityLabel={
+                    achieved
+                      ? `Tier ${tier} reward unlocked: ${rewardLabel}`
+                      : `Tier ${tier} reward: complete levels ${levelRange} to unlock ${rewardLabel}`
+                  }
                   accessibilityRole="text"
                 >
                   <Text style={[styles.tierRewardTitle, { color: colors.text?.secondary ?? colors.primary }]}>
@@ -229,7 +227,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
               </Text>
             </ScrollView>
             <TouchableOpacity
-              style={[styles.rulesClose, { borderColor: colors.primary }]}
+              style={[styles.rulesCloseBtn, { borderColor: colors.primary }]}
               onPress={() => setShowRules(false)}
             >
               <Text style={[styles.rulesCloseText, { color: colors.primary }]}>Close</Text>
@@ -252,6 +250,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: SIZING.spacing.md,
   },
+  errorText: { fontSize: SIZING.font.body, textAlign: 'center', marginTop: SIZING.spacing.lg },
   rulesButton: {
     alignSelf: 'flex-start',
     borderWidth: 1,
@@ -260,40 +259,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZING.spacing.sm,
     marginBottom: SIZING.spacing.md,
   },
-  rulesButtonText: {
-    fontSize: SIZING.font.small,
-    fontWeight: '500',
-  },
-  loader: {
-    marginTop: SIZING.spacing.xl,
-  },
-  tierScroll: {
-    flex: 1,
-  },
-  tierScrollContent: {
-    paddingBottom: SIZING.spacing.lg,
-  },
+  rulesButtonText: { fontSize: SIZING.font.small, fontWeight: '500' },
+  loader: { marginTop: SIZING.spacing.xl },
+  tierScroll: { flex: 1 },
+  tierScrollContent: { paddingBottom: SIZING.spacing.lg },
   tierRow: {
-    marginTop: SIZING.spacing.sm,
-    marginBottom: SIZING.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SIZING.spacing.lg,
     flexWrap: 'wrap',
+    marginTop: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.lg,
   },
-  tierLeft: {
-    flexDirection: 'column',
-  },
-  tierLabel: {
-    fontSize: SIZING.font.body,
-    fontWeight: '600',
-    marginBottom: SIZING.spacing.xs,
-  },
-  levelRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SIZING.spacing.sm,
-  },
+  tierLeft: { flexDirection: 'column' },
+  tierLabel: { fontSize: SIZING.font.body, fontWeight: '600', marginBottom: SIZING.spacing.xs },
+  levelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SIZING.spacing.sm },
   tierRewardBox: {
     borderWidth: 1,
     borderRadius: 8,
@@ -302,23 +282,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tierRewardTitle: {
-    fontSize: SIZING.font.small,
-    fontWeight: '600',
-    marginBottom: SIZING.spacing.xs,
-  },
-  tierRewardValue: {
-    fontSize: SIZING.font.body,
-    fontWeight: '700',
-    marginBottom: SIZING.spacing.xs,
-  },
-  tierRewardHint: {
-    fontSize: SIZING.font.small,
-  },
-  errorText: {
-    fontSize: SIZING.font.body,
-    marginTop: SIZING.spacing.lg,
-  },
+  tierRewardTitle: { fontSize: SIZING.font.small, fontWeight: '600', marginBottom: SIZING.spacing.xs },
+  tierRewardValue: { fontSize: SIZING.font.body, fontWeight: '700', marginBottom: SIZING.spacing.xs },
+  tierRewardHint: { fontSize: SIZING.font.small },
   rulesOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -343,11 +309,8 @@ const styles = StyleSheet.create({
     paddingRight: SIZING.spacing.sm,
     paddingBottom: SIZING.spacing.lg,
   },
-  rulesText: {
-    fontSize: SIZING.font.small,
-    lineHeight: 22,
-  },
-  rulesClose: {
+  rulesText: { fontSize: SIZING.font.small, lineHeight: 22 },
+  rulesCloseBtn: {
     borderWidth: 1,
     borderRadius: 6,
     paddingVertical: SIZING.spacing.xs,
@@ -355,7 +318,5 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     marginTop: SIZING.spacing.md,
   },
-  rulesCloseText: {
-    fontSize: SIZING.font.small,
-  },
+  rulesCloseText: { fontSize: SIZING.font.small },
 });

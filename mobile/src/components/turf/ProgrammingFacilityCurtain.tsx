@@ -30,13 +30,21 @@ export const ProgrammingFacilityCurtain = memo(function ProgrammingFacilityCurta
   showUnlockPrice,
 }: ProgrammingFacilityCurtainProps) {
   const balanceTotal = useAppSelector((state) => state.balance?.total ?? 0);
-  const [unlock, { isLoading }] = useUnlockProgrammingFacilityMutation();
+  const [unlock, { isLoading, isError, error }] = useUnlockProgrammingFacilityMutation();
 
   const canAfford = balanceTotal >= PROGRAMMING_FACILITY_UNLOCK_COST;
   const handleUnlock = () => {
     if (!showUnlockPrice || !canAfford || isLoading) return;
     unlock();
   };
+
+  const unlockErrorMessage =
+    isError && error
+      ? (error as { status?: number; data?: { error?: string } }).status === 402 ||
+        (error as { data?: { error?: string } }).data?.error === 'Insufficient funds'
+        ? 'Insufficient funds.'
+        : 'Unlock failed. Try again.'
+      : null;
 
   return (
     <View style={[styles.curtain, { backgroundColor: '#0a0f0a' }]}>
@@ -52,30 +60,35 @@ export const ProgrammingFacilityCurtain = memo(function ProgrammingFacilityCurta
       {/* Center content: lock (1–19) or price (20) */}
       <View style={styles.centerContent} pointerEvents="box-none">
         {showUnlockPrice ? (
-          <TouchableOpacity
-            style={styles.priceTouchable}
-            onPress={handleUnlock}
-            disabled={!canAfford || isLoading}
-            activeOpacity={0.8}
-            accessible
-            accessibilityLabel={`Unlock Programming Facility for $${PROGRAMMING_FACILITY_UNLOCK_COST.toLocaleString()}. ${canAfford ? 'Tap to unlock.' : 'Insufficient funds.'}`}
-            accessibilityRole="button"
-          >
-            <View style={[styles.priceBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#60A5FA" />
-              ) : (
-                <>
-                  <Text style={[styles.priceText, { color: '#60A5FA' }]}>
-                    ${PROGRAMMING_FACILITY_UNLOCK_COST.toLocaleString()}
-                  </Text>
-                  <Text style={[styles.priceSubtext, { color: '#60A5FA' }]}>
-                    Tap to unlock
-                  </Text>
-                </>
-              )}
-            </View>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={styles.priceTouchable}
+              onPress={handleUnlock}
+              disabled={!canAfford || isLoading}
+              activeOpacity={0.8}
+              accessible
+              accessibilityLabel={`Unlock Programming Facility for $${PROGRAMMING_FACILITY_UNLOCK_COST.toLocaleString()}. ${canAfford ? 'Tap to unlock.' : 'Insufficient funds.'}`}
+              accessibilityRole="button"
+            >
+              <View style={[styles.priceBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#60A5FA" />
+                ) : (
+                  <>
+                    <Text style={[styles.priceText, { color: '#60A5FA' }]}>
+                      ${PROGRAMMING_FACILITY_UNLOCK_COST.toLocaleString()}
+                    </Text>
+                    <Text style={[styles.priceSubtext, { color: '#60A5FA' }]}>
+                      Tap to unlock
+                    </Text>
+                  </>
+                )}
+              </View>
+            </TouchableOpacity>
+            {unlockErrorMessage ? (
+              <Text style={styles.unlockError}>{unlockErrorMessage}</Text>
+            ) : null}
+          </>
         ) : (
           <View style={[styles.lockBadge, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
             <Text style={styles.lockEmoji}>🔒</Text>
@@ -153,5 +166,11 @@ const styles = StyleSheet.create({
   priceSubtext: {
     fontSize: SIZING.font.small,
     marginTop: SIZING.spacing.xs,
+  },
+  unlockError: {
+    marginTop: SIZING.spacing.sm,
+    fontSize: SIZING.font.small,
+    color: '#f87171',
+    textAlign: 'center',
   },
 });

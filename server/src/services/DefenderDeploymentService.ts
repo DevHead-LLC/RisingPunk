@@ -103,11 +103,13 @@ export class DefenderDeploymentService {
       }
       
 
-      // Get defender's level and army bonus (e.g. Packet Breach) for bot stat scaling
+      // Get defender's level and army/guardian/phreak bonus (e.g. Packet Breach, RCH, Binary Bank Crack) for bot stat scaling
       const UserModel = mongoose.model('User');
       const defender = await UserModel.findById(battle.defenderId);
       const defenderLevel = defender?.level || 1;
       const defenderArmyBonus = defender?.armyBonus;
+      const defenderGuardianBonus = defender?.guardianBonus;
+      const defenderPhreakBonus = defender?.phreakBonus;
 
       // Check if we have any bots left to deploy
       const totalAvailable = Object.values(defenderBots.bots).reduce((sum: number, count: any) => sum + (count || 0), 0);
@@ -127,7 +129,7 @@ export class DefenderDeploymentService {
       let remainingBots = { ...defenderBots.bots };
       
       for (let i = 0; i < maxBattalionsThisTick; i++) {
-        const deploymentResult = await this.prepareSingleBattalion(battle, remainingBots, defenderLevel, defenderArmyBonus);
+        const deploymentResult = await this.prepareSingleBattalion(battle, remainingBots, defenderLevel, defenderArmyBonus, defenderGuardianBonus, defenderPhreakBonus);
         
         if (deploymentResult.success && deploymentResult.battalion && deploymentResult.botType && deploymentResult.quantity) {
           deployments.push({
@@ -211,10 +213,12 @@ export class DefenderDeploymentService {
    * Prepare a single battalion without updating inventory
    */
   private static async prepareSingleBattalion(
-    battle: IBattleDocument, 
-    remainingBots: any, 
+    battle: IBattleDocument,
+    remainingBots: any,
     defenderLevel: number,
-    defenderArmyBonus?: { strength: number; defense: number; speed: number; health: number }
+    defenderArmyBonus?: { strength: number; defense: number; speed: number; health: number },
+    defenderGuardianBonus?: { strength: number; defense: number; speed: number; health: number },
+    defenderPhreakBonus?: { strength: number; defense: number; speed: number; health: number }
   ): Promise<{ success: boolean; battalion?: IBattalion; botType?: 'guardian' | 'breacher' | 'phreak'; quantity?: number }> {
     try {
       // Find available bot types with remaining quantities
@@ -246,7 +250,9 @@ export class DefenderDeploymentService {
         selectedType as BotType,
         quantity,
         defenderLevel,
-        defenderArmyBonus
+        defenderArmyBonus,
+        defenderGuardianBonus,
+        defenderPhreakBonus
       );
 
       return {
@@ -270,7 +276,9 @@ export class DefenderDeploymentService {
     botType: BotType,
     quantity: number,
     defenderLevel: number,
-    defenderArmyBonus?: { strength: number; defense: number; speed: number; health: number }
+    defenderArmyBonus?: { strength: number; defense: number; speed: number; health: number },
+    defenderGuardianBonus?: { strength: number; defense: number; speed: number; health: number },
+    defenderPhreakBonus?: { strength: number; defense: number; speed: number; health: number }
   ): Promise<IBattalion> {
     // Generate unique battalion ID
     const battalionId = `defender-battalion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -282,7 +290,9 @@ export class DefenderDeploymentService {
       quantity,
       defenderLevel,
       nodes,
-      defenderArmyBonus
+      defenderArmyBonus,
+      defenderGuardianBonus,
+      defenderPhreakBonus
     );
   }
 

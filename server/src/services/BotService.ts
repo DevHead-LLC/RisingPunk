@@ -13,11 +13,24 @@ export interface ArmyBonus {
   health: number;
 }
 
+/** Optional Cavalry (Guardian) bonus from e.g. Race Condition Heist tier rewards; applied only when botType is guardian. */
+export type GuardianBonus = ArmyBonus;
+
+/** Programming bonus for Range bot type (Phreaks) from Binary Bank Crack. Same stats as Infantry/Cavalry: strength, defense, speed, health. Applied in battle, Digital Barracks, and Profile > Stats. */
+export interface PhreakBonus {
+  strength: number;
+  defense: number;
+  speed: number;
+  health: number;
+}
+
 export class BotService {
   static async getUserBotStats(
     botType: string,
     userLevel: number,
-    armyBonus?: ArmyBonus
+    armyBonus?: ArmyBonus,
+    guardianBonus?: GuardianBonus,
+    phreakBonus?: PhreakBonus
   ): Promise<BotConfig> {
     try {
       let effectiveStats = BotStatsService.computeEffectiveBotStats(botType, userLevel);
@@ -29,6 +42,30 @@ export class BotService {
           defense: effectiveStats.defense + armyBonus.defense,
           speed: effectiveStats.speed + armyBonus.speed,
         };
+      }
+      if (botType === 'guardian' && guardianBonus) {
+        effectiveStats = {
+          ...effectiveStats,
+          offense: effectiveStats.offense + guardianBonus.strength,
+          health: effectiveStats.health + guardianBonus.health,
+          defense: effectiveStats.defense + guardianBonus.defense,
+          speed: effectiveStats.speed + guardianBonus.speed,
+        };
+      }
+      // Range bot type (Phreaks): programming bonus is Attack/Health/Defense/Speed, same as Infantry/Cavalry. Not "attack range" stat.
+      if (botType === 'phreak' && phreakBonus) {
+        const p = phreakBonus as PhreakBonus & { range?: number };
+        if (typeof p.strength === 'number' || typeof p.health === 'number') {
+          effectiveStats = {
+            ...effectiveStats,
+            offense: effectiveStats.offense + (p.strength ?? 0),
+            health: effectiveStats.health + (p.health ?? 0),
+            defense: effectiveStats.defense + (p.defense ?? 0),
+            speed: effectiveStats.speed + (p.speed ?? 0),
+          };
+        } else if (typeof p.range === 'number') {
+          effectiveStats = { ...effectiveStats, range: effectiveStats.range + p.range };
+        }
       }
       const role = BotStatsService.getBotRole(botType);
       return {
