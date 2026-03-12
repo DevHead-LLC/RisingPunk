@@ -22,43 +22,12 @@ import {
   type BinaryBankCrackSessionResponse,
 } from '../store/api/binaryBankCrackApi';
 import { balanceApi } from '../store/api/balanceApi';
-
-const TIER_COUNT = 21;
-
-/** Same tier reward labels as Packet Breach and Race Condition Heist (Attack / Health / Defense cycle). */
-const TIER_CONFIGS: { tier: number; rewardLabel: string; levelRange: string }[] = [
-  { tier: 1, rewardLabel: 'Attack +0.5', levelRange: '1.1–1.5' },
-  { tier: 2, rewardLabel: 'Health +1', levelRange: '2.1–2.5' },
-  { tier: 3, rewardLabel: 'Defense +0.10%', levelRange: '3.1–3.5' },
-  { tier: 4, rewardLabel: 'Attack +1', levelRange: '4.1–4.5' },
-  { tier: 5, rewardLabel: 'Health +2', levelRange: '5.1–5.5' },
-  { tier: 6, rewardLabel: 'Defense +0.30%', levelRange: '6.1–6.5' },
-  { tier: 7, rewardLabel: 'Attack +1.5', levelRange: '7.1–7.5' },
-  { tier: 8, rewardLabel: 'Health +3', levelRange: '8.1–8.5' },
-  { tier: 9, rewardLabel: 'Defense +0.50%', levelRange: '9.1–9.5' },
-  { tier: 10, rewardLabel: 'Attack +2', levelRange: '10.1–10.5' },
-  { tier: 11, rewardLabel: 'Health +4', levelRange: '11.1–11.5' },
-  { tier: 12, rewardLabel: 'Defense +0.70%', levelRange: '12.1–12.5' },
-  { tier: 13, rewardLabel: 'Attack +2.5', levelRange: '13.1–13.5' },
-  { tier: 14, rewardLabel: 'Health +5', levelRange: '14.1–14.5' },
-  { tier: 15, rewardLabel: 'Defense +0.90%', levelRange: '15.1–15.5' },
-  { tier: 16, rewardLabel: 'Attack +3', levelRange: '16.1–16.5' },
-  { tier: 17, rewardLabel: 'Health +6', levelRange: '17.1–17.5' },
-  { tier: 18, rewardLabel: 'Defense +1.10%', levelRange: '18.1–18.5' },
-  { tier: 19, rewardLabel: 'Attack +3.5', levelRange: '19.1–19.5' },
-  { tier: 20, rewardLabel: 'Health +7', levelRange: '20.1–20.5' },
-  { tier: 21, rewardLabel: 'Defense +1.30%', levelRange: '21.1–21.5' },
-];
-
-function getTierRewardLabel(tier: number): string {
-  const config = TIER_CONFIGS.find((c) => c.tier === tier);
-  return config?.rewardLabel ?? `Tier ${tier}`;
-}
-
-function getTierLevelRange(tier: number): string {
-  const config = TIER_CONFIGS.find((c) => c.tier === tier);
-  return config?.levelRange ?? `${tier}.1–${tier}.5`;
-}
+import {
+  TIER_COUNT,
+  getTierRewardLabel,
+  getTierLevelRange,
+} from '../utils/programmingFacilityTierConfig';
+import { ProgrammingFacilityLevelCell } from '../components/programmingFacility/ProgrammingFacilityLevelCell';
 
 const GAME_RULES_TEXT = `BINARY BANK CRACK — HOW TO PLAY
 
@@ -86,78 +55,6 @@ type BinaryBankCrackLevelScreenProps = {
   onClose: () => void;
   onSelectLevel: (levelId: string, session?: BinaryBankCrackSessionResponse) => void;
 };
-
-function formatCost(cost: number): string {
-  return `$${cost.toLocaleString()}`;
-}
-
-function LevelCell({
-  config,
-  colors,
-  onPress,
-  canAfford,
-  isSessionStarting,
-  isThisLevelStarting,
-}: {
-  config: BinaryBankCrackLevelConfig;
-  colors: ReturnType<typeof useThemeColors>;
-  onPress: () => void;
-  canAfford: boolean;
-  isSessionStarting: boolean;
-  isThisLevelStarting: boolean;
-}) {
-  const canTap = config.isUnlocked && !config.isCompleted && canAfford && !isSessionStarting;
-  const costLabel = formatCost(config.cost ?? 0);
-  const content = (
-    <View
-      style={[
-        styles.levelBox,
-        { borderColor: colors.primary },
-        !config.isUnlocked && styles.levelBoxLocked,
-        config.isCompleted && styles.levelBoxCompleted,
-        config.isUnlocked && !config.isCompleted && !canAfford && styles.levelBoxCantAfford,
-      ]}
-    >
-      <Text style={[styles.levelLabel, { color: colors.text?.secondary ?? colors.primary }]}>
-        {config.levelId}
-      </Text>
-      <Text style={[styles.levelCost, { color: colors.text?.secondary ?? colors.primary }]}>
-        {costLabel}
-      </Text>
-      {isThisLevelStarting && (
-        <View style={styles.levelOverlay} pointerEvents="none">
-          <ActivityIndicator size="small" color={colors.primary} />
-        </View>
-      )}
-      {config.isCompleted && !isThisLevelStarting && (
-        <View style={styles.levelOverlay} pointerEvents="none">
-          <Text style={[styles.defeatedX, { color: colors.error }]}>✗</Text>
-        </View>
-      )}
-    </View>
-  );
-  if (config.isUnlocked && !config.isCompleted) {
-    return (
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.7}
-        disabled={!canAfford || isSessionStarting}
-        accessible
-        accessibilityLabel={
-          isThisLevelStarting
-            ? `Level ${config.levelId}, starting...`
-            : canAfford
-              ? `Level ${config.levelId}, ${costLabel}. Tap to play.`
-              : `Level ${config.levelId}, ${costLabel}. Insufficient funds.`
-        }
-        accessibilityRole="button"
-      >
-        {content}
-      </TouchableOpacity>
-    );
-  }
-  return content;
-}
 
 const ENTRY_DEDUCTION_DELAY_MS = 1000;
 
@@ -265,7 +162,7 @@ export function BinaryBankCrackLevelScreen({ onClose, onSelectLevel }: BinaryBan
                   </Text>
                   <View style={styles.levelRow}>
                     {tierLevels.map((config) => (
-                      <LevelCell
+                      <ProgrammingFacilityLevelCell
                         key={config.levelId}
                         config={config}
                         colors={colors}
@@ -360,14 +257,6 @@ const styles = StyleSheet.create({
   tierRewardTitle: { fontSize: SIZING.font.small, fontWeight: '600', marginBottom: SIZING.spacing.xs },
   tierRewardValue: { fontSize: SIZING.font.body, fontWeight: '700', marginBottom: SIZING.spacing.xs },
   tierRewardHint: { fontSize: SIZING.font.small },
-  levelBox: { borderWidth: 1, borderRadius: 8, paddingVertical: SIZING.spacing.md, paddingHorizontal: SIZING.spacing.lg, minWidth: 64, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  levelBoxLocked: { opacity: 0.5 },
-  levelBoxCompleted: { opacity: 0.9 },
-  levelLabel: { fontSize: SIZING.font.body, fontWeight: '600' },
-  levelCost: { fontSize: SIZING.font.small, marginTop: SIZING.spacing.xs },
-  levelBoxCantAfford: { opacity: 0.7 },
-  levelOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  defeatedX: { fontSize: 24, fontWeight: '700' },
   errorText: { fontSize: SIZING.font.body, marginTop: SIZING.spacing.lg },
   rulesOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: SIZING.spacing.lg },
   rulesBox: { borderWidth: 1, borderRadius: 8, padding: SIZING.spacing.lg, maxWidth: 420, width: '90%', maxHeight: '85%', minHeight: 200 },

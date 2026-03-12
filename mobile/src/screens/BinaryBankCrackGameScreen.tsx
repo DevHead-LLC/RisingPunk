@@ -187,6 +187,10 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
     const size = registersBits[0]?.length ?? 4;
     if (registersMatchTargets(registersBits, vaultTargets, size)) return;
     lostOrWonRef.current = true;
+    if (countdownIntervalRef.current != null) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
     setLostByFlips(true);
   }, [vaultTargets, registersBits, flipsRemaining, flipsUsedThisRun, win, lostByTime, lostByFlips]);
 
@@ -203,6 +207,10 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       if (result.registerResults) setRegisterResults(result.registerResults);
       if (result.win) {
         lostOrWonRef.current = true;
+        if (countdownIntervalRef.current != null) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
         setLostByTime(false);
         setLostByFlips(false);
         setClaimingInProgress(true);
@@ -218,6 +226,10 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
         }
       } else if (result.lostAllFlips) {
         lostOrWonRef.current = true;
+        if (countdownIntervalRef.current != null) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
         setLostByTime(false);
         setLostByFlips(true);
       }
