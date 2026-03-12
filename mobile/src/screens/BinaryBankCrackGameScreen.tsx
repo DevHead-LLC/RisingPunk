@@ -187,6 +187,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
         lostOrWonRef.current = true;
         setLostByTime(false);
         setLostByFlips(false);
+        setClaimingInProgress(true);
         try {
           await claimLevel(levelId).unwrap();
           setWin(true);
@@ -194,6 +195,8 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
         } catch {
           setWin(true);
           setClaimError(true);
+        } finally {
+          setClaimingInProgress(false);
         }
       } else if (result.lostAllFlips) {
         lostOrWonRef.current = true;
