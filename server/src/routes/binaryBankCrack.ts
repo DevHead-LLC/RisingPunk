@@ -148,6 +148,20 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         }
       }
     }
+    // If existing session has expired (timer ran out), delete so player can retry and start a new run instead of instant loss loop.
+    if (sessionDoc) {
+      const expireParams = getLevelParams(sessionDoc.levelId);
+      if (expireParams) {
+        const createdExpire = (sessionDoc as { createdAt?: Date }).createdAt;
+        const elapsedExpire = createdExpire
+          ? Math.floor((Date.now() - new Date(createdExpire).getTime()) / 1000)
+          : 0;
+        if (elapsedExpire >= (expireParams.timeLimitSeconds ?? 30)) {
+          await BinaryBankCrackSession.deleteOne({ userId: user._id, levelId });
+          sessionDoc = null;
+        }
+      }
+    }
     if (!sessionDoc) {
       const cost = getCostForLevel(levelId);
       const now = new Date();

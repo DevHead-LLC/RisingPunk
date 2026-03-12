@@ -154,15 +154,6 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
                   Range · Phreaks
                 </Text>
               </TouchableOpacity>
-
-              <View style={[styles.gameOption, styles.gameOptionLocked, { borderColor: colors.primary }]}>
-                <Text style={[styles.gameOptionTitle, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Locked
-                </Text>
-                <Text style={[styles.gameOptionDesc, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Coming soon
-                </Text>
-              </View>
             </ScrollView>
           </View>
         </View>
@@ -242,9 +233,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: SIZING.spacing.md,
     marginBottom: SIZING.spacing.sm,
-  },
-  gameOptionLocked: {
-    opacity: 0.6,
   },
   gameOptionTitle: {
     fontSize: SIZING.font.body,
