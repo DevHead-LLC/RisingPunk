@@ -186,7 +186,6 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
           setWin(true);
           setClaimError(false);
         } catch {
-          setWin(true);
           setClaimError(true);
         } finally {
           setClaimingInProgress(false);
