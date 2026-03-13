@@ -588,7 +588,7 @@ export function RaceConditionHeistGameScreen({
   const phaseRotations: string[][] = [session.wordRotationPhase2 ?? [], session.wordRotationPhase3 ?? [], session.wordRotationPhase4 ?? [], session.wordRotationPhase5 ?? [], session.wordRotationPhase6 ?? [], session.wordRotationPhase7 ?? [], session.wordRotationPhase8 ?? [], session.wordRotationPhase9 ?? [], session.wordRotationPhase10 ?? [], session.wordRotationPhase11 ?? [], session.wordRotationPhase12 ?? [], session.wordRotationPhase13 ?? []];
   const phaseOffsets = [session.wordStartOffsetPhase2 ?? 0, session.wordStartOffsetPhase3 ?? 0, session.wordStartOffsetPhase4 ?? 0, session.wordStartOffsetPhase5 ?? 0, session.wordStartOffsetPhase6 ?? 0, session.wordStartOffsetPhase7 ?? 0, session.wordStartOffsetPhase8 ?? 0, session.wordStartOffsetPhase9 ?? 0, session.wordStartOffsetPhase10 ?? 0, session.wordStartOffsetPhase11 ?? 0, session.wordStartOffsetPhase12 ?? 0, session.wordStartOffsetPhase13 ?? 0];
   const sessionRecord = session as unknown as Record<string, unknown>;
-  const usePhaseFlags: boolean[] = new Array(12);
+  const usePhaseFlags: boolean[] = Array(12).fill(false);
   const phaseElapsed: number[] = new Array(12);
   for (let i = 11; i >= 0; i--) {
     const n = i + 2;
