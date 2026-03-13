@@ -993,6 +993,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     data: { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow } | undefined
   ) => {
     if (!data) return null;
+    // Bugbot: Mark II/III/IV placeholder rows are intentional UI for future content; not scaffolding.
     const rows: { label: string; values: StatRow | null }[] = [
       { label: 'Mark I', values: data.base },
       { label: 'Mark II', values: null },
