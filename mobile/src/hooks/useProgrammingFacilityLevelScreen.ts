@@ -75,10 +75,10 @@ export function useProgrammingFacilityLevelScreen<TSession = unknown>({
           return;
         }
         entryDelayTimeoutRef.current = setTimeout(() => {
+          if (!isMountedRef.current) return;
           entryDelayTimeoutRef.current = null;
           isSelectingLevelRef.current = false;
           setStartingLevelId(null);
-          if (!isMountedRef.current) return;
           onSelectLevel(levelId, result);
         }, entryDeductionDelayMs);
       } catch (err: unknown) {
