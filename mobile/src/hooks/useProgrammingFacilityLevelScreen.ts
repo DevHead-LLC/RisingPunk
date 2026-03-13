@@ -82,6 +82,7 @@ export function useProgrammingFacilityLevelScreen<TSession = unknown>({
           onSelectLevel(levelId, result);
         }, entryDeductionDelayMs);
       } catch (err: unknown) {
+        if (!isMountedRef.current) return;
         isSelectingLevelRef.current = false;
         setStartingLevelId(null);
         onStartSessionError?.(err);
