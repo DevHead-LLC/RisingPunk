@@ -180,12 +180,15 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
       setSequence([]);
       if (result.win) {
         lostOrWonRef.current = true;
+        setClaimingInProgress(true);
         try {
           await claimLevel(levelId).unwrap();
           setWin(true);
           setClaimError(false);
         } catch {
           setClaimError(true);
+        } finally {
+          setClaimingInProgress(false);
         }
       } else if (result.lostAllAttempts || result.attemptsLeft === 0) {
         lostOrWonRef.current = true;
