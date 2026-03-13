@@ -34,9 +34,12 @@ export function useProgrammingFacilityLevelScreen<TSession = unknown>({
   const [startingLevelId, setStartingLevelId] = useState<string | null>(null);
   const entryDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSelectingLevelRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (entryDelayTimeoutRef.current != null) {
         clearTimeout(entryDelayTimeoutRef.current);
         entryDelayTimeoutRef.current = null;
@@ -66,13 +69,19 @@ export function useProgrammingFacilityLevelScreen<TSession = unknown>({
       setStartingLevelId(levelId);
       try {
         const result = await startSession(levelId);
+        if (!isMountedRef.current) {
+          isSelectingLevelRef.current = false;
+          return;
+        }
         entryDelayTimeoutRef.current = setTimeout(() => {
+          if (!isMountedRef.current) return;
           entryDelayTimeoutRef.current = null;
           isSelectingLevelRef.current = false;
           setStartingLevelId(null);
           onSelectLevel(levelId, result);
         }, entryDeductionDelayMs);
       } catch (err: unknown) {
+        if (!isMountedRef.current) return;
         isSelectingLevelRef.current = false;
         setStartingLevelId(null);
         onStartSessionError?.(err);
