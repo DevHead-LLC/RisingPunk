@@ -238,28 +238,6 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
     );
   }
 
-  if (win) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <CloseButton onPress={onClose} />
-        <View style={styles.centered}>
-          <Text style={[styles.winTitle, { color: colors.success ?? colors.primary }]}>
-            Level complete!
-          </Text>
-          <Text style={[styles.winSub, { color: colors.text?.secondary ?? colors.primary }]}>
-            You breached the node.
-          </Text>
-          <TouchableOpacity
-            style={[styles.backButton, { borderColor: colors.primary }]}
-            onPress={onClose}
-          >
-            <Text style={[styles.backButtonText, { color: colors.primary }]}>Back to levels</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   if (claimError || claimingInProgress) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -290,6 +268,28 @@ export function PacketBreachGameScreen({ levelId, initialSession, onClose }: Pac
           )}
           <TouchableOpacity
             style={[styles.backButton, { borderColor: colors.primary, marginTop: SIZING.spacing.sm }]}
+            onPress={onClose}
+          >
+            <Text style={[styles.backButtonText, { color: colors.primary }]}>Back to levels</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (win) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <CloseButton onPress={onClose} />
+        <View style={styles.centered}>
+          <Text style={[styles.winTitle, { color: colors.success ?? colors.primary }]}>
+            Level complete!
+          </Text>
+          <Text style={[styles.winSub, { color: colors.text?.secondary ?? colors.primary }]}>
+            You breached the node.
+          </Text>
+          <TouchableOpacity
+            style={[styles.backButton, { borderColor: colors.primary }]}
             onPress={onClose}
           >
             <Text style={[styles.backButtonText, { color: colors.primary }]}>Back to levels</Text>
