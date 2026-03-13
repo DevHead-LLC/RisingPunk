@@ -249,7 +249,12 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
         }
       }
     } catch {
-      // Handled by API
+      // Timer-zero effect was skipped while submit was in flight; if it hit 0 during the failed request, apply lost-by-time so the game doesn't get stuck.
+      if (timeLeftRef.current <= 0) {
+        lostOrWonRef.current = true;
+        setLostByTime(true);
+        clearCountdown();
+      }
     } finally {
       submitInFlightRef.current = false;
     }
