@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
+import { getCurrentBalance } from '../../store/slices/balanceSlice';
 import { useUnlockProgrammingFacilityMutation } from '../../store/api/authApi';
 import { SIZING } from '../../styles/theme';
 
@@ -29,7 +30,7 @@ type ProgrammingFacilityCurtainProps = {
 export const ProgrammingFacilityCurtain = memo(function ProgrammingFacilityCurtain({
   showUnlockPrice,
 }: ProgrammingFacilityCurtainProps) {
-  const balanceTotal = useAppSelector((state) => state.balance?.total ?? 0);
+  const balanceTotal = useAppSelector(getCurrentBalance);
   const [unlock, { isLoading, isError, error }] = useUnlockProgrammingFacilityMutation();
 
   const canAfford = balanceTotal >= PROGRAMMING_FACILITY_UNLOCK_COST;
