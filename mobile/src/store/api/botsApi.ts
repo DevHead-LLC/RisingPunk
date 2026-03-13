@@ -9,6 +9,14 @@ import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
 import { trackFirstBots } from '../../services/analyticsService';
 
+export interface StatRow {
+  health: number;
+  offense: number;
+  defense: number;
+  speed: number;
+  range: number;
+}
+
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
@@ -62,6 +70,13 @@ export const botsApi = createApi({
     }),
     fetchBotStats: builder.query<{ botStats: any }, void>({
       query: () => '/api/bots/stats',
+      providesTags: ['Bots'],
+    }),
+    fetchBotStatsBreakdown: builder.query<
+      { userLevel: number; breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> },
+      void
+    >({
+      query: () => '/api/bots/stats-breakdown',
       providesTags: ['Bots'],
     }),
     startBuild: builder.mutation<any, { type: BotType; quantity: number; totalCost: number }>({
@@ -147,4 +162,4 @@ export const botsApi = createApi({
   }),
 });
 
-export const { useFetchBotsQuery, useFetchBuildStateQuery, useFetchBotStatsQuery, useStartBuildMutation, useAssignToBattalionMutation, useSpeedupBotBuildMutation } = botsApi;
+export const { useFetchBotsQuery, useFetchBuildStateQuery, useFetchBotStatsQuery, useFetchBotStatsBreakdownQuery, useStartBuildMutation, useAssignToBattalionMutation, useSpeedupBotBuildMutation } = botsApi;

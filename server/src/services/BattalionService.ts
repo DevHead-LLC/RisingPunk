@@ -4,7 +4,7 @@
  */
 
 import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
-import { BotService } from './BotService';
+import { BotService, ArmyBonus } from './BotService';
 import { BattalionFactory } from './BattalionFactory';
 import { MovementService } from './MovementService';
 import { MovementState } from '../types/battle';
@@ -141,7 +141,14 @@ export class BattalionService {
     return validatedBotType;
   }
 
-  static async createUserBattalions(nodes: INode[], userLevel: number, userBattalions?: Array<{type: string, quantity: number}>): Promise<IBattalion[]> {
+  static async createUserBattalions(
+    nodes: INode[],
+    userLevel: number,
+    userBattalions?: Array<{ type: string; quantity: number }>,
+    armyBonus?: ArmyBonus,
+    guardianBonus?: ArmyBonus,
+    phreakBonus?: { strength: number; defense: number; speed: number; health: number }
+  ): Promise<IBattalion[]> {
     if (!userBattalions || userBattalions.length === 0) {
       return [];
     }
@@ -159,8 +166,8 @@ export class BattalionService {
       }
       const validatedBotType = this.validateBotType(battalion.type);
       
-      // Get stats from BotService based on user level
-      const botConfig = await BotService.getUserBotStats(validatedBotType, userLevel);
+      // Get stats from BotService (army bonus for breacher, guardian bonus for guardian, phreak bonus for phreak)
+      const botConfig = await BotService.getUserBotStats(validatedBotType, userLevel, armyBonus, guardianBonus, phreakBonus);
       
       // Random node selection from available user nodes
       // Multiple battalions can share the same node

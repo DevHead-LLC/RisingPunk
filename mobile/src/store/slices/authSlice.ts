@@ -19,6 +19,8 @@ export interface User {
   level: number;
   unlockedFeatures: {
     hackRig: boolean;
+    researchCenter?: boolean;
+    programmingFacility?: boolean;
   };
   profileGender: 'male' | 'female';
   onboardingCompleted: boolean;
@@ -958,6 +960,10 @@ export const authSlice = createSlice({
       state.user = action.payload.user;
       state.error = null;
     },
+    /** Merge server profile (e.g. from getProfile query) into auth.user so unlockedFeatures etc. stay in sync after rehydration. */
+    setUserProfileFromPayload: (state, action: PayloadAction<Record<string, unknown> | null | undefined>) => {
+      applyUserProfilePayload(state, action.payload);
+    },
     setOnboardingCompleted: (state) => {
       // Only allow onboarding completion if app is initialized
       if (!state.isInitialized) {
@@ -1020,6 +1026,11 @@ export const authSlice = createSlice({
     setUserLevel: (state, action: PayloadAction<number>) => {
       if (state.user) {
         state.user.level = action.payload;
+      }
+    },
+    setProgrammingFacilityUnlocked: (state) => {
+      if (state.user?.unlockedFeatures) {
+        state.user.unlockedFeatures.programmingFacility = true;
       }
     },
     handleAccountSwitched: (state, action) => {
@@ -1358,7 +1369,7 @@ export const authSlice = createSlice({
   },
 });
 
-export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserLevel, handleAccountSwitched } = authSlice.actions;
+export const { clearError, setCredentials, setOnboardingCompleted, setShowOnboarding, setShowTurfIntro, setShowHandleSelection, setShowEmailVerification, setShowEmailVerificationBanner, setEmailVerificationPrompted, forceRefreshData, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserLevel, setProgrammingFacilityUnlocked, setUserProfileFromPayload, handleAccountSwitched } = authSlice.actions;
 export const logout = logoutUser;
 export const googleSignIn = googleSignInUser;
 export const googleSignUp = googleSignUpUser;

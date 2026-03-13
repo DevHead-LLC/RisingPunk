@@ -5,6 +5,7 @@
 
 import { IBattalion, BotType, NodeOwner } from '../types/battle';
 import { INode } from '../types/battle';
+import { BotService } from './BotService';
 
 export class BattalionFactory {
   
@@ -48,14 +49,17 @@ export class BattalionFactory {
 
   /**
    * Create a defender battalion with proper positioning and stats
-   * Used by DefenderDeploymentService for wave spawning
+   * Used by DefenderDeploymentService for wave spawning. Optional armyBonus (e.g. Packet Breach) applied for breacher.
    */
   static async createDefenderBattalion(
     id: string,
     type: BotType,
     quantity: number,
     defenderLevel: number,
-    nodes: INode[]
+    nodes: INode[],
+    armyBonus?: { strength: number; defense: number; speed: number; health: number },
+    guardianBonus?: { strength: number; defense: number; speed: number; health: number },
+    phreakBonus?: { strength: number; defense: number; speed: number; health: number }
   ): Promise<IBattalion> {
     // Find all suitable spawn nodes (enemy-owned nodes)
     const enemyNodes = nodes.filter(node => node.owner === 'enemy');
@@ -67,9 +71,8 @@ export class BattalionFactory {
     const randomIndex = Math.floor(Math.random() * enemyNodes.length);
     const spawnNode = enemyNodes[randomIndex];
 
-    // Get actual bot stats from database for this specific bot type
-    const BotService = require('./BotService').BotService;
-    const botConfig = await BotService.getUserBotStats(type, defenderLevel);
+    // Get actual bot stats from database (army bonus for breacher, guardian bonus for guardian, phreak bonus for phreak)
+    const botConfig = await BotService.getUserBotStats(type, defenderLevel, armyBonus, guardianBonus, phreakBonus);
     
     if (!botConfig || !botConfig.stats) {
       throw new Error(`No bot stats found for type: ${type} at level ${defenderLevel}`);

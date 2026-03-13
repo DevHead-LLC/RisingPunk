@@ -2,7 +2,7 @@ import React, { memo, useEffect, useRef, useCallback } from 'react';
 import { View, Text, Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { useThemeColors } from '../hooks/useThemeColors';
-import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner } from '../store/slices/authSlice';
+import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserProfileFromPayload } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
 import { setBots, setBuildState } from '../store/slices/botsSlice';
 import { syncPreferencesFromStorage, syncPreferencesFromUser } from '../store/slices/preferencesSlice';
@@ -192,6 +192,13 @@ const AppContent = memo(() => {
       return () => clearTimeout(timer);
     }
   }, [token, dispatch]);
+
+  // Sync auth.user from fresh profile (e.g. after rehydration) so unlockedFeatures.programmingFacility etc. match server; avoids Programming Facility appearing locked until user visits profile.
+  useEffect(() => {
+    if (profileData && token) {
+      dispatch(setUserProfileFromPayload(profileData as Record<string, unknown>));
+    }
+  }, [profileData, token, dispatch]);
 
   // Sync preferences from fresh profile data from database
   useEffect(() => {

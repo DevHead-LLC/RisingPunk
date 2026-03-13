@@ -5,6 +5,7 @@ export const resetAllApiCaches = (api: any) => {
   api.dispatch({ type: 'api/resetApiState' });
   api.dispatch({ type: 'authApi/resetApiState' });
   api.dispatch({ type: 'balanceApi/resetApiState' });
+  api.dispatch({ type: 'dailyHaulApi/resetApiState' });
   api.dispatch({ type: 'botsApi/resetApiState' });
   api.dispatch({ type: 'mapApi/resetApiState' });
   api.dispatch({ type: 'battleApi/resetApiState' });
@@ -13,4 +14,7 @@ export const resetAllApiCaches = (api: any) => {
   api.dispatch({ type: 'rentalHousingApi/resetApiState' });
   api.dispatch({ type: 'researchFeaturesApi/resetApiState' });
   api.dispatch({ type: 'privateMessagesApi/resetApiState' });
+  api.dispatch({ type: 'packetBreachApi/resetApiState' });
+  api.dispatch({ type: 'raceConditionHeistApi/resetApiState' });
+  api.dispatch({ type: 'binaryBankCrackApi/resetApiState' });
 };

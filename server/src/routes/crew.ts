@@ -8,6 +8,7 @@ import { CrewChatMessage } from '../models/CrewChatMessage';
 import mongoose from 'mongoose';
 import { filterBadWords, containsBadWords, containsBadWordsAsSubstring } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
+import { accrueBalanceFromTo } from '../utils/balanceAccrual';
 
 const router = express.Router();
 
@@ -2254,12 +2255,13 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
       }
 
       const now = new Date();
-      const secondsElapsed = (now.getTime() - president.balance.lastUpdated.getTime()) / 1000;
-      const roundedSecondsElapsed = Math.floor(secondsElapsed / 10) * 10;
-      const fullPrecisionIncome = roundedSecondsElapsed * president.balance.ratePerSecond;
-      const totalWithRemainder = (president.balance.fractionalRemainder || 0) + fullPrecisionIncome;
-      const wholeDollarsToAdd = Math.floor(totalWithRemainder);
-      const currentBalance = president.balance.total + wholeDollarsToAdd;
+      const presidentAccrual = accrueBalanceFromTo({
+        lastUpdatedMs: president.balance.lastUpdated.getTime(),
+        toTimeMs: now.getTime(),
+        ratePerSecond: president.balance.ratePerSecond,
+        fractionalRemainder: president.balance.fractionalRemainder ?? 0,
+      });
+      const currentBalance = president.balance.total + presidentAccrual.wholeDollarsToAdd;
 
       if (currentBalance < totalCost) {
         await session.abortTransaction();
@@ -2299,23 +2301,23 @@ router.post('/gift-all-members', auth, async (req: GiftAllMembersRequest, res: R
       }
 
       president.balance.total = currentBalance - totalCost;
-      president.balance.fractionalRemainder = totalWithRemainder - wholeDollarsToAdd;
-      president.balance.lastUpdated = new Date(president.balance.lastUpdated.getTime() + (roundedSecondsElapsed * 1000));
+      president.balance.fractionalRemainder = presidentAccrual.newFractionalRemainder;
+      president.balance.lastUpdated = new Date(president.balance.lastUpdated.getTime() + (presidentAccrual.roundedSecondsElapsed * 1000));
       await president.save({ session });
-      
+
       for (let i = 0; i < memberUsersForTransaction.length; i++) {
         const member = memberUsersForTransaction[i];
-        const memberSecondsElapsed = (now.getTime() - member.balance.lastUpdated.getTime()) / 1000;
-        const memberRoundedSeconds = Math.floor(memberSecondsElapsed / 10) * 10;
-        const memberFullPrecisionIncome = memberRoundedSeconds * member.balance.ratePerSecond;
-        const memberTotalWithRemainder = (member.balance.fractionalRemainder || 0) + memberFullPrecisionIncome;
-        const memberWholeDollarsToAdd = Math.floor(memberTotalWithRemainder);
-        
+        const memberAccrual = accrueBalanceFromTo({
+          lastUpdatedMs: member.balance.lastUpdated.getTime(),
+          toTimeMs: now.getTime(),
+          ratePerSecond: member.balance.ratePerSecond,
+          fractionalRemainder: member.balance.fractionalRemainder ?? 0,
+        });
         const giftAmountForThisMember = baseAmountPerMember + (i < remainder ? 1 : 0);
-        
-        member.balance.total += memberWholeDollarsToAdd + giftAmountForThisMember;
-        member.balance.fractionalRemainder = memberTotalWithRemainder - memberWholeDollarsToAdd;
-        member.balance.lastUpdated = new Date(member.balance.lastUpdated.getTime() + (memberRoundedSeconds * 1000));
+
+        member.balance.total += memberAccrual.wholeDollarsToAdd + giftAmountForThisMember;
+        member.balance.fractionalRemainder = memberAccrual.newFractionalRemainder;
+        member.balance.lastUpdated = new Date(member.balance.lastUpdated.getTime() + (memberAccrual.roundedSecondsElapsed * 1000));
         await member.save({ session });
       }
 

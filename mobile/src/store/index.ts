@@ -21,6 +21,10 @@ import { researchFeaturesApi } from './api/researchFeaturesApi';
 import { leaderboardApi } from './api/leaderboardApi';
 import { userGuideApi } from './api/userGuideApi';
 import { privateMessagesApi } from './api/privateMessagesApi';
+import { dailyHaulApi } from './api/dailyHaulApi';
+import { packetBreachApi } from './api/packetBreachApi';
+import { raceConditionHeistApi } from './api/raceConditionHeistApi';
+import { binaryBankCrackApi } from './api/binaryBankCrackApi';
 
 export const store = configureStore({
   reducer: {
@@ -45,6 +49,10 @@ export const store = configureStore({
     [leaderboardApi.reducerPath]: leaderboardApi.reducer,
     [userGuideApi.reducerPath]: userGuideApi.reducer,
     [privateMessagesApi.reducerPath]: privateMessagesApi.reducer,
+    [dailyHaulApi.reducerPath]: dailyHaulApi.reducer,
+    [packetBreachApi.reducerPath]: packetBreachApi.reducer,
+    [raceConditionHeistApi.reducerPath]: raceConditionHeistApi.reducer,
+    [binaryBankCrackApi.reducerPath]: binaryBankCrackApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -65,7 +73,11 @@ export const store = configureStore({
     .concat(researchFeaturesApi.middleware)
     .concat(leaderboardApi.middleware)
     .concat(userGuideApi.middleware)
-    .concat(privateMessagesApi.middleware),
+    .concat(privateMessagesApi.middleware)
+    .concat(dailyHaulApi.middleware)
+    .concat(packetBreachApi.middleware)
+    .concat(raceConditionHeistApi.middleware)
+    .concat(binaryBankCrackApi.middleware),
   devTools: __DEV__,
 });
 
