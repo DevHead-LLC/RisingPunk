@@ -71,7 +71,6 @@ export function useProgrammingFacilityLevelScreen<TSession = unknown>({
         const result = await startSession(levelId);
         if (!isMountedRef.current) {
           isSelectingLevelRef.current = false;
-          setStartingLevelId(null);
           return;
         }
         entryDelayTimeoutRef.current = setTimeout(() => {
