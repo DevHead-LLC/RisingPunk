@@ -46,20 +46,143 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// Get bot stats from server (single source of truth)
+// Get bot stats from server (single source of truth). Used by Digital Barracks and elsewhere.
+// Range bot type (Phreaks) get Binary Bank Crack tier bonus (Attack/Health/Defense/Speed) applied here, in battle, and in stats-breakdown.
 router.get('/stats', auth, async (req, res) => {
   try {
     const { BotService } = require('../services/BotService');
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select('level armyBonus guardianBonus phreakBonus');
     const userLevel = user?.level || 1;
-    
+    const armyBonus = user?.armyBonus;
+    const guardianBonus = user?.guardianBonus;
+    const phreakBonus = user?.phreakBonus;
     const botStats: Record<string, any> = {};
     for (const botType of ['guardian', 'breacher', 'phreak']) {
-      const config = await BotService.getUserBotStats(botType, userLevel);
+      const config = await BotService.getUserBotStats(botType, userLevel, armyBonus, guardianBonus, phreakBonus);
       botStats[botType] = config;
     }
-    
     res.json({ botStats });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/** Stat row shape for breakdown (health, offense, defense, speed, range). */
+interface StatRow {
+  health: number;
+  offense: number;
+  defense: number;
+  speed: number;
+  range: number;
+}
+
+const { computePacketBreachArmyBonus } = require('../config/packetBreachConfig');
+const { computeRaceConditionHeistGuardianBonus } = require('../config/raceConditionHeistConfig');
+const { computeBinaryBankCrackPhreakBonus } = require('../config/binaryBankCrackConfig');
+// Get bot stats breakdown for profile charts (base, +level, +programming, total)
+// Total row comes from BotService.getUserBotStats (same as /stats and battles) so one source of truth.
+// Range bot type (Phreaks): programming bonus from Binary Bank Crack (Attack/Health/Defense/Speed), same pattern as PB → Infantry (breacher), RCH → Cavalry (guardian).
+router.get('/stats-breakdown', auth, async (req, res) => {
+  try {
+    const { BotService } = require('../services/BotService');
+    const BotStatsService = require('../services/BotStatsService').BotStatsService;
+    await BotStatsService.loadConfigs();
+    const user = await User.findById(req.user._id).select('level packetBreach raceConditionHeist binaryBankCrack armyBonus guardianBonus phreakBonus');
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const userLevel = user.level || 1;
+    const packetBreachLevels: string[] = Array.isArray(user.packetBreach?.levelsCompleted) ? user.packetBreach!.levelsCompleted : [];
+    const programmingFromLevels = computePacketBreachArmyBonus(packetBreachLevels);
+    const storedArmyBonus = user.armyBonus || { strength: 0, defense: 0, speed: 0, health: 0 };
+    const armyBonusMatches =
+      storedArmyBonus.strength === programmingFromLevels.strength &&
+      storedArmyBonus.defense === programmingFromLevels.defense &&
+      storedArmyBonus.speed === programmingFromLevels.speed &&
+      storedArmyBonus.health === programmingFromLevels.health;
+    if (!armyBonusMatches) {
+      await User.updateOne({ _id: user._id }, { $set: { armyBonus: programmingFromLevels } });
+    }
+    const armyBonusForStats = armyBonusMatches ? storedArmyBonus : programmingFromLevels;
+    const rchLevels: string[] = Array.isArray(user.raceConditionHeist?.levelsCompleted) ? user.raceConditionHeist!.levelsCompleted : [];
+    const programmingGuardianFromLevels = computeRaceConditionHeistGuardianBonus(rchLevels);
+    const storedGuardianBonus = user.guardianBonus || { strength: 0, defense: 0, speed: 0, health: 0 };
+    const guardianBonusMatches =
+      storedGuardianBonus.strength === programmingGuardianFromLevels.strength &&
+      storedGuardianBonus.defense === programmingGuardianFromLevels.defense &&
+      storedGuardianBonus.speed === programmingGuardianFromLevels.speed &&
+      storedGuardianBonus.health === programmingGuardianFromLevels.health;
+    if (!guardianBonusMatches) {
+      await User.updateOne({ _id: user._id }, { $set: { guardianBonus: programmingGuardianFromLevels } });
+    }
+    const guardianBonusForStats = guardianBonusMatches ? storedGuardianBonus : programmingGuardianFromLevels;
+    const bbcLevels: string[] = Array.isArray(user.binaryBankCrack?.levelsCompleted) ? user.binaryBankCrack!.levelsCompleted : [];
+    const programmingPhreakFromLevels = computeBinaryBankCrackPhreakBonus(bbcLevels);
+    const storedPhreakBonus = user.phreakBonus ?? { strength: 0, defense: 0, speed: 0, health: 0 };
+    const phreakBonusMatches =
+      storedPhreakBonus.strength === programmingPhreakFromLevels.strength &&
+      storedPhreakBonus.defense === programmingPhreakFromLevels.defense &&
+      storedPhreakBonus.speed === programmingPhreakFromLevels.speed &&
+      storedPhreakBonus.health === programmingPhreakFromLevels.health;
+    if (!phreakBonusMatches) {
+      await User.updateOne({ _id: user._id }, { $set: { phreakBonus: programmingPhreakFromLevels } });
+    }
+    const phreakBonusForStats = phreakBonusMatches ? storedPhreakBonus : programmingPhreakFromLevels;
+
+    const zeroRow = (): StatRow => ({ health: 0, offense: 0, defense: 0, speed: 0, range: 0 });
+    const breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> = {};
+
+    for (const botType of ['guardian', 'breacher', 'phreak']) {
+      const base = BotStatsService.getBaseStats(botType);
+      const effective = BotStatsService.computeEffectiveBotStats(botType, userLevel);
+      const levelBonus: StatRow = {
+        health: Math.round((effective.health - base.health) * 100) / 100,
+        offense: Math.round((effective.offense - base.offense) * 100) / 100,
+        defense: Math.round((effective.defense - base.defense) * 1000) / 1000,
+        speed: effective.speed - base.speed,
+        range: effective.range - base.range,
+      };
+      const programmingBonus: StatRow =
+        botType === 'breacher'
+          ? {
+              health: programmingFromLevels.health,
+              offense: programmingFromLevels.strength,
+              defense: programmingFromLevels.defense,
+              speed: programmingFromLevels.speed,
+              range: 0,
+            }
+          : botType === 'guardian'
+            ? {
+                health: programmingGuardianFromLevels.health,
+                offense: programmingGuardianFromLevels.strength,
+                defense: programmingGuardianFromLevels.defense,
+                speed: programmingGuardianFromLevels.speed,
+                range: 0,
+              }
+            : botType === 'phreak'
+              ? {
+                  health: (phreakBonusForStats as any).health ?? 0,
+                  offense: (phreakBonusForStats as any).strength ?? 0,
+                  defense: (phreakBonusForStats as any).defense ?? 0,
+                  speed: (phreakBonusForStats as any).speed ?? 0,
+                  range: (phreakBonusForStats as any).range ?? 0,
+                }
+              : zeroRow();
+      const researchBonus = zeroRow(); // Placeholder for future research bonuses
+      const finalConfig = await BotService.getUserBotStats(botType, userLevel, armyBonusForStats, guardianBonusForStats, phreakBonusForStats);
+      const s = finalConfig.stats;
+      const total: StatRow = {
+        health: Math.round(s.health * 100) / 100,
+        offense: Math.round(s.offense * 100) / 100,
+        defense: Math.round(s.defense * 1000) / 1000,
+        speed: Math.round(s.speed),
+        range: Math.round(s.range * 100) / 100,
+      };
+      breakdown[botType] = { base, levelBonus, programmingBonus, researchBonus, total };
+    }
+
+    res.json({ userLevel, breakdown });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

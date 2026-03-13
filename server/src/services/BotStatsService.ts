@@ -86,6 +86,7 @@ export class BotStatsService {
     }
   }
 
+  /** Returns a copy so callers cannot mutate the cached config. */
   static getBaseStats(botType: string): BotBaseStats {
     if (!this.configsLoaded) {
       throw new Error('BotStatsService configs not loaded');
@@ -96,7 +97,7 @@ export class BotStatsService {
       throw new Error(`Bot type '${botType}' not found`);
     }
 
-    return botConfig.base;
+    return { ...botConfig.base };
   }
 
   static getGrowthConfig(): GrowthConfig {
