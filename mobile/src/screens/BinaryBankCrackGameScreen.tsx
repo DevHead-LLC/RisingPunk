@@ -159,7 +159,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
 
   const toggleBit = useCallback(
     (registerIndex: number, bitIndex: number) => {
-      if (win || lostByTime || lostByFlips || lostOrWonRef.current) return;
+      if (submitting || win || lostByTime || lostByFlips || lostOrWonRef.current) return;
       const flipsLeft = Math.max(0, flipsRemaining - flipsUsedThisRunRef.current);
       if (flipsLeft <= 0) return;
       flipsUsedThisRunRef.current += 1;
@@ -173,7 +173,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       });
       setRegisterResults(null);
     },
-    [win, lostByTime, lostByFlips, flipsRemaining]
+    [submitting, win, lostByTime, lostByFlips, flipsRemaining]
   );
 
   /** Fail only when flips are 0 AND the combination is still wrong (not solved). */
@@ -309,7 +309,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
                       { borderColor: colors.primary, backgroundColor: registersBits[regIndex]?.[i] ? (colors.primary + '40') : 'transparent' },
                     ]}
                     onPress={() => toggleBit(regIndex, i)}
-                    disabled={gameOver || noFlipsLeft}
+                    disabled={gameOver || noFlipsLeft || submitting}
                     accessible
                     accessibilityLabel={`Register ${regIndex + 1}, bit ${w}, ${registersBits[regIndex]?.[i] ? 'on' : 'off'}`}
                     accessibilityRole="button"
