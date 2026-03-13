@@ -21,7 +21,7 @@ import { useGetCurrentTaskGuideTaskQuery, useUpdateTaskGuideVisibilityMutation, 
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { useGetProfileQuery, useGetResearchCenterStatusQuery, useDeleteAccountMutation, authApi } from '../store/api/authApi';
-import { useFetchBotStatsQuery, botsApi } from '../store/api/botsApi';
+import { useFetchBotStatsBreakdownQuery, botsApi, type StatRow } from '../store/api/botsApi';
 import { balanceApi } from '../store/api/balanceApi';
 import { mapApi } from '../store/api/mapApi';
 import { privateMessagesApi } from '../store/api/privateMessagesApi';
@@ -38,17 +38,6 @@ import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 import { getGuestDeviceId } from '../services/guestCredentialsStorage';
 import DeviceInfo from 'react-native-device-info';
 import { openReviewUrl, getHasOpenedReview } from '../utils/openReviewAndClaimReward';
-
-interface BotStats {
-  role: string;
-  stats: {
-    health: number;
-    offense: number;
-    defense: number;
-    speed: number;
-    range: number;
-  };
-}
 
 interface UserProfile {
   handle: string;
@@ -74,7 +63,7 @@ interface UserProfile {
   };
 }
 
-type TabType = 'profile' | 'settings' | 'account' | 'content';
+type TabType = 'profile' | 'stats' | 'settings' | 'account' | 'content';
 
 const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: number) => StyleSheet.create({
   container: {
@@ -368,47 +357,167 @@ const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: numb
     fontSize: SIZING.font.h3,
     fontWeight: 'bold',
   },
-  featuresSection: {
+  statsTabSection: {
     marginBottom: SIZING.spacing.lg,
     marginHorizontal: SIZING.spacing.sm,
-    backgroundColor: colors.background + '66',
-    borderWidth: 1,
-    borderColor: colors.matrix + '33',
-    borderRadius: 12,
-    padding: SIZING.spacing.md,
   },
-  featureItem: {
-    backgroundColor: colors.matrix + '15',
-    borderWidth: 2,
-    borderColor: colors.matrix + '66',
-    borderRadius: 10,
-    padding: SIZING.spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  statsTabSectionTitle: {
+    color: colors.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
     marginBottom: SIZING.spacing.sm,
-    shadowColor: colors.matrix,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    textAlign: 'center',
   },
-  featureLabel: {
-    color: colors.text.primary,
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  featureValue: {
-    fontSize: SIZING.font.body,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    paddingHorizontal: SIZING.spacing.sm,
-    paddingVertical: SIZING.spacing.xs,
-    borderRadius: 6,
-    backgroundColor: 'transparent',
+  statsChartCard: {
+    marginBottom: SIZING.spacing.lg,
+    marginHorizontal: SIZING.spacing.sm,
+    backgroundColor: colors.matrix + '1A',
     borderWidth: 1,
-    borderColor: colors.matrix + '40',
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.sm,
+  },
+  statsChartTitle: {
+    color: colors.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginBottom: SIZING.spacing.sm,
+    textAlign: 'center',
+  },
+  statsChartTable: {
+    borderWidth: 1,
+    borderColor: colors.matrix + '66',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  statsChartHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.matrix + '33',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.matrix + '66',
+  },
+  statsChartRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.matrix + '33',
+  },
+  statsChartRowLabel: {
+    width: 102,
+    paddingVertical: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.xs,
+    justifyContent: 'center',
+    borderRightWidth: 1,
+    borderRightColor: colors.matrix + '66',
+  },
+  statsChartHeaderCell: {
+    flex: 1,
+    minWidth: 36,
+    paddingVertical: SIZING.spacing.xs,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsChartCell: {
+    flex: 1,
+    minWidth: 36,
+    paddingVertical: SIZING.spacing.xs,
+    paddingHorizontal: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsChartHeaderText: {
+    color: colors.text.primary,
+    fontSize: Math.max(10, SIZING.font.small * 0.85),
+    fontWeight: 'bold',
+  },
+  statsChartRowLabelText: {
+    color: colors.text.secondary,
+    fontSize: Math.max(10, SIZING.font.small * 0.85),
+    fontWeight: 'bold',
+  },
+  statsChartCellText: {
+    color: colors.matrix,
+    fontSize: Math.max(10, SIZING.font.small * 0.85),
+    fontWeight: 'bold',
+  },
+  statsCompactCard: {
+    backgroundColor: colors.matrix + '1A',
+    borderWidth: 1,
+    borderColor: colors.matrix,
+    borderRadius: 8,
+    padding: SIZING.spacing.sm,
+  },
+  statsCompactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    paddingVertical: SIZING.spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.matrix + '33',
+  },
+  statsCompactRole: {
+    color: colors.matrix,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginRight: SIZING.spacing.sm,
+    width: 56,
+  },
+  statsCompactStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    flex: 1,
+    gap: SIZING.spacing.xs,
+  },
+  statsCompactStat: {
+    color: colors.matrix,
+    fontSize: Math.max(11, SIZING.font.small * 0.9),
+    fontWeight: 'bold',
+  },
+  statsCompactGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.sm,
+  },
+  statsCompactBattleItem: {
+    backgroundColor: colors.background + '99',
+    borderWidth: 1,
+    borderColor: colors.matrix + '66',
+    borderRadius: 6,
+    padding: SIZING.spacing.sm,
+    alignItems: 'center',
+    minWidth: '45%',
+    flex: 1,
+  },
+  statsCompactBattleLabel: {
+    color: colors.text.secondary,
+    fontSize: Math.max(10, SIZING.font.small * 0.85),
+    fontWeight: 'bold',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  statsCompactBattleValue: {
+    color: colors.matrix,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  statsCompactWinRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingTop: SIZING.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.matrix + '33',
+  },
+  statsCompactWinLabel: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+  },
+  statsCompactWinValue: {
+    color: colors.matrix,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
   },
   disconnectButton: {
     backgroundColor: colors.background + 'CC',
@@ -786,7 +895,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     skip: !token,
   });
 
-  const { data: botStatsData, isLoading: botStatsLoading, error: botStatsError } = useFetchBotStatsQuery(undefined, {
+  const { data: breakdownData, isLoading: breakdownLoading } = useFetchBotStatsBreakdownQuery(undefined, {
     skip: !token,
   });
   const { data: researchCenterData, isLoading: researchCenterLoading } = useGetResearchCenterStatusQuery(undefined, {
@@ -868,9 +977,73 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     return `${Math.round((successful / total) * 100)}%`;
   };
 
-  const botStats: Record<string, BotStats> = botStatsData?.botStats || {};
+  const formatStat = (value: number, isDefense: boolean): string =>
+    isDefense ? `${(value * 100).toFixed(1)}%` : String(value);
 
-  const loading = profileLoading || botStatsLoading;
+  const COLUMNS: { key: keyof StatRow; label: string; isDefense: boolean }[] = [
+    { key: 'health', label: 'HP', isDefense: false },
+    { key: 'offense', label: 'ATK', isDefense: false },
+    { key: 'defense', label: 'DEF', isDefense: true },
+    { key: 'speed', label: 'SPD', isDefense: false },
+    { key: 'range', label: 'RNG', isDefense: false },
+  ];
+
+  const renderStatsChart = (
+    title: string,
+    data: { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow } | undefined
+  ) => {
+    if (!data) return null;
+    // Bugbot: Mark II/III/IV placeholder rows are intentional UI for future content; not scaffolding.
+    const rows: { label: string; values: StatRow | null }[] = [
+      { label: 'Mark I', values: data.base },
+      { label: 'Mark II', values: null },
+      { label: 'Mark III', values: null },
+      { label: 'Mark IV', values: null },
+      { label: '+User Level', values: data.levelBonus },
+      { label: '+Programming', values: data.programmingBonus },
+      { label: '+Research', values: data.researchBonus },
+      { label: 'Mark I Total', values: data.total },
+      { label: 'Mark II Total', values: null },
+      { label: 'Mark III Total', values: null },
+      { label: 'Mark IV Total', values: null },
+    ];
+    return (
+      <View key={title} style={styles.statsChartCard}>
+        <Text style={styles.statsChartTitle}>{title}</Text>
+        <View style={styles.statsChartTable}>
+          <View style={styles.statsChartHeaderRow}>
+            <View style={styles.statsChartRowLabel}><Text style={styles.statsChartHeaderText} /></View>
+            {COLUMNS.map((col) => (
+              <View key={col.key} style={styles.statsChartHeaderCell}>
+                <Text style={styles.statsChartHeaderText}>{col.label}</Text>
+              </View>
+            ))}
+          </View>
+          {rows.map((row, rowIndex) => (
+            <View
+              key={row.label}
+              style={[styles.statsChartRow, rowIndex === rows.length - 1 && { borderBottomWidth: 0 }]}
+            >
+              <View style={styles.statsChartRowLabel}>
+                <Text style={styles.statsChartRowLabelText}>{row.label}</Text>
+              </View>
+              {COLUMNS.map((col) => (
+                <View key={col.key} style={styles.statsChartCell}>
+                  <Text style={styles.statsChartCellText}>
+                    {row.values ? formatStat(row.values[col.key], col.isDefense) : '???'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  const breakdown = breakdownData?.breakdown;
+
+  const loading = profileLoading || breakdownLoading;
 
   if (loading) {
     return (
@@ -929,6 +1102,15 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
           >
             <Text style={[styles.leftTabText, activeTab === 'profile' && styles.activeLeftTabText]}>
               PROFILE
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.leftTab, activeTab === 'stats' && styles.activeLeftTab]}
+            onPress={() => setActiveTab('stats')}
+          >
+            <Text style={[styles.leftTabText, activeTab === 'stats' && styles.activeLeftTabText]}>
+              STATS
             </Text>
           </TouchableOpacity>
           
@@ -1006,124 +1188,54 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 </View>
               </View>
 
-              {/* Bot Stats Section */}
-              <View style={styles.botStatsSection}>
-                <Text style={styles.sectionTitle}>BOT STATS</Text>
-                <View style={styles.botStatsGrid}>
-                  {Object.entries(botStats).map(([type, stats]) => (
-                    <View key={type} style={styles.botStatCard}>
-                      <View style={styles.botStatHeader}>
-                        <Text style={styles.botType}>{type.toUpperCase()}</Text>
-                        <Text style={styles.botRole}>{stats.role}</Text>
-                      </View>
-                      <View style={styles.statsGrid}>
-                        <View style={styles.statItem}>
-                          <Text style={styles.statLabel}>HP</Text>
-                          <Text style={styles.statValue}>{stats.stats.health}</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                          <Text style={styles.statLabel}>ATK</Text>
-                          <Text style={styles.statValue}>{stats.stats.offense}</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                          <Text style={styles.statLabel}>DEF</Text>
-                          <Text style={styles.statValue}>{Math.round(stats.stats.defense * 100)}%</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                          <Text style={styles.statLabel}>SPD</Text>
-                          <Text style={styles.statValue}>{stats.stats.speed}</Text>
-                        </View>
-                        <View style={styles.statItem}>
-                          <Text style={styles.statLabel}>RNG</Text>
-                          <Text style={styles.statValue}>{stats.stats.range}</Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              {/* Battle Stats Section */}
+              <TouchableOpacity style={styles.disconnectButton} onPress={handleLogout}>
+                <Text style={styles.disconnectText}>DISCONNECT</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          ) : activeTab === 'stats' ? (
+            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
+              {breakdown && (
+                <>
+                  {renderStatsChart('INFANTRY', breakdown.breacher)}
+                  {renderStatsChart('CAVALRY', breakdown.guardian)}
+                  {renderStatsChart('RANGED', breakdown.phreak)}
+                </>
+              )}
               {profile?.battleStats && (
-                <View style={styles.battleStatsSection}>
-                  <Text style={styles.sectionTitle}>BATTLE STATISTICS</Text>
-                  <View style={styles.battleStatsGrid}>
-                    <View style={styles.battleStatCard}>
-                      <Text style={styles.battleStatLabel}>Bots Destroyed</Text>
-                      <Text style={styles.battleStatValue}>{profile.battleStats.botsDestroyed}</Text>
+                <View style={styles.statsTabSection}>
+                  <Text style={styles.statsTabSectionTitle}>BATTLE STATISTICS</Text>
+                  <View style={styles.statsCompactCard}>
+                    <View style={styles.statsCompactGrid}>
+                      <View style={styles.statsCompactBattleItem}>
+                        <Text style={styles.statsCompactBattleLabel}>Bots Destroyed</Text>
+                        <Text style={styles.statsCompactBattleValue}>{profile.battleStats.botsDestroyed}</Text>
+                      </View>
+                      <View style={styles.statsCompactBattleItem}>
+                        <Text style={styles.statsCompactBattleLabel}>Bots Lost</Text>
+                        <Text style={styles.statsCompactBattleValue}>{profile.battleStats.botsLost}</Text>
+                      </View>
+                      <View style={styles.statsCompactBattleItem}>
+                        <Text style={styles.statsCompactBattleLabel}>Attacks (W/L)</Text>
+                        <Text style={styles.statsCompactBattleValue}>{profile.battleStats.successfulAttacks} / {profile.battleStats.failedAttacks}</Text>
+                      </View>
+                      <View style={styles.statsCompactBattleItem}>
+                        <Text style={styles.statsCompactBattleLabel}>Defenses (W/L)</Text>
+                        <Text style={styles.statsCompactBattleValue}>{profile.battleStats.successfulDefenses} / {profile.battleStats.failedDefenses}</Text>
+                      </View>
                     </View>
-                    <View style={styles.battleStatCard}>
-                      <Text style={styles.battleStatLabel}>Bots Lost</Text>
-                      <Text style={styles.battleStatValue}>{profile.battleStats.botsLost}</Text>
-                    </View>
-                    <View style={styles.battleStatCard}>
-                      <Text style={styles.battleStatLabel}>Successful Attacks</Text>
-                      <Text style={styles.battleStatValue}>{profile.battleStats.successfulAttacks}</Text>
-                    </View>
-                    <View style={styles.battleStatCard}>
-                      <Text style={styles.battleStatLabel}>Failed Attacks</Text>
-                      <Text style={styles.battleStatValue}>{profile.battleStats.failedAttacks}</Text>
-                    </View>
-                    <View style={styles.battleStatCard}>
-                      <Text style={styles.battleStatLabel}>Successful Defenses</Text>
-                      <Text style={styles.battleStatValue}>{profile.battleStats.successfulDefenses}</Text>
-                    </View>
-                    <View style={styles.battleStatCard}>
-                      <Text style={styles.battleStatLabel}>Failed Defenses</Text>
-                      <Text style={styles.battleStatValue}>{profile.battleStats.failedDefenses}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.winPercentageContainer}>
-                    <View style={styles.winPercentageItem}>
-                      <Text style={styles.winPercentageLabel}>Attack Win %</Text>
-                      <Text style={styles.winPercentageValue}>
+                    <View style={styles.statsCompactWinRow}>
+                      <Text style={styles.statsCompactWinLabel}>Attack Win %</Text>
+                      <Text style={styles.statsCompactWinValue}>
                         {calculateWinPercentage(profile.battleStats.successfulAttacks, profile.battleStats.failedAttacks)}
                       </Text>
-                    </View>
-                    <View style={styles.winPercentageItem}>
-                      <Text style={styles.winPercentageLabel}>Defense Win %</Text>
-                      <Text style={styles.winPercentageValue}>
+                      <Text style={styles.statsCompactWinLabel}>Defense Win %</Text>
+                      <Text style={styles.statsCompactWinValue}>
                         {calculateWinPercentage(profile.battleStats.successfulDefenses, profile.battleStats.failedDefenses)}
                       </Text>
                     </View>
                   </View>
                 </View>
               )}
-
-              {/* Features Section */}
-              <View style={styles.featuresSection}>
-                <Text style={styles.sectionTitle}>FEATURES</Text>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureLabel}>HACK RIG</Text>
-                  <Text style={[
-                    styles.featureValue, 
-                    { 
-                      color: profile.unlockedFeatures.hackRig ? colors.matrix : colors.text.secondary,
-                      borderColor: profile.unlockedFeatures.hackRig ? colors.matrix : colors.text.secondary + '66',
-                      backgroundColor: profile.unlockedFeatures.hackRig ? colors.matrix + '15' : colors.text.secondary + '15'
-                    }
-                  ]}>
-                    {profile.unlockedFeatures.hackRig ? 'UNLOCKED' : 'LOCKED'}
-                  </Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Text style={styles.featureLabel}>RESEARCH CENTER</Text>
-                  <Text style={[
-                    styles.featureValue, 
-                    { 
-                      color: profile.unlockedFeatures.researchCenter ? colors.matrix : colors.text.secondary,
-                      borderColor: profile.unlockedFeatures.researchCenter ? colors.matrix : colors.text.secondary + '66',
-                      backgroundColor: profile.unlockedFeatures.researchCenter ? colors.matrix + '15' : colors.text.secondary + '15'
-                    }
-                  ]}>
-                    {profile.unlockedFeatures.researchCenter ? 'UNLOCKED' : 'LOCKED'}
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity style={styles.disconnectButton} onPress={handleLogout}>
-                <Text style={styles.disconnectText}>DISCONNECT</Text>
-              </TouchableOpacity>
             </ScrollView>
           ) : activeTab === 'settings' ? (
             <View style={styles.settingsContainer}>
