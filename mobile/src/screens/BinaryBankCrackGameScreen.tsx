@@ -246,6 +246,18 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
 
   const handleClose = useCallback(() => onClose(), [onClose]);
 
+  const handleRetryClaim = useCallback(async () => {
+    setClaimingInProgress(true);
+    try {
+      await claimLevel(levelId).unwrap();
+      setClaimError(false);
+    } catch {
+      setClaimError(true);
+    } finally {
+      setClaimingInProgress(false);
+    }
+  }, [levelId, claimLevel]);
+
   if (starting && vaultTargets.length === 0) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -335,8 +347,19 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
         <View style={styles.resultBox}>
           <Text style={[styles.resultTitle, { color: colors.success ?? colors.primary }]}>VAULT CRACKED</Text>
           <Text style={[styles.resultSub, { color: colors.text?.secondary ?? colors.primary }]}>ACCOUNT BREACH SUCCESSFUL</Text>
-          {claimError && (
-            <Text style={[styles.claimError, { color: colors.error }]}>Claim failed. Tap Back and try again.</Text>
+          {claimError && !claimingInProgress && (
+            <>
+              <Text style={[styles.claimError, { color: colors.error }]}>Claim failed. Tap Retry to try again.</Text>
+              <TouchableOpacity
+                style={[styles.retryClaimButton, { borderColor: colors.primary }]}
+                onPress={handleRetryClaim}
+                accessible
+                accessibilityLabel="Retry claim"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.backButtonText, { color: colors.primary }]}>Retry claim</Text>
+              </TouchableOpacity>
+            </>
           )}
           {claimingInProgress && <ActivityIndicator size="small" color={colors.primary} />}
         </View>
@@ -384,6 +407,7 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: SIZING.font.large, fontWeight: '700', marginBottom: SIZING.spacing.xs },
   resultSub: { fontSize: SIZING.font.body },
   claimError: { fontSize: SIZING.font.small, marginTop: SIZING.spacing.sm },
+  retryClaimButton: { borderWidth: 1, borderRadius: 8, padding: SIZING.spacing.md, marginTop: SIZING.spacing.sm, alignSelf: 'center' },
   backButton: { borderWidth: 1, borderRadius: 8, padding: SIZING.spacing.md, marginTop: SIZING.spacing.lg, alignSelf: 'flex-start' },
   backButtonText: { fontSize: SIZING.font.body, fontWeight: '600' },
 });
