@@ -71,6 +71,8 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
   const flipsUsedThisRunRef = useRef(0);
   /** Countdown interval id; cleared when time hits 0 so we don't depend on timeLeft in the timer effect (avoids drift). */
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** True while submitRegisters is in flight; timer effect does not set lostByTime so a submit-at-1s can complete. */
+  const submitInFlightRef = useRef(false);
 
   const [startSession, { isLoading: starting }] = useStartBinaryBankCrackSessionMutation();
   const [submitRegisters, { isLoading: submitting }] = useSubmitBinaryBankCrackRegistersMutation();
@@ -97,6 +99,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       setClaimError(false);
       setClaimingInProgress(false);
       lostOrWonRef.current = false;
+      submitInFlightRef.current = false;
       setSessionKey((k) => k + 1);
       return;
     }
@@ -121,6 +124,7 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
           setClaimError(false);
           setClaimingInProgress(false);
           lostOrWonRef.current = false;
+          submitInFlightRef.current = false;
           setSessionKey((k) => k + 1);
         }
       } catch {
@@ -144,9 +148,9 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
     };
   }, [vaultTargets.length, sessionKey]);
 
-  /** When countdown hits 0, mark lost-by-time and stop the interval. */
+  /** When countdown hits 0, mark lost-by-time and stop the interval. Skip if a submit is in flight so a submit-at-1s is decided by the server response, not the timer. */
   useEffect(() => {
-    if (vaultTargets.length === 0 || timeLeft !== 0 || lostOrWonRef.current) return;
+    if (vaultTargets.length === 0 || timeLeft !== 0 || lostOrWonRef.current || submitInFlightRef.current) return;
     lostOrWonRef.current = true;
     setLostByTime(true);
     if (countdownIntervalRef.current != null) {
@@ -195,8 +199,10 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
   const handleSubmit = useCallback(async () => {
     if (submitting || win || lostByTime || lostByFlips || lostOrWonRef.current) return;
     if (registersBits.length !== vaultTargets.length) return;
+    if (timeLeft <= 0) return;
     setRegisterResults(null);
     const used = flipsUsedThisRun;
+    submitInFlightRef.current = true;
     try {
       const result = await submitRegisters({ levelId, registers: registersBits, flipsUsed: used }).unwrap();
       setFlipsRemaining(result.flipsRemaining);
@@ -241,8 +247,10 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
       }
     } catch {
       // Handled by API
+    } finally {
+      submitInFlightRef.current = false;
     }
-  }, [levelId, registersBits, vaultTargets.length, flipsUsedThisRun, submitting, win, lostByTime, lostByFlips, submitRegisters, claimLevel]);
+  }, [levelId, registersBits, vaultTargets.length, flipsUsedThisRun, timeLeft, submitting, win, lostByTime, lostByFlips, submitRegisters, claimLevel]);
 
   const handleClose = useCallback(() => onClose(), [onClose]);
 
@@ -269,8 +277,8 @@ export function BinaryBankCrackGameScreen({ levelId, initialSession, onClose }: 
 
   const lost = lostByTime || lostByFlips;
   const gameOver = win || lost || claimingInProgress;
-  /** Submit allowed with 0 flips when combination is correct; lostByFlips only when 0 flips and wrong combo. */
-  const canSubmit = !gameOver && !submitting && !lostOrWonRef.current;
+  /** Submit allowed with 0 flips when combination is correct; lostByFlips only when 0 flips and wrong combo. Disable when time is 0 so lockdown and submit are separate. */
+  const canSubmit = !gameOver && !submitting && !lostOrWonRef.current && timeLeft > 0;
   const noFlipsLeft = flipsDisplay <= 0;
 
   return (

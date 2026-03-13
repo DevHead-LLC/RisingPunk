@@ -349,12 +349,13 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'No active session; start a session first' });
       return;
     }
-    /** Enforce time limit on server so delayed or scripted requests cannot win after timer expired. */
+    /** Enforce time limit on server so delayed or scripted requests cannot win after timer expired. Use 1s grace: client timer starts when session response is received, so server can be ~1s ahead; only fail when elapsed > limit + 1 so "1s left" on client is still valid. */
     const createdSubmit = (sessionDoc as { createdAt?: Date }).createdAt;
     const elapsedSubmit = createdSubmit
       ? Math.floor((Date.now() - new Date(createdSubmit).getTime()) / 1000)
       : 0;
-    if (elapsedSubmit >= params.timeLimitSeconds) {
+    const timeLimitWithGrace = params.timeLimitSeconds + 1;
+    if (elapsedSubmit > timeLimitWithGrace) {
       await BinaryBankCrackSession.deleteOne({ userId: req.user!._id, levelId });
       const userForBal = await User.findById(userId);
       const bal = userForBal?.balance;

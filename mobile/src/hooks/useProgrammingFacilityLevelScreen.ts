@@ -53,6 +53,7 @@ export function useProgrammingFacilityLevelScreen<TSession = unknown>({
       entryDelayTimeoutRef.current = null;
     }
     isSelectingLevelRef.current = false;
+    setStartingLevelId(null);
     onClose();
   }, [onClose]);
 
