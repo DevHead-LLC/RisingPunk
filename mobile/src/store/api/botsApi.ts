@@ -1,6 +1,13 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
 import { BotType } from '../slices/botsSlice';
+import { balanceApi } from './balanceApi';
+import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
+import { globalErrorHandler } from '../../services/GlobalErrorHandler';
+import { resetAllApiCaches } from './resetApiCaches';
+import { setAppVersionHeader } from './appVersionHeader';
+import { handle426IfNeeded } from './handle426';
+import { trackFirstBots } from '../../services/analyticsService';
 
 export interface StatRow {
   health: number;
@@ -9,13 +16,6 @@ export interface StatRow {
   speed: number;
   range: number;
 }
-import { balanceApi } from './balanceApi';
-import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
-import { globalErrorHandler } from '../../services/GlobalErrorHandler';
-import { resetAllApiCaches } from './resetApiCaches';
-import { setAppVersionHeader } from './appVersionHeader';
-import { handle426IfNeeded } from './handle426';
-import { trackFirstBots } from '../../services/analyticsService';
 
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
