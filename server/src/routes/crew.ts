@@ -3,12 +3,13 @@ import { Request, Response } from 'express';
 import auth from '../middleware/auth';
 import { Crew } from '../models/Crew';
 import { CrewStatus } from '../models/CrewStatus';
-import { User } from '../models/User';
+import { User, IUser } from '../models/User';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 import mongoose from 'mongoose';
 import { filterBadWords, containsBadWords, containsBadWordsAsSubstring } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 import { accrueBalanceFromTo } from '../utils/balanceAccrual';
+import { getActiveJobInfo, applyCrewBackupHelp, getJobLabel } from '../services/CrewBackupService';
 
 const router = express.Router();
 
@@ -212,6 +213,136 @@ router.get('/status/:userId', auth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching user crew status:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// --- Crew backup request (help) ---
+router.post('/request-backup', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus?.isInCrew || !crewStatus.crewId) {
+      res.status(400).json({ error: 'You must be in a crew to request backup' });
+      return;
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const job = getActiveJobInfo(user);
+    if (!job) {
+      res.status(400).json({ error: 'No active build or remodel to request backup for' });
+      return;
+    }
+    user.crewBackupRequestedAt = new Date();
+    if (!user.crewBackupHelpApplied) {
+      (user as any).crewBackupHelpApplied = { totalSeconds: 0, helperUserIds: [] };
+    }
+    await user.save();
+    res.json({ success: true, message: 'Backup requested' });
+  } catch (error) {
+    console.error('Error requesting crew backup:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/backup-requests', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+    const crewStatus = await CrewStatus.findOne({ userId });
+    if (!crewStatus?.isInCrew || !crewStatus.crewId) {
+      res.json({ backupRequests: [] });
+      return;
+    }
+    const crewId = crewStatus.crewId.toString();
+    const crew = await Crew.findById(crewId).lean();
+    if (!crew) {
+      res.json({ backupRequests: [] });
+      return;
+    }
+    const memberIds: mongoose.Types.ObjectId[] = [];
+    if (crew.presidentId) memberIds.push(crew.presidentId as mongoose.Types.ObjectId);
+    (crew.executives || []).forEach((e: any) => memberIds.push(e));
+    (crew.members || []).forEach((m: any) => memberIds.push(m));
+    const usersWithBackup = await User.find({
+      _id: { $in: memberIds },
+      crewBackupRequestedAt: { $ne: null }
+    })
+      .select('handle _id crewBackupRequestedAt crewBackupHelpApplied researchCenterLevel rentalHousingLevels activeRemodel rentalHousingBuilds researchCenterBuild')
+      .lean();
+    const helperUserIdStr = userId.toString();
+    const backupRequestsList: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean }> = [];
+    for (const u of usersWithBackup) {
+      if (u.crewBackupRequestedAt == null) continue;
+      const job = getActiveJobInfo(u as IUser);
+      const jobLabel = job ? getJobLabel(u as IUser, job) : 'build or remodel';
+      const helperIds = (u as any).crewBackupHelpApplied?.helperUserIds ?? [];
+      const hasCurrentUserHelped = helperIds.some((id: any) => id?.toString() === helperUserIdStr);
+      backupRequestsList.push({
+        userId: (u as any)._id.toString(),
+        handle: (u as any).handle,
+        requestedAt: u.crewBackupRequestedAt instanceof Date ? u.crewBackupRequestedAt.toISOString() : String(u.crewBackupRequestedAt),
+        jobLabel,
+        hasCurrentUserHelped
+      });
+    }
+    backupRequestsList.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+    res.json({ backupRequests: backupRequestsList });
+  } catch (error) {
+    console.error('Error fetching crew backup requests:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/backup/:userId', auth, async (req: Request, res: Response) => {
+  try {
+    const helperUserId = req.user?._id;
+    const targetUserId = req.params.userId;
+    if (!helperUserId || !targetUserId || !mongoose.Types.ObjectId.isValid(targetUserId)) {
+      res.status(400).json({ error: 'Invalid target user' });
+      return;
+    }
+    if (helperUserId.toString() === targetUserId) {
+      res.status(400).json({ error: 'You cannot back up yourself' });
+      return;
+    }
+    const helperStatus = await CrewStatus.findOne({ userId: helperUserId });
+    if (!helperStatus?.isInCrew || !helperStatus.crewId) {
+      res.status(400).json({ error: 'You must be in a crew to back up a member' });
+      return;
+    }
+    const targetStatus = await CrewStatus.findOne({ userId: targetUserId });
+    if (!targetStatus?.isInCrew || targetStatus.crewId?.toString() !== helperStatus.crewId?.toString()) {
+      res.status(400).json({ error: 'Target user is not in your crew' });
+      return;
+    }
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const result = await applyCrewBackupHelp(targetUser, new mongoose.Types.ObjectId(helperUserId.toString()));
+    res.json({
+      success: true,
+      reduction: result.reduction,
+      newCompletesAt: result.newCompletesAt.toISOString()
+    });
+  } catch (error: any) {
+    if (['No active build or remodel to back up', 'User has not requested backup', 'You have already backed up this crew member for this job', 'Maximum crew backup for this job has been reached', 'Build or remodel is already complete'].includes(error.message)) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    console.error('Error applying crew backup:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -1421,6 +1552,36 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
 
     const memberCount = 1 + executives.length + members.length;
 
+    const allMemberIds = [
+      ...(president ? [president._id] : []),
+      ...executives.map((e: any) => e._id),
+      ...members.map((m: any) => m._id)
+    ];
+    const usersWithBackup = await User.find({
+      _id: { $in: allMemberIds },
+      crewBackupRequestedAt: { $ne: null }
+    })
+      .select('handle _id crewBackupRequestedAt crewBackupHelpApplied researchCenterLevel rentalHousingLevels activeRemodel rentalHousingBuilds researchCenterBuild')
+      .lean();
+    const currentUserIdStr = userId?.toString() ?? '';
+    const backupRequestsList: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean }> = [];
+    for (const u of usersWithBackup) {
+      if (u.crewBackupRequestedAt == null) continue;
+      const job = getActiveJobInfo(u as IUser);
+      const jobLabel = job ? getJobLabel(u as IUser, job) : 'build or remodel';
+      const helperIds = (u as any).crewBackupHelpApplied?.helperUserIds ?? [];
+      const hasCurrentUserHelped = helperIds.some((id: any) => id?.toString() === currentUserIdStr);
+      backupRequestsList.push({
+        userId: (u as any)._id.toString(),
+        handle: (u as any).handle,
+        requestedAt: u.crewBackupRequestedAt instanceof Date ? u.crewBackupRequestedAt.toISOString() : String(u.crewBackupRequestedAt),
+        jobLabel,
+        hasCurrentUserHelped
+      });
+    }
+    backupRequestsList.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+    const backupRequests = backupRequestsList;
+
     res.json({
       success: true,
       crew: {
@@ -1446,7 +1607,8 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
           userId: member._id.toString(),
           handle: member.handle,
           level: member.level || 1
-        }))
+        })),
+        backupRequests: isCrewMember ? backupRequests : []
       }
     });
   } catch (error) {

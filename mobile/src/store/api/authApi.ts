@@ -60,6 +60,7 @@ export interface ProfileResponse {
   };
   profileGender: 'male' | 'female';
   totalGuardiansBuilt?: number;
+  crewBackupHelpCount?: number;
 }
 
 export interface UserLookupResponse {
@@ -80,6 +81,7 @@ export interface UserProfileResponse {
     successfulDefenses: number;
     failedDefenses: number;
   };
+  crewBackupHelpCount?: number;
 }
 
 export interface UnlockResearchCenterResponse {
@@ -623,10 +625,45 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
-    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
+    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }>; backupRequests?: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean }> } }, string>({
       query: (crewId) => `/api/crew/${crewId}`,
       providesTags: ['User', 'Crew'],
       refetchOnMountOrArgChange: true,
+    }),
+
+    requestCrewBackup: builder.mutation<{ success: boolean; message: string }, void>({
+      query: () => ({
+        url: '/api/crew/request-backup',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User', 'Crew'],
+    }),
+
+    getCrewBackupRequests: builder.query<{ backupRequests: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean }> }, void>({
+      query: () => '/api/crew/backup-requests',
+      providesTags: ['Crew'],
+    }),
+
+    backupCrewMember: builder.mutation<{ success: boolean; reduction: number; newCompletesAt: string }, string>({
+      query: (targetUserId) => ({
+        url: `/api/crew/backup/${targetUserId}`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['User', 'Crew'],
+      async onQueryStarted(_targetUserId, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(
+            authApi.util.updateQueryData('getProfile', undefined, (draft) => {
+              if (draft) {
+                draft.crewBackupHelpCount = (draft.crewBackupHelpCount ?? 0) + 1;
+              }
+            })
+          );
+        } catch {
+          // Only update cache on success
+        }
+      },
     }),
 
     updateCrewRules: builder.mutation<{ success: boolean; crewRules: string[] }, { crewId: string; crewRules: string[] }>({
@@ -876,6 +913,9 @@ export const {
   useApplyToCrewMutation,
   useWithdrawApplicationMutation,
   useGetCrewDetailsQuery,
+  useRequestCrewBackupMutation,
+  useGetCrewBackupRequestsQuery,
+  useBackupCrewMemberMutation,
   useAcceptApplicantMutation,
   useDenyApplicantMutation,
   useLeaveCrewMutation,

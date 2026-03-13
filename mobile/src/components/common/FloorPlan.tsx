@@ -22,6 +22,10 @@ interface FloorPlanProps {
   activeRemodelRoom?: string | null;
   /** ISO date string when the active remodel completes (for countdown and speedup) */
   activeRemodelCompletesAt?: string | null;
+  /** When true, show "Request back-up" button next to Speedup while remodeling (crew backup request). */
+  showRequestBackup?: boolean;
+  /** Called when user taps "Request back-up" (only when showRequestBackup and remodel in progress). */
+  onRequestBackup?: () => void;
   /** When true, render only the Garage room (for Garage tab). When false, render Main Floor rooms only. */
   showGarage?: boolean;
   /** Max room remodel level from server. When provided with roomRemodelLevels, used for gating. */
@@ -44,6 +48,8 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
   onRemodel,
   activeRemodelRoom,
   activeRemodelCompletesAt,
+  showRequestBackup = false,
+  onRequestBackup,
   showGarage = false,
   maxRoomLevel,
   maxGarageRoomLevel,
@@ -106,9 +112,16 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           {activeRemodelRoom === 'garage' && onRemodel && (
             <View style={styles.remodelingRow}>
               <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('garage')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
+              <View style={styles.remodelActions}>
+                {!timeUp && showRequestBackup && onRequestBackup && (
+                  <TouchableOpacity onPress={onRequestBackup} style={styles.remodelButton}>
+                    <Text style={styles.remodelButtonText}>Request back-up</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => onRemodel('garage')} style={styles.remodelButton}>
+                  <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -140,9 +153,16 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           {activeRemodelRoom === 'bathroom' && onRemodel && (
             <View style={styles.remodelingRow}>
               <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('bathroom')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
+              <View style={styles.remodelActions}>
+                {!timeUp && showRequestBackup && onRequestBackup && (
+                  <TouchableOpacity onPress={onRequestBackup} style={styles.remodelButton}>
+                    <Text style={styles.remodelButtonText}>Request back-up</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => onRemodel('bathroom')} style={styles.remodelButton}>
+                  <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -173,9 +193,16 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           {activeRemodelRoom === 'kitchen' && onRemodel && (
             <View style={styles.remodelingRow}>
               <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('kitchen')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
+              <View style={styles.remodelActions}>
+                {!timeUp && showRequestBackup && onRequestBackup && (
+                  <TouchableOpacity onPress={onRequestBackup} style={styles.remodelButton}>
+                    <Text style={styles.remodelButtonText}>Request back-up</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => onRemodel('kitchen')} style={styles.remodelButton}>
+                  <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -200,9 +227,16 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           {activeRemodelRoom === 'bedroom' && onRemodel && (
             <View style={styles.remodelingRow}>
               <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('bedroom')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
+              <View style={styles.remodelActions}>
+                {!timeUp && showRequestBackup && onRequestBackup && (
+                  <TouchableOpacity onPress={onRequestBackup} style={styles.remodelButton}>
+                    <Text style={styles.remodelButtonText}>Request back-up</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => onRemodel('bedroom')} style={styles.remodelButton}>
+                  <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -226,9 +260,16 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           {activeRemodelRoom === 'livingRoom' && onRemodel && (
             <View style={styles.remodelingRow}>
               <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('livingRoom')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
+              <View style={styles.remodelActions}>
+                {!timeUp && showRequestBackup && onRequestBackup && (
+                  <TouchableOpacity onPress={onRequestBackup} style={styles.remodelButton}>
+                    <Text style={styles.remodelButtonText}>Request back-up</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={() => onRemodel('livingRoom')} style={styles.remodelButton}>
+                  <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -350,6 +391,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     marginTop: 6,
+  },
+  remodelActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   remodelingText: {
     fontSize: 12,

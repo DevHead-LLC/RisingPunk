@@ -121,6 +121,15 @@ export interface IUser extends Document {
     /** Start of UTC day when user last claimed; used to allow only one claim per calendar day. */
     lastClaimedDateUtc?: Date;
   };
+  /** Crew backup request: set when user requests backup for current build/remodel; cleared when job completes. */
+  crewBackupRequestedAt?: Date | null;
+  /** Crew backup help applied for current job: total seconds reduced and list of helper user ids (one help per member per request). */
+  crewBackupHelpApplied?: {
+    totalSeconds: number;
+    helperUserIds: mongoose.Types.ObjectId[];
+  } | null;
+  /** Total number of times this user has backed up another crew member (each Back up click = 1). */
+  crewBackupHelpCount?: number;
   /** Packet Breach: level IDs completed (e.g. ["1.1", "1.2"]). Linear unlock: next level unlocks when prior is completed. */
   packetBreach?: {
     levelsCompleted: string[];
@@ -512,6 +521,12 @@ const userSchema = new Schema({
     awardedAmounts: { type: [Number], default: undefined },
     lastClaimedDateUtc: { type: Date, required: false }
   },
+  crewBackupRequestedAt: { type: Date, default: null },
+  crewBackupHelpApplied: {
+    totalSeconds: { type: Number, default: 0 },
+    helperUserIds: { type: [Schema.Types.ObjectId], ref: 'User', default: [] }
+  },
+  crewBackupHelpCount: { type: Number, default: 0 },
   packetBreach: {
     levelsCompleted: { type: [String], default: [] },
     pendingClaimLevelIds: { type: [String], default: [] }

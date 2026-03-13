@@ -6,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance, getCurrentBalance } from '../../store/slices/balanceSlice';
-import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation } from '../../store/api/authApi';
+import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 import { trackFirstConstruct } from '../../services/analyticsService';
@@ -58,7 +58,18 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const [unlockRentalHousing, { isLoading: isUnlocking }] = useUnlockRentalHousingMutation();
   const [completeRentalHousing, { isLoading: isCompleting }] = useCompleteRentalHousingMutation();
   const [speedupPropertyConstruction] = useSpeedupPropertyConstructionMutation();
-  
+  const [requestCrewBackup] = useRequestCrewBackupMutation();
+  const { data: crewStatus } = useGetCrewStatusQuery();
+  const isBuildingFromStatus = rentalHousingStatus?.isBuilding ?? false;
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+    skip: !crewStatus?.crewId || !crewStatus?.isInCrew || !isBuildingFromStatus,
+    pollingInterval: isBuildingFromStatus ? 5000 : 0,
+  });
+  const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
+  const hasRequestedBackup = Boolean(
+    crewDetails?.crew?.backupRequests?.some((r) => String(r.userId) === String(currentUserId))
+  );
+
   const dispatch = useAppDispatch();
   const previousIsUnlockedRef = useRef<boolean | undefined>(undefined);
   
@@ -303,14 +314,29 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       </View>
       
       {showTimer && (
-        <DevelopmentTimer
-          isBuilding={isBuilding}
-          buildStatus={buildStatus}
-          onComplete={handleTimerComplete}
-          topOffset="120%"
-          leftOffset={-50}
-          width={120}
-        />
+        <View>
+          <DevelopmentTimer
+            isBuilding={isBuilding}
+            buildStatus={buildStatus}
+            onComplete={handleTimerComplete}
+            topOffset="120%"
+            leftOffset={-50}
+            width={120}
+          />
+          {isBuilding && crewStatus?.isInCrew && !hasRequestedBackup && (
+            <TouchableOpacity
+              style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
+              onPress={() => {
+                requestCrewBackup()
+                  .unwrap()
+                  .then(() => refetchCrewDetails?.())
+                  .catch(() => {});
+              }}
+            >
+              <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       <BuildModal
@@ -425,5 +451,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  requestBackupButton: {
+    marginTop: SIZING.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  requestBackupText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

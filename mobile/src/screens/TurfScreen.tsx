@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState} from 'react-native';
+import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState, Image} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -51,6 +51,9 @@ import { battleApi } from '../store/api/battleApi';
 import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { SIZING } from '../styles/theme';
 import { getPersistedTurfNavState, setPersistedTurfNavState, type TurfScreenName } from '../utils/turfNavStatePersistence';
+import { CrewBackupBanner } from '../components/turf/CrewBackupBanner';
+import { CrewModal } from '../components/hackMap/CrewModal';
+import { useGetCrewStatusQuery } from '../store/api/authApi';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any, useAnimatedReaction: any;
@@ -198,6 +201,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
+  const [showCrewModal, setShowCrewModal] = useState(false);
+  const [crewModalInitialCategory, setCrewModalInitialCategory] = useState<'backup-requests' | null>(null);
   const [showSearchUserModal, setShowSearchUserModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
@@ -213,6 +218,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       }
     };
   }, []);
+
+  const { data: crewStatus } = useGetCrewStatusQuery();
 
   // Restore persisted nav state on mount (Phase 2: refresh — stay on current screen and position).
   // State is per-user so a new guest does not see the previous account's screen (e.g. HackMap/onboarding).
@@ -1732,7 +1739,36 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   return (
     <>
+      {currentScreen === 'turf' && (
+        <CrewBackupBanner
+          canShowBanner={true}
+          onPressOpenCrewToBackup={() => {
+            setCrewModalInitialCategory('backup-requests');
+            setShowCrewModal(true);
+          }}
+        />
+      )}
       {renderScreen()}
+      {currentScreen === 'turf' && crewStatus?.isInCrew && (
+        <TouchableOpacity
+          style={styles.crewIconButton}
+          onPress={() => {
+            setCrewModalInitialCategory(null);
+            setShowCrewModal(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={styles.crewIconImage} resizeMode="contain" />
+        </TouchableOpacity>
+      )}
+      <CrewModal
+        visible={showCrewModal}
+        onClose={() => {
+          setShowCrewModal(false);
+          setCrewModalInitialCategory(null);
+        }}
+        initialCategory={crewModalInitialCategory}
+      />
       {showOnboarding && (
         <OnboardingSlides
           onComplete={handleOnboardingComplete}
@@ -1766,6 +1802,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     zIndex: 10002,
+  },
+  crewIconButton: {
+    position: 'absolute',
+    bottom: SIZING.spacing.lg,
+    right: SIZING.spacing.lg,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(128, 90, 213, 0.95)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 255, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10002,
+  },
+  crewIconImage: {
+    width: 28,
+    height: 28,
   },
   turfGrid: {
     flex: 1,

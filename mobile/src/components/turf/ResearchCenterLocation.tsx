@@ -3,7 +3,7 @@ import {TouchableOpacity, View, Text, Image, StyleSheet, Modal, Animated} from '
 import { useTheme } from '../../context/ThemeContext';
 import {SIZING} from '../../styles/theme';
 import {useThemeColors} from '../../hooks/useThemeColors';
-import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery, useSpeedupResearchCenterConstructionMutation } from '../../store/api/authApi';
+import { useUnlockResearchCenterMutation, useGetProfileQuery, useGetResearchCenterStatusQuery, useSpeedupResearchCenterConstructionMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -47,6 +47,9 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   const isHighlighted = isIntroActive || isBuildResearchCenter;
   const [unlockResearchCenter] = useUnlockResearchCenterMutation();
   const [speedupResearchCenterConstruction] = useSpeedupResearchCenterConstructionMutation();
+  const [requestCrewBackup] = useRequestCrewBackupMutation();
+  const { data: crewStatus } = useGetCrewStatusQuery();
+  const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
   const { data: profile, isLoading } = useGetProfileQuery();
   const token = useAppSelector((state) => state.auth.token);
   const userId = useAppSelector((state) => state.auth.user?._id);
@@ -55,6 +58,14 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     skip: !token, // Don't query if user isn't logged in
     pollingInterval: isBuildingState ? 5000 : 0,
   });
+  const isBuildingFromStatus = buildStatus?.buildStatus != null;
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+    skip: !crewStatus?.crewId || !crewStatus?.isInCrew || !isBuildingFromStatus,
+    pollingInterval: isBuildingFromStatus ? 5000 : 0,
+  });
+  const hasRequestedBackup = Boolean(
+    crewDetails?.crew?.backupRequests?.some((r) => String(r.userId) === String(currentUserId))
+  );
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
   const reduxBalance = useAppSelector((state) => state.balance.total);
@@ -306,6 +317,19 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
               refetchBuildStatus();
             }}
           />
+          {crewStatus?.isInCrew && !hasRequestedBackup && (
+            <TouchableOpacity
+              style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
+              onPress={() => {
+                requestCrewBackup()
+                  .unwrap()
+                  .then(() => refetchCrewDetails?.())
+                  .catch(() => {});
+              }}
+            >
+              <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -480,6 +504,17 @@ const styles = StyleSheet.create({
     marginTop: SIZING.spacing.md,
     width: '95%',
     marginLeft: '2.5%',
+  },
+  requestBackupButton: {
+    marginTop: SIZING.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  requestBackupText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   modalOverlay: {
     position: 'absolute',

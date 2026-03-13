@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useAppSelector } from '../../store/hooks';
+import { useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { BuildCountdownTimer } from './BuildCountdownTimer';
 
 interface DevelopmentZoneProps {
@@ -15,6 +17,19 @@ interface DevelopmentZoneProps {
 
 export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buildingProperties = [] }) => {
   const colors = useThemeColors();
+  const activeBuilds = buildingProperties.filter(prop => prop.buildStatus && prop.buildStatus.completesAt);
+  const hasActiveBuild = activeBuilds.length > 0;
+
+  const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
+  const { data: crewStatus } = useGetCrewStatusQuery();
+  const { data: crewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+    skip: !crewStatus?.crewId || !crewStatus?.isInCrew || !hasActiveBuild,
+    pollingInterval: hasActiveBuild ? 5000 : 0,
+  });
+  const hasRequestedBackup = Boolean(
+    crewDetails?.crew?.backupRequests?.some((r) => String(r.userId) === String(currentUserId))
+  );
+  const [requestCrewBackup] = useRequestCrewBackupMutation();
 
   const containerStyle = [
     styles.developmentZone,
@@ -23,8 +38,6 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buil
       borderColor: colors.matrix + '33'
     }
   ];
-
-  const activeBuilds = buildingProperties.filter(prop => prop.buildStatus && prop.buildStatus.completesAt);
 
   return (
     <View style={containerStyle}>
@@ -47,6 +60,14 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buil
             completesAt={activeBuilds[0].buildStatus.completesAt}
             onComplete={activeBuilds[0].onComplete}
           />
+          {crewStatus?.isInCrew && !hasRequestedBackup && (
+            <TouchableOpacity
+              style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
+              onPress={() => requestCrewBackup().catch(() => {})}
+            >
+              <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -102,5 +123,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+    gap: SIZING.spacing.sm,
+  },
+  requestBackupButton: {
+    marginTop: SIZING.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  requestBackupText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

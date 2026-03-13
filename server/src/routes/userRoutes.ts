@@ -18,6 +18,7 @@ import { getResearchCenterLevelConfig, getResearchCenterMaxLevel, type ResearchC
 import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
 import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
 import { accrueBalanceToTime } from '../utils/balanceAccrual';
+import { clearCrewBackupState } from '../services/CrewBackupService';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -149,7 +150,7 @@ const markInvestmentPropertyTaskCompleted = async (userId: string | mongoose.Typ
 
 router.get('/profile', auth, async (req: Request, res: Response) => {
   try {
-    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats totalGuardiansBuilt isGuest hashedAccessKey');
+    const user = await User.findById(req.user._id).select('handle email level experience unlockedFeatures profileGender battleStats totalGuardiansBuilt crewBackupHelpCount isGuest hashedAccessKey');
     
     if (!user) {
       res.status(404).json({ message: 'User not found' });
@@ -182,6 +183,7 @@ router.get('/profile', auth, async (req: Request, res: Response) => {
         successfulDefenses: user.battleStats?.successfulDefenses || 0,
         failedDefenses: user.battleStats?.failedDefenses || 0
       },
+      crewBackupHelpCount: user.crewBackupHelpCount ?? 0,
       totalGuardiansBuilt: user.totalGuardiansBuilt || 0,
       isGuest: user.isGuest || false,
       hasPassword: !!(user as any).hashedAccessKey
@@ -201,7 +203,7 @@ router.get('/profile/:userId', auth, async (req: Request, res: Response) => {
       return;
     }
 
-    const user = await User.findById(userId).select('handle level profileGender battleStats');
+    const user = await User.findById(userId).select('handle level profileGender battleStats crewBackupHelpCount');
     
     if (!user) {
       res.status(404).json({ error: 'User not found' });
@@ -220,7 +222,8 @@ router.get('/profile/:userId', auth, async (req: Request, res: Response) => {
         failedAttacks: user.battleStats?.failedAttacks || 0,
         successfulDefenses: user.battleStats?.successfulDefenses || 0,
         failedDefenses: user.battleStats?.failedDefenses || 0
-      }
+      },
+      crewBackupHelpCount: user.crewBackupHelpCount ?? 0
     });
   } catch (error) {
     console.error('Server error:', error);
@@ -389,6 +392,7 @@ router.get('/research-center-status', auth, async (req: Request, res: Response) 
           completesAt: null,
           targetLevel: null
         };
+        clearCrewBackupState(user);
         await user.save();
         isUnlocked = true;
         level = targetLevel;
@@ -456,6 +460,7 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
         completesAt: null,
         targetLevel: null
       };
+      clearCrewBackupState(user);
       await user.save();
       await markResearchCenterTaskCompleted(String(user._id));
     }
@@ -471,6 +476,15 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
     // Reject if a build is still in progress (timer not yet expired)
     if (user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt && now < user.researchCenterBuild.completesAt) {
       res.status(400).json({ message: 'Research Center build already in progress.' });
+      return;
+    }
+    // One build at a time globally: reject if any investment property build is in progress
+    const hasRentalBuild = Object.entries(user.rentalHousingBuilds || {}).some(([, b]) => {
+      const build = b as { startedAt: Date | null; completesAt: Date | null };
+      return build?.startedAt && build?.completesAt && now < new Date(build.completesAt);
+    });
+    if (hasRentalBuild) {
+      res.status(400).json({ message: 'Another build is already in progress (research center or investment property). Finish it first.' });
       return;
     }
 
@@ -564,6 +578,7 @@ router.post('/speedup-research-center-construction', auth, async (req: Request, 
         completesAt: null,
         targetLevel: null
       };
+      clearCrewBackupState(userInTransaction);
       userInTransaction.balance.total -= cost;
 
       await userInTransaction.save({ session });
@@ -692,13 +707,31 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
       return;
     }
 
-    const user = await User.findById(userId);
+    let user = await User.findById(userId);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
 
     await RentalHousingSyncService.ensureLegacyRentalLevels(user);
+
+    // Room remodel auto-complete: when timer has ended, apply completion so client never needs to tap "Complete"
+    const now = new Date();
+    const ar = user.activeRemodel;
+    if (ar?.completesAt && now >= new Date(ar.completesAt)) {
+      const propId = ar.propertyId;
+      const room = ar.room;
+      const targetRoomLevel = ar.targetRoomLevel;
+      const rooms = user.rentalHousingRooms || {} as any;
+      const propRooms = rooms[`property${propId}`] || { bathroom: 1, kitchen: 1, bedroom: 1, livingRoom: 1, garage: 1 };
+      propRooms[room] = targetRoomLevel;
+      rooms[`property${propId}`] = propRooms;
+      await User.findByIdAndUpdate(userId, {
+        $set: { rentalHousingRooms: rooms },
+        $unset: { activeRemodel: 1, crewBackupRequestedAt: 1, crewBackupHelpApplied: 1 }
+      });
+      user = await User.findById(userId) || user;
+    }
 
     const config = await getRentalPropertyConfig();
     const maxPropertyLevel = config.maxPropertyLevel;
@@ -783,6 +816,12 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
     
     if (buildStatus?.startedAt && buildStatus?.completesAt && new Date() < new Date(buildStatus.completesAt)) {
       res.status(400).json({ error: 'Property already under construction' });
+      return;
+    }
+    // One build at a time globally: reject if research center build is in progress
+    const researchCenterBuilding = user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt && new Date() < new Date(user.researchCenterBuild.completesAt);
+    if (researchCenterBuilding) {
+      res.status(400).json({ error: 'Another build is already in progress (research center or investment property). Finish it first.' });
       return;
     }
 
@@ -884,7 +923,10 @@ router.post('/complete-rental-housing/:propertyId', auth, async (req, res): Prom
       updateData[`rentalHousingLevelSetByBuild.${propertyKey}`] = true;
     }
 
-    await User.findByIdAndUpdate(userId, { $set: updateData });
+    await User.findByIdAndUpdate(userId, {
+      $set: updateData,
+      $unset: { crewBackupRequestedAt: 1, crewBackupHelpApplied: 1 }
+    });
 
     if (propertyId === 1) {
       await markInvestmentPropertyTaskCompleted(userId);
@@ -1160,8 +1202,9 @@ router.post('/complete-remodel/:propertyId', auth, async (req, res): Promise<voi
       propRooms[room] = ar.targetRoomLevel;
       rooms[`property${propertyId}`] = propRooms;
       userInTransaction.rentalHousingRooms = rooms;
+      clearCrewBackupState(userInTransaction);
       await userInTransaction.save({ session });
-      await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1 } }, { session });
+      await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1, crewBackupRequestedAt: 1, crewBackupHelpApplied: 1 } }, { session });
     });
   } catch (error: any) {
     if (error.message === 'User not found') {
@@ -1245,7 +1288,8 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
       userInTransaction.rentalHousingRooms = rooms;
       userInTransaction.balance.total -= cost;
       await userInTransaction.save({ session });
-      await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1 } }, { session });
+      clearCrewBackupState(userInTransaction);
+      await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1, crewBackupRequestedAt: 1, crewBackupHelpApplied: 1 } }, { session });
     });
   } catch (error: any) {
     if (error.message === 'User not found') {
