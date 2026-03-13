@@ -148,17 +148,23 @@ router.post('/session/start', auth, async (req: Request, res: Response) => {
         }
       }
     }
-    // If existing session has expired (timer ran out), delete so player can retry and start a new run instead of instant loss loop.
+    // If existing session has expired (timer ran out) or has 0 flips (game over), delete so the next start is a fresh game with full timer.
     if (sessionDoc) {
       const expireParams = getLevelParams(sessionDoc.levelId);
       if (expireParams) {
-        const createdExpire = (sessionDoc as { createdAt?: Date }).createdAt;
-        const elapsedExpire = createdExpire
-          ? Math.floor((Date.now() - new Date(createdExpire).getTime()) / 1000)
-          : 0;
-        if (elapsedExpire >= (expireParams.timeLimitSeconds ?? 30)) {
+        if (sessionDoc.flipsRemaining <= 0) {
           await BinaryBankCrackSession.deleteOne({ userId: user._id, levelId });
           sessionDoc = null;
+        } else {
+          const createdExpire = (sessionDoc as { createdAt?: Date }).createdAt;
+          const elapsedExpire = createdExpire
+            ? Math.floor((Date.now() - new Date(createdExpire).getTime()) / 1000)
+            : 0;
+          const limitSec = expireParams.timeLimitSeconds ?? 30;
+          if (elapsedExpire >= limitSec) {
+            await BinaryBankCrackSession.deleteOne({ userId: user._id, levelId });
+            sessionDoc = null;
+          }
         }
       }
     }
@@ -349,12 +355,13 @@ router.post('/submit', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'No active session; start a session first' });
       return;
     }
-    /** Enforce time limit on server so delayed or scripted requests cannot win after timer expired. */
+    /** Enforce time limit on server so delayed or scripted requests cannot win after timer expired. Client timer starts when session response is received (network latency); server can be ~1s ahead. Reject when elapsed >= limit + 1 so we allow ~1s grace (one floor-second) without double-counting. */
     const createdSubmit = (sessionDoc as { createdAt?: Date }).createdAt;
     const elapsedSubmit = createdSubmit
       ? Math.floor((Date.now() - new Date(createdSubmit).getTime()) / 1000)
       : 0;
-    if (elapsedSubmit >= params.timeLimitSeconds) {
+    const limitWithGrace = params.timeLimitSeconds + 1;
+    if (elapsedSubmit >= limitWithGrace) {
       await BinaryBankCrackSession.deleteOne({ userId: req.user!._id, levelId });
       const userForBal = await User.findById(userId);
       const bal = userForBal?.balance;
