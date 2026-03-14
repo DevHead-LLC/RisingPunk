@@ -100,10 +100,17 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const [modalCountdownNow, setModalCountdownNow] = useState(() => Date.now());
   const [hasActiveRemodelHere, setHasActiveRemodelHere] = useState(false);
   const [activeTab, setActiveTab] = useState<'mainFloor' | 'garage'>('mainFloor');
+  /** True when we've seen status.isBuilding so we keep polling until build completes (avoids using status in its own query options). */
+  const [pollForBuilding, setPollForBuilding] = useState(false);
 
   const { data: status, refetch: refetchRentalStatus } = useGetRentalHousingStatusQuery(propertyId, {
-    pollingInterval: remodelRoom || hasActiveRemodelHere || (status?.isBuilding ?? false) ? 5000 : 0
+    pollingInterval: remodelRoom || hasActiveRemodelHere || pollForBuilding ? 5000 : 0
   });
+
+  useEffect(() => {
+    if (status?.isBuilding) setPollForBuilding(true);
+    else if (status !== undefined) setPollForBuilding(false);
+  }, [status?.isBuilding, status]);
   const { data: crewStatus } = useGetCrewStatusQuery();
   const hasActiveRemodelThisProperty = status?.activeRemodel?.propertyId === propertyId;
   const isPropertyBuilding = status?.isBuilding ?? false;
