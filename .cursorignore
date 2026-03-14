@@ -4,7 +4,7 @@ server/scripts/*seed*.js
 **/seed*.js
 **/*seed*.js
 
-# Database scripts that could modify data
+# Backup/restore/encrypt scripts - DO NOT ACCESS - Could modify data
 server/scripts/backup*.js
 server/scripts/restore*.js
 server/scripts/encrypt*.js

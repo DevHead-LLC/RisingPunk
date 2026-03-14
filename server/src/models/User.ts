@@ -17,6 +17,8 @@ export interface IUser extends Document {
     total: number;
   };
   armyBonus: { strength: number; defense: number; speed: number; health: number };
+  /** Cavalry (Guardian) bonus from Race Condition Heist tier completion; applied only when bot type is guardian. */
+  guardianBonus?: { strength: number; defense: number; speed: number; health: number };
   balance: {
     total: number;
     ratePerSecond: number;
@@ -27,6 +29,7 @@ export interface IUser extends Document {
   unlockedFeatures: {
     hackRig: boolean;
     researchCenter: boolean;
+    programmingFacility: boolean;
     rentalHousing1: boolean;
     rentalHousing2: boolean;
     rentalHousing3: boolean;
@@ -110,6 +113,32 @@ export interface IUser extends Document {
   totalPhreaksBuilt?: number;
   totalBreachersBuilt?: number;
   lifetimeHighNetWorth?: number;
+  /** Daily Haul (7-day claim): week boundary, claimed sequence (1→2→…→7), amounts, and last claim date for one-claim-per-UTC-day. */
+  dailyHaul?: {
+    weekStartUtc: Date;
+    claimedDays: number[];
+    awardedAmounts?: number[];
+    /** Start of UTC day when user last claimed; used to allow only one claim per calendar day. */
+    lastClaimedDateUtc?: Date;
+  };
+  /** Packet Breach: level IDs completed (e.g. ["1.1", "1.2"]). Linear unlock: next level unlocks when prior is completed. */
+  packetBreach?: {
+    levelsCompleted: string[];
+    /** Level IDs won but not yet claimed; allows claim after server restart. */
+    pendingClaimLevelIds?: string[];
+  };
+  /** Race Condition Heist: level IDs completed; tier completion grants Guardian (Cavalry) bonus. */
+  raceConditionHeist?: {
+    levelsCompleted: string[];
+    pendingClaimLevelIds?: string[];
+  };
+  /** Binary Bank Crack: level IDs completed; tier completion grants Phreak (Range) bonus. */
+  binaryBankCrack?: {
+    levelsCompleted: string[];
+    pendingClaimLevelIds?: string[];
+  };
+  /** Phreak (Ranged) bonus from Binary Bank Crack tier completion; same shape as armyBonus/guardianBonus (Attack/Health/Defense cycle). */
+  phreakBonus?: { strength: number; defense: number; speed: number; health: number };
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
   blockedUserIds?: mongoose.Types.ObjectId[];
   /** Set by schema timestamps: true. */
@@ -191,22 +220,16 @@ const userSchema = new Schema({
     }
   },
   armyBonus: {
-    strength: {
-      type: Number,
-      default: 0
-    },
-    defense: {
-      type: Number,
-      default: 0
-    },
-    speed: {
-      type: Number,
-      default: 0
-    },
-    health: {
-      type: Number,
-      default: 0
-    }
+    strength: { type: Number, default: 0 },
+    defense: { type: Number, default: 0 },
+    speed: { type: Number, default: 0 },
+    health: { type: Number, default: 0 }
+  },
+  guardianBonus: {
+    strength: { type: Number, default: 0 },
+    defense: { type: Number, default: 0 },
+    speed: { type: Number, default: 0 },
+    health: { type: Number, default: 0 }
   },
   balance: {
     total: {
@@ -236,6 +259,10 @@ const userSchema = new Schema({
       default: false
     },
     researchCenter: {
+      type: Boolean,
+      default: false
+    },
+    programmingFacility: {
       type: Boolean,
       default: false
     },
@@ -478,6 +505,30 @@ const userSchema = new Schema({
   currentTokenId: {
     type: String,
     required: false
+  },
+  dailyHaul: {
+    weekStartUtc: { type: Date, required: false },
+    claimedDays: { type: [Number], default: [] },
+    awardedAmounts: { type: [Number], default: undefined },
+    lastClaimedDateUtc: { type: Date, required: false }
+  },
+  packetBreach: {
+    levelsCompleted: { type: [String], default: [] },
+    pendingClaimLevelIds: { type: [String], default: [] }
+  },
+  raceConditionHeist: {
+    levelsCompleted: { type: [String], default: [] },
+    pendingClaimLevelIds: { type: [String], default: [] }
+  },
+  binaryBankCrack: {
+    levelsCompleted: { type: [String], default: [] },
+    pendingClaimLevelIds: { type: [String], default: [] }
+  },
+  phreakBonus: {
+    strength: { type: Number, default: 0 },
+    defense: { type: Number, default: 0 },
+    speed: { type: Number, default: 0 },
+    health: { type: Number, default: 0 }
   },
   blockedUserIds: {
     type: [Schema.Types.ObjectId],

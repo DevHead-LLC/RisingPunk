@@ -1078,6 +1078,52 @@ After completing conflict resolution and pushing `android_mergeDev`, run through
 
 ---
 
+---
+
+## Session: 2025-03-13 (merge dev → android_mergeDev)
+
+**Branch context:** Full merge flow per merge-flow.md: created `android_mergeDev` from `androidStaging`, pushed, merged `origin/dev`. Two conflicts: .DS_Store (binary), mobile/src/components/AppContent.tsx (imports).
+
+### 1. `.DS_Store`
+
+**Conflict:** Binary file (HEAD vs origin/dev).
+
+| Side | Content |
+|------|--------|
+| HEAD | Binary .DS_Store (macOS metadata) |
+| dev  | Different binary .DS_Store |
+
+**Resolution:** Accepted **dev** (theirs). Final state: dev’s .DS_Store.
+
+**Rationale:** Not Android-specific; .DS_Store is in .gitignore. Either version is fine; taking dev’s keeps merge clean.
+
+**Failure-mode hints for later:** None.
+
+---
+
+### 2. `mobile/src/components/AppContent.tsx`
+
+**Conflict:** Imports – useThemeColors + authSlice (with or without setUserProfileFromPayload).
+
+| Side | Content |
+|------|--------|
+| HEAD | `useThemeColors` from hooks; authSlice imports without `setUserProfileFromPayload`. |
+| dev  | authSlice imports with `setUserProfileFromPayload`; no useThemeColors in conflict. |
+
+**Resolution:** Combined **both**. Final state: `useThemeColors` from '../hooks/useThemeColors'; authSlice import includes `setUserProfileFromPayload` (and all other auth actions from dev).
+
+**Rationale:** Component uses both: `colors` from useThemeColors (loading View background) and `setUserProfileFromPayload` in the profileData effect. Neither is Android-deployment–specific; both needed.
+
+**Rejected content:** None—both sides merged.
+
+**Failure-mode hints for later:** If loading state shows black background, confirm useThemeColors and colors.background are still used. If profile/unlockedFeatures don’t sync after rehydration, confirm setUserProfileFromPayload is dispatched when profileData is set.
+
+---
+
+**Post-merge checklist:** HandleSelectionModal – (run after push if needed; no changes to that file in this merge.)
+
+---
+
 ## Related docs
 
 - `taskItems/android/appWide/network-security-config.md` – overall network security config design.
