@@ -4,8 +4,9 @@ apply plugin: "com.facebook.react"
 apply plugin: "com.google.gms.google-services"
 
 // CRITICAL: Set ENVFILE before react-native-config loads it
-// This ensures dotenv.gradle reads the correct file
-def envFile = System.env['ENVFILE'] ?: System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE")
+// Prefer explicit -DENVFILE= and project property over shell ENV so npm script is source of truth.
+// Otherwise a lingering ENVFILE=.env.staging in the shell can override -DENVFILE=.env.prod and ship staging.
+def envFile = System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE") ?: System.env['ENVFILE']
 if (envFile) {
     // Make sure ENVFILE is available to react-native-config
     System.setProperty('ENVFILE', envFile)
@@ -21,8 +22,8 @@ apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.grad
 
 // Log environment info after react-native-config loads it (configuration phase)
 gradle.projectsEvaluated {
-    // Reuse envFile from outer scope, or read it again if not set
-    def configEnvFile = envFile ?: System.env['ENVFILE'] ?: System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE")
+    // Reuse envFile from outer scope (already resolved with -D over env)
+    def configEnvFile = envFile ?: System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE") ?: System.env['ENVFILE']
     if (configEnvFile) {
         println ""
         println "=========================================="
@@ -287,8 +288,8 @@ afterEvaluate {
             }
             
             // CRITICAL: Verify environment file is set correctly for ALL release builds (both bundle and assemble)
-            // Read ENVFILE the same way react-native-config does
-            def taskEnvFile = System.env['ENVFILE'] ?: System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE")
+            // Prefer -D/project property over env so npm run android:build:bundle always means prod
+            def taskEnvFile = System.getProperty('ENVFILE') ?: project.findProperty("ENVFILE") ?: System.env['ENVFILE']
             def isBundleRelease = name.contains("bundle") && name.contains("release")
             def isAssembleRelease = name.contains("assemble") && name.contains("release")
             def isReleaseBuild = isBundleRelease || isAssembleRelease
