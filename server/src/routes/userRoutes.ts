@@ -503,10 +503,12 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
     user.balance.total -= buildCost;
     const buildStartedAt = new Date();
     const buildTimeMs = buildTimeMinutes * 60 * 1000;
+    const originalTotalSeconds = buildTimeMinutes * 60;
     user.researchCenterBuild = {
       startedAt: buildStartedAt,
       completesAt: new Date(buildStartedAt.getTime() + buildTimeMs),
-      targetLevel: nextLevel
+      targetLevel: nextLevel,
+      originalTotalSeconds
     };
     await user.save();
 
@@ -846,12 +848,14 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
 
     const now = new Date();
     const completesAt = new Date(now.getTime() + buildTimeMinutes * 60 * 1000);
+    const originalTotalSeconds = buildTimeMinutes * 60;
 
     const updateData: any = {
       [`rentalHousingBuilds.${propertyKey}`]: {
         startedAt: now,
         completesAt: completesAt,
-        targetLevel: nextBuildLevel
+        targetLevel: nextBuildLevel,
+        originalTotalSeconds
       },
       'balance.total': user.balance.total - buildCost
     };
@@ -1132,6 +1136,7 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
       if (user.balance.total < tierConfig.cost) throw new Error('Insufficient funds');
       const now = new Date();
       const completesAt = new Date(now.getTime() + tierConfig.constructionTimeMinutes * 60 * 1000);
+      const originalTotalSeconds = tierConfig.constructionTimeMinutes * 60;
       newBalance = user.balance.total - tierConfig.cost;
       user.balance.total = newBalance;
       (user as any).activeRemodel = {
@@ -1139,7 +1144,8 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
         room,
         startedAt: now,
         completesAt,
-        targetRoomLevel: nextRoomLevel
+        targetRoomLevel: nextRoomLevel,
+        originalTotalSeconds
       };
       activeRemodelPayload = { propertyId, room: room as string, startedAt: now, completesAt, targetRoomLevel: nextRoomLevel };
       await user.save({ session });

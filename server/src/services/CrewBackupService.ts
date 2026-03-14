@@ -26,18 +26,24 @@ export function getActiveJobInfo(user: IUser): ActiveJobInfo | null {
   if (rc?.startedAt && rc?.completesAt && now < new Date(rc.completesAt)) {
     const startedAt = new Date(rc.startedAt);
     const completesAt = new Date(rc.completesAt);
-    const totalSeconds = Math.round((completesAt.getTime() - startedAt.getTime()) / 1000);
+    const computedTotal = Math.round((completesAt.getTime() - startedAt.getTime()) / 1000);
+    const totalSeconds = (rc.originalTotalSeconds != null && rc.originalTotalSeconds > 0)
+      ? rc.originalTotalSeconds
+      : computedTotal;
     return { jobType: 'researchCenterBuild', startedAt, completesAt, totalSeconds };
   }
 
   // Rental housing build (any property)
-  const builds = (user.rentalHousingBuilds || {}) as Record<string, { startedAt: Date | null; completesAt: Date | null } | undefined>;
+  const builds = (user.rentalHousingBuilds || {}) as Record<string, { startedAt: Date | null; completesAt: Date | null; originalTotalSeconds?: number } | undefined>;
   for (const key of ['property1', 'property2', 'property3', 'property4'] as const) {
     const b = builds[key];
     if (b?.startedAt && b?.completesAt && now < new Date(b.completesAt)) {
       const startedAt = new Date(b.startedAt);
       const completesAt = new Date(b.completesAt);
-      const totalSeconds = Math.round((completesAt.getTime() - startedAt.getTime()) / 1000);
+      const computedTotal = Math.round((completesAt.getTime() - startedAt.getTime()) / 1000);
+      const totalSeconds = (b.originalTotalSeconds != null && b.originalTotalSeconds > 0)
+        ? b.originalTotalSeconds
+        : computedTotal;
       return { jobType: 'rentalBuild', jobKey: key, startedAt, completesAt, totalSeconds };
     }
   }
@@ -47,7 +53,10 @@ export function getActiveJobInfo(user: IUser): ActiveJobInfo | null {
   if (ar?.startedAt && ar?.completesAt && now < new Date(ar.completesAt)) {
     const startedAt = new Date(ar.startedAt);
     const completesAt = new Date(ar.completesAt);
-    const totalSeconds = Math.round((completesAt.getTime() - startedAt.getTime()) / 1000);
+    const computedTotal = Math.round((completesAt.getTime() - startedAt.getTime()) / 1000);
+    const totalSeconds = (ar.originalTotalSeconds != null && ar.originalTotalSeconds > 0)
+      ? ar.originalTotalSeconds
+      : computedTotal;
     return { jobType: 'remodel', startedAt, completesAt, totalSeconds };
   }
 
@@ -120,27 +129,70 @@ export async function applyCrewBackupHelp(
   if (reduction <= 0) throw new Error('Maximum crew backup for this job has been reached');
 
   const newCompletesAt = new Date(currentCompletesAt.getTime() - reduction * 1000);
+  const reductionMs = reduction * 1000;
 
-  // Update user: set new completesAt on the active job and add this helper
-  const updatePayload: any = {
-    crewBackupHelpApplied: {
-      totalSeconds: alreadyUsed + reduction,
-      helperUserIds: [...helperIds, helperUserId]
-    }
+  // Atomic update: $push helper, $inc totalSeconds, and subtract reduction from job completesAt.
+  // Query excludes docs where this helper already applied so we don't double-add (and catch races).
+  const filter: mongoose.FilterQuery<any> = {
+    _id: targetUser._id,
+    'crewBackupHelpApplied.helperUserIds': { $ne: helperUserId }
   };
+  const pipeline: mongoose.mongo.Document[] = [
+    {
+      $set: {
+        'crewBackupHelpApplied.helperUserIds': {
+          $concatArrays: [
+            { $ifNull: ['$crewBackupHelpApplied.helperUserIds', []] },
+            [helperUserId]
+          ]
+        }
+      }
+    },
+    {
+      $set: {
+        'crewBackupHelpApplied.totalSeconds': {
+          $add: [{ $ifNull: ['$crewBackupHelpApplied.totalSeconds', 0] }, reduction]
+        }
+      }
+    }
+  ];
 
-  if (job.jobType === 'researchCenterBuild') {
-    updatePayload['researchCenterBuild.completesAt'] = newCompletesAt;
-  } else if (job.jobType === 'rentalBuild' && job.jobKey) {
-    updatePayload[`rentalHousingBuilds.${job.jobKey}.completesAt`] = newCompletesAt;
-  } else if (job.jobType === 'remodel') {
-    updatePayload['activeRemodel.completesAt'] = newCompletesAt;
+  const completesAtPath =
+    job.jobType === 'researchCenterBuild'
+      ? 'researchCenterBuild.completesAt'
+      : job.jobType === 'rentalBuild' && job.jobKey
+        ? `rentalHousingBuilds.${job.jobKey}.completesAt`
+        : 'activeRemodel.completesAt';
+  pipeline.push({
+    $set: {
+      [completesAtPath]: {
+        $dateSubtract: {
+          startDate: `$${completesAtPath}`,
+          unit: 'millisecond',
+          amount: reductionMs
+        }
+      }
+    }
+  });
+
+  const updated = await User.findOneAndUpdate(filter, pipeline, {
+    new: true
+  });
+  if (!updated) {
+    throw new Error('You have already backed up this crew member for this job');
   }
-
-  await User.findByIdAndUpdate(targetUser._id, { $set: updatePayload });
   await User.findByIdAndUpdate(helperUserId, { $inc: { crewBackupHelpCount: 1 } });
 
-  return { reduction, newCompletesAt };
+  const updatedCompletesAt =
+    job.jobType === 'researchCenterBuild'
+      ? updated.researchCenterBuild?.completesAt
+      : job.jobType === 'rentalBuild' && job.jobKey
+        ? (updated.rentalHousingBuilds as Record<string, { completesAt?: Date }>)?.[job.jobKey]?.completesAt
+        : updated.activeRemodel?.completesAt;
+  const resultCompletesAt =
+    updatedCompletesAt instanceof Date ? updatedCompletesAt : newCompletesAt;
+
+  return { reduction, newCompletesAt: resultCompletesAt };
 }
 
 /**

@@ -13,6 +13,44 @@ import { getActiveJobInfo, applyCrewBackupHelp, getJobLabel } from '../services/
 
 const router = express.Router();
 
+const BACKUP_REQUEST_SELECT = 'handle _id crewBackupRequestedAt crewBackupHelpApplied researchCenterLevel rentalHousingLevels activeRemodel rentalHousingBuilds researchCenterBuild';
+
+export type BackupRequestItem = { userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean };
+
+/**
+ * Build sorted list of backup requests for crew members who have requested backup.
+ * Used by GET /backup-requests and GET /:crewId (crew details).
+ */
+async function buildBackupRequestsList(
+  memberIds: mongoose.Types.ObjectId[],
+  currentUserIdStr: string
+): Promise<BackupRequestItem[]> {
+  if (memberIds.length === 0) return [];
+  const usersWithBackup = await User.find({
+    _id: { $in: memberIds },
+    crewBackupRequestedAt: { $ne: null }
+  })
+    .select(BACKUP_REQUEST_SELECT)
+    .lean();
+  const list: BackupRequestItem[] = [];
+  for (const u of usersWithBackup) {
+    if (u.crewBackupRequestedAt == null) continue;
+    const job = getActiveJobInfo(u as IUser);
+    const jobLabel = job ? getJobLabel(u as IUser, job) : 'build or remodel';
+    const helperIds = (u as any).crewBackupHelpApplied?.helperUserIds ?? [];
+    const hasCurrentUserHelped = helperIds.some((id: any) => id?.toString() === currentUserIdStr);
+    list.push({
+      userId: (u as any)._id.toString(),
+      handle: (u as any).handle,
+      requestedAt: u.crewBackupRequestedAt instanceof Date ? u.crewBackupRequestedAt.toISOString() : String(u.crewBackupRequestedAt),
+      jobLabel,
+      hasCurrentUserHelped
+    });
+  }
+  list.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+  return list;
+}
+
 interface CreateCrewRequest extends Request {
   body: {
     crewName: string;
@@ -274,29 +312,7 @@ router.get('/backup-requests', auth, async (req: Request, res: Response) => {
     if (crew.presidentId) memberIds.push(crew.presidentId as mongoose.Types.ObjectId);
     (crew.executives || []).forEach((e: any) => memberIds.push(e));
     (crew.members || []).forEach((m: any) => memberIds.push(m));
-    const usersWithBackup = await User.find({
-      _id: { $in: memberIds },
-      crewBackupRequestedAt: { $ne: null }
-    })
-      .select('handle _id crewBackupRequestedAt crewBackupHelpApplied researchCenterLevel rentalHousingLevels activeRemodel rentalHousingBuilds researchCenterBuild')
-      .lean();
-    const helperUserIdStr = userId.toString();
-    const backupRequestsList: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean }> = [];
-    for (const u of usersWithBackup) {
-      if (u.crewBackupRequestedAt == null) continue;
-      const job = getActiveJobInfo(u as IUser);
-      const jobLabel = job ? getJobLabel(u as IUser, job) : 'build or remodel';
-      const helperIds = (u as any).crewBackupHelpApplied?.helperUserIds ?? [];
-      const hasCurrentUserHelped = helperIds.some((id: any) => id?.toString() === helperUserIdStr);
-      backupRequestsList.push({
-        userId: (u as any)._id.toString(),
-        handle: (u as any).handle,
-        requestedAt: u.crewBackupRequestedAt instanceof Date ? u.crewBackupRequestedAt.toISOString() : String(u.crewBackupRequestedAt),
-        jobLabel,
-        hasCurrentUserHelped
-      });
-    }
-    backupRequestsList.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+    const backupRequestsList = await buildBackupRequestsList(memberIds, userId.toString());
     res.json({ backupRequests: backupRequestsList });
   } catch (error) {
     console.error('Error fetching crew backup requests:', error);
@@ -1557,30 +1573,7 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
       ...executives.map((e: any) => e._id),
       ...members.map((m: any) => m._id)
     ];
-    const usersWithBackup = await User.find({
-      _id: { $in: allMemberIds },
-      crewBackupRequestedAt: { $ne: null }
-    })
-      .select('handle _id crewBackupRequestedAt crewBackupHelpApplied researchCenterLevel rentalHousingLevels activeRemodel rentalHousingBuilds researchCenterBuild')
-      .lean();
-    const currentUserIdStr = userId?.toString() ?? '';
-    const backupRequestsList: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean }> = [];
-    for (const u of usersWithBackup) {
-      if (u.crewBackupRequestedAt == null) continue;
-      const job = getActiveJobInfo(u as IUser);
-      const jobLabel = job ? getJobLabel(u as IUser, job) : 'build or remodel';
-      const helperIds = (u as any).crewBackupHelpApplied?.helperUserIds ?? [];
-      const hasCurrentUserHelped = helperIds.some((id: any) => id?.toString() === currentUserIdStr);
-      backupRequestsList.push({
-        userId: (u as any)._id.toString(),
-        handle: (u as any).handle,
-        requestedAt: u.crewBackupRequestedAt instanceof Date ? u.crewBackupRequestedAt.toISOString() : String(u.crewBackupRequestedAt),
-        jobLabel,
-        hasCurrentUserHelped
-      });
-    }
-    backupRequestsList.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
-    const backupRequests = backupRequestsList;
+    const backupRequests = await buildBackupRequestsList(allMemberIds, userId?.toString() ?? '');
 
     res.json({
       success: true,

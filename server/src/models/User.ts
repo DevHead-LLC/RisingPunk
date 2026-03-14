@@ -59,12 +59,14 @@ export interface IUser extends Document {
     completesAt: Date | null;
     /** Target level (1–20) for this build. */
     targetLevel?: number | null;
+    /** Original build duration in seconds (for crew backup formula; set when job starts). */
+    originalTotalSeconds?: number;
   };
   rentalHousingBuilds?: {
-    property1: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
-    property2: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
-    property3: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
-    property4: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number };
+    property1: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number; originalTotalSeconds?: number };
+    property2: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number; originalTotalSeconds?: number };
+    property3: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number; originalTotalSeconds?: number };
+    property4: { startedAt: Date | null; completesAt: Date | null; targetLevel?: number; originalTotalSeconds?: number };
   };
   /** Property level 0 = not built, 1-9 = build level. */
   rentalHousingLevels?: {
@@ -94,6 +96,8 @@ export interface IUser extends Document {
     startedAt: Date | null;
     completesAt: Date | null;
     targetRoomLevel: number;
+    /** Original remodel duration in seconds (for crew backup formula; set when job starts). */
+    originalTotalSeconds?: number;
   } | null;
   antivirusShield?: {
     active: boolean;
@@ -357,28 +361,33 @@ const userSchema = new Schema({
     targetLevel: {
       type: Number,
       default: null
-    }
+    },
+    originalTotalSeconds: { type: Number, default: undefined }
   },
   rentalHousingBuilds: {
     property1: {
       startedAt: { type: Date, default: null },
       completesAt: { type: Date, default: null },
-      targetLevel: { type: Number, default: null }
+      targetLevel: { type: Number, default: null },
+      originalTotalSeconds: { type: Number, default: undefined }
     },
     property2: {
       startedAt: { type: Date, default: null },
       completesAt: { type: Date, default: null },
-      targetLevel: { type: Number, default: null }
+      targetLevel: { type: Number, default: null },
+      originalTotalSeconds: { type: Number, default: undefined }
     },
     property3: {
       startedAt: { type: Date, default: null },
       completesAt: { type: Date, default: null },
-      targetLevel: { type: Number, default: null }
+      targetLevel: { type: Number, default: null },
+      originalTotalSeconds: { type: Number, default: undefined }
     },
     property4: {
       startedAt: { type: Date, default: null },
       completesAt: { type: Date, default: null },
-      targetLevel: { type: Number, default: null }
+      targetLevel: { type: Number, default: null },
+      originalTotalSeconds: { type: Number, default: undefined }
     }
   },
   rentalHousingLevels: {
@@ -428,7 +437,8 @@ const userSchema = new Schema({
     room: { type: String, enum: ['bathroom', 'kitchen', 'bedroom', 'livingRoom', 'garage'], default: null },
     startedAt: { type: Date, default: null },
     completesAt: { type: Date, default: null },
-    targetRoomLevel: { type: Number, default: null }
+    targetRoomLevel: { type: Number, default: null },
+    originalTotalSeconds: { type: Number, default: undefined }
   },
   antivirusShield: {
     active: {
