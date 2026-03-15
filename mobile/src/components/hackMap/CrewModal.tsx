@@ -364,6 +364,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         await refetchCrewDetails();
         await refetchCrewStatus();
       } catch (err) {
+        console.error('Error backing up crew member:', err);
       }
     },
     [backupCrewMember, crewStatus?.crewId, dispatch, refetchCrewDetails, refetchCrewStatus]
