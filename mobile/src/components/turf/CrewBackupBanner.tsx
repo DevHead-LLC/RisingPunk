@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useGetCrewStatusQuery, useGetCrewDetailsQuery } from '../../store/api/authApi';
@@ -32,13 +32,6 @@ export function CrewBackupBanner({ canShowBanner, onPressOpenCrewToBackup }: Cre
   const hasUnhelpedRequests = backupRequests.some(
     (r) => String(r.userId ?? '').trim() !== String(currentUserId ?? '').trim() && r.hasCurrentUserHelped === false
   );
-
-  const lastLogRef = useRef<string>('');
-  useEffect(() => {
-    const key = crewData?.crew?.id + '|' + (backupRequests?.length ?? 0) + '|' + hasUnhelpedRequests + '|' + (currentUserId ?? '').toString().slice(0, 8);
-    if (key === lastLogRef.current) return;
-    lastLogRef.current = key;
-  }, [crewData?.crew?.id, backupRequests?.length, hasUnhelpedRequests, currentUserId]);
 
   const [dismissed, setDismissed] = useState(false);
 

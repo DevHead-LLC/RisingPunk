@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, TextInput, Image } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -293,14 +293,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       (r) => String(r.userId ?? '').trim() !== uid && r.hasCurrentUserHelped === false
     );
   }, [activeCrewDetails?.crew?.backupRequests, currentUserId]);
-
-  const crewModalBackupLogRef = useRef<string>('');
-  useEffect(() => {
-    const backupRequests = activeCrewDetails?.crew?.backupRequests ?? [];
-    const key = (crewStatus?.crewId ?? '') + '|' + backupRequests.length + '|' + hasUnhelpedBackupRequests + '|' + (currentUserId ?? '').toString().slice(0, 8);
-    if (key === crewModalBackupLogRef.current) return;
-    crewModalBackupLogRef.current = key;
-  }, [crewStatus?.crewId, activeCrewDetails?.crew?.backupRequests, hasUnhelpedBackupRequests, currentUserId]);
 
   const handleAcceptApplicant = useCallback(async (applicantUserId: string) => {
     if (!crewStatus?.crewId) {

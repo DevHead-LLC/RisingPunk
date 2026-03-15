@@ -130,11 +130,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   );
   const [requestCrewBackup] = useRequestCrewBackupMutation();
 
-  useEffect(() => {
-    const myReqs = backupRequests.filter((r) => String(r.userId) === String(currentUserId));
-    const types = myReqs.map((r) => r.jobType ?? r.jobLabel);
-  }, [backupRequests, hasRequestedBackupForBuild, hasRequestedBackupForRemodel, crewDetails, crewStatus?.isInCrew, currentUserId]);
-
   const hadActiveRemodelRef = useRef(false);
   const hadActiveBuildRef = useRef(false);
   useEffect(() => {

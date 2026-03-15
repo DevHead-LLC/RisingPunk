@@ -92,11 +92,6 @@ async function buildBackupRequestsList(
     });
   }
   list.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
-  const forUser = currentUserIdStr.slice(0, 8);
-  const itemsSummary = list.map((i) => ({ u: i.userId.slice(0, 8), jobType: i.jobType ?? '?', jobKey: i.jobKey ?? '', helped: i.hasCurrentUserHelped }));
-  if (list.length === 0 && usersWithBackup.length > 0) {
-    const debug = usersWithBackup.map((u: any) => ({ id: u._id?.toString?.().slice(0, 8), legacyAt: !!u.crewBackupRequestedAt, arrLen: (u.crewBackupRequests ?? []).length }));
-  }
   return list;
 }
 
