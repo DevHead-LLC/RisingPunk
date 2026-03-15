@@ -650,7 +650,6 @@ export const authApi = createApi({
         } else if (body && typeof body === 'object' && 'jobType' in body && body.jobType) {
           sent = { jobType: body.jobType };
         }
-        console.log('[crew request-backup] body=' + (sent ? JSON.stringify(sent) : 'build'));
         return {
           url: '/api/crew/request-backup',
           method: 'POST',
@@ -663,9 +662,7 @@ export const authApi = createApi({
         const userId = state.auth?.user?._id ?? (state.auth?.user as { id?: string })?.id;
         const handle = (state.auth?.user as { handle?: string })?.handle ?? '';
         const crewId = (authApi.endpoints.getCrewStatus.select()(state) as { data?: { crewId?: string } })?.data?.crewId;
-        console.log('[CLIENT requestCrewBackup] onQueryStarted crewId=' + (crewId ?? 'NONE') + ' userId=' + (userId ? String(userId).slice(0, 8) : 'NONE') + ' arg=' + JSON.stringify(arg));
         if (!crewId || !userId) {
-          console.log('[CLIENT requestCrewBackup] SKIP optimistic update: crewId or userId missing');
           try { await queryFulfilled; } catch { /* noop */ }
           return;
         }
@@ -686,7 +683,6 @@ export const authApi = createApi({
         const patchResult = dispatch(
           authApi.util.updateQueryData('getCrewDetails', crewId, (draft) => {
             if (!draft?.crew) {
-              console.log('[CLIENT requestCrewBackup] optimistic patch SKIPPED: draft.crew is null');
               return;
             }
             const list = draft.crew.backupRequests ?? [];
@@ -697,17 +693,13 @@ export const authApi = createApi({
             );
             if (!alreadyHas) {
               draft.crew.backupRequests = [...list, newRow];
-              console.log('[CLIENT requestCrewBackup] optimistic patch APPLIED: added jobType=' + (resolvedJobType ?? 'research') + ' listLen=' + (list.length + 1));
             } else {
-              console.log('[CLIENT requestCrewBackup] optimistic patch SKIPPED: already has jobType=' + (resolvedJobType ?? 'research'));
             }
           })
         );
         try {
           await queryFulfilled;
-          console.log('[CLIENT requestCrewBackup] server confirmed success for jobType=' + (resolvedJobType ?? 'research'));
         } catch (err) {
-          console.log('[CLIENT requestCrewBackup] server FAILED — undoing optimistic patch, err=' + String(err));
           patchResult.undo();
         }
       },
@@ -718,7 +710,6 @@ export const authApi = createApi({
       { targetUserId: string; jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research'; jobKey?: string; categoryId?: string; featureId?: string }
     >({
       query: ({ targetUserId, jobType, jobKey, categoryId, featureId }) => {
-        console.log('[crew backup-apply] target=' + (targetUserId ?? '').slice(0, 8) + ' jobType=' + (jobType ?? ''));
         return {
           url: `/api/crew/backup/${targetUserId}`,
           method: 'POST',

@@ -455,11 +455,9 @@ router.get('/:name', async (req: Request, res: Response) => {
     const viewportEarly = parseViewportFromRequest(req);
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
-      console.log('[map fetch] no map found for', name, '- dropping legacy index if present and generating');
       // Drop legacy unique index so insert can succeed (E11000); per-doc uniqueness enforced in app (user-position-and-locator.md)
       try {
         await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
-        console.log('[map fetch] dropped legacy unique index cells.x_1_cells.y_1');
       } catch (_) {
         // Index may not exist or already dropped
       }
@@ -515,7 +513,6 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
       try {
         await MapModel.collection.dropIndex('cells.x_1_cells.y_1');
-        console.log('[map fetch] dropped legacy unique index cells.x_1_cells.y_1 (migrate path)');
       } catch (_) {}
       const recreated = await mapService.generateMap(name);
       mapDoc = (recreated as any) || await MapModel.findOne({ name });
@@ -529,7 +526,6 @@ router.get('/:name', async (req: Request, res: Response) => {
       // Fix E11000 duplicate key: shared dedupe (mapCellUtils) prefers occupied over empty, stronger occupancy when both occupied (Bugbot).
       const deduped = dedupCellsByCoord(cells);
       if (deduped.length !== cells.length) {
-        console.log('[map fetch] deduping cells', cells.length, '->', deduped.length);
         const updated = await MapModel.findOneAndUpdate(
           { _id: (mapDoc as any)._id },
           { $set: { cells: deduped } },

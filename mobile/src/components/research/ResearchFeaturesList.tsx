@@ -128,7 +128,6 @@ export function ResearchFeaturesList({
         onRequestBackup={
           showRequestBackup
             ? () => {
-                console.log('[ResearchFeaturesList] CLICKED research Request back-up cat=' + categoryId + ' feat=' + feature.id);
                 requestCrewBackup({ categoryId, featureId: feature.id });
               }
             : undefined

@@ -511,6 +511,8 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
       originalTotalSeconds
     };
     await user.save();
+    // Clear any stale backup request from a previous research center build so "Request back-up" shows fresh
+    await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(req.user._id)), 'researchCenterBuild');
 
     res.json({
       success: true,
@@ -868,7 +870,9 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
       'balance.total': user.balance.total - buildCost
     };
 
-    // Clear previous backup request so "Request back-up" shows for this new build until they request
+    // Clear previous backup request (both legacy fields and crewBackupRequests array entry)
+    // so "Request back-up" shows fresh for this new build/upgrade
+    await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'rentalBuild', propertyKey);
     await User.findByIdAndUpdate(userId, {
       $set: updateData,
       $unset: {
@@ -1165,7 +1169,7 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
         targetRoomLevel: nextRoomLevel,
         originalTotalSeconds
       };
-      // Clear previous backup request so "Request back-up" shows for this new remodel until they request
+      // Clear legacy backup fields so "Request back-up" shows fresh for this new remodel
       (user as any).crewBackupRequestedAt = null;
       (user as any).crewBackupHelpApplied = null;
       (user as any).crewBackupResearchCategoryId = null;
@@ -1174,6 +1178,8 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
       activeRemodelPayload = { propertyId, room: room as string, startedAt: now, completesAt, targetRoomLevel: nextRoomLevel };
       await user.save({ session });
     });
+    // Clear any stale crewBackupRequests entry from a previous remodel
+    await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'remodel');
     res.json({
       success: true,
       message: 'Remodel started',
@@ -1320,9 +1326,7 @@ router.post('/speedup-remodel/:propertyId', auth, async (req, res): Promise<void
       await userInTransaction.save({ session });
       await User.updateOne({ _id: userId }, { $unset: { activeRemodel: 1 } }, { session });
     });
-    console.log('[speedup-remodel] transaction committed for userId=' + String(userId).slice(0, 8) + ', now removing backup request');
     await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'remodel');
-    console.log('[speedup-remodel] backup request removed for userId=' + String(userId).slice(0, 8));
   } catch (error: any) {
     if (error.message === 'User not found') {
       res.status(404).json({ error: error.message });

@@ -54,7 +54,6 @@ async function buildBackupRequestsList(
             : undefined;
         const job = await getActiveJobInfo(u as IUser, entry.jobType, options);
         if (!job) {
-          console.log('[crew backup-list] SKIP entry userId=' + (u as any)._id?.toString?.().slice(0, 8) + ' jobType=' + entry.jobType + ' (getActiveJobInfo returned null — job may have completed)');
           continue;
         }
         const jobLabel = getJobLabel(u as IUser, job);
@@ -95,10 +94,8 @@ async function buildBackupRequestsList(
   list.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
   const forUser = currentUserIdStr.slice(0, 8);
   const itemsSummary = list.map((i) => ({ u: i.userId.slice(0, 8), jobType: i.jobType ?? '?', jobKey: i.jobKey ?? '', helped: i.hasCurrentUserHelped }));
-  console.log('[crew backup-list] forUser=' + forUser + ' memberCount=' + memberIds.length + ' listLength=' + list.length + ' items=' + JSON.stringify(itemsSummary));
   if (list.length === 0 && usersWithBackup.length > 0) {
     const debug = usersWithBackup.map((u: any) => ({ id: u._id?.toString?.().slice(0, 8), legacyAt: !!u.crewBackupRequestedAt, arrLen: (u.crewBackupRequests ?? []).length }));
-    console.log('[crew backup-list] WARN no items but found users=' + JSON.stringify(debug));
   }
   return list;
 }
@@ -319,14 +316,12 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
     const userId = req.user?._id;
     const body = req.body ?? {};
     const requesterId = userId?.toString?.().slice(0, 8) ?? '?';
-    console.log('[crew request-backup] requester=' + requesterId + ' body=' + JSON.stringify(body));
     if (!userId) {
       res.status(401).json({ error: 'User not authenticated' });
       return;
     }
     const crewStatus = await CrewStatus.findOne({ userId });
     if (!crewStatus?.isInCrew || !crewStatus.crewId) {
-      console.log('[crew request-backup] requester=' + requesterId + ' rejected=not_in_crew');
       res.status(400).json({ error: 'You must be in a crew to request backup' });
       return;
     }
@@ -350,12 +345,10 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
         !researchDoc.researchCompletesAt ||
         now >= new Date(researchDoc.researchCompletesAt)
       ) {
-        console.log('[crew request-backup] requester=' + requesterId + ' path=research rejected=no_active_research');
         res.status(400).json({ error: 'No active research to request backup for' });
         return;
       }
       if (hasRequestForJob(user, 'research', undefined, categoryId, featureId)) {
-        console.log('[crew request-backup] requester=' + requesterId + ' path=research ALREADY_REQUESTED (idempotent success)');
         res.json({ success: true, message: 'Backup already requested for this research' });
         return;
       }
@@ -370,7 +363,6 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
       await User.updateOne({ _id: userId }, { $push: { crewBackupRequests: newEntry } });
       const afterUser = await User.findById(userId).select('crewBackupRequests').lean();
       const afterCount = (afterUser as any)?.crewBackupRequests?.length ?? 0;
-      console.log('[crew request-backup] requester=' + requesterId + ' path=research success arrayLen=' + afterCount);
       res.json({ success: true, message: 'Backup requested' });
       return;
     }
@@ -379,12 +371,10 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
       ? await getActiveJobInfo(user, bodyJobType)
       : await getActiveJobInfo(user);
     if (!job) {
-      console.log('[crew request-backup] requester=' + requesterId + ' path=build rejected=no_active_job' + (bodyJobType ? ' preferredType=' + bodyJobType : ''));
       res.status(400).json({ error: 'No active build or remodel to request backup for' });
       return;
     }
     if (hasRequestForJob(user, job.jobType, job.jobKey, job.categoryId, job.featureId)) {
-      console.log('[crew request-backup] requester=' + requesterId + ' path=build jobType=' + (job?.jobType ?? '?') + ' ALREADY_REQUESTED (idempotent success)');
       res.json({ success: true, message: 'Backup already requested for this job' });
       return;
     }
@@ -401,7 +391,6 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
     const afterUser = await User.findById(userId).select('crewBackupRequests').lean();
     const afterCount = (afterUser as any)?.crewBackupRequests?.length ?? 0;
     const afterTypes = ((afterUser as any)?.crewBackupRequests ?? []).map((e: any) => e.jobType);
-    console.log('[crew request-backup] requester=' + requesterId + ' path=build jobType=' + (job?.jobType ?? '?') + ' success arrayLen=' + afterCount + ' types=' + JSON.stringify(afterTypes));
     res.json({ success: true, message: 'Backup requested' });
   } catch (error) {
     console.error('Error requesting crew backup:', error);
@@ -491,7 +480,6 @@ router.post('/backup/:userId', auth, async (req: Request<{ userId: string }, {},
     }
     const helperId = helperUserId.toString().slice(0, 8);
     const targetId = targetUserId.slice(0, 8);
-    console.log('[crew backup-apply] helper=' + helperId + ' target=' + targetId + ' jobType=' + (body.jobType ?? '?') + ' success reduction=' + result.reduction);
     res.json({
       success: true,
       reduction: result.reduction,
@@ -501,7 +489,6 @@ router.post('/backup/:userId', auth, async (req: Request<{ userId: string }, {},
     const helperId = req.user?._id?.toString?.().slice(0, 8) ?? '?';
     const targetId = (req.params.userId ?? '').slice(0, 8);
     if (['No active build or remodel to back up', 'User has not requested backup', 'You have already backed up this crew member for this job', 'Maximum crew backup for this job has been reached', 'Build or remodel is already complete'].includes(error.message)) {
-      console.log('[crew backup-apply] helper=' + helperId + ' target=' + targetId + ' rejected ' + (error.message ?? ''));
       res.status(400).json({ error: error.message });
       return;
     }

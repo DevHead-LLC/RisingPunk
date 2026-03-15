@@ -15,6 +15,8 @@ export interface ActiveJobInfo {
   categoryId?: string;
   featureId?: string;
   featureName?: string;
+  /** Target level for builds/upgrades (rental property or research center). */
+  targetLevel?: number;
   startedAt: Date;
   completesAt: Date;
   totalSeconds: number;
@@ -99,7 +101,8 @@ export async function getActiveJobInfo(
       const totalSeconds = (rc.originalTotalSeconds != null && rc.originalTotalSeconds > 0)
         ? rc.originalTotalSeconds
         : computedTotal;
-      return { jobType: 'researchCenterBuild', startedAt, completesAt, totalSeconds };
+      const rcTargetLevel = (rc as any).targetLevel ?? undefined;
+      return { jobType: 'researchCenterBuild', startedAt, completesAt, totalSeconds, ...(rcTargetLevel != null && { targetLevel: rcTargetLevel }) };
     }
   }
   if (onlyResearchCenterBuild) return null;
@@ -119,7 +122,8 @@ export async function getActiveJobInfo(
         const totalSeconds = (b.originalTotalSeconds != null && b.originalTotalSeconds > 0)
           ? b.originalTotalSeconds
           : computedTotal;
-        return { jobType: 'rentalBuild', jobKey: key, startedAt, completesAt, totalSeconds };
+        const bTargetLevel = (b as any).targetLevel ?? undefined;
+        return { jobType: 'rentalBuild', jobKey: key, startedAt, completesAt, totalSeconds, ...(bTargetLevel != null && { targetLevel: bTargetLevel }) };
       }
     }
   }
@@ -186,7 +190,6 @@ export async function removeCrewBackupRequestForJob(
     { _id: userId },
     { $pull: { crewBackupRequests: pullMatch } }
   );
-  console.log('[removeCrewBackupRequestForJob] userId=' + userId.toString().slice(0, 8) + ' jobType=' + jobType + ' match=' + JSON.stringify(pullMatch) + ' modifiedCount=' + result.modifiedCount);
 }
 
 const ROOM_LABELS: Record<string, string> = {
@@ -221,15 +224,17 @@ export function getJobLabel(user: IUser, job: ActiveJobInfo): string {
   }
   if (job.jobType === 'researchCenterBuild') {
     const level = user.researchCenterLevel ?? 0;
-    return level < 1 ? 'Research Center build' : 'Research Center upgrade';
+    if (level < 1) return 'Research Center build';
+    const targetLabel = job.targetLevel ? ` to Lv. ${job.targetLevel}` : '';
+    return `Research Center upgrade${targetLabel}`;
   }
   if (job.jobType === 'rentalBuild' && job.jobKey) {
     const propNum = job.jobKey.replace('property', '');
     const levels = user.rentalHousingLevels as Record<string, number> | undefined;
     const currentLevel = levels?.[job.jobKey] ?? 0;
-    return currentLevel < 1
-      ? `Investment property ${propNum} build`
-      : `Investment property ${propNum} upgrade`;
+    if (currentLevel < 1) return `Investment property ${propNum} build`;
+    const targetLabel = job.targetLevel ? ` to Lv. ${job.targetLevel}` : '';
+    return `Investment property ${propNum} upgrade${targetLabel}`;
   }
   if (job.jobType === 'remodel' && user.activeRemodel?.room) {
     const room = user.activeRemodel.room;

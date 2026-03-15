@@ -79,7 +79,6 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buil
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                console.log('[DevelopmentZone] CLICKED rentalBuild Request back-up');
                 requestCrewBackup({ jobType: 'rentalBuild' });
               }}
             >

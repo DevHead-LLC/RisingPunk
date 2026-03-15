@@ -300,7 +300,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     const key = (crewStatus?.crewId ?? '') + '|' + backupRequests.length + '|' + hasUnhelpedBackupRequests + '|' + (currentUserId ?? '').toString().slice(0, 8);
     if (key === crewModalBackupLogRef.current) return;
     crewModalBackupLogRef.current = key;
-    console.log('[crew modal] backupRequestsLength=' + backupRequests.length + ' hasUnhelped=' + hasUnhelpedBackupRequests + ' currentUser=' + (currentUserId ?? '').toString().slice(0, 8));
   }, [crewStatus?.crewId, activeCrewDetails?.crew?.backupRequests, hasUnhelpedBackupRequests, currentUserId]);
 
   const handleAcceptApplicant = useCallback(async (applicantUserId: string) => {
@@ -339,7 +338,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
   const handleBackupCrewMember = useCallback(
     async (req: { userId: string; jobType?: string; jobKey?: string; categoryId?: string; featureId?: string }) => {
-      console.log('[CrewModal] handleBackupCrewMember CALLED: userId=' + req.userId.slice(0, 8) + ' jobType=' + (req.jobType ?? '?'));
       try {
         const result = await backupCrewMember({
           targetUserId: req.userId,
@@ -348,7 +346,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           categoryId: req.categoryId,
           featureId: req.featureId,
         }).unwrap();
-        console.log('[CrewModal] handleBackupCrewMember SUCCESS: reduction=' + result?.reduction + ' newCompletesAt=' + result?.newCompletesAt);
         const crewId = crewStatus?.crewId ?? '';
         if (crewId) {
           dispatch(
@@ -364,7 +361,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 );
                 if (match) {
                   match.hasCurrentUserHelped = true;
-                  console.log('[CrewModal] optimistic: marked hasCurrentUserHelped=true for jobType=' + (req.jobType ?? '?'));
                 }
               }
             })
@@ -373,7 +369,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         await refetchCrewDetails();
         await refetchCrewStatus();
       } catch (err) {
-        console.log('[CrewModal] handleBackupCrewMember FAILED: ' + String(err));
       }
     },
     [backupCrewMember, crewStatus?.crewId, dispatch, refetchCrewDetails, refetchCrewStatus]

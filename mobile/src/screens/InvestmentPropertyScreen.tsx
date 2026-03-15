@@ -133,10 +133,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   useEffect(() => {
     const myReqs = backupRequests.filter((r) => String(r.userId) === String(currentUserId));
     const types = myReqs.map((r) => r.jobType ?? r.jobLabel);
-    console.log('[InvestPropScreen] backupRequests changed: total=' + backupRequests.length +
-      ' mine=' + myReqs.length + ' types=' + JSON.stringify(types) +
-      ' hasBackupBuild=' + hasRequestedBackupForBuild + ' hasBackupRemodel=' + hasRequestedBackupForRemodel +
-      ' crewDetails?=' + (crewDetails != null) + ' isInCrew=' + crewStatus?.isInCrew);
   }, [backupRequests, hasRequestedBackupForBuild, hasRequestedBackupForRemodel, crewDetails, crewStatus?.isInCrew, currentUserId]);
 
   const hadActiveRemodelRef = useRef(false);
@@ -262,7 +258,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
             <TouchableOpacity
               style={[styles.propertyBuildBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                console.log('[InvestPropScreen] CLICKED rentalBuild Request back-up');
                 requestCrewBackup({ jobType: 'rentalBuild' });
               }}
             >
@@ -288,7 +283,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
                 onRequestBackup={() => {
-                  console.log('[InvestPropScreen] CLICKED remodel Request back-up (mainFloor)');
                   requestCrewBackup({ jobType: 'remodel' });
                 }}
                 showGarage={false}
@@ -313,7 +307,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
                 onRequestBackup={() => {
-                  console.log('[InvestPropScreen] CLICKED remodel Request back-up (garage)');
                   requestCrewBackup({ jobType: 'remodel' });
                 }}
                 showGarage={true}
@@ -385,7 +378,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                         <TouchableOpacity
                           style={[styles.modalButton, { backgroundColor: colors.primary, marginTop: 8 }]}
                           onPress={() => {
-                            console.log('[InvestPropScreen] CLICKED remodel Request back-up (modal)');
                             requestCrewBackup({ jobType: 'remodel' });
                           }}
                         >

@@ -38,7 +38,6 @@ export function CrewBackupBanner({ canShowBanner, onPressOpenCrewToBackup }: Cre
     const key = crewData?.crew?.id + '|' + (backupRequests?.length ?? 0) + '|' + hasUnhelpedRequests + '|' + (currentUserId ?? '').toString().slice(0, 8);
     if (key === lastLogRef.current) return;
     lastLogRef.current = key;
-    console.log('[crew banner] backupRequestsLength=' + (backupRequests?.length ?? 0) + ' hasUnhelped=' + hasUnhelpedRequests + ' currentUser=' + (currentUserId ?? '').toString().slice(0, 8));
   }, [crewData?.crew?.id, backupRequests?.length, hasUnhelpedRequests, currentUserId]);
 
   const [dismissed, setDismissed] = useState(false);

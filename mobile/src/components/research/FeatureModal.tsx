@@ -514,7 +514,6 @@ export function FeatureModal({
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                console.log('[FeatureModal] CLICKED research Request back-up cat=' + categoryId + ' feat=' + feature.id);
                 requestCrewBackup({ categoryId, featureId: feature.id });
               }}
             >

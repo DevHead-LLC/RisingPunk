@@ -326,7 +326,6 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                console.log('[ResearchCenterLoc] CLICKED researchCenterBuild Request back-up');
                 requestCrewBackup({ jobType: 'researchCenterBuild' });
               }}
             >
