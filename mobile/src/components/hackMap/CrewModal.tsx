@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, TextInput, Image } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -21,7 +21,7 @@ import { LeaderboardModal } from './LeaderboardModal';
 import { UserReportModal } from '../modals/UserReportModal';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
-import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery, useBackupCrewMemberMutation } from '../../store/api/authApi';
+import { authApi, useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery, useBackupCrewMemberMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -136,9 +136,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   
   const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(
     crewStatus?.crewId || '',
-    { 
+    {
       skip: !crewStatus?.crewId || !visible || !crewStatus?.isInCrew,
-      pollingInterval: visible && crewStatus?.crewId && crewStatus?.isInCrew ? 3000 : 0,
+      pollingInterval: visible && crewStatus?.crewId && crewStatus?.isInCrew ? 10000 : 0,
     }
   );
   
@@ -285,12 +285,23 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     return withoutBackup(CATEGORIES).filter(cat => baseFilter(cat));
   };
 
-  /** True when another crew member has requested backup and current user has not helped them yet. */
+  /** Show backup icon only when there is at least one backup request from another crew member that the current user has not yet helped. General rule for all members (president, executives, members): if you've already helped everyone who requested, or there are no requests, do not show the icon. */
   const hasUnhelpedBackupRequests = useMemo(() => {
     const backupRequests = activeCrewDetails?.crew?.backupRequests ?? [];
-    const uid = String(currentUserId ?? '');
-    return backupRequests.some((r) => String(r.userId) !== uid && !r.hasCurrentUserHelped);
+    const uid = String(currentUserId ?? '').trim();
+    return backupRequests.some(
+      (r) => String(r.userId ?? '').trim() !== uid && r.hasCurrentUserHelped === false
+    );
   }, [activeCrewDetails?.crew?.backupRequests, currentUserId]);
+
+  const crewModalBackupLogRef = useRef<string>('');
+  useEffect(() => {
+    const backupRequests = activeCrewDetails?.crew?.backupRequests ?? [];
+    const key = (crewStatus?.crewId ?? '') + '|' + backupRequests.length + '|' + hasUnhelpedBackupRequests + '|' + (currentUserId ?? '').toString().slice(0, 8);
+    if (key === crewModalBackupLogRef.current) return;
+    crewModalBackupLogRef.current = key;
+    console.log('[crew modal] backupRequestsLength=' + backupRequests.length + ' hasUnhelped=' + hasUnhelpedBackupRequests + ' currentUser=' + (currentUserId ?? '').toString().slice(0, 8));
+  }, [crewStatus?.crewId, activeCrewDetails?.crew?.backupRequests, hasUnhelpedBackupRequests, currentUserId]);
 
   const handleAcceptApplicant = useCallback(async (applicantUserId: string) => {
     if (!crewStatus?.crewId) {
@@ -326,13 +337,47 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     }
   }, [denyApplicant, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus]);
 
-  const handleBackupCrewMember = useCallback(async (targetUserId: string) => {
-    try {
-      await backupCrewMember(targetUserId).unwrap();
-      await refetchCrewDetails();
-      await refetchCrewStatus();
-    } catch (_) {}
-  }, [backupCrewMember, refetchCrewDetails, refetchCrewStatus]);
+  const handleBackupCrewMember = useCallback(
+    async (req: { userId: string; jobType?: string; jobKey?: string; categoryId?: string; featureId?: string }) => {
+      console.log('[CrewModal] handleBackupCrewMember CALLED: userId=' + req.userId.slice(0, 8) + ' jobType=' + (req.jobType ?? '?'));
+      try {
+        const result = await backupCrewMember({
+          targetUserId: req.userId,
+          jobType: req.jobType as any,
+          jobKey: req.jobKey,
+          categoryId: req.categoryId,
+          featureId: req.featureId,
+        }).unwrap();
+        console.log('[CrewModal] handleBackupCrewMember SUCCESS: reduction=' + result?.reduction + ' newCompletesAt=' + result?.newCompletesAt);
+        const crewId = crewStatus?.crewId ?? '';
+        if (crewId) {
+          dispatch(
+            authApi.util.updateQueryData('getCrewDetails', crewId, (draft) => {
+              if (draft?.crew?.backupRequests) {
+                const match = draft.crew.backupRequests.find(
+                  (r) =>
+                    String(r.userId ?? '').trim() === String(req.userId ?? '').trim() &&
+                    (r.jobType ?? '') === (req.jobType ?? '') &&
+                    (r.jobKey ?? '') === (req.jobKey ?? '') &&
+                    (r.categoryId ?? '') === (req.categoryId ?? '') &&
+                    (r.featureId ?? '') === (req.featureId ?? '')
+                );
+                if (match) {
+                  match.hasCurrentUserHelped = true;
+                  console.log('[CrewModal] optimistic: marked hasCurrentUserHelped=true for jobType=' + (req.jobType ?? '?'));
+                }
+              }
+            })
+          );
+        }
+        await refetchCrewDetails();
+        await refetchCrewStatus();
+      } catch (err) {
+        console.log('[CrewModal] handleBackupCrewMember FAILED: ' + String(err));
+      }
+    },
+    [backupCrewMember, crewStatus?.crewId, dispatch, refetchCrewDetails, refetchCrewStatus]
+  );
 
   const hasApplicants = useMemo(() => {
     return (activeCrewDetails?.crew?.applicants?.length || 0) > 0;
@@ -984,7 +1029,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
   const renderBackupRequests = () => {
     const backupRequests = activeCrewDetails?.crew?.backupRequests ?? [];
-    const othersRequests = backupRequests.filter((r) => String(r.userId) !== String(currentUserId));
+    const myIdNorm = String(currentUserId ?? '').trim();
+    const myHandle = (currentUser as any)?.handle?.trim?.();
+    const othersRequests = backupRequests.filter((r) => {
+      const reqIdNorm = String(r.userId ?? '').trim();
+      if (reqIdNorm === myIdNorm) return false;
+      if (myHandle && r.handle?.trim?.() === myHandle) return false;
+      return true;
+    });
     if (othersRequests.length === 0) {
       return (
         <View style={styles.categoryContent}>
@@ -1006,7 +1058,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         <View style={styles.membersList}>
           {othersRequests.map((req) => (
             <View
-              key={req.userId}
+              key={`${req.userId}-${req.jobType ?? ''}-${req.jobKey ?? ''}-${req.categoryId ?? ''}-${req.featureId ?? ''}`}
               style={[
                 styles.memberItem,
                 styles.memberSlot,
@@ -1021,7 +1073,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               {!req.hasCurrentUserHelped ? (
                 <TouchableOpacity
                   style={[styles.memberActionButton, { borderColor: colors.primary, backgroundColor: colors.primary }]}
-                  onPress={() => handleBackupCrewMember(req.userId)}
+                  onPress={() => handleBackupCrewMember(req)}
                   disabled={isBackingUpCrewMember}
                   activeOpacity={0.7}
                 >
@@ -2132,6 +2184,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     marginRight: SIZING.spacing.sm,
   },
+  // Bugbot: reported image 54×54 overflowing 44×44 button; assessed as visually fine, no change.
   backupIconImage: {
     width: 54,
     height: 54,

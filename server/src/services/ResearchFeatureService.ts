@@ -484,6 +484,10 @@ export class ResearchFeatureService {
           }
         }
 
+        // Remove only this research's backup request when it completes (per-job state)
+        const { removeCrewBackupRequestForJob } = await import('./CrewBackupService');
+        await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'research', undefined, categoryId, featureId);
+
         return {
           success: true,
           message: 'Research completed successfully',

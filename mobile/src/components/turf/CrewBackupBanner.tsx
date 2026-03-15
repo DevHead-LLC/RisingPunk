@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useGetCrewStatusQuery, useGetCrewDetailsQuery } from '../../store/api/authApi';
@@ -24,13 +24,22 @@ export function CrewBackupBanner({ canShowBanner, onPressOpenCrewToBackup }: Cre
   const { data: crewStatus } = useGetCrewStatusQuery(undefined, { skip: !currentUserId });
   const { data: crewData } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
-    pollingInterval: 5000,
+    pollingInterval: 15000,
   });
 
   const backupRequests = crewData?.crew?.backupRequests ?? [];
+  /** Show banner only when there is at least one backup request from another crew member that the current user has not yet helped. Same rule for all members: no icon/banner if you've already helped everyone who requested. */
   const hasUnhelpedRequests = backupRequests.some(
-    (r) => String(r.userId) !== String(currentUserId) && !r.hasCurrentUserHelped
+    (r) => String(r.userId ?? '').trim() !== String(currentUserId ?? '').trim() && r.hasCurrentUserHelped === false
   );
+
+  const lastLogRef = useRef<string>('');
+  useEffect(() => {
+    const key = crewData?.crew?.id + '|' + (backupRequests?.length ?? 0) + '|' + hasUnhelpedRequests + '|' + (currentUserId ?? '').toString().slice(0, 8);
+    if (key === lastLogRef.current) return;
+    lastLogRef.current = key;
+    console.log('[crew banner] backupRequestsLength=' + (backupRequests?.length ?? 0) + ' hasUnhelped=' + hasUnhelpedRequests + ' currentUser=' + (currentUserId ?? '').toString().slice(0, 8));
+  }, [crewData?.crew?.id, backupRequests?.length, hasUnhelpedRequests, currentUserId]);
 
   const [dismissed, setDismissed] = useState(false);
 

@@ -64,7 +64,12 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     pollingInterval: isBuildingFromStatus ? 5000 : 0,
   });
   const hasRequestedBackup = Boolean(
-    crewDetails?.crew?.backupRequests?.some((r) => String(r.userId) === String(currentUserId))
+    currentUserId &&
+    crewDetails?.crew?.backupRequests?.some(
+      (r) =>
+        String(r.userId) === String(currentUserId) &&
+        (r.jobType === 'researchCenterBuild' || (r.jobLabel?.includes('Research Center') ?? false))
+    )
   );
   const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery();
   const dispatch = useAppDispatch();
@@ -317,14 +322,12 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
               refetchBuildStatus();
             }}
           />
-          {crewStatus?.isInCrew && !hasRequestedBackup && (
+          {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackup && (
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                requestCrewBackup()
-                  .unwrap()
-                  .then(() => refetchCrewDetails?.())
-                  .catch(() => {});
+                console.log('[ResearchCenterLoc] CLICKED researchCenterBuild Request back-up');
+                requestCrewBackup({ jobType: 'researchCenterBuild' });
               }}
             >
               <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>

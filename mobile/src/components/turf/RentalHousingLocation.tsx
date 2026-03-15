@@ -6,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance, getCurrentBalance } from '../../store/slices/balanceSlice';
-import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
+import { authApi, useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 import { trackFirstConstruct } from '../../services/analyticsService';
@@ -66,13 +66,29 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
     pollingInterval: isBuildingFromStatus ? 5000 : 0,
   });
   const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
+  // Match rental build by jobType (same as DevelopmentZone) so we hide only when user requested for this build
   const hasRequestedBackup = Boolean(
-    crewDetails?.crew?.backupRequests?.some((r) => String(r.userId) === String(currentUserId))
+    currentUserId &&
+    crewDetails?.crew?.backupRequests?.some(
+      (r) =>
+        String(r.userId) === String(currentUserId) &&
+        (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false))
+    )
   );
 
   const dispatch = useAppDispatch();
   const previousIsUnlockedRef = useRef<boolean | undefined>(undefined);
-  
+  const hadBuildingRef = useRef(false);
+
+  // When this property starts building, refetch crew details so "Request back-up" uses fresh list (not stale cache from a previous build)
+  useEffect(() => {
+    if (isBuildingFromStatus && crewStatus?.crewId && crewStatus?.isInCrew && !hadBuildingRef.current) {
+      hadBuildingRef.current = true;
+      refetchCrewDetails();
+    }
+    if (!isBuildingFromStatus) hadBuildingRef.current = false;
+  }, [isBuildingFromStatus, crewStatus?.crewId, crewStatus?.isInCrew, refetchCrewDetails]);
+
   // Get balance from Redux store (always call hooks unconditionally)
   const reduxBalance = useAppSelector((state) => state.balance.total);
   
@@ -167,7 +183,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
     try {
       const result = await unlockRentalHousing(propertyId).unwrap();
       
-      if (result.success) {
+      if (result.success && result.buildStatus) {
         // Update local balance - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
         dispatch(updateBalance({ 
           total: result.newBalance, 
@@ -175,7 +191,14 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
           lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
           fractionalRemainder: currentBalanceState.fractionalRemainder
         }));
-        
+        // Optimistic cache update so TurfScreen/DevelopmentZone see active build immediately and "Request back-up" shows with the upgrade
+        const startedAt = typeof result.buildStatus.startedAt === 'string' ? result.buildStatus.startedAt : new Date(result.buildStatus.startedAt).toISOString();
+        const completesAt = typeof result.buildStatus.completesAt === 'string' ? result.buildStatus.completesAt : new Date(result.buildStatus.completesAt).toISOString();
+        dispatch(authApi.util.updateQueryData('getRentalHousingStatus', propertyId, (draft) => {
+          draft.isBuilding = true;
+          draft.buildStatus = { startedAt, completesAt, targetLevel: result.buildStatus!.targetLevel };
+        }));
+        refetch();
         // Show success modal
         setShowBuildStartedModal(true);
         setShowPopup(false);
@@ -323,14 +346,12 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
             leftOffset={-50}
             width={120}
           />
-          {isBuilding && crewStatus?.isInCrew && !hasRequestedBackup && (
+          {isBuilding && crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackup && (
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                requestCrewBackup()
-                  .unwrap()
-                  .then(() => refetchCrewDetails?.())
-                  .catch(() => {});
+                console.log('[RentalHousingLoc] CLICKED rentalBuild Request back-up');
+                requestCrewBackup({ jobType: 'rentalBuild' });
               }}
             >
               <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>

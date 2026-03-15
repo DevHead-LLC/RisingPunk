@@ -114,15 +114,49 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const { data: crewStatus } = useGetCrewStatusQuery();
   const hasActiveRemodelThisProperty = status?.activeRemodel?.propertyId === propertyId;
   const isPropertyBuilding = status?.isBuilding ?? false;
-  const { data: crewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
-    pollingInterval: hasActiveRemodelThisProperty || isPropertyBuilding ? 5000 : 0,
+    pollingInterval: hasActiveRemodelThisProperty || isPropertyBuilding ? 3000 : 0,
   });
   const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
-  const hasRequestedBackup = Boolean(
-    crewDetails?.crew?.backupRequests?.some((r) => String(r.userId) === String(currentUserId))
+  const backupRequests = crewDetails?.crew?.backupRequests ?? [];
+  const mine = (pred: (r: { userId?: string; jobType?: string; jobLabel?: string }) => boolean) =>
+    Boolean(currentUserId && backupRequests.some((r) => String(r.userId) === String(currentUserId) && pred(r)));
+  const hasRequestedBackupForBuild = mine(
+    (r) => r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false)
+  );
+  const hasRequestedBackupForRemodel = mine(
+    (r) => r.jobType === 'remodel' || (r.jobLabel?.toLowerCase().includes('remodel') ?? false)
   );
   const [requestCrewBackup] = useRequestCrewBackupMutation();
+
+  useEffect(() => {
+    const myReqs = backupRequests.filter((r) => String(r.userId) === String(currentUserId));
+    const types = myReqs.map((r) => r.jobType ?? r.jobLabel);
+    console.log('[InvestPropScreen] backupRequests changed: total=' + backupRequests.length +
+      ' mine=' + myReqs.length + ' types=' + JSON.stringify(types) +
+      ' hasBackupBuild=' + hasRequestedBackupForBuild + ' hasBackupRemodel=' + hasRequestedBackupForRemodel +
+      ' crewDetails?=' + (crewDetails != null) + ' isInCrew=' + crewStatus?.isInCrew);
+  }, [backupRequests, hasRequestedBackupForBuild, hasRequestedBackupForRemodel, crewDetails, crewStatus?.isInCrew, currentUserId]);
+
+  const hadActiveRemodelRef = useRef(false);
+  const hadActiveBuildRef = useRef(false);
+  useEffect(() => {
+    const hasActiveRemodel = Boolean(hasActiveRemodelThisProperty && crewStatus?.crewId && crewStatus?.isInCrew);
+    if (hasActiveRemodel && !hadActiveRemodelRef.current) {
+      hadActiveRemodelRef.current = true;
+      refetchCrewDetails();
+    }
+    if (!hasActiveRemodelThisProperty) hadActiveRemodelRef.current = false;
+  }, [hasActiveRemodelThisProperty, crewStatus?.crewId, crewStatus?.isInCrew, refetchCrewDetails]);
+  useEffect(() => {
+    const hasActiveBuild = Boolean(isPropertyBuilding && crewStatus?.crewId && crewStatus?.isInCrew);
+    if (hasActiveBuild && !hadActiveBuildRef.current) {
+      hadActiveBuildRef.current = true;
+      refetchCrewDetails();
+    }
+    if (!isPropertyBuilding) hadActiveBuildRef.current = false;
+  }, [isPropertyBuilding, crewStatus?.crewId, crewStatus?.isInCrew, refetchCrewDetails]);
 
   useEffect(() => {
     setHasActiveRemodelHere(status?.activeRemodel?.propertyId === propertyId);
@@ -224,10 +258,13 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
             {propertyLevel === 0 ? 'Property build' : 'Property upgrade'} in progress — Time left:{' '}
             {Math.floor(propertyBuildRemainingSec / 60)}:{(Math.floor(propertyBuildRemainingSec) % 60).toString().padStart(2, '0')}
           </Text>
-          {crewStatus?.isInCrew && !hasRequestedBackup && (
+          {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForBuild && (
             <TouchableOpacity
               style={[styles.propertyBuildBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
-              onPress={() => requestCrewBackup().catch(() => {})}
+              onPress={() => {
+                console.log('[InvestPropScreen] CLICKED rentalBuild Request back-up');
+                requestCrewBackup({ jobType: 'rentalBuild' });
+              }}
             >
               <Text style={[styles.propertyBuildBackupButtonText, { color: colors.background ?? '#fff' }]}>Request back-up</Text>
             </TouchableOpacity>
@@ -249,8 +286,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 onRemodel={propertyLevel >= 3 && hasRemodelConfig ? setRemodelRoom : undefined}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
-                showRequestBackup={Boolean(crewStatus?.isInCrew && !hasRequestedBackup)}
-                onRequestBackup={() => requestCrewBackup().catch(() => {})}
+                showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
+                onRequestBackup={() => {
+                  console.log('[InvestPropScreen] CLICKED remodel Request back-up (mainFloor)');
+                  requestCrewBackup({ jobType: 'remodel' });
+                }}
                 showGarage={false}
                 maxRoomLevel={maxRoomLevel}
                 roomRemodelLevels={roomRemodelLevels}
@@ -271,8 +311,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
-                showRequestBackup={Boolean(crewStatus?.isInCrew && !hasRequestedBackup)}
-                onRequestBackup={() => requestCrewBackup().catch(() => {})}
+                showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
+                onRequestBackup={() => {
+                  console.log('[InvestPropScreen] CLICKED remodel Request back-up (garage)');
+                  requestCrewBackup({ jobType: 'remodel' });
+                }}
                 showGarage={true}
                 maxRoomLevel={maxRoomLevel}
                 maxGarageRoomLevel={maxGarageRoomLevel}
@@ -338,10 +381,13 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                       <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
                         {timeUp ? 'Remodel complete! (Completion is automatic.)' : `Remodel in progress. Time left: ${Math.floor(remainingSec / 60)}:${(Math.floor(remainingSec) % 60).toString().padStart(2, '0')}`}
                       </Text>
-                      {!timeUp && crewStatus?.isInCrew && !hasRequestedBackup && (
+                      {!timeUp && crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel && (
                         <TouchableOpacity
                           style={[styles.modalButton, { backgroundColor: colors.primary, marginTop: 8 }]}
-                          onPress={() => requestCrewBackup().catch(() => {})}
+                          onPress={() => {
+                            console.log('[InvestPropScreen] CLICKED remodel Request back-up (modal)');
+                            requestCrewBackup({ jobType: 'remodel' });
+                          }}
                         >
                           <Text style={styles.modalButtonText}>Request back-up</Text>
                         </TouchableOpacity>
@@ -368,6 +414,8 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                                   fractionalRemainder: balanceState.fractionalRemainder
                                 }));
                                 setRemodelRoom(null);
+                                refetchRentalStatus();
+                                refetchCrewDetails();
                               } catch {
                                 // keep modal open
                               }

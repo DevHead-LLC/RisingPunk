@@ -9,17 +9,27 @@ import mongoose from 'mongoose';
 import { filterBadWords, containsBadWords, containsBadWordsAsSubstring } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 import { accrueBalanceFromTo } from '../utils/balanceAccrual';
-import { getActiveJobInfo, applyCrewBackupHelp, getJobLabel } from '../services/CrewBackupService';
+import { getActiveJobInfo, applyCrewBackupHelp, applyCrewBackupHelpByRequest, getJobLabel, hasRequestForJob } from '../services/CrewBackupService';
 
 const router = express.Router();
 
-const BACKUP_REQUEST_SELECT = 'handle _id crewBackupRequestedAt crewBackupHelpApplied researchCenterLevel rentalHousingLevels activeRemodel rentalHousingBuilds researchCenterBuild';
+const BACKUP_REQUEST_SELECT = 'handle _id crewBackupRequestedAt crewBackupHelpApplied crewBackupResearchCategoryId crewBackupResearchFeatureId crewBackupRequestedJobType crewBackupRequests researchCenterLevel rentalHousingLevels activeRemodel rentalHousingBuilds researchCenterBuild';
 
-export type BackupRequestItem = { userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean };
+export type BackupRequestItem = {
+  userId: string;
+  handle: string;
+  requestedAt: string;
+  jobLabel: string;
+  hasCurrentUserHelped: boolean;
+  jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research';
+  jobKey?: string;
+  categoryId?: string;
+  featureId?: string;
+};
 
 /**
  * Build sorted list of backup requests for crew members who have requested backup.
- * Used by GET /backup-requests and GET /:crewId (crew details).
+ * Uses crewBackupRequests array (one list item per request entry still in progress); falls back to legacy single-request.
  */
 async function buildBackupRequestsList(
   memberIds: mongoose.Types.ObjectId[],
@@ -28,14 +38,45 @@ async function buildBackupRequestsList(
   if (memberIds.length === 0) return [];
   const usersWithBackup = await User.find({
     _id: { $in: memberIds },
-    crewBackupRequestedAt: { $ne: null }
+    $or: [{ crewBackupRequestedAt: { $ne: null } }, { 'crewBackupRequests.0': { $exists: true } }],
   })
     .select(BACKUP_REQUEST_SELECT)
     .lean();
   const list: BackupRequestItem[] = [];
   for (const u of usersWithBackup) {
+    const requests = (u as any).crewBackupRequests ?? [];
+    if (requests.length > 0) {
+      for (const entry of requests) {
+        const options = entry.jobType === 'research' && entry.categoryId && entry.featureId
+          ? { categoryId: entry.categoryId, featureId: entry.featureId }
+          : entry.jobType === 'rentalBuild' && entry.jobKey
+            ? { jobKey: entry.jobKey }
+            : undefined;
+        const job = await getActiveJobInfo(u as IUser, entry.jobType, options);
+        if (!job) {
+          console.log('[crew backup-list] SKIP entry userId=' + (u as any)._id?.toString?.().slice(0, 8) + ' jobType=' + entry.jobType + ' (getActiveJobInfo returned null — job may have completed)');
+          continue;
+        }
+        const jobLabel = getJobLabel(u as IUser, job);
+        const helperIds = entry.helpApplied?.helperUserIds ?? [];
+        const hasCurrentUserHelped = helperIds.some((id: any) => id?.toString() === currentUserIdStr);
+        list.push({
+          userId: (u as any)._id.toString(),
+          handle: (u as any).handle,
+          requestedAt: entry.requestedAt instanceof Date ? entry.requestedAt.toISOString() : String(entry.requestedAt),
+          jobLabel,
+          hasCurrentUserHelped,
+          jobType: entry.jobType,
+          ...(entry.jobKey && { jobKey: entry.jobKey }),
+          ...(entry.categoryId && { categoryId: entry.categoryId }),
+          ...(entry.featureId && { featureId: entry.featureId }),
+        });
+      }
+      continue;
+    }
     if (u.crewBackupRequestedAt == null) continue;
-    const job = getActiveJobInfo(u as IUser);
+    const requestedJobType = (u as any).crewBackupRequestedJobType ?? undefined;
+    const job = await getActiveJobInfo(u as IUser, requestedJobType);
     const jobLabel = job ? getJobLabel(u as IUser, job) : 'build or remodel';
     const helperIds = (u as any).crewBackupHelpApplied?.helperUserIds ?? [];
     const hasCurrentUserHelped = helperIds.some((id: any) => id?.toString() === currentUserIdStr);
@@ -44,10 +85,21 @@ async function buildBackupRequestsList(
       handle: (u as any).handle,
       requestedAt: u.crewBackupRequestedAt instanceof Date ? u.crewBackupRequestedAt.toISOString() : String(u.crewBackupRequestedAt),
       jobLabel,
-      hasCurrentUserHelped
+      hasCurrentUserHelped,
+      ...(job?.jobType && { jobType: job.jobType }),
+      ...(job?.jobKey && { jobKey: job.jobKey }),
+      ...(job?.categoryId && { categoryId: job.categoryId }),
+      ...(job?.featureId && { featureId: job.featureId }),
     });
   }
   list.sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
+  const forUser = currentUserIdStr.slice(0, 8);
+  const itemsSummary = list.map((i) => ({ u: i.userId.slice(0, 8), jobType: i.jobType ?? '?', jobKey: i.jobKey ?? '', helped: i.hasCurrentUserHelped }));
+  console.log('[crew backup-list] forUser=' + forUser + ' memberCount=' + memberIds.length + ' listLength=' + list.length + ' items=' + JSON.stringify(itemsSummary));
+  if (list.length === 0 && usersWithBackup.length > 0) {
+    const debug = usersWithBackup.map((u: any) => ({ id: u._id?.toString?.().slice(0, 8), legacyAt: !!u.crewBackupRequestedAt, arrLen: (u.crewBackupRequests ?? []).length }));
+    console.log('[crew backup-list] WARN no items but found users=' + JSON.stringify(debug));
+  }
   return list;
 }
 
@@ -256,15 +308,25 @@ router.get('/status/:userId', auth, async (req: Request, res: Response) => {
 });
 
 // --- Crew backup request (help) ---
-router.post('/request-backup', auth, async (req: Request, res: Response) => {
+interface RequestBackupBody {
+  categoryId?: string;
+  featureId?: string;
+  /** When requesting backup for build/remodel, which job type so server uses the correct one when user has both (e.g. rental build + remodel). */
+  jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel';
+}
+router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBody>, res: Response) => {
   try {
     const userId = req.user?._id;
+    const body = req.body ?? {};
+    const requesterId = userId?.toString?.().slice(0, 8) ?? '?';
+    console.log('[crew request-backup] requester=' + requesterId + ' body=' + JSON.stringify(body));
     if (!userId) {
       res.status(401).json({ error: 'User not authenticated' });
       return;
     }
     const crewStatus = await CrewStatus.findOne({ userId });
     if (!crewStatus?.isInCrew || !crewStatus.crewId) {
+      console.log('[crew request-backup] requester=' + requesterId + ' rejected=not_in_crew');
       res.status(400).json({ error: 'You must be in a crew to request backup' });
       return;
     }
@@ -273,16 +335,73 @@ router.post('/request-backup', auth, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    const job = getActiveJobInfo(user);
+    const { categoryId, featureId, jobType: bodyJobType } = body;
+    if (categoryId != null && featureId != null) {
+      // Research backup: validate this feature is in progress; add one entry per job to crewBackupRequests
+      const { UserResearchFeature } = await import('../models/UserResearchFeature');
+      const { ResearchFeatureService } = await import('../services/ResearchFeatureService');
+      const researchDoc = await UserResearchFeature.findOne({
+        userId,
+        ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
+      });
+      const now = new Date();
+      if (
+        !researchDoc?.isResearching ||
+        !researchDoc.researchCompletesAt ||
+        now >= new Date(researchDoc.researchCompletesAt)
+      ) {
+        console.log('[crew request-backup] requester=' + requesterId + ' path=research rejected=no_active_research');
+        res.status(400).json({ error: 'No active research to request backup for' });
+        return;
+      }
+      if (hasRequestForJob(user, 'research', undefined, categoryId, featureId)) {
+        console.log('[crew request-backup] requester=' + requesterId + ' path=research ALREADY_REQUESTED (idempotent success)');
+        res.json({ success: true, message: 'Backup already requested for this research' });
+        return;
+      }
+      const requestedAt = new Date();
+      const newEntry = {
+        jobType: 'research' as const,
+        categoryId,
+        featureId,
+        requestedAt,
+        helpApplied: { totalSeconds: 0, helperUserIds: [] as mongoose.Types.ObjectId[] },
+      };
+      await User.updateOne({ _id: userId }, { $push: { crewBackupRequests: newEntry } });
+      const afterUser = await User.findById(userId).select('crewBackupRequests').lean();
+      const afterCount = (afterUser as any)?.crewBackupRequests?.length ?? 0;
+      console.log('[crew request-backup] requester=' + requesterId + ' path=research success arrayLen=' + afterCount);
+      res.json({ success: true, message: 'Backup requested' });
+      return;
+    }
+    // Build/remodel backup: add one entry per job to crewBackupRequests so completing one job doesn't clear the other
+    const job = bodyJobType
+      ? await getActiveJobInfo(user, bodyJobType)
+      : await getActiveJobInfo(user);
     if (!job) {
+      console.log('[crew request-backup] requester=' + requesterId + ' path=build rejected=no_active_job' + (bodyJobType ? ' preferredType=' + bodyJobType : ''));
       res.status(400).json({ error: 'No active build or remodel to request backup for' });
       return;
     }
-    user.crewBackupRequestedAt = new Date();
-    if (!user.crewBackupHelpApplied) {
-      (user as any).crewBackupHelpApplied = { totalSeconds: 0, helperUserIds: [] };
+    if (hasRequestForJob(user, job.jobType, job.jobKey, job.categoryId, job.featureId)) {
+      console.log('[crew request-backup] requester=' + requesterId + ' path=build jobType=' + (job?.jobType ?? '?') + ' ALREADY_REQUESTED (idempotent success)');
+      res.json({ success: true, message: 'Backup already requested for this job' });
+      return;
     }
-    await user.save();
+    const requestedAt = new Date();
+    const newEntry = {
+      jobType: job.jobType,
+      ...(job.jobKey && { jobKey: job.jobKey }),
+      ...(job.categoryId && { categoryId: job.categoryId }),
+      ...(job.featureId && { featureId: job.featureId }),
+      requestedAt,
+      helpApplied: { totalSeconds: 0, helperUserIds: [] as mongoose.Types.ObjectId[] },
+    };
+    await User.updateOne({ _id: userId }, { $push: { crewBackupRequests: newEntry } });
+    const afterUser = await User.findById(userId).select('crewBackupRequests').lean();
+    const afterCount = (afterUser as any)?.crewBackupRequests?.length ?? 0;
+    const afterTypes = ((afterUser as any)?.crewBackupRequests ?? []).map((e: any) => e.jobType);
+    console.log('[crew request-backup] requester=' + requesterId + ' path=build jobType=' + (job?.jobType ?? '?') + ' success arrayLen=' + afterCount + ' types=' + JSON.stringify(afterTypes));
     res.json({ success: true, message: 'Backup requested' });
   } catch (error) {
     console.error('Error requesting crew backup:', error);
@@ -308,10 +427,14 @@ router.get('/backup-requests', auth, async (req: Request, res: Response) => {
       res.json({ backupRequests: [] });
       return;
     }
-    const memberIds: mongoose.Types.ObjectId[] = [];
-    if (crew.presidentId) memberIds.push(crew.presidentId as mongoose.Types.ObjectId);
-    (crew.executives || []).forEach((e: any) => memberIds.push(e));
-    (crew.members || []).forEach((m: any) => memberIds.push(m));
+    const rawIds: (mongoose.Types.ObjectId | undefined)[] = [
+      crew.presidentId as mongoose.Types.ObjectId,
+      ...((crew.executives || []) as mongoose.Types.ObjectId[]),
+      ...((crew.members || []) as mongoose.Types.ObjectId[]),
+    ];
+    const memberIds = rawIds
+      .filter((id): id is mongoose.Types.ObjectId => id != null && mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id.toString()));
     const backupRequestsList = await buildBackupRequestsList(memberIds, userId.toString());
     res.json({ backupRequests: backupRequestsList });
   } catch (error) {
@@ -320,10 +443,17 @@ router.get('/backup-requests', auth, async (req: Request, res: Response) => {
   }
 });
 
-router.post('/backup/:userId', auth, async (req: Request, res: Response) => {
+interface BackupApplyBody {
+  jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research';
+  jobKey?: string;
+  categoryId?: string;
+  featureId?: string;
+}
+router.post('/backup/:userId', auth, async (req: Request<{ userId: string }, {}, BackupApplyBody>, res: Response) => {
   try {
     const helperUserId = req.user?._id;
     const targetUserId = req.params.userId;
+    const body = req.body ?? {};
     if (!helperUserId || !targetUserId || !mongoose.Types.ObjectId.isValid(targetUserId)) {
       res.status(400).json({ error: 'Invalid target user' });
       return;
@@ -347,14 +477,31 @@ router.post('/backup/:userId', auth, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    const result = await applyCrewBackupHelp(targetUser, new mongoose.Types.ObjectId(helperUserId.toString()));
+    const requests = (targetUser as any).crewBackupRequests ?? [];
+    let result: { reduction: number; newCompletesAt: Date };
+    if (requests.length > 0 && body.jobType) {
+      result = await applyCrewBackupHelpByRequest(targetUser, new mongoose.Types.ObjectId(helperUserId.toString()), {
+        jobType: body.jobType,
+        jobKey: body.jobKey,
+        categoryId: body.categoryId,
+        featureId: body.featureId,
+      });
+    } else {
+      result = await applyCrewBackupHelp(targetUser, new mongoose.Types.ObjectId(helperUserId.toString()));
+    }
+    const helperId = helperUserId.toString().slice(0, 8);
+    const targetId = targetUserId.slice(0, 8);
+    console.log('[crew backup-apply] helper=' + helperId + ' target=' + targetId + ' jobType=' + (body.jobType ?? '?') + ' success reduction=' + result.reduction);
     res.json({
       success: true,
       reduction: result.reduction,
       newCompletesAt: result.newCompletesAt.toISOString()
     });
   } catch (error: any) {
+    const helperId = req.user?._id?.toString?.().slice(0, 8) ?? '?';
+    const targetId = (req.params.userId ?? '').slice(0, 8);
     if (['No active build or remodel to back up', 'User has not requested backup', 'You have already backed up this crew member for this job', 'Maximum crew backup for this job has been reached', 'Build or remodel is already complete'].includes(error.message)) {
+      console.log('[crew backup-apply] helper=' + helperId + ' target=' + targetId + ' rejected ' + (error.message ?? ''));
       res.status(400).json({ error: error.message });
       return;
     }
@@ -1568,11 +1715,18 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
 
     const memberCount = 1 + executives.length + members.length;
 
-    const allMemberIds = [
-      ...(president ? [president._id] : []),
-      ...executives.map((e: any) => e._id),
-      ...members.map((m: any) => m._id)
-    ];
+    // Build backup list from raw crew member IDs (unpopulated) so president and all members are included reliably
+    const crewRaw = await Crew.findById(crewId).select('presidentId executives members').lean();
+    const rawIdsForBackup: (mongoose.Types.ObjectId | undefined)[] = crewRaw
+      ? [
+          crewRaw.presidentId as mongoose.Types.ObjectId,
+          ...((crewRaw.executives || []) as mongoose.Types.ObjectId[]),
+          ...((crewRaw.members || []) as mongoose.Types.ObjectId[]),
+        ]
+      : [];
+    const allMemberIds = rawIdsForBackup
+      .filter((id): id is mongoose.Types.ObjectId => id != null && mongoose.Types.ObjectId.isValid(id))
+      .map((id) => new mongoose.Types.ObjectId(id.toString()));
     const backupRequests = await buildBackupRequestsList(allMemberIds, userId?.toString() ?? '');
 
     res.json({

@@ -125,13 +125,30 @@ export interface IUser extends Document {
     /** Start of UTC day when user last claimed; used to allow only one claim per calendar day. */
     lastClaimedDateUtc?: Date;
   };
-  /** Crew backup request: set when user requests backup for current build/remodel; cleared when job completes. */
+  /** Crew backup request: set when user requests backup for current build/remodel/research; cleared when job completes. */
   crewBackupRequestedAt?: Date | null;
+  /** When set with crewBackupRequestedAt, the backup request is for this research feature (UserResearchFeature). */
+  crewBackupResearchCategoryId?: string | null;
+  crewBackupResearchFeatureId?: string | null;
+  /** When set with crewBackupRequestedAt (build/remodel path), which job type this request is for so we can show/apply help for the correct job when user has both e.g. rental build and remodel. */
+  crewBackupRequestedJobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research' | null;
   /** Crew backup help applied for current job: total seconds reduced and list of helper user ids (one help per member per request). */
   crewBackupHelpApplied?: {
     totalSeconds: number;
     helperUserIds: mongoose.Types.ObjectId[];
   } | null;
+  /**
+   * Per-job backup requests. One entry per job (e.g. one for rental build property2, one for remodel).
+   * When a job completes we remove only that entry so other jobs' "has requested" state stays.
+   */
+  crewBackupRequests?: Array<{
+    jobType: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research';
+    jobKey?: string;
+    categoryId?: string;
+    featureId?: string;
+    requestedAt: Date;
+    helpApplied: { totalSeconds: number; helperUserIds: mongoose.Types.ObjectId[] };
+  }>;
   /** Total number of times this user has backed up another crew member (each Back up click = 1). */
   crewBackupHelpCount?: number;
   /** Packet Breach: level IDs completed (e.g. ["1.1", "1.2"]). Linear unlock: next level unlocks when prior is completed. */
@@ -532,9 +549,26 @@ const userSchema = new Schema({
     lastClaimedDateUtc: { type: Date, required: false }
   },
   crewBackupRequestedAt: { type: Date, default: null },
+  crewBackupResearchCategoryId: { type: String, default: null },
+  crewBackupResearchFeatureId: { type: String, default: null },
+  crewBackupRequestedJobType: { type: String, enum: ['researchCenterBuild', 'rentalBuild', 'remodel', 'research'], default: null },
   crewBackupHelpApplied: {
     totalSeconds: { type: Number, default: 0 },
     helperUserIds: { type: [Schema.Types.ObjectId], ref: 'User', default: [] }
+  },
+  crewBackupRequests: {
+    type: [{
+      jobType: { type: String, enum: ['researchCenterBuild', 'rentalBuild', 'remodel', 'research'], required: true },
+      jobKey: { type: String, default: null },
+      categoryId: { type: String, default: null },
+      featureId: { type: String, default: null },
+      requestedAt: { type: Date, required: true },
+      helpApplied: {
+        totalSeconds: { type: Number, default: 0 },
+        helperUserIds: { type: [Schema.Types.ObjectId], ref: 'User', default: [] }
+      }
+    }],
+    default: []
   },
   crewBackupHelpCount: { type: Number, default: 0 },
   packetBreach: {
