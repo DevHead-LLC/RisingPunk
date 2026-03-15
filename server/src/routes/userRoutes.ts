@@ -18,7 +18,7 @@ import { getResearchCenterLevelConfig, getResearchCenterMaxLevel, type ResearchC
 import { RentalHousingIncomeService } from '../services/RentalHousingIncomeService';
 import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
 import { accrueBalanceToTime } from '../utils/balanceAccrual';
-import { clearCrewBackupState, removeCrewBackupRequestForJob } from '../services/CrewBackupService';
+import { removeCrewBackupRequestForJob } from '../services/CrewBackupService';
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -1048,7 +1048,10 @@ router.post('/speedup-property-construction/:propertyId', auth, async (req, res)
 
       await userInTransaction.save({ session });
     });
-    
+
+    const propertyKey = `property${propertyId}`;
+    await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'rentalBuild', propertyKey);
+
     if (propertyId === 1) {
       await markInvestmentPropertyTaskCompleted(userId);
     }

@@ -107,7 +107,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     pollingInterval: visible && crewStatus?.isInCrew ? 3000 : 0,
   });
   useEffect(() => {
-    if (visible && initialCategory) {
+    if (!visible) {
+      setCurrentCategory(null);
+      return;
+    }
+    if (initialCategory) {
       setCurrentCategory(initialCategory);
     }
   }, [visible, initialCategory]);
@@ -268,21 +272,20 @@ export const CrewModal: React.FC<CrewModalProps> = ({
 
     const baseFilter = (cat: { id: CrewCategory }) =>
       cat.id !== 'crew-settings' && cat.id !== 'recruiting';
-    const withoutBackup = (cats: typeof CATEGORIES) => cats.filter(c => c.id !== 'backup-requests');
 
     if (!userRole) {
-      return withoutBackup(CATEGORIES).filter(cat => baseFilter(cat));
+      return CATEGORIES.filter(cat => baseFilter(cat));
     }
     if (userRole === 'president') {
-      return withoutBackup(CATEGORIES);
+      return CATEGORIES;
     }
     if (isExecutive) {
-      return withoutBackup(CATEGORIES).filter(cat => cat.id !== 'crew-settings');
+      return CATEGORIES.filter(cat => cat.id !== 'crew-settings');
     }
     if (userRole === 'member') {
-      return withoutBackup(CATEGORIES).filter(cat => baseFilter(cat));
+      return CATEGORIES.filter(cat => baseFilter(cat));
     }
-    return withoutBackup(CATEGORIES).filter(cat => baseFilter(cat));
+    return CATEGORIES.filter(cat => baseFilter(cat));
   };
 
   /** Show backup icon only when there is at least one backup request from another crew member that the current user has not yet helped. General rule for all members (president, executives, members): if you've already helped everyone who requested, or there are no requests, do not show the icon. */
