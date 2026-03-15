@@ -310,7 +310,6 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
   try {
     const userId = req.user?._id;
     const body = req.body ?? {};
-    const requesterId = userId?.toString?.().slice(0, 8) ?? '?';
     if (!userId) {
       res.status(401).json({ error: 'User not authenticated' });
       return;
@@ -356,8 +355,6 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
         helpApplied: { totalSeconds: 0, helperUserIds: [] as mongoose.Types.ObjectId[] },
       };
       await User.updateOne({ _id: userId }, { $push: { crewBackupRequests: newEntry } });
-      const afterUser = await User.findById(userId).select('crewBackupRequests').lean();
-      const afterCount = (afterUser as any)?.crewBackupRequests?.length ?? 0;
       res.json({ success: true, message: 'Backup requested' });
       return;
     }
@@ -383,9 +380,6 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
       helpApplied: { totalSeconds: 0, helperUserIds: [] as mongoose.Types.ObjectId[] },
     };
     await User.updateOne({ _id: userId }, { $push: { crewBackupRequests: newEntry } });
-    const afterUser = await User.findById(userId).select('crewBackupRequests').lean();
-    const afterCount = (afterUser as any)?.crewBackupRequests?.length ?? 0;
-    const afterTypes = ((afterUser as any)?.crewBackupRequests ?? []).map((e: any) => e.jobType);
     res.json({ success: true, message: 'Backup requested' });
   } catch (error) {
     console.error('Error requesting crew backup:', error);
@@ -473,16 +467,12 @@ router.post('/backup/:userId', auth, async (req: Request<{ userId: string }, {},
     } else {
       result = await applyCrewBackupHelp(targetUser, new mongoose.Types.ObjectId(helperUserId.toString()));
     }
-    const helperId = helperUserId.toString().slice(0, 8);
-    const targetId = targetUserId.slice(0, 8);
     res.json({
       success: true,
       reduction: result.reduction,
       newCompletesAt: result.newCompletesAt.toISOString()
     });
   } catch (error: any) {
-    const helperId = req.user?._id?.toString?.().slice(0, 8) ?? '?';
-    const targetId = (req.params.userId ?? '').slice(0, 8);
     if (['No active build or remodel to back up', 'User has not requested backup', 'You have already backed up this crew member for this job', 'Maximum crew backup for this job has been reached', 'Build or remodel is already complete'].includes(error.message)) {
       res.status(400).json({ error: error.message });
       return;
