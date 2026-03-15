@@ -134,7 +134,6 @@ export class MapService {
     } finally {
       await session.endSession();
     }
-    console.log('[MapService.generateMap] inserted map', name, 'with', plainCells.length, 'cells in MapCell collection');
     return Map.findOne({ name });
   }
 

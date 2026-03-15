@@ -120,7 +120,6 @@ mongoose.connect(process.env.MONGODB_URI, {
     if (emailIndex && !emailIndex.sparse) {
       await usersCollection.dropIndex('email_1');
       await User.syncIndexes();
-      console.log('Dropped non-sparse email_1 index and re-synced; guest accounts can now be created.');
     }
   } catch (indexErr: unknown) {
     const err = indexErr as { codeName?: string; message?: string };
@@ -627,7 +626,6 @@ app.use('/', healthRoute);
 const startServer = (port = PORT, maxAttempts = 0) => {
   try {
     const server = app.listen(port, () => {
-      console.log(`🚀 Server running on http://localhost:${port}`);
     });
     
     // Setup server error handler

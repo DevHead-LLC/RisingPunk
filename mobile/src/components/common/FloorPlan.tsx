@@ -22,6 +22,10 @@ interface FloorPlanProps {
   activeRemodelRoom?: string | null;
   /** ISO date string when the active remodel completes (for countdown and speedup) */
   activeRemodelCompletesAt?: string | null;
+  /** When true, show "Request back-up" button next to Speedup while remodeling (crew backup request). */
+  showRequestBackup?: boolean;
+  /** Called when user taps "Request back-up" (only when showRequestBackup and remodel in progress). */
+  onRequestBackup?: () => void;
   /** When true, render only the Garage room (for Garage tab). When false, render Main Floor rooms only. */
   showGarage?: boolean;
   /** Max room remodel level from server. When provided with roomRemodelLevels, used for gating. */
@@ -44,6 +48,8 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
   onRemodel,
   activeRemodelRoom,
   activeRemodelCompletesAt,
+  showRequestBackup = false,
+  onRequestBackup,
   showGarage = false,
   maxRoomLevel,
   maxGarageRoomLevel,
@@ -65,6 +71,22 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
   const timeUp = remainingSec <= 0;
   const timeLabel = timeUp ? 'Complete! Tap to finish.' : `${formatRemodelTimeLeft(remainingSec)} left`;
   const actionButtonLabel = timeUp ? 'Complete' : 'Speedup';
+
+  const renderRemodelActions = (room: RemodelRoomType) => (
+    <View style={styles.remodelingRow}>
+      <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
+      <View style={styles.remodelActions}>
+        {!timeUp && showRequestBackup && onRequestBackup && (
+          <TouchableOpacity onPress={onRequestBackup} style={styles.remodelButton}>
+            <Text style={styles.remodelButtonText}>Request back-up</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity onPress={() => onRemodel!(room)} style={styles.remodelButton}>
+          <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const propertyData = rentalIncome?.propertyBreakdown.find(p => p.propertyId === propertyId);
   const roomValues = propertyData?.roomValues;
@@ -103,14 +125,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.00' : formatCurrencyThousandths(garageValue)}
           </Text>
-          {activeRemodelRoom === 'garage' && onRemodel && (
-            <View style={styles.remodelingRow}>
-              <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('garage')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {activeRemodelRoom === 'garage' && onRemodel && renderRemodelActions('garage')}
         </View>
       </View>
     );
@@ -137,14 +152,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.010' : formatCurrencyThousandths(roomValues?.bathroom ?? 0)}
           </Text>
-          {activeRemodelRoom === 'bathroom' && onRemodel && (
-            <View style={styles.remodelingRow}>
-              <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('bathroom')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {activeRemodelRoom === 'bathroom' && onRemodel && renderRemodelActions('bathroom')}
         </View>
       </View>
       
@@ -170,14 +178,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.010' : formatCurrencyThousandths(roomValues?.kitchen ?? 0)}
           </Text>
-          {activeRemodelRoom === 'kitchen' && onRemodel && (
-            <View style={styles.remodelingRow}>
-              <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('kitchen')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {activeRemodelRoom === 'kitchen' && onRemodel && renderRemodelActions('kitchen')}
         </View>
       </View>
       
@@ -197,14 +198,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.020' : formatCurrencyThousandths(roomValues?.bedroom ?? 0)}
           </Text>
-          {activeRemodelRoom === 'bedroom' && onRemodel && (
-            <View style={styles.remodelingRow}>
-              <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('bedroom')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {activeRemodelRoom === 'bedroom' && onRemodel && renderRemodelActions('bedroom')}
         </View>
       </View>
       
@@ -223,14 +217,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.020' : formatCurrencyThousandths(roomValues?.livingRoom ?? 0)}
           </Text>
-          {activeRemodelRoom === 'livingRoom' && onRemodel && (
-            <View style={styles.remodelingRow}>
-              <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
-              <TouchableOpacity onPress={() => onRemodel('livingRoom')} style={styles.remodelButton}>
-                <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {activeRemodelRoom === 'livingRoom' && onRemodel && renderRemodelActions('livingRoom')}
         </View>
       </View>
     </View>
@@ -350,6 +337,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     marginTop: 6,
+  },
+  remodelActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   remodelingText: {
     fontSize: 12,

@@ -714,19 +714,6 @@ router.post('/assign', auth, async (req, res) => {
             .filter((assignment: any) => assignment.botType === botType)
             .reduce((sum: number, assignment: any) => sum + assignment.quantity, 0);
 
-        if (battalionId === 'C') {
-          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion C`);
-        }
-        if (battalionId === 'D') {
-          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion D`);
-        }
-        if (battalionId === 'E') {
-          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion E`);
-        }
-        if (battalionId === 'F') {
-          console.log(`[AUDIT] User ${userId} assigned ${quantity} ${botType} to Battalion F`);
-        }
-
         res.json({ 
           success: true,
           availableBotCount: finalAvailableCount,

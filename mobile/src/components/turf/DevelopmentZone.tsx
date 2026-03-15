@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useAppSelector } from '../../store/hooks';
+import { useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { BuildCountdownTimer } from './BuildCountdownTimer';
 
 interface DevelopmentZoneProps {
@@ -15,6 +17,34 @@ interface DevelopmentZoneProps {
 
 export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buildingProperties = [] }) => {
   const colors = useThemeColors();
+  const activeBuilds = buildingProperties.filter(prop => prop.buildStatus && prop.buildStatus.completesAt);
+  const hasActiveBuild = activeBuilds.length > 0;
+
+  const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
+  const { data: crewStatus } = useGetCrewStatusQuery();
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+    skip: !crewStatus?.crewId || !crewStatus?.isInCrew || !hasActiveBuild,
+    pollingInterval: hasActiveBuild ? 3000 : 0,
+  });
+  // Only hide "Request back-up" when user has requested backup for an *investment property* build (rentalBuild).
+  // Do not match Research Center or research requests — those are different job types and would wrongly hide this button.
+  const hasRequestedBackupForRentalBuild = Boolean(
+    currentUserId &&
+    crewDetails?.crew?.backupRequests?.some(
+      (r) =>
+        String(r.userId) === String(currentUserId) &&
+        (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false))
+    )
+  );
+  const hadActiveBuildRef = useRef(false);
+  useEffect(() => {
+    if (hasActiveBuild && crewStatus?.crewId && crewStatus?.isInCrew && !hadActiveBuildRef.current) {
+      hadActiveBuildRef.current = true;
+      refetchCrewDetails();
+    }
+    if (!hasActiveBuild) hadActiveBuildRef.current = false;
+  }, [hasActiveBuild, crewStatus?.crewId, crewStatus?.isInCrew, refetchCrewDetails]);
+  const [requestCrewBackup] = useRequestCrewBackupMutation();
 
   const containerStyle = [
     styles.developmentZone,
@@ -23,8 +53,6 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buil
       borderColor: colors.matrix + '33'
     }
   ];
-
-  const activeBuilds = buildingProperties.filter(prop => prop.buildStatus && prop.buildStatus.completesAt);
 
   return (
     <View style={containerStyle}>
@@ -47,6 +75,16 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buil
             completesAt={activeBuilds[0].buildStatus.completesAt}
             onComplete={activeBuilds[0].onComplete}
           />
+          {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRentalBuild && (
+            <TouchableOpacity
+              style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
+              onPress={() => {
+                requestCrewBackup({ jobType: 'rentalBuild' });
+              }}
+            >
+              <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -102,5 +140,17 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+    gap: SIZING.spacing.sm,
+  },
+  requestBackupButton: {
+    marginTop: SIZING.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  requestBackupText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
