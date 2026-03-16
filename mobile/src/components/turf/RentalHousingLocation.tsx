@@ -47,6 +47,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const [showBuildStartedModal, setShowBuildStartedModal] = useState(false);
   const [showBuildErrorModal, setShowBuildErrorModal] = useState(false);
   const [buildErrorMessage, setBuildErrorMessage] = useState('');
+  const [buildErrorModalTitle, setBuildErrorModalTitle] = useState<'CAN\'T START BUILD' | 'SPEEDUP ERROR'>('CAN\'T START BUILD');
   const [showCompletionErrorModal, setShowCompletionErrorModal] = useState(false);
   const [showSpeedupModal, setShowSpeedupModal] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -211,6 +212,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       if (error?.data?.error === 'Insufficient funds') {
         setShowInsufficientFundsModal(true);
       } else {
+        setBuildErrorModalTitle('CAN\'T START BUILD');
         setBuildErrorMessage(msg && typeof msg === 'string' ? msg : 'Failed to start build. Please try again.');
         setShowBuildErrorModal(true);
       }
@@ -267,6 +269,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       if (error?.data?.error === 'Insufficient funds') {
         setShowInsufficientFundsModal(true);
       } else {
+        setBuildErrorModalTitle('SPEEDUP ERROR');
         const msg = error?.data?.message || error?.data?.error;
         setBuildErrorMessage(msg && typeof msg === 'string' ? msg : 'Failed to speed up build. Please try again.');
         setShowBuildErrorModal(true);
@@ -399,8 +402,8 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 
       <LockedFeatureModal
         visible={showBuildErrorModal}
-        title="CAN'T START BUILD"
-        message={buildErrorMessage || 'Failed to start build. Please try again.'}
+        title={buildErrorModalTitle}
+        message={buildErrorMessage || (buildErrorModalTitle === 'SPEEDUP ERROR' ? 'Failed to speed up build. Please try again.' : 'Failed to start build. Please try again.')}
         onClose={() => setShowBuildErrorModal(false)}
         closeButtonText="CLOSE"
       />
