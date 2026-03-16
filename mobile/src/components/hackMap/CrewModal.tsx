@@ -345,6 +345,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     async (req: { userId: string; jobType?: string; jobKey?: string; categoryId?: string; featureId?: string }) => {
       const key = getBackupRequestKey(req);
       if (backupInProgressKeyRef.current !== null) {
+        if (key === backupInProgressKeyRef.current) return;
+        const alreadyQueued = backupQueueRef.current.some((q) => getBackupRequestKey(q) === key);
+        if (alreadyQueued) return;
         backupQueueRef.current.push(req);
         return;
       }

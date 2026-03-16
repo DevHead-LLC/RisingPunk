@@ -267,6 +267,8 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       if (error?.data?.error === 'Insufficient funds') {
         setShowInsufficientFundsModal(true);
       } else {
+        const msg = error?.data?.message || error?.data?.error;
+        setBuildErrorMessage(msg && typeof msg === 'string' ? msg : 'Failed to speed up build. Please try again.');
         setShowBuildErrorModal(true);
       }
     }
