@@ -278,6 +278,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 3 && hasRemodelConfig ? setRemodelRoom : undefined}
+                onCloseRemodel={() => setRemodelRoom(null)}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
@@ -302,6 +303,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
+                onCloseRemodel={() => setRemodelRoom(null)}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}

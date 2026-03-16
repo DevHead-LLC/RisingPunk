@@ -18,6 +18,8 @@ interface FloorPlanProps {
   propertyLevel?: number;
   /** When set, show room level badge and Remodel callback for upgradable rooms */
   onRemodel?: (room: RemodelRoomType) => void;
+  /** When set, called when user taps Close after remodel time is up (avoids opening remodel modal). */
+  onCloseRemodel?: () => void;
   /** When set for this property, show "Remodeling..." for the room in progress */
   activeRemodelRoom?: string | null;
   /** ISO date string when the active remodel completes (for countdown and speedup) */
@@ -46,6 +48,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
   propertyId,
   propertyLevel = 0,
   onRemodel,
+  onCloseRemodel,
   activeRemodelRoom,
   activeRemodelCompletesAt,
   showRequestBackup = false,
@@ -81,7 +84,10 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
             <Text style={styles.remodelButtonText}>Request back-up</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={() => onRemodel!(room)} style={styles.remodelButton}>
+        <TouchableOpacity
+          onPress={() => (timeUp ? (onCloseRemodel?.() ?? undefined) : onRemodel!(room))}
+          style={styles.remodelButton}
+        >
           <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
         </TouchableOpacity>
       </View>
