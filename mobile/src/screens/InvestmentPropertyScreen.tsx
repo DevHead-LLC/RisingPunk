@@ -8,13 +8,14 @@ import { FloorPlan } from '../components/common/FloorPlan';
 import {
   useGetRentalHousingStatusQuery,
   useStartRemodelMutation,
-  useCompleteRemodelMutation,
   useSpeedupRemodelMutation,
   useGetCrewStatusQuery,
   useGetCrewDetailsQuery,
   useRequestCrewBackupMutation,
 } from '../store/api/authApi';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { balanceApi } from '../store/api/balanceApi';
+import { rentalHousingApi } from '../store/api/rentalHousingApi';
 import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
 import { usePanGesture } from '../hooks/usePanGesture';
@@ -154,7 +155,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   }, [status?.activeRemodel?.propertyId, propertyId]);
 
   const [startRemodel] = useStartRemodelMutation();
-  const [completeRemodel] = useCompleteRemodelMutation();
   const [speedupRemodel] = useSpeedupRemodelMutation();
   const dispatch = useAppDispatch();
   const balanceState = useAppSelector(state => state.balance);
@@ -176,8 +176,10 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   useEffect(() => {
     if (timeUp && isModalShowingInProgress) {
       refetchRentalStatus();
+      dispatch(balanceApi.util.invalidateTags(['Balance']));
+      dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
     }
-  }, [timeUp, isModalShowingInProgress, refetchRentalStatus]);
+  }, [timeUp, isModalShowingInProgress, refetchRentalStatus, dispatch]);
   useEffect(() => {
     if (!isModalShowingInProgress) return;
     setModalCountdownNow(Date.now());
@@ -199,8 +201,10 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   useEffect(() => {
     if (isPropertyBuilding && propertyBuildRemainingSec <= 0) {
       refetchRentalStatus();
+      dispatch(balanceApi.util.invalidateTags(['Balance']));
+      dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
     }
-  }, [isPropertyBuilding, propertyBuildRemainingSec, refetchRentalStatus]);
+  }, [isPropertyBuilding, propertyBuildRemainingSec, refetchRentalStatus, dispatch]);
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;

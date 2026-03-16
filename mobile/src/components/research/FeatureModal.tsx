@@ -510,7 +510,7 @@ export function FeatureModal({
               </TouchableOpacity>
             </View>
           )}
-          {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackup && (
+          {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackup && researchTimeRemaining > 0 && (
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
