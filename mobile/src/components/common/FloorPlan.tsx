@@ -69,8 +69,8 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
 
   const remainingSec = activeRemodelRoom && completesAtMs ? Math.max(0, (completesAtMs - now) / 1000) : 0;
   const timeUp = remainingSec <= 0;
-  const timeLabel = timeUp ? 'Complete! Tap to finish.' : `${formatRemodelTimeLeft(remainingSec)} left`;
-  const actionButtonLabel = timeUp ? 'Complete' : 'Speedup';
+  const timeLabel = timeUp ? 'Remodel complete! (Completion is automatic.)' : `${formatRemodelTimeLeft(remainingSec)} left`;
+  const actionButtonLabel = timeUp ? 'Close' : 'Speedup';
 
   const renderRemodelActions = (room: RemodelRoomType) => (
     <View style={styles.remodelingRow}>

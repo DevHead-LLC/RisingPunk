@@ -716,7 +716,7 @@ export const authApi = createApi({
           body: jobType != null ? { jobType, jobKey, categoryId, featureId } : undefined,
         };
       },
-      invalidatesTags: ['User', 'Crew'],
+      invalidatesTags: ['Crew'],
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled;

@@ -208,6 +208,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
       // Don't call onPress here since we're now building, not navigating
     } catch (error: any) {
       console.error('Failed to start research center build:', error);
+      setShowPopup(false);
       const errorMsg = error?.data?.message || 'Failed to start research center build';
       setErrorMessage(errorMsg);
       setShowErrorModal(true);
