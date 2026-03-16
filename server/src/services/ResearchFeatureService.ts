@@ -265,6 +265,7 @@ export class ResearchFeatureService {
 
         const researchStartedAt = new Date();
         const researchCompletesAt = new Date(researchStartedAt.getTime() + (feature.researchTimeHours || 4) * 60 * 60 * 1000);
+        const originalResearchTotalSeconds = Math.round((researchCompletesAt.getTime() - researchStartedAt.getTime()) / 1000);
 
         // Deduct cost from user balance
         await User.findByIdAndUpdate(
@@ -288,6 +289,7 @@ export class ResearchFeatureService {
             isResearching: true,
             researchStartedAt,
             researchCompletesAt,
+            originalResearchTotalSeconds,
             researchTimeHours: feature.researchTimeHours || 4,
             unlockCost: feature.unlockCost
           },

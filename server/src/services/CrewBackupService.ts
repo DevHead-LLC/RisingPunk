@@ -74,7 +74,10 @@ export async function getActiveJobInfo(
     ) {
       const startedAt = researchDoc.researchStartedAt ? new Date(researchDoc.researchStartedAt) : now;
       const completesAt = new Date(researchDoc.researchCompletesAt);
-      const totalSeconds = Math.round((completesAt.getTime() - startedAt.getTime()) / 1000);
+      const computedTotal = Math.round((completesAt.getTime() - startedAt.getTime()) / 1000);
+      const totalSeconds = (researchDoc.originalResearchTotalSeconds != null && researchDoc.originalResearchTotalSeconds > 0)
+        ? researchDoc.originalResearchTotalSeconds
+        : computedTotal;
       const feature = await getFeatureByIdAsync(researchCategoryId, researchFeatureId);
       const featureName = feature?.name ?? researchFeatureId;
       return {
