@@ -479,12 +479,14 @@ router.post('/unlock-research-center', auth, async (req: Request, res: Response)
       return;
     }
     // One build at a time globally: reject if any investment property build is in progress
-    const hasRentalBuild = Object.entries(user.rentalHousingBuilds || {}).some(([, b]) => {
-      const build = b as { startedAt: Date | null; completesAt: Date | null };
-      return build?.startedAt && build?.completesAt && now < new Date(build.completesAt);
+    const rentalBuilds = (user.rentalHousingBuilds || {}) as Record<string, { startedAt: Date | null; completesAt: Date | null } | undefined>;
+    const activeRentalKey = (['property1', 'property2', 'property3', 'property4'] as const).find((key) => {
+      const b = rentalBuilds[key];
+      return b?.startedAt && b?.completesAt && now < new Date(b.completesAt);
     });
-    if (hasRentalBuild) {
-      res.status(400).json({ message: 'Another build is already in progress (research center or investment property). Finish it first.' });
+    if (activeRentalKey) {
+      const propNum = activeRentalKey.replace('property', '');
+      res.status(400).json({ message: `Finish your Investment Property ${propNum} build or upgrade first. Then you can start the Research Center.` });
       return;
     }
 
@@ -833,7 +835,8 @@ router.post('/unlock-rental-housing/:propertyId', auth, async (req, res): Promis
     // One build at a time globally: reject if research center build is in progress
     const researchCenterBuilding = user.researchCenterBuild?.startedAt && user.researchCenterBuild?.completesAt && new Date() < new Date(user.researchCenterBuild.completesAt);
     if (researchCenterBuilding) {
-      res.status(400).json({ error: 'Another build is already in progress (research center or investment property). Finish it first.' });
+      const msg = `Finish your Research Center build or upgrade first. Then you can start Investment Property ${propertyId}.`;
+      res.status(400).json({ error: msg, message: msg });
       return;
     }
 
@@ -1144,7 +1147,11 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
       if (propertyLevel < 3) throw new Error('Property must be level 3 or higher to remodel rooms');
       if (room === 'garage' && propertyLevel < 7) throw new Error('Property must be level 7 or higher to remodel garage');
       if (user.activeRemodel && (user.activeRemodel as any).propertyId != null) {
-        throw new Error('Another remodel is already in progress');
+        const ar = user.activeRemodel as { propertyId: number; room: string };
+        const roomLabels: Record<string, string> = { bathroom: 'Bathroom', kitchen: 'Kitchen', bedroom: 'Bedroom', livingRoom: 'Living Room', garage: 'Garage' };
+        const roomLabel = roomLabels[ar.room] || ar.room;
+        const msg = `Complete your current remodel first (Property ${ar.propertyId}, ${roomLabel}). Once it's done, you can start a new one.`;
+        throw new Error(msg);
       }
       const roomLevels = RentalHousingIncomeService.getRoomLevels(user, propertyId, maxRoomLevel);
       const currentRoomLevel = roomLevels[room as keyof typeof roomLevels] ?? 1;
@@ -1194,7 +1201,11 @@ router.post('/start-remodel/:propertyId', auth, async (req, res): Promise<void> 
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    if (['Another remodel is already in progress', 'Room is already at max remodel level', 'Insufficient funds', 'Property must be level 3 or higher to remodel rooms'].includes(error.message)) {
+    if (error.message?.includes('Complete your current remodel first')) {
+      res.status(400).json({ error: error.message, message: error.message });
+      return;
+    }
+    if (['Room is already at max remodel level', 'Insufficient funds', 'Property must be level 3 or higher to remodel rooms'].includes(error.message)) {
       res.status(400).json({ error: error.message });
       return;
     }

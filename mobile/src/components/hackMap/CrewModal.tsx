@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, SafeAreaView, Dimensions, TextInput, Image } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -117,7 +117,10 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   }, [visible, initialCategory]);
 
   const [disbandCrew, { isLoading: isDisbanding }] = useDisbandCrewMutation();
-  const [backupCrewMember, { isLoading: isBackingUpCrewMember }] = useBackupCrewMemberMutation();
+  const [backupCrewMember] = useBackupCrewMemberMutation();
+  const [backupInProgressKey, setBackupInProgressKey] = useState<string | null>(null);
+  const backupInProgressKeyRef = useRef<string | null>(null);
+  const backupQueueRef = useRef<Array<{ userId: string; jobType?: string; jobKey?: string; categoryId?: string; featureId?: string }>>([]);
   const [acceptApplicant, { isLoading: isAccepting }] = useAcceptApplicantMutation();
   const [denyApplicant, { isLoading: isDenying }] = useDenyApplicantMutation();
   const [leaveCrew, { isLoading: isLeaving }] = useLeaveCrewMutation();
@@ -264,6 +267,9 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     return category?.label || '';
   };
 
+  /** Backup requests are reached only via the header icon (when hasUnhelpedBackupRequests); do not show "Back up your crew member" in the grid. */
+  const excludeBackupRequests = (cat: { id: CrewCategory }) => cat.id !== 'backup-requests';
+
   const getVisibleCategories = (): typeof CATEGORIES => {
     const userRole = crewStatus?.role;
     const currentUserId = currentUser?._id || (currentUser as any)?.id;
@@ -274,18 +280,18 @@ export const CrewModal: React.FC<CrewModalProps> = ({
       cat.id !== 'crew-settings' && cat.id !== 'recruiting';
 
     if (!userRole) {
-      return CATEGORIES.filter(cat => baseFilter(cat));
+      return CATEGORIES.filter(cat => excludeBackupRequests(cat) && baseFilter(cat));
     }
     if (userRole === 'president') {
-      return CATEGORIES;
+      return CATEGORIES.filter(cat => excludeBackupRequests(cat));
     }
     if (isExecutive) {
-      return CATEGORIES.filter(cat => cat.id !== 'crew-settings');
+      return CATEGORIES.filter(cat => excludeBackupRequests(cat) && cat.id !== 'crew-settings');
     }
     if (userRole === 'member') {
-      return CATEGORIES.filter(cat => baseFilter(cat));
+      return CATEGORIES.filter(cat => excludeBackupRequests(cat) && baseFilter(cat));
     }
-    return CATEGORIES.filter(cat => baseFilter(cat));
+    return CATEGORIES.filter(cat => excludeBackupRequests(cat) && baseFilter(cat));
   };
 
   /** Show backup icon only when there is at least one backup request from another crew member that the current user has not yet helped. General rule for all members (president, executives, members): if you've already helped everyone who requested, or there are no requests, do not show the icon. */
@@ -331,10 +337,24 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     }
   }, [denyApplicant, crewStatus?.crewId, refetchCrewDetails, refetchCrewStatus]);
 
+  const getBackupRequestKey = useCallback((req: { userId: string; jobType?: string; jobKey?: string; categoryId?: string; featureId?: string }) => {
+    return `${req.userId}-${req.jobType ?? ''}-${req.jobKey ?? ''}-${req.categoryId ?? ''}-${req.featureId ?? ''}`;
+  }, []);
+
   const handleBackupCrewMember = useCallback(
     async (req: { userId: string; jobType?: string; jobKey?: string; categoryId?: string; featureId?: string }) => {
+      const key = getBackupRequestKey(req);
+      if (backupInProgressKeyRef.current !== null) {
+        if (key === backupInProgressKeyRef.current) return;
+        const alreadyQueued = backupQueueRef.current.some((q) => getBackupRequestKey(q) === key);
+        if (alreadyQueued) return;
+        backupQueueRef.current.push(req);
+        return;
+      }
+      backupInProgressKeyRef.current = key;
+      setBackupInProgressKey(key);
       try {
-        const result = await backupCrewMember({
+        await backupCrewMember({
           targetUserId: req.userId,
           jobType: req.jobType as any,
           jobKey: req.jobKey,
@@ -365,9 +385,16 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         await refetchCrewStatus();
       } catch (err) {
         console.error('Error backing up crew member:', err);
+      } finally {
+        backupInProgressKeyRef.current = null;
+        setBackupInProgressKey(null);
+        const next = backupQueueRef.current.shift();
+        if (next) {
+          setTimeout(() => handleBackupCrewMember(next), 0);
+        }
       }
     },
-    [backupCrewMember, crewStatus?.crewId, dispatch, refetchCrewDetails, refetchCrewStatus]
+    [backupCrewMember, crewStatus?.crewId, dispatch, getBackupRequestKey, refetchCrewDetails, refetchCrewStatus]
   );
 
   const hasApplicants = useMemo(() => {
@@ -1065,11 +1092,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 <TouchableOpacity
                   style={[styles.memberActionButton, { borderColor: colors.primary, backgroundColor: colors.primary }]}
                   onPress={() => handleBackupCrewMember(req)}
-                  disabled={isBackingUpCrewMember}
+                  disabled={backupInProgressKey === getBackupRequestKey(req)}
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.memberActionButtonText, { color: '#FFFFFF' }]}>
-                    {isBackingUpCrewMember ? 'Backing up...' : 'Back up'}
+                    {backupInProgressKey === getBackupRequestKey(req) ? 'Backing up...' : 'Back up'}
                   </Text>
                 </TouchableOpacity>
               ) : (

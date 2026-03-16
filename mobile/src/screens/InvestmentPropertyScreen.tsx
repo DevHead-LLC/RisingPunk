@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, memo, useState } from 'react';
-import { View, ScrollView, StyleSheet, Text, Modal, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, Text, Modal, TouchableOpacity, Alert } from 'react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
@@ -278,6 +278,10 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 3 && hasRemodelConfig ? setRemodelRoom : undefined}
+                onCloseRemodel={() => {
+                  setRemodelRoom(null);
+                  refetchRentalStatus();
+                }}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
@@ -302,6 +306,10 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
+                onCloseRemodel={() => {
+                  setRemodelRoom(null);
+                  refetchRentalStatus();
+                }}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
@@ -491,8 +499,11 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                               }
                               refetchRentalStatus();
                               setRemodelRoom(null);
-                            } catch {
-                              // keep modal open
+                            } catch (err: any) {
+                              const msg = err?.data?.message || err?.data?.error;
+                              if (msg && typeof msg === 'string') {
+                                Alert.alert('Can\'t Start Remodel', msg);
+                              }
                             }
                           }}
                           disabled={!hasFunds}
