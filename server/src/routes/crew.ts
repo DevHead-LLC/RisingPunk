@@ -1687,15 +1687,12 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
 
     const memberCount = 1 + executives.length + members.length;
 
-    // Build backup list from raw crew member IDs (unpopulated) so president and all members are included reliably
-    const crewRaw = await Crew.findById(crewId).select('presidentId executives members').lean();
-    const rawIdsForBackup: (mongoose.Types.ObjectId | undefined)[] = crewRaw
-      ? [
-          crewRaw.presidentId as mongoose.Types.ObjectId,
-          ...((crewRaw.executives || []) as mongoose.Types.ObjectId[]),
-          ...((crewRaw.members || []) as mongoose.Types.ObjectId[]),
-        ]
-      : [];
+    // Build backup list from member IDs (from already-fetched crew: populated refs have _id)
+    const rawIdsForBackup: (mongoose.Types.ObjectId | undefined)[] = [
+      (president as any)?._id,
+      ...(executives as any[]).map((e: any) => e._id ?? e),
+      ...(members as any[]).map((e: any) => e._id ?? e),
+    ];
     const allMemberIds = rawIdsForBackup
       .filter((id): id is mongoose.Types.ObjectId => id != null && mongoose.Types.ObjectId.isValid(id))
       .map((id) => new mongoose.Types.ObjectId(id.toString()));
