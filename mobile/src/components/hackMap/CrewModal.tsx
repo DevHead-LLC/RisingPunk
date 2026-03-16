@@ -145,7 +145,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     crewStatus?.crewId || '',
     {
       skip: !crewStatus?.crewId || !visible || !crewStatus?.isInCrew,
-      pollingInterval: visible && crewStatus?.crewId && crewStatus?.isInCrew ? 10000 : 0,
+      pollingInterval: visible && crewStatus?.crewId && crewStatus?.isInCrew ? 3000 : 0,
     }
   );
   

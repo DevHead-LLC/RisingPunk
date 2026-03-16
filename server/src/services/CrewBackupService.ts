@@ -295,6 +295,15 @@ export async function applyCrewBackupHelpByRequest(
   const newCompletesAt = new Date(currentCompletesAt.getTime() - reduction * 1000);
   const reductionMs = reduction * 1000;
 
+  const completesAtPath =
+    job.jobType === 'researchCenterBuild'
+      ? 'researchCenterBuild.completesAt'
+      : job.jobType === 'rentalBuild' && job.jobKey
+        ? `rentalHousingBuilds.${job.jobKey}.completesAt`
+        : job.jobType === 'remodel'
+          ? 'activeRemodel.completesAt'
+          : null;
+
   const elemMatch: Record<string, unknown> = { jobType: requestId.jobType };
   if (requestId.jobKey != null) elemMatch.jobKey = requestId.jobKey;
   if (requestId.categoryId != null) elemMatch.categoryId = requestId.categoryId;
@@ -324,20 +333,14 @@ export async function applyCrewBackupHelpByRequest(
   };
   const arrayUpdate: mongoose.mongo.UpdateFilter<IUser> = {
     $push: { 'crewBackupRequests.$[elem].helpApplied.helperUserIds': helperUserId },
-    $inc: { 'crewBackupRequests.$[elem].helpApplied.totalSeconds': reduction },
+    $inc: {
+      'crewBackupRequests.$[elem].helpApplied.totalSeconds': reduction,
+      ...(completesAtPath != null ? { [completesAtPath]: -reductionMs } : {}),
+    },
   };
   const updated = await User.findOneAndUpdate(filter, arrayUpdate, { arrayFilters, new: true });
   if (!updated) throw new Error('You have already backed up this crew member for this job');
 
-  if (job.jobType !== 'research') {
-    const path =
-      job.jobType === 'researchCenterBuild'
-        ? 'researchCenterBuild.completesAt'
-        : job.jobType === 'rentalBuild' && job.jobKey
-          ? `rentalHousingBuilds.${job.jobKey}.completesAt`
-          : 'activeRemodel.completesAt';
-    await User.updateOne({ _id: targetUser._id }, { $set: { [path]: new Date(newCompletesAt.getTime()) } });
-  }
   await User.findByIdAndUpdate(helperUserId, { $inc: { crewBackupHelpCount: 1 } });
   return { reduction, newCompletesAt };
 }
