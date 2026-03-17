@@ -60,7 +60,7 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
   });
   const isBuildingFromStatus = buildStatus?.buildStatus != null;
   const crewIdStr = crewStatus?.crewId != null ? String(crewStatus.crewId) : '';
-  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewIdStr, {
+  const { data: crewDetails } = useGetCrewDetailsQuery(crewIdStr, {
     skip: !crewIdStr || !crewStatus?.isInCrew || !isBuildingFromStatus,
     pollingInterval: isBuildingFromStatus ? 5000 : 0,
   });
@@ -327,13 +327,8 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
           {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackup && (
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
-              onPress={async () => {
-                try {
-                  await requestCrewBackup({ jobType: 'researchCenterBuild' }).unwrap();
-                  await refetchCrewDetails();
-                } catch {
-                  // Error already surfaced by mutation
-                }
+              onPress={() => {
+                requestCrewBackup({ jobType: 'researchCenterBuild' });
               }}
             >
               <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
