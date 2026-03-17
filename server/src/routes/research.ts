@@ -683,8 +683,13 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
       await session.endSession();
     }
 
-    // Remove crew backup request for this research now that it completed (speed-up path; normal completion does this in ResearchFeatureService.completeResearch)
-    await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'research', undefined, categoryId, featureId);
+    // Remove crew backup request for this research now that it completed (speed-up path; normal completion does this in ResearchFeatureService.completeResearch).
+    // Wrapped in try/catch so a transient DB error here does not return 500 after the transaction already committed (research unlocked, balance deducted).
+    try {
+      await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'research', undefined, categoryId, featureId);
+    } catch (cleanupError) {
+      console.error('Error removing crew backup request after research speedup (research already completed):', cleanupError);
+    }
 
     // Reload user to get updated balance
     let updatedUser = await User.findById(userId);
