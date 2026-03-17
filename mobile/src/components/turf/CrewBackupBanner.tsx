@@ -35,15 +35,10 @@ export function CrewBackupBanner({ canShowBanner, onPressOpenCrewToBackup }: Cre
 
   const [dismissed, setDismissed] = useState(false);
 
-  // When there are new unhelped requests and we're allowed to show, reset dismissed so banner appears
+  // Reset dismissed only when unhelped requests change (e.g. new requests arrive), not when canShowBanner toggles (e.g. closing a modal would otherwise re-show a dismissed banner).
   useEffect(() => {
-    if (hasUnhelpedRequests && canShowBanner) {
-      setDismissed(false);
-    }
-    if (!hasUnhelpedRequests) {
-      setDismissed(false);
-    }
-  }, [hasUnhelpedRequests, canShowBanner]);
+    setDismissed(false);
+  }, [hasUnhelpedRequests]);
 
   // Auto-dismiss after 4 seconds when visible
   useEffect(() => {
