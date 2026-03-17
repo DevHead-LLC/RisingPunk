@@ -18,7 +18,7 @@ interface FloorPlanProps {
   propertyLevel?: number;
   /** When set, show room level badge and Remodel callback for upgradable rooms */
   onRemodel?: (room: RemodelRoomType) => void;
-  /** When set, called when user taps Close after remodel time is up (avoids opening remodel modal). */
+  /** When set, called when user taps Close after remodel time is up (parent refetches status; server auto-completes expired remodels on GET rental-housing-status). */
   onCloseRemodel?: () => void;
   /** When set for this property, show "Remodeling..." for the room in progress */
   activeRemodelRoom?: string | null;
