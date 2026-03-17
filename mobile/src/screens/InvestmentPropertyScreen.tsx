@@ -173,6 +173,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     ? Math.max(0, (new Date(activeRemodel.completesAt).getTime() - modalCountdownNow) / 1000)
     : 0;
   const timeUp = remainingSec <= 0;
+  // Bugbot: Refetch triggers server-side remodel auto-complete (GET rental-housing-status auto-completes when timer has ended); no explicit complete-remodel call needed.
   useEffect(() => {
     if (timeUp && isModalShowingInProgress) {
       refetchRentalStatus();

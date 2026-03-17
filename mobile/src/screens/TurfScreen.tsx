@@ -203,6 +203,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [showMessagesModal, setShowMessagesModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [crewModalInitialCategory, setCrewModalInitialCategory] = useState<'backup-requests' | null>(null);
+  const [crewModalFocusBackupKey, setCrewModalFocusBackupKey] = useState(0);
   const [showSearchUserModal, setShowSearchUserModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
@@ -1744,6 +1745,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           canShowBanner={true}
           onPressOpenCrewToBackup={() => {
             setCrewModalInitialCategory('backup-requests');
+            setCrewModalFocusBackupKey((k) => k + 1);
             setShowCrewModal(true);
           }}
         />
@@ -1768,6 +1770,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           setCrewModalInitialCategory(null);
         }}
         initialCategory={crewModalInitialCategory}
+        focusInitialCategoryKey={crewModalInitialCategory === 'backup-requests' ? crewModalFocusBackupKey : undefined}
       />
       {showOnboarding && (
         <OnboardingSlides
