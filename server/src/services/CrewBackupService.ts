@@ -333,14 +333,17 @@ export async function applyCrewBackupHelpByRequest(
   };
   const arrayUpdate: mongoose.mongo.UpdateFilter<IUser> = {
     $push: { 'crewBackupRequests.$[elem].helpApplied.helperUserIds': helperUserId },
-    $inc: {
-      'crewBackupRequests.$[elem].helpApplied.totalSeconds': reduction,
-      ...(completesAtPath != null ? { [completesAtPath]: -reductionMs } : {}),
-    },
+    $inc: { 'crewBackupRequests.$[elem].helpApplied.totalSeconds': reduction },
   };
   const updated = await User.findOneAndUpdate(filter, arrayUpdate, { arrayFilters, new: true });
   if (!updated) throw new Error('You have already backed up this crew member for this job');
 
+  if (completesAtPath != null) {
+    await User.updateOne(
+      { _id: targetUser._id },
+      [{ $set: { [completesAtPath]: { $dateSubtract: { startDate: `$${completesAtPath}`, unit: 'millisecond', amount: reductionMs } } } }]
+    );
+  }
   await User.findByIdAndUpdate(helperUserId, { $inc: { crewBackupHelpCount: 1 } });
   return { reduction, newCompletesAt };
 }
