@@ -1236,6 +1236,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showSearchUserModal, setShowSearchUserModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [crewModalInitialCategory, setCrewModalInitialCategory] = useState<'backup-requests' | null>(null);
+  const [crewModalFocusBackupKey, setCrewModalFocusBackupKey] = useState(0);
   const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
@@ -4216,6 +4217,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         canShowBanner={!showProbeFollowModal}
         onPressOpenCrewToBackup={() => {
           setCrewModalInitialCategory('backup-requests');
+          setCrewModalFocusBackupKey((k) => k + 1);
           setShowCrewModal(true);
         }}
       />
@@ -4281,6 +4283,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         visible={showCrewModal}
         onClose={handleCrewClose}
         initialCategory={crewModalInitialCategory}
+        focusInitialCategoryKey={crewModalInitialCategory === 'backup-requests' ? crewModalFocusBackupKey : undefined}
       />
 
       <CrewOnboardingModal

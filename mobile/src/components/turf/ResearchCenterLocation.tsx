@@ -59,8 +59,9 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
     pollingInterval: isBuildingState ? 5000 : 0,
   });
   const isBuildingFromStatus = buildStatus?.buildStatus != null;
-  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
-    skip: !crewStatus?.crewId || !crewStatus?.isInCrew || !isBuildingFromStatus,
+  const crewIdStr = crewStatus?.crewId != null ? String(crewStatus.crewId) : '';
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewIdStr, {
+    skip: !crewIdStr || !crewStatus?.isInCrew || !isBuildingFromStatus,
     pollingInterval: isBuildingFromStatus ? 5000 : 0,
   });
   const hasRequestedBackup = Boolean(
@@ -326,8 +327,13 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
           {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackup && (
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
-              onPress={() => {
-                requestCrewBackup({ jobType: 'researchCenterBuild' });
+              onPress={async () => {
+                try {
+                  await requestCrewBackup({ jobType: 'researchCenterBuild' }).unwrap();
+                  await refetchCrewDetails();
+                } catch {
+                  // Error already surfaced by mutation
+                }
               }}
             >
               <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
