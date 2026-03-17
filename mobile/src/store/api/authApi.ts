@@ -680,8 +680,9 @@ export const authApi = createApi({
           ...(categoryId != null && { categoryId }),
           ...(featureId != null && { featureId }),
         };
+        const crewIdStr = String(crewId);
         const patchResult = dispatch(
-          authApi.util.updateQueryData('getCrewDetails', crewId, (draft) => {
+          authApi.util.updateQueryData('getCrewDetails', crewIdStr, (draft) => {
             if (!draft?.crew) {
               return;
             }

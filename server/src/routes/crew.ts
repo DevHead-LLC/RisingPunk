@@ -457,12 +457,17 @@ router.post('/backup/:userId', auth, async (req: Request<{ userId: string }, {},
     }
     const requests = (targetUser as any).crewBackupRequests ?? [];
     let result: { reduction: number; newCompletesAt: Date };
-    if (requests.length > 0 && body.jobType) {
+    if (requests.length > 0) {
+      const jobType = body.jobType ?? (requests.length === 1 ? (requests[0] as any).jobType : undefined);
+      if (!jobType) {
+        res.status(400).json({ error: 'Specify which job to back up (jobType required when user has multiple backup requests)' });
+        return;
+      }
       result = await applyCrewBackupHelpByRequest(targetUser, new mongoose.Types.ObjectId(helperUserId.toString()), {
-        jobType: body.jobType,
-        jobKey: body.jobKey,
-        categoryId: body.categoryId,
-        featureId: body.featureId,
+        jobType,
+        jobKey: body.jobKey ?? (requests.length === 1 ? (requests[0] as any).jobKey : undefined),
+        categoryId: body.categoryId ?? (requests.length === 1 ? (requests[0] as any).categoryId : undefined),
+        featureId: body.featureId ?? (requests.length === 1 ? (requests[0] as any).featureId : undefined),
       });
     } else {
       result = await applyCrewBackupHelp(targetUser, new mongoose.Types.ObjectId(helperUserId.toString()));

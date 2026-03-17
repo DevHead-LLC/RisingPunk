@@ -37,6 +37,8 @@ interface CrewModalProps {
   onClose: () => void;
   /** When set and modal becomes visible, open directly to this category (e.g. 'backup-requests'). */
   initialCategory?: CrewCategory | null;
+  /** Increment when parent wants to re-navigate to initialCategory (e.g. backup banner tapped again while modal already open). */
+  focusInitialCategoryKey?: number;
 }
 
 type CrewCategory = 
@@ -69,6 +71,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   visible,
   onClose,
   initialCategory = null,
+  focusInitialCategoryKey,
 }) => {
   const colors = useThemeColors();
   const [currentCategory, setCurrentCategory] = useState<CrewCategory>(null);
@@ -114,7 +117,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
     if (initialCategory) {
       setCurrentCategory(initialCategory);
     }
-  }, [visible, initialCategory]);
+  }, [visible, initialCategory, focusInitialCategoryKey]);
 
   const [disbandCrew, { isLoading: isDisbanding }] = useDisbandCrewMutation();
   const [backupCrewMember] = useBackupCrewMemberMutation();

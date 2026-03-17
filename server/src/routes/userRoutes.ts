@@ -724,7 +724,7 @@ router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise
     // Room remodel auto-complete: when timer has ended, apply completion so client never needs to tap "Complete"
     const now = new Date();
     const ar = user.activeRemodel;
-    if (ar?.completesAt && now >= new Date(ar.completesAt)) {
+    if (ar?.startedAt && ar?.completesAt && now >= new Date(ar.completesAt)) {
       const propId = ar.propertyId;
       const room = ar.room;
       const targetRoomLevel = ar.targetRoomLevel;
