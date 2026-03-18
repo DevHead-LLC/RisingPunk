@@ -28,17 +28,18 @@ export function CrewBackupBanner({ canShowBanner, onPressOpenCrewToBackup }: Cre
   });
 
   const backupRequests = crewData?.crew?.backupRequests ?? [];
-  /** Show banner only when there is at least one backup request from another crew member that the current user has not yet helped. Same rule for all members: no icon/banner if you've already helped everyone who requested. */
-  const hasUnhelpedRequests = backupRequests.some(
+  /** Unhelped = from another crew member and current user has not yet helped. */
+  const unhelpedRequests = backupRequests.filter(
     (r) => String(r.userId ?? '').trim() !== String(currentUserId ?? '').trim() && r.hasCurrentUserHelped === false
   );
+  const hasUnhelpedRequests = unhelpedRequests.length > 0;
 
   const [dismissed, setDismissed] = useState(false);
 
-  // Reset dismissed only when unhelped requests change (e.g. new requests arrive), not when canShowBanner toggles (e.g. closing a modal would otherwise re-show a dismissed banner).
+  // Reset dismissed when the set of unhelped requests changes (e.g. count increases = new request; count/length changes), not when canShowBanner toggles (Bugbot).
   useEffect(() => {
     setDismissed(false);
-  }, [hasUnhelpedRequests]);
+  }, [unhelpedRequests.length]);
 
   // Auto-dismiss after 4 seconds when visible
   useEffect(() => {
