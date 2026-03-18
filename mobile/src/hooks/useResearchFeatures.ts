@@ -2,13 +2,15 @@ import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { ResearchFeature } from '../components/research/ResearchFeaturesList';
 
 export function useResearchFeatures(categoryId: string | null) {
-  const { 
-    data: features = [], 
-    isLoading: loading, 
+  const {
+    data: features = [],
+    isLoading: loading,
     error: queryError,
     refetch
   } = useGetUserFeaturesQuery(categoryId || '', {
-    skip: !categoryId || categoryId === ''
+    skip: !categoryId || categoryId === '',
+    // Poll when viewing a category so crew backup time reduction is visible without leaving the screen
+    pollingInterval: categoryId ? 5000 : 0,
   });
 
   // Convert RTK Query error to string

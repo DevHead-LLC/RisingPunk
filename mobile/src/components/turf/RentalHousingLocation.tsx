@@ -6,7 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { updateBalance, getCurrentBalance } from '../../store/slices/balanceSlice';
-import { useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation } from '../../store/api/authApi';
+import { authApi, useGetRentalHousingStatusQuery, useUnlockRentalHousingMutation, useCompleteRentalHousingMutation, useSpeedupPropertyConstructionMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 import { trackFirstConstruct } from '../../services/analyticsService';
@@ -46,6 +46,8 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const [showInsufficientFundsModal, setShowInsufficientFundsModal] = useState(false);
   const [showBuildStartedModal, setShowBuildStartedModal] = useState(false);
   const [showBuildErrorModal, setShowBuildErrorModal] = useState(false);
+  const [buildErrorMessage, setBuildErrorMessage] = useState('');
+  const [buildErrorModalTitle, setBuildErrorModalTitle] = useState<'CAN\'T START BUILD' | 'SPEEDUP ERROR'>('CAN\'T START BUILD');
   const [showCompletionErrorModal, setShowCompletionErrorModal] = useState(false);
   const [showSpeedupModal, setShowSpeedupModal] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -58,10 +60,37 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
   const [unlockRentalHousing, { isLoading: isUnlocking }] = useUnlockRentalHousingMutation();
   const [completeRentalHousing, { isLoading: isCompleting }] = useCompleteRentalHousingMutation();
   const [speedupPropertyConstruction] = useSpeedupPropertyConstructionMutation();
-  
+  const [requestCrewBackup] = useRequestCrewBackupMutation();
+  const { data: crewStatus } = useGetCrewStatusQuery();
+  const isBuildingFromStatus = rentalHousingStatus?.isBuilding ?? false;
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+    skip: !crewStatus?.crewId || !crewStatus?.isInCrew || !isBuildingFromStatus,
+    pollingInterval: isBuildingFromStatus ? 5000 : 0,
+  });
+  const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
+  // Match rental build by jobType (same as DevelopmentZone) so we hide only when user requested for this build
+  const hasRequestedBackup = Boolean(
+    currentUserId &&
+    crewDetails?.crew?.backupRequests?.some(
+      (r) =>
+        String(r.userId) === String(currentUserId) &&
+        (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false))
+    )
+  );
+
   const dispatch = useAppDispatch();
   const previousIsUnlockedRef = useRef<boolean | undefined>(undefined);
-  
+  const hadBuildingRef = useRef(false);
+
+  // When this property starts building, refetch crew details so "Request back-up" uses fresh list (not stale cache from a previous build)
+  useEffect(() => {
+    if (isBuildingFromStatus && crewStatus?.crewId && crewStatus?.isInCrew && !hadBuildingRef.current) {
+      hadBuildingRef.current = true;
+      refetchCrewDetails();
+    }
+    if (!isBuildingFromStatus) hadBuildingRef.current = false;
+  }, [isBuildingFromStatus, crewStatus?.crewId, crewStatus?.isInCrew, refetchCrewDetails]);
+
   // Get balance from Redux store (always call hooks unconditionally)
   const reduxBalance = useAppSelector((state) => state.balance.total);
   
@@ -157,26 +186,37 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       const result = await unlockRentalHousing(propertyId).unwrap();
       
       if (result.success) {
-        // Update local balance - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
-        dispatch(updateBalance({ 
-          total: result.newBalance, 
-          ratePerSecond: currentBalanceState.ratePerSecond, 
-          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
-          fractionalRemainder: currentBalanceState.fractionalRemainder
-        }));
-        
-        // Show success modal
+        // Update balance whenever the server sends newBalance so we don't show success UI with stale balance (consistent with success modal)
+        if (result.newBalance !== undefined) {
+          dispatch(updateBalance({
+            total: result.newBalance,
+            ratePerSecond: currentBalanceState.ratePerSecond,
+            lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+            fractionalRemainder: currentBalanceState.fractionalRemainder
+          }));
+        }
+        if (result.buildStatus) {
+          // Optimistic cache update so TurfScreen/DevelopmentZone see active build immediately and "Request back-up" shows with the upgrade
+          const startedAt = typeof result.buildStatus.startedAt === 'string' ? result.buildStatus.startedAt : new Date(result.buildStatus.startedAt).toISOString();
+          const completesAt = typeof result.buildStatus.completesAt === 'string' ? result.buildStatus.completesAt : new Date(result.buildStatus.completesAt).toISOString();
+          dispatch(authApi.util.updateQueryData('getRentalHousingStatus', propertyId, (draft) => {
+            draft.isBuilding = true;
+            draft.buildStatus = { startedAt, completesAt, targetLevel: result.buildStatus!.targetLevel };
+          }));
+        }
+        refetch();
         setShowBuildStartedModal(true);
         setShowPopup(false);
       }
     } catch (error: any) {
       console.error('Error starting rental housing build:', error);
-      
+      setShowPopup(false);
+      const msg = error?.data?.message || error?.data?.error;
       if (error?.data?.error === 'Insufficient funds') {
         setShowInsufficientFundsModal(true);
-      } else if (error?.data?.error === 'Only one property can be built at a time') {
-        setShowBuildErrorModal(true);
       } else {
+        setBuildErrorModalTitle('CAN\'T START BUILD');
+        setBuildErrorMessage(msg && typeof msg === 'string' ? msg : 'Failed to start build. Please try again.');
         setShowBuildErrorModal(true);
       }
     }
@@ -232,6 +272,9 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       if (error?.data?.error === 'Insufficient funds') {
         setShowInsufficientFundsModal(true);
       } else {
+        setBuildErrorModalTitle('SPEEDUP ERROR');
+        const msg = error?.data?.message || error?.data?.error;
+        setBuildErrorMessage(msg && typeof msg === 'string' ? msg : 'Failed to speed up build. Please try again.');
         setShowBuildErrorModal(true);
       }
     }
@@ -303,14 +346,26 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       </View>
       
       {showTimer && (
-        <DevelopmentTimer
-          isBuilding={isBuilding}
-          buildStatus={buildStatus}
-          onComplete={handleTimerComplete}
-          topOffset="120%"
-          leftOffset={-50}
-          width={120}
-        />
+        <View>
+          <DevelopmentTimer
+            isBuilding={isBuilding}
+            buildStatus={buildStatus}
+            onComplete={handleTimerComplete}
+            topOffset="120%"
+            leftOffset={-50}
+            width={120}
+          />
+          {isBuilding && crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackup && (
+            <TouchableOpacity
+              style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
+              onPress={() => {
+                requestCrewBackup({ jobType: 'rentalBuild' });
+              }}
+            >
+              <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       <BuildModal
@@ -350,8 +405,8 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
 
       <LockedFeatureModal
         visible={showBuildErrorModal}
-        title="BUILD ERROR"
-        message="Failed to start build. Please try again."
+        title={buildErrorModalTitle}
+        message={buildErrorMessage || (buildErrorModalTitle === 'SPEEDUP ERROR' ? 'Failed to speed up build. Please try again.' : 'Failed to start build. Please try again.')}
         onClose={() => setShowBuildErrorModal(false)}
         closeButtonText="CLOSE"
       />
@@ -425,5 +480,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  requestBackupButton: {
+    marginTop: SIZING.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    borderWidth: 1,
+    alignSelf: 'center',
+  },
+  requestBackupText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

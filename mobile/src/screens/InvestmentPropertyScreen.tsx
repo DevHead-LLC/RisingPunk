@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, memo, useState } from 'react';
-import { View, ScrollView, StyleSheet, Text, Modal, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, Text, Modal, TouchableOpacity, Alert } from 'react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
@@ -8,10 +8,14 @@ import { FloorPlan } from '../components/common/FloorPlan';
 import {
   useGetRentalHousingStatusQuery,
   useStartRemodelMutation,
-  useCompleteRemodelMutation,
   useSpeedupRemodelMutation,
+  useGetCrewStatusQuery,
+  useGetCrewDetailsQuery,
+  useRequestCrewBackupMutation,
 } from '../store/api/authApi';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
+import { balanceApi } from '../store/api/balanceApi';
+import { rentalHousingApi } from '../store/api/rentalHousingApi';
 import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
 import { usePanGesture } from '../hooks/usePanGesture';
@@ -97,17 +101,60 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const [modalCountdownNow, setModalCountdownNow] = useState(() => Date.now());
   const [hasActiveRemodelHere, setHasActiveRemodelHere] = useState(false);
   const [activeTab, setActiveTab] = useState<'mainFloor' | 'garage'>('mainFloor');
+  /** True when we've seen status.isBuilding so we keep polling until build completes (avoids using status in its own query options). */
+  const [pollForBuilding, setPollForBuilding] = useState(false);
 
-  const { data: status } = useGetRentalHousingStatusQuery(propertyId, {
-    pollingInterval: remodelRoom || hasActiveRemodelHere ? 5000 : 0
+  const { data: status, refetch: refetchRentalStatus } = useGetRentalHousingStatusQuery(propertyId, {
+    pollingInterval: remodelRoom || hasActiveRemodelHere || pollForBuilding ? 5000 : 0
   });
+
+  useEffect(() => {
+    if (status?.isBuilding) setPollForBuilding(true);
+    else if (status !== undefined) setPollForBuilding(false);
+  }, [status?.isBuilding, status]);
+  const { data: crewStatus } = useGetCrewStatusQuery();
+  const hasActiveRemodelThisProperty = status?.activeRemodel?.propertyId === propertyId;
+  const isPropertyBuilding = status?.isBuilding ?? false;
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+    skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
+    pollingInterval: hasActiveRemodelThisProperty || isPropertyBuilding ? 3000 : 0,
+  });
+  const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
+  const backupRequests = crewDetails?.crew?.backupRequests ?? [];
+  const mine = (pred: (r: { userId?: string; jobType?: string; jobLabel?: string }) => boolean) =>
+    Boolean(currentUserId && backupRequests.some((r) => String(r.userId) === String(currentUserId) && pred(r)));
+  const hasRequestedBackupForBuild = mine(
+    (r) => r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false)
+  );
+  const hasRequestedBackupForRemodel = mine(
+    (r) => r.jobType === 'remodel' || (r.jobLabel?.toLowerCase().includes('remodel') ?? false)
+  );
+  const [requestCrewBackup] = useRequestCrewBackupMutation();
+
+  const hadActiveRemodelRef = useRef(false);
+  const hadActiveBuildRef = useRef(false);
+  useEffect(() => {
+    const hasActiveRemodel = Boolean(hasActiveRemodelThisProperty && crewStatus?.crewId && crewStatus?.isInCrew);
+    if (hasActiveRemodel && !hadActiveRemodelRef.current) {
+      hadActiveRemodelRef.current = true;
+      refetchCrewDetails();
+    }
+    if (!hasActiveRemodelThisProperty) hadActiveRemodelRef.current = false;
+  }, [hasActiveRemodelThisProperty, crewStatus?.crewId, crewStatus?.isInCrew, refetchCrewDetails]);
+  useEffect(() => {
+    const hasActiveBuild = Boolean(isPropertyBuilding && crewStatus?.crewId && crewStatus?.isInCrew);
+    if (hasActiveBuild && !hadActiveBuildRef.current) {
+      hadActiveBuildRef.current = true;
+      refetchCrewDetails();
+    }
+    if (!isPropertyBuilding) hadActiveBuildRef.current = false;
+  }, [isPropertyBuilding, crewStatus?.crewId, crewStatus?.isInCrew, refetchCrewDetails]);
 
   useEffect(() => {
     setHasActiveRemodelHere(status?.activeRemodel?.propertyId === propertyId);
   }, [status?.activeRemodel?.propertyId, propertyId]);
 
   const [startRemodel] = useStartRemodelMutation();
-  const [completeRemodel] = useCompleteRemodelMutation();
   const [speedupRemodel] = useSpeedupRemodelMutation();
   const dispatch = useAppDispatch();
   const balanceState = useAppSelector(state => state.balance);
@@ -122,12 +169,43 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   const hasRemodelConfig = Boolean(maxRoomLevel != null && roomRemodelLevels?.length);
 
   const isModalShowingInProgress = Boolean(remodelRoom && activeRemodel?.room === remodelRoom && activeRemodel?.completesAt);
+  const remainingSec = activeRemodel?.completesAt
+    ? Math.max(0, (new Date(activeRemodel.completesAt).getTime() - modalCountdownNow) / 1000)
+    : 0;
+  const timeUp = remainingSec <= 0;
+  // Bugbot: Refetch triggers server-side remodel auto-complete (GET rental-housing-status auto-completes when timer has ended); no explicit complete-remodel call needed.
+  useEffect(() => {
+    if (timeUp && isModalShowingInProgress) {
+      refetchRentalStatus();
+      dispatch(balanceApi.util.invalidateTags(['Balance']));
+      dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+    }
+  }, [timeUp, isModalShowingInProgress, refetchRentalStatus, dispatch]);
   useEffect(() => {
     if (!isModalShowingInProgress) return;
     setModalCountdownNow(Date.now());
     const id = setInterval(() => setModalCountdownNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [isModalShowingInProgress, remodelRoom, activeRemodel?.room, activeRemodel?.completesAt]);
+
+  const propertyBuildCompletesAt = status?.buildStatus?.completesAt ?? null;
+  const [propertyBuildCountdownNow, setPropertyBuildCountdownNow] = useState(() => Date.now());
+  const propertyBuildRemainingSec = propertyBuildCompletesAt
+    ? Math.max(0, (new Date(propertyBuildCompletesAt).getTime() - propertyBuildCountdownNow) / 1000)
+    : 0;
+  useEffect(() => {
+    if (!isPropertyBuilding || !propertyBuildCompletesAt) return;
+    setPropertyBuildCountdownNow(Date.now());
+    const id = setInterval(() => setPropertyBuildCountdownNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isPropertyBuilding, propertyBuildCompletesAt]);
+  useEffect(() => {
+    if (isPropertyBuilding && propertyBuildRemainingSec <= 0) {
+      refetchRentalStatus();
+      dispatch(balanceApi.util.invalidateTags(['Balance']));
+      dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+    }
+  }, [isPropertyBuilding, propertyBuildRemainingSec, refetchRentalStatus, dispatch]);
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
@@ -168,7 +246,27 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
           </Text>
         </View>
       </View>
-      
+
+      {/* Property build/upgrade in progress: timer + Request back-up */}
+      {isPropertyBuilding && propertyBuildRemainingSec > 0 && (
+        <View style={[styles.propertyBuildBanner, { backgroundColor: colors.primary + '22', borderColor: colors.matrix }]}>
+          <Text style={[styles.propertyBuildBannerText, { color: colors.text?.primary ?? '#fff' }]}>
+            {propertyLevel === 0 ? 'Property build' : 'Property upgrade'} in progress — Time left:{' '}
+            {Math.floor(propertyBuildRemainingSec / 60)}:{(Math.floor(propertyBuildRemainingSec) % 60).toString().padStart(2, '0')}
+          </Text>
+          {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForBuild && (
+            <TouchableOpacity
+              style={[styles.propertyBuildBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
+              onPress={() => {
+                requestCrewBackup({ jobType: 'rentalBuild' });
+              }}
+            >
+              <Text style={[styles.propertyBuildBackupButtonText, { color: colors.background ?? '#fff' }]}>Request back-up</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
       <View style={styles.scrollView}>
         {(!showGarageTab || activeTab === 'mainFloor') ? (
           <GesturePanView 
@@ -181,8 +279,16 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 3 && hasRemodelConfig ? setRemodelRoom : undefined}
+                onCloseRemodel={() => {
+                  setRemodelRoom(null);
+                  refetchRentalStatus();
+                }}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
+                showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
+                onRequestBackup={() => {
+                  requestCrewBackup({ jobType: 'remodel' });
+                }}
                 showGarage={false}
                 maxRoomLevel={maxRoomLevel}
                 roomRemodelLevels={roomRemodelLevels}
@@ -201,8 +307,16 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
+                onCloseRemodel={() => {
+                  setRemodelRoom(null);
+                  refetchRentalStatus();
+                }}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
+                showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
+                onRequestBackup={() => {
+                  requestCrewBackup({ jobType: 'remodel' });
+                }}
                 showGarage={true}
                 maxRoomLevel={maxRoomLevel}
                 maxGarageRoomLevel={maxGarageRoomLevel}
@@ -266,30 +380,25 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                   return (
                     <>
                       <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>
-                        {timeUp ? 'Remodel complete! Tap Complete to finish.' : `Remodel in progress. Time left: ${Math.floor(remainingSec / 60)}:${(Math.floor(remainingSec) % 60).toString().padStart(2, '0')}`}
+                        {timeUp ? 'Remodel complete! (Completion is automatic.)' : `Remodel in progress. Time left: ${Math.floor(remainingSec / 60)}:${(Math.floor(remainingSec) % 60).toString().padStart(2, '0')}`}
                       </Text>
+                      {!timeUp && crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel && (
+                        <TouchableOpacity
+                          style={[styles.modalButton, { backgroundColor: colors.primary, marginTop: 8 }]}
+                          onPress={() => {
+                            requestCrewBackup({ jobType: 'remodel' });
+                          }}
+                        >
+                          <Text style={styles.modalButtonText}>Request back-up</Text>
+                        </TouchableOpacity>
+                      )}
                       <View style={{ flexDirection: 'row', gap: 12, marginTop: 12 }}>
                         {timeUp ? (
                           <TouchableOpacity
                             style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                            onPress={async () => {
-                              try {
-                                const res = await completeRemodel({ propertyId, room: remodelRoom }).unwrap();
-                                if (res.ratePerSecond != null || res.newBalance != null) {
-                                  dispatch(updateBalance({
-                                    total: res.newBalance ?? balanceState.total ?? 0,
-                                    ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
-                                    lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
-                                    fractionalRemainder: balanceState.fractionalRemainder
-                                  }));
-                                }
-                                setRemodelRoom(null);
-                              } catch {
-                                // keep modal open
-                              }
-                            }}
+                            onPress={() => setRemodelRoom(null)}
                           >
-                            <Text style={styles.modalButtonText}>Complete</Text>
+                            <Text style={styles.modalButtonText}>Close</Text>
                           </TouchableOpacity>
                         ) : (
                           <TouchableOpacity
@@ -305,6 +414,8 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                                   fractionalRemainder: balanceState.fractionalRemainder
                                 }));
                                 setRemodelRoom(null);
+                                refetchRentalStatus();
+                                refetchCrewDetails();
                               } catch {
                                 // keep modal open
                               }
@@ -387,9 +498,13 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                                   fractionalRemainder: balanceState.fractionalRemainder
                                 }));
                               }
+                              refetchRentalStatus();
                               setRemodelRoom(null);
-                            } catch {
-                              // keep modal open
+                            } catch (err: any) {
+                              const msg = err?.data?.message || err?.data?.error;
+                              if (msg && typeof msg === 'string') {
+                                Alert.alert('Can\'t Start Remodel', msg);
+                              }
                             }
                           }}
                           disabled={!hasFunds}
@@ -508,6 +623,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
+  },
+  propertyBuildBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: SIZING.spacing.sm,
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.md,
+    borderBottomWidth: 1,
+    marginHorizontal: SIZING.spacing.md,
+    marginTop: 4,
+    borderRadius: 8,
+  },
+  propertyBuildBannerText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  propertyBuildBackupButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  propertyBuildBackupButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,

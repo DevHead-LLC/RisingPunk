@@ -9,6 +9,8 @@ export interface IUserResearchFeature extends Document {
   isResearching: boolean;
   researchStartedAt: Date | null;
   researchCompletesAt: Date | null;
+  /** Original research duration in seconds when research started; used for crew backup formula so per-helper reduction does not degrade as completesAt is reduced. */
+  originalResearchTotalSeconds?: number | null;
   researchTimeHours: number;
   unlockCost: number;
   createdAt: Date;
@@ -62,6 +64,10 @@ const userResearchFeatureSchema = new Schema({
   },
   researchCompletesAt: {
     type: Date,
+    default: null
+  },
+  originalResearchTotalSeconds: {
+    type: Number,
     default: null
   },
   researchTimeHours: {

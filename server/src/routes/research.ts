@@ -8,6 +8,7 @@ import { User } from '../models/User';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { getTaskList } from '../config/taskListData';
 import { accrueBalanceFromTo } from '../utils/balanceAccrual';
+import { removeCrewBackupRequestForJob } from '../services/CrewBackupService';
 import mongoose from 'mongoose';
 
 const router = express.Router();
@@ -680,6 +681,14 @@ router.post('/speedup-feature-research', auth, async (req: Request, res: Respons
       throw error;
     } finally {
       await session.endSession();
+    }
+
+    // Remove crew backup request for this research now that it completed (speed-up path; normal completion does this in ResearchFeatureService.completeResearch).
+    // Wrapped in try/catch so a transient DB error here does not return 500 after the transaction already committed (research unlocked, balance deducted).
+    try {
+      await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'research', undefined, categoryId, featureId);
+    } catch (cleanupError) {
+      console.error('Error removing crew backup request after research speedup (research already completed):', cleanupError);
     }
 
     // Reload user to get updated balance
