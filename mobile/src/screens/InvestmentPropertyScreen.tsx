@@ -282,6 +282,8 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 onCloseRemodel={() => {
                   setRemodelRoom(null);
                   refetchRentalStatus();
+                  dispatch(balanceApi.util.invalidateTags(['Balance']));
+                  dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
                 }}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
@@ -310,6 +312,8 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 onCloseRemodel={() => {
                   setRemodelRoom(null);
                   refetchRentalStatus();
+                  dispatch(balanceApi.util.invalidateTags(['Balance']));
+                  dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
                 }}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
