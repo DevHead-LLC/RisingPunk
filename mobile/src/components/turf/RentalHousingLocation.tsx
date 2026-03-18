@@ -185,23 +185,24 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
     try {
       const result = await unlockRentalHousing(propertyId).unwrap();
       
-      if (result.success && result.buildStatus) {
-        // Update local balance - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
-        dispatch(updateBalance({ 
-          total: result.newBalance, 
-          ratePerSecond: currentBalanceState.ratePerSecond, 
-          lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
-          fractionalRemainder: currentBalanceState.fractionalRemainder
-        }));
-        // Optimistic cache update so TurfScreen/DevelopmentZone see active build immediately and "Request back-up" shows with the upgrade
-        const startedAt = typeof result.buildStatus.startedAt === 'string' ? result.buildStatus.startedAt : new Date(result.buildStatus.startedAt).toISOString();
-        const completesAt = typeof result.buildStatus.completesAt === 'string' ? result.buildStatus.completesAt : new Date(result.buildStatus.completesAt).toISOString();
-        dispatch(authApi.util.updateQueryData('getRentalHousingStatus', propertyId, (draft) => {
-          draft.isBuilding = true;
-          draft.buildStatus = { startedAt, completesAt, targetLevel: result.buildStatus!.targetLevel };
-        }));
+      if (result.success) {
+        if (result.buildStatus) {
+          // Update local balance - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
+          dispatch(updateBalance({
+            total: result.newBalance,
+            ratePerSecond: currentBalanceState.ratePerSecond,
+            lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
+            fractionalRemainder: currentBalanceState.fractionalRemainder
+          }));
+          // Optimistic cache update so TurfScreen/DevelopmentZone see active build immediately and "Request back-up" shows with the upgrade
+          const startedAt = typeof result.buildStatus.startedAt === 'string' ? result.buildStatus.startedAt : new Date(result.buildStatus.startedAt).toISOString();
+          const completesAt = typeof result.buildStatus.completesAt === 'string' ? result.buildStatus.completesAt : new Date(result.buildStatus.completesAt).toISOString();
+          dispatch(authApi.util.updateQueryData('getRentalHousingStatus', propertyId, (draft) => {
+            draft.isBuilding = true;
+            draft.buildStatus = { startedAt, completesAt, targetLevel: result.buildStatus!.targetLevel };
+          }));
+        }
         refetch();
-        // Show success modal
         setShowBuildStartedModal(true);
         setShowPopup(false);
       }
