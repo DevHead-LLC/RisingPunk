@@ -38,6 +38,8 @@ import { ChangePasswordModal } from '../components/modals/ChangePasswordModal';
 import { getGuestDeviceId } from '../services/guestCredentialsStorage';
 import DeviceInfo from 'react-native-device-info';
 import { openReviewUrl, getHasOpenedReview } from '../utils/openReviewAndClaimReward';
+import { BattlesTab } from '../components/profile/BattlesTab';
+import { useGetBattlePresetsQuery } from '../store/api/battlePresetsApi';
 
 interface UserProfile {
   handle: string;
@@ -64,7 +66,7 @@ interface UserProfile {
   crewBackupHelpCount?: number;
 }
 
-type TabType = 'profile' | 'stats' | 'settings' | 'account' | 'content';
+type TabType = 'profile' | 'stats' | 'settings' | 'account' | 'content' | 'battles';
 
 const createProfileStyles = (colors: any, screenWidth: number, scaleFactor: number) => StyleSheet.create({
   container: {
@@ -722,6 +724,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [revealVendorId, setRevealVendorId] = useState(false);
   const [hasOpenedReview, setHasOpenedReview] = useState(false);
   const userId = user?._id ?? null;
+  const { data: battlePresetsData } = useGetBattlePresetsQuery();
+  const hasUnlockedAnyPreset = !!battlePresetsData?.presets?.['1']?.unlocked;
 
   // Load device ID, vendor ID, and "has opened review" for Account tab (per-user keys)
   useEffect(() => {
@@ -1153,6 +1157,17 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               CONTENT
             </Text>
           </TouchableOpacity>
+
+          {hasUnlockedAnyPreset && (
+            <TouchableOpacity
+              style={[styles.leftTab, activeTab === 'battles' && styles.activeLeftTab]}
+              onPress={() => setActiveTab('battles')}
+            >
+              <Text style={[styles.leftTabText, activeTab === 'battles' && styles.activeLeftTabText]}>
+                BATTLES
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* RIGHT SIDE CONTENT */}
@@ -1198,9 +1213,9 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
               {breakdown && (
                 <>
-                  {renderStatsChart('INFANTRY', breakdown.breacher)}
-                  {renderStatsChart('CAVALRY', breakdown.guardian)}
-                  {renderStatsChart('RANGED', breakdown.phreak)}
+                  {renderStatsChart('BRUTE', breakdown.breacher)}
+                  {renderStatsChart('SPRINT', breakdown.guardian)}
+                  {renderStatsChart('REMOTE', breakdown.phreak)}
                 </>
               )}
               {profile?.battleStats && (
@@ -1564,7 +1579,6 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                     style={styles.replayButton}
                     onPress={() => {
                       onClose();
-                      // Trigger onboarding replay by setting showOnboarding to true
                       dispatch(setShowOnboarding(true));
                     }}
                   >
@@ -1590,6 +1604,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                 </TouchableOpacity>
               </View>
             </ScrollView>
+          ) : activeTab === 'battles' ? (
+            <BattlesTab />
           ) : null}
         </View>
       </View>

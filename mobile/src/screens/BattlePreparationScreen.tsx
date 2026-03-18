@@ -19,6 +19,7 @@ import { useBattalionSlotUnlocks } from '../hooks/useBattalionSlotUnlocks';
 import { API_URL } from '../config';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
+import { PresetBar } from '../components/battle/PresetBar';
 
 const DeployPurgeHighlightBorder = React.memo(({ colors }: { colors: any }) => {
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
@@ -83,6 +84,7 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const token = useAppSelector((state) => state.auth.token);
   const userId = useAppSelector((state) => state.auth.user?._id);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
+  const userBalance = useAppSelector((state) => state.balance.total ?? 0);
   const [assignToBattalion] = useAssignToBattalionMutation();
   const [startBattle] = useStartBattleMutation();
   const [deactivateShield] = useDeactivateShieldMutation();
@@ -224,6 +226,27 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       console.error('Failed to reset battalions:', error);
     }
   }, [assignToBattalion, isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked]);
+
+  const handleApplyPreset = React.useCallback(async (presetAssignments: Record<string, BattalionAssignment>) => {
+    try {
+      await resetBattalions();
+      setAssignments({});
+
+      const assignPromises = Object.entries(presetAssignments).map(([battalionId, assignment]) => {
+        if (!assignment || assignment.quantity <= 0) return Promise.resolve();
+        return assignToBattalion({
+          botType: assignment.botType as BotType,
+          quantity: assignment.quantity,
+          battalionId,
+        });
+      });
+      await Promise.all(assignPromises);
+
+      setAssignments(presetAssignments);
+    } catch (error) {
+      console.error('Failed to apply preset:', error);
+    }
+  }, [resetBattalions, assignToBattalion]);
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
@@ -501,6 +524,12 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
       {!isDeployPurgeHighlight && (
         <View>
+          <PresetBar
+            botCounts={botCounts}
+            userBalance={userBalance}
+            unlockedSlots={{ isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked }}
+            onApplyPreset={handleApplyPreset}
+          />
           <TouchableOpacity
             style={[
               styles.executeButton,

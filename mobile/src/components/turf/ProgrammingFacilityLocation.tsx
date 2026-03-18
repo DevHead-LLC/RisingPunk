@@ -123,7 +123,7 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
               >
                 <Text style={[styles.gameOptionTitle, { color: colors.primary }]}>Packet Breach</Text>
                 <Text style={[styles.gameOptionDesc, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Infantry · Breach the node
+                  Brute · Breach the node
                 </Text>
               </TouchableOpacity>
 
@@ -137,7 +137,7 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
               >
                 <Text style={[styles.gameOptionTitle, { color: colors.primary }]}>Race Condition Heist</Text>
                 <Text style={[styles.gameOptionDesc, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Cavalry · Hijack the packet
+                  Sprint · Hijack the packet
                 </Text>
               </TouchableOpacity>
 
@@ -151,7 +151,7 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
               >
                 <Text style={[styles.gameOptionTitle, { color: colors.primary }]}>Binary Bank Crack</Text>
                 <Text style={[styles.gameOptionDesc, { color: colors.text?.secondary ?? colors.primary }]}>
-                  Range · Phreaks
+                  Remote · Phreaks
                 </Text>
               </TouchableOpacity>
             </ScrollView>

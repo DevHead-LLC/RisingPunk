@@ -53,6 +53,7 @@ import { SIZING } from '../styles/theme';
 import { getPersistedTurfNavState, setPersistedTurfNavState, type TurfScreenName } from '../utils/turfNavStatePersistence';
 import { CrewBackupBanner } from '../components/turf/CrewBackupBanner';
 import { CrewModal } from '../components/hackMap/CrewModal';
+import { ActiveJobsModal } from '../components/turf/ActiveJobsModal';
 import { useGetCrewStatusQuery } from '../store/api/authApi';
 
 // Platform-specific imports - available on both platforms but only used on Android
@@ -204,6 +205,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [crewModalInitialCategory, setCrewModalInitialCategory] = useState<'backup-requests' | null>(null);
   const [crewModalFocusBackupKey, setCrewModalFocusBackupKey] = useState(0);
+  const [showActiveJobsModal, setShowActiveJobsModal] = useState(false);
   const [showSearchUserModal, setShowSearchUserModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
@@ -1751,18 +1753,33 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         />
       )}
       {renderScreen()}
-      {currentScreen === 'turf' && crewStatus?.isInCrew && (
-        <TouchableOpacity
-          style={styles.crewIconButton}
-          onPress={() => {
-            setCrewModalInitialCategory(null);
-            setShowCrewModal(true);
-          }}
-          activeOpacity={0.8}
-        >
-          <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={styles.crewIconImage} resizeMode="contain" />
-        </TouchableOpacity>
+      {currentScreen === 'turf' && (
+        <View style={styles.bottomRightIcons}>
+          <TouchableOpacity
+            style={styles.activeJobsIconButton}
+            onPress={() => setShowActiveJobsModal(true)}
+            activeOpacity={0.8}
+          >
+            <Image source={require('../assets/images/ui/activeJobs.png')} style={styles.activeJobsIconImage} resizeMode="contain" />
+          </TouchableOpacity>
+          {crewStatus?.isInCrew && (
+            <TouchableOpacity
+              style={styles.crewIconButton}
+              onPress={() => {
+                setCrewModalInitialCategory(null);
+                setShowCrewModal(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={styles.crewIconImage} resizeMode="contain" />
+            </TouchableOpacity>
+          )}
+        </View>
       )}
+      <ActiveJobsModal
+        visible={showActiveJobsModal}
+        onClose={() => setShowActiveJobsModal(false)}
+      />
       <CrewModal
         visible={showCrewModal}
         onClose={() => {
@@ -1806,10 +1823,16 @@ const styles = StyleSheet.create({
     gap: 8,
     zIndex: 10002,
   },
-  crewIconButton: {
+  bottomRightIcons: {
     position: 'absolute',
     bottom: SIZING.spacing.lg,
     right: SIZING.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 10002,
+  },
+  activeJobsIconButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -1818,7 +1841,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 255, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10002,
+  },
+  activeJobsIconImage: {
+    width: 33,
+    height: 33,
+  },
+  crewIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(128, 90, 213, 0.95)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 255, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   crewIconImage: {
     width: 28,

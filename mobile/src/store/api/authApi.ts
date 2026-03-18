@@ -176,6 +176,16 @@ export interface RentalHousingStatusResponse {
   }>;
 }
 
+export interface ActiveJobEntry {
+  jobType: string;
+  label: string;
+  completesAt: string;
+}
+
+export interface ActiveJobsResponse {
+  jobs: ActiveJobEntry[];
+}
+
 export interface UnlockRentalHousingResponse {
   success: boolean;
   message: string;
@@ -389,6 +399,11 @@ export const authApi = createApi({
 
     getResearchCenterStatus: builder.query<ResearchCenterStatusResponse, void>({
       query: () => '/api/users/research-center-status',
+      providesTags: ['User'],
+    }),
+
+    getActiveJobs: builder.query<ActiveJobsResponse, void>({
+      query: () => '/api/users/active-jobs',
       providesTags: ['User'],
     }),
 
@@ -958,6 +973,7 @@ export const {
   useUnlockResearchCenterMutation,
   useUnlockProgrammingFacilityMutation,
   useGetResearchCenterStatusQuery,
+  useGetActiveJobsQuery,
   useSpeedupResearchCenterConstructionMutation,
   useGetRentalHousingStatusQuery,
   useUnlockRentalHousingMutation,

@@ -46,7 +46,7 @@ LIMITS
 • Timer: complete before time expires or the system locks down.
 
 TIER REWARDS
-Complete all five levels in a tier to unlock that tier's stat bonus for the Range bot type (Phreaks): Attack, Health, Defense, Speed — same cycle as Infantry (Packet Breach) and Cavalry (Race Condition Heist).`;
+Complete all five levels in a tier to unlock that tier's stat bonus for the Remote bot type (Phreaks): Attack, Health, Defense, Speed — same cycle as Brute (Packet Breach) and Sprint (Race Condition Heist).`;
 
 type BinaryBankCrackLevelScreenProps = {
   onClose: () => void;
@@ -94,7 +94,7 @@ export function BinaryBankCrackLevelScreen({ onClose, onSelectLevel }: BinaryBan
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={handleClose} />
       <Balance />
-      <Text style={[styles.title, { color: colors.primary }]}>Program Range for Tiered Rewards</Text>
+      <Text style={[styles.title, { color: colors.primary }]}>Program Remote for Tiered Rewards</Text>
       <TouchableOpacity
         onPress={() => setShowRules(true)}
         style={[styles.rulesButton, { borderColor: colors.primary }]}

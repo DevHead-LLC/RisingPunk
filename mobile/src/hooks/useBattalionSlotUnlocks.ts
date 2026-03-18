@@ -24,6 +24,43 @@ function isResearchFeatureEffectivelyUnlocked(feature: FeatureWithResearch | nul
   return !!(feature.isResearching && researchCompletesAtMs <= Date.now());
 }
 
+const BATTALION_SIZE_FEATURE_IDS = [
+  'battalion-size-250',
+  'battalion-size-500',
+  'battalion-size-1000',
+  'battalion-size-2000',
+  'battalion-size-4500',
+  'battalion-size-6500',
+] as const;
+
+const BATTALION_SIZE_MAP: Record<string, number> = {
+  'battalion-size-250': 500,
+  'battalion-size-500': 1000,
+  'battalion-size-1000': 2000,
+  'battalion-size-2000': 4000,
+  'battalion-size-4500': 8500,
+  'battalion-size-6500': 15000,
+};
+
+/**
+ * Returns the current maximum troops allowed per battalion based on research unlocks.
+ * Base is 250; each successive battalion-size research doubles/raises it.
+ */
+export function useBattalionMaxSize(): number {
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+
+  return useMemo(() => {
+    let max = 250;
+    for (const id of BATTALION_SIZE_FEATURE_IDS) {
+      const f = hackAbilityFeatures?.find((feat: { id?: string }) => feat.id === id);
+      if (!f) break;
+      if (!isResearchFeatureEffectivelyUnlocked(f)) break;
+      max = BATTALION_SIZE_MAP[id] ?? max;
+    }
+    return max;
+  }, [hackAbilityFeatures]);
+}
+
 /**
  * Returns whether Battalion C, D, E, and F slots are effectively unlocked (same logic as server isBattalionSlotUnlocked).
  * Uses hack-ability user features; one source of truth for the "effectively unlocked" check on the client.
