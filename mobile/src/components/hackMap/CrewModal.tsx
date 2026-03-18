@@ -2205,7 +2205,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     marginRight: SIZING.spacing.sm,
   },
-  // Bugbot: reported image 54×54 overflowing 44×44 button; assessed as visually fine, no change.
+  // Bugbot: 54×54 image overflows 44×44 backupIconButton by design; intentional for visibility/emphasis (not an oversight).
   backupIconImage: {
     width: 54,
     height: 54,

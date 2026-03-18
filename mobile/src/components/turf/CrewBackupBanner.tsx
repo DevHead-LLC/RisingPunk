@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useGetCrewStatusQuery, useGetCrewDetailsQuery } from '../../store/api/authApi';
@@ -28,17 +28,22 @@ export function CrewBackupBanner({ canShowBanner, onPressOpenCrewToBackup }: Cre
   });
 
   const backupRequests = crewData?.crew?.backupRequests ?? [];
-  /** Show banner only when there is at least one backup request from another crew member that the current user has not yet helped. Same rule for all members: no icon/banner if you've already helped everyone who requested. */
-  const hasUnhelpedRequests = backupRequests.some(
+  /** Unhelped = from another crew member and current user has not yet helped. */
+  const unhelpedRequests = backupRequests.filter(
     (r) => String(r.userId ?? '').trim() !== String(currentUserId ?? '').trim() && r.hasCurrentUserHelped === false
   );
+  const hasUnhelpedRequests = unhelpedRequests.length > 0;
 
   const [dismissed, setDismissed] = useState(false);
+  const prevUnhelpedCountRef = useRef(unhelpedRequests.length);
 
-  // Reset dismissed only when unhelped requests change (e.g. new requests arrive), not when canShowBanner toggles (e.g. closing a modal would otherwise re-show a dismissed banner).
+  // Reset dismissed only when a new request arrives (count increases), not when count decreases (e.g. someone helped) or canShowBanner toggles (Bugbot).
   useEffect(() => {
-    setDismissed(false);
-  }, [hasUnhelpedRequests]);
+    const prev = prevUnhelpedCountRef.current;
+    const curr = unhelpedRequests.length;
+    if (curr > prev) setDismissed(false);
+    prevUnhelpedCountRef.current = curr;
+  }, [unhelpedRequests.length]);
 
   // Auto-dismiss after 4 seconds when visible
   useEffect(() => {
