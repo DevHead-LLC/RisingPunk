@@ -67,7 +67,7 @@ export function FeatureModal({
   const [requestCrewBackup] = useRequestCrewBackupMutation();
   const { data: crewStatus } = useGetCrewStatusQuery(undefined, { skip: !visible });
   const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
-    skip: !visible || !crewStatus?.crewId || !crewStatus?.isInCrew || !(feature.isResearching ?? isResearching),
+    skip: !visible || !crewStatus?.crewId || !crewStatus?.isInCrew || !(feature.isResearching || isResearching),
   });
   const hasRequestedBackup = Boolean(
     currentUserId &&
