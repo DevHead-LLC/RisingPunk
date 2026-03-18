@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useGetCrewStatusQuery, useGetCrewDetailsQuery } from '../../store/api/authApi';
@@ -35,10 +35,14 @@ export function CrewBackupBanner({ canShowBanner, onPressOpenCrewToBackup }: Cre
   const hasUnhelpedRequests = unhelpedRequests.length > 0;
 
   const [dismissed, setDismissed] = useState(false);
+  const prevUnhelpedCountRef = useRef(unhelpedRequests.length);
 
-  // Reset dismissed when the set of unhelped requests changes (e.g. count increases = new request; count/length changes), not when canShowBanner toggles (Bugbot).
+  // Reset dismissed only when a new request arrives (count increases), not when count decreases (e.g. someone helped) or canShowBanner toggles (Bugbot).
   useEffect(() => {
-    setDismissed(false);
+    const prev = prevUnhelpedCountRef.current;
+    const curr = unhelpedRequests.length;
+    if (curr > prev) setDismissed(false);
+    prevUnhelpedCountRef.current = curr;
   }, [unhelpedRequests.length]);
 
   // Auto-dismiss after 4 seconds when visible
