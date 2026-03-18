@@ -694,7 +694,6 @@ export const authApi = createApi({
             );
             if (!alreadyHas) {
               draft.crew.backupRequests = [...list, newRow];
-            } else {
             }
           })
         );
