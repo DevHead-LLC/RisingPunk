@@ -55,6 +55,10 @@ export function FeatureModal({
   const userId = useAppSelector((state) => state.auth.user?._id);
   const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
   const [isResearching, setIsResearching] = useState(false);
+  // Sync local isResearching when modal opens or feature changes so we never show crew UI for a different feature (Bugbot).
+  useEffect(() => {
+    if (visible) setIsResearching(!!feature.isResearching);
+  }, [visible, feature.id, feature.isResearching]);
   const [researchTimeRemaining, setResearchTimeRemaining] = useState(0);
   const [isSpeedupLoading, setIsSpeedupLoading] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -66,6 +70,7 @@ export function FeatureModal({
   const [speedupFeatureResearch] = useSpeedupFeatureResearchMutation();
   const [requestCrewBackup] = useRequestCrewBackupMutation();
   const { data: crewStatus } = useGetCrewStatusQuery(undefined, { skip: !visible });
+  // Use ?? so server's explicit false is respected; local isResearching only used when feature.isResearching is null/undefined (Bugbot).
   const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
     skip: !visible || !crewStatus?.crewId || !crewStatus?.isInCrew || !(feature.isResearching ?? isResearching),
   });
