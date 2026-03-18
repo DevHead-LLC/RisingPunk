@@ -186,14 +186,16 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
       const result = await unlockRentalHousing(propertyId).unwrap();
       
       if (result.success) {
-        if (result.buildStatus) {
-          // Update local balance - preserve existing ratePerSecond, lastUpdated, and fractionalRemainder
+        // Update balance whenever the server sends newBalance so we don't show success UI with stale balance (consistent with success modal)
+        if (result.newBalance !== undefined) {
           dispatch(updateBalance({
             total: result.newBalance,
             ratePerSecond: currentBalanceState.ratePerSecond,
             lastUpdated: currentBalanceState.lastUpdated ? new Date(currentBalanceState.lastUpdated) : null,
             fractionalRemainder: currentBalanceState.fractionalRemainder
           }));
+        }
+        if (result.buildStatus) {
           // Optimistic cache update so TurfScreen/DevelopmentZone see active build immediately and "Request back-up" shows with the upgrade
           const startedAt = typeof result.buildStatus.startedAt === 'string' ? result.buildStatus.startedAt : new Date(result.buildStatus.startedAt).toISOString();
           const completesAt = typeof result.buildStatus.completesAt === 'string' ? result.buildStatus.completesAt : new Date(result.buildStatus.completesAt).toISOString();
