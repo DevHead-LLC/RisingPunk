@@ -132,6 +132,7 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
         transparent
         animationType="fade"
         onRequestClose={() => setOpenBotPickerForRow(null)}
+        supportedOrientations={['landscape-left', 'landscape-right']}
       >
         <TouchableOpacity
           style={styles.botPickerOverlay}
