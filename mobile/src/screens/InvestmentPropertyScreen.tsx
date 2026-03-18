@@ -174,13 +174,16 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     : 0;
   const timeUp = remainingSec <= 0;
   // Bugbot: Refetch triggers server-side remodel auto-complete (GET rental-housing-status auto-completes when timer has ended); no explicit complete-remodel call needed.
+  // When timer hits zero while modal is open, close the modal so we don't jump to "Start new Remodel" after refetch clears activeRemodel (Bugbot).
   useEffect(() => {
     if (timeUp && isModalShowingInProgress) {
+      setRemodelRoom(null);
       refetchRentalStatus();
       dispatch(balanceApi.util.invalidateTags(['Balance']));
       dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+      refetchCrewDetails();
     }
-  }, [timeUp, isModalShowingInProgress, refetchRentalStatus, dispatch]);
+  }, [timeUp, isModalShowingInProgress, refetchRentalStatus, refetchCrewDetails, dispatch]);
   useEffect(() => {
     if (!isModalShowingInProgress) return;
     setModalCountdownNow(Date.now());
@@ -284,6 +287,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                   refetchRentalStatus();
                   dispatch(balanceApi.util.invalidateTags(['Balance']));
                   dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+                  refetchCrewDetails();
                 }}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
@@ -314,6 +318,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                   refetchRentalStatus();
                   dispatch(balanceApi.util.invalidateTags(['Balance']));
                   dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+                  refetchCrewDetails();
                 }}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
