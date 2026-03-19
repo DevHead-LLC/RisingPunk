@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, memo, useState } from 'react';
+import React, { useRef, useEffect, memo, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, Text, Modal, TouchableOpacity, Alert } from 'react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
@@ -173,17 +173,18 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     ? Math.max(0, (new Date(activeRemodel.completesAt).getTime() - modalCountdownNow) / 1000)
     : 0;
   const timeUp = remainingSec <= 0;
+  const closeRemodelModal = useCallback(() => {
+    setRemodelRoom(null);
+    refetchRentalStatus();
+    dispatch(balanceApi.util.invalidateTags(['Balance']));
+    dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+    refetchCrewDetails();
+  }, [dispatch, refetchRentalStatus, refetchCrewDetails]);
   // Bugbot: Refetch triggers server-side remodel auto-complete (GET rental-housing-status auto-completes when timer has ended); no explicit complete-remodel call needed.
   // When timer hits zero while modal is open, close the modal so we don't jump to "Start new Remodel" after refetch clears activeRemodel (Bugbot).
   useEffect(() => {
-    if (timeUp && isModalShowingInProgress) {
-      setRemodelRoom(null);
-      refetchRentalStatus();
-      dispatch(balanceApi.util.invalidateTags(['Balance']));
-      dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
-      refetchCrewDetails();
-    }
-  }, [timeUp, isModalShowingInProgress, refetchRentalStatus, refetchCrewDetails, dispatch]);
+    if (timeUp && isModalShowingInProgress) closeRemodelModal();
+  }, [timeUp, isModalShowingInProgress, closeRemodelModal]);
   useEffect(() => {
     if (!isModalShowingInProgress) return;
     setModalCountdownNow(Date.now());
@@ -282,13 +283,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 3 && hasRemodelConfig ? setRemodelRoom : undefined}
-                onCloseRemodel={() => {
-                  setRemodelRoom(null);
-                  refetchRentalStatus();
-                  dispatch(balanceApi.util.invalidateTags(['Balance']));
-                  dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
-                  refetchCrewDetails();
-                }}
+                onCloseRemodel={closeRemodelModal}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
@@ -313,13 +308,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
-                onCloseRemodel={() => {
-                  setRemodelRoom(null);
-                  refetchRentalStatus();
-                  dispatch(balanceApi.util.invalidateTags(['Balance']));
-                  dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
-                  refetchCrewDetails();
-                }}
+                onCloseRemodel={closeRemodelModal}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
@@ -405,7 +394,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                         {timeUp ? (
                           <TouchableOpacity
                             style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                            onPress={() => setRemodelRoom(null)}
+                            onPress={closeRemodelModal}
                           >
                             <Text style={styles.modalButtonText}>Close</Text>
                           </TouchableOpacity>
@@ -434,7 +423,10 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                             <Text style={styles.modalButtonText}>Speedup (${speedupCost})</Text>
                           </TouchableOpacity>
                         )}
-                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#444' }]} onPress={() => setRemodelRoom(null)}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, { backgroundColor: '#444' }]}
+                          onPress={timeUp ? closeRemodelModal : () => setRemodelRoom(null)}
+                        >
                           <Text style={styles.modalButtonText}>Close</Text>
                         </TouchableOpacity>
                       </View>
