@@ -63,12 +63,6 @@ router.get('/go', (req: Request, res: Response) => {
       redirectUrl = url.toString();
     }
 
-    // Lightweight logging (async, doesn't block redirect)
-    // Only log first 50 chars of UA to reduce log size
-    setImmediate(() => {
-      console.log(`[Redirect] ${os} -> ${redirectUrl.substring(0, 60)}...`);
-    });
-
     // Perform redirect (302 = temporary redirect, appropriate for this use case)
     res.redirect(302, redirectUrl);
   } catch (error) {
