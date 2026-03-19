@@ -402,36 +402,38 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                             <Text style={styles.modalButtonText}>Close</Text>
                           </TouchableOpacity>
                         ) : (
-                          <TouchableOpacity
-                            style={[styles.modalButton, { backgroundColor: canSpeedup ? colors.primary : '#666' }]}
-                            onPress={async () => {
-                              if (!canSpeedup) return;
-                              try {
-                                const res = await speedupRemodel({ propertyId, room: remodelRoom }).unwrap();
-                                dispatch(updateBalance({
-                                  total: res.newBalance,
-                                  ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
-                                  lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
-                                  fractionalRemainder: balanceState.fractionalRemainder
-                                }));
-                                setRemodelRoom(null);
-                                refetchRentalStatus();
-                                refetchCrewDetails();
-                              } catch {
-                                // keep modal open
-                              }
-                            }}
-                            disabled={!canSpeedup}
-                          >
-                            <Text style={styles.modalButtonText}>Speedup (${speedupCost})</Text>
-                          </TouchableOpacity>
+                          <>
+                            <TouchableOpacity
+                              style={[styles.modalButton, { backgroundColor: canSpeedup ? colors.primary : '#666' }]}
+                              onPress={async () => {
+                                if (!canSpeedup) return;
+                                try {
+                                  const res = await speedupRemodel({ propertyId, room: remodelRoom }).unwrap();
+                                  dispatch(updateBalance({
+                                    total: res.newBalance,
+                                    ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
+                                    lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                    fractionalRemainder: balanceState.fractionalRemainder
+                                  }));
+                                  setRemodelRoom(null);
+                                  refetchRentalStatus();
+                                  refetchCrewDetails();
+                                } catch {
+                                  // keep modal open
+                                }
+                              }}
+                              disabled={!canSpeedup}
+                            >
+                              <Text style={styles.modalButtonText}>Speedup (${speedupCost})</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.modalButton, { backgroundColor: '#444' }]}
+                              onPress={() => setRemodelRoom(null)}
+                            >
+                              <Text style={styles.modalButtonText}>Close</Text>
+                            </TouchableOpacity>
+                          </>
                         )}
-                        <TouchableOpacity
-                          style={[styles.modalButton, { backgroundColor: '#444' }]}
-                          onPress={timeUp ? closeRemodelModal : () => setRemodelRoom(null)}
-                        >
-                          <Text style={styles.modalButtonText}>Close</Text>
-                        </TouchableOpacity>
                       </View>
                     </>
                   );
