@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { ResearchFeature } from './ResearchFeaturesList';
+import { ResearchFeature, matchesResearchCrewBackupRequest } from './FeatureCard';
 import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatureResearchMutation, useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { useGetResearchCenterStatusQuery, useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -76,13 +76,9 @@ export function FeatureModal({
   });
   const hasRequestedBackup = Boolean(
     currentUserId &&
-    crewDetails?.crew?.backupRequests?.some(
-      (r) =>
-        String(r.userId) === String(currentUserId) &&
-        r.jobType === 'research' &&
-        r.categoryId === categoryId &&
-        r.featureId === feature.id
-    )
+      crewDetails?.crew?.backupRequests?.some((r) =>
+        matchesResearchCrewBackupRequest(r, currentUserId, categoryId, feature.id)
+      )
   );
   const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
 
