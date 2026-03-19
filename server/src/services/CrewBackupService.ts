@@ -309,17 +309,8 @@ export async function applyCrewBackupHelpByRequest(
   if (requestId.categoryId != null) elemMatch.categoryId = requestId.categoryId;
   if (requestId.featureId != null) elemMatch.featureId = requestId.featureId;
 
-  if (job.jobType === 'research') {
-    const { ResearchFeatureService } = await import('./ResearchFeatureService');
-    const researchFilter = ResearchFeatureService.getFeatureIdFindFilter(
-      job.categoryId as string,
-      job.featureId as string
-    );
-    const researchDoc = await UserResearchFeature.findOne({ userId: targetUser._id, ...researchFilter });
-    if (!researchDoc?.researchCompletesAt) throw new Error('No active build or remodel to back up');
-    const newResearchCompletesAt = new Date(new Date(researchDoc.researchCompletesAt).getTime() - reductionMs);
-    await UserResearchFeature.findByIdAndUpdate(researchDoc._id, { researchCompletesAt: newResearchCompletesAt });
-  }
+  // Record helper + totalSeconds on User first (atomic). Apply research timer reduction only after that succeeds
+  // so we never persist completesAt reduction without helpApplied tracking (Bugbot: concurrent help race).
 
   const arrayFilters: Record<string, unknown>[] = [{ 'elem.jobType': requestId.jobType }];
   if (requestId.jobKey != null) arrayFilters[0]['elem.jobKey'] = requestId.jobKey;
@@ -337,6 +328,18 @@ export async function applyCrewBackupHelpByRequest(
   };
   const updated = await User.findOneAndUpdate(filter, arrayUpdate, { arrayFilters, new: true });
   if (!updated) throw new Error('You have already backed up this crew member for this job');
+
+  if (job.jobType === 'research') {
+    const { ResearchFeatureService } = await import('./ResearchFeatureService');
+    const researchFilter = ResearchFeatureService.getFeatureIdFindFilter(
+      job.categoryId as string,
+      job.featureId as string
+    );
+    const researchDoc = await UserResearchFeature.findOne({ userId: targetUser._id, ...researchFilter });
+    if (!researchDoc?.researchCompletesAt) throw new Error('No active build or remodel to back up');
+    const newResearchCompletesAt = new Date(new Date(researchDoc.researchCompletesAt).getTime() - reductionMs);
+    await UserResearchFeature.findByIdAndUpdate(researchDoc._id, { researchCompletesAt: newResearchCompletesAt });
+  }
 
   if (completesAtPath != null) {
     await User.updateOne(

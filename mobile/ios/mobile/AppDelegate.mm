@@ -1,5 +1,6 @@
 #import "AppDelegate.h"
 
+#import <AppTrackingTransparency/AppTrackingTransparency.h>
 #import <React/RCTBundleURLProvider.h>
 #import <FirebaseCore/FirebaseCore.h>
 
@@ -46,6 +47,19 @@
   self.initialProps = @{};
 
   return [super application:application didFinishLaunchingWithOptions:launchOptions];
+}
+
+- (void)applicationDidBecomeActive:(UIApplication *)application
+{
+  [super applicationDidBecomeActive:application];
+
+  // ATT must run while UIApplicationStateActive; didFinishLaunching is too early on iOS 15+.
+  if (@available(iOS 14.0, *)) {
+    if ([ATTrackingManager trackingAuthorizationStatus] == ATTrackingManagerAuthorizationStatusNotDetermined) {
+      [ATTrackingManager requestTrackingAuthorizationWithCompletionHandler:^(__unused ATTrackingManagerAuthorizationStatus status) {
+      }];
+    }
+  }
 }
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
