@@ -51,7 +51,8 @@
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
 {
-  [super applicationDidBecomeActive:application];
+  // Do not call [super applicationDidBecomeActive:] — RCTAppDelegate does not implement this selector;
+  // forwarding to super would hit NSObject and crash (unrecognized selector).
 
   // ATT must run while UIApplicationStateActive; didFinishLaunching is too early on iOS 15+.
   if (@available(iOS 14.0, *)) {
