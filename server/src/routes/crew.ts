@@ -305,6 +305,8 @@ interface RequestBackupBody {
   featureId?: string;
   /** When requesting backup for build/remodel, which job type so server uses the correct one when user has both (e.g. rental build + remodel). */
   jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel';
+  /** For rentalBuild, which property (e.g. property2) when multiple investment builds may be active (Bugbot). */
+  jobKey?: string;
 }
 router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBody>, res: Response) => {
   try {
@@ -324,7 +326,7 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    const { categoryId, featureId, jobType: bodyJobType } = body;
+    const { categoryId, featureId, jobType: bodyJobType, jobKey: bodyJobKey } = body;
     if (categoryId != null && featureId != null) {
       // Research backup: validate this feature is in progress; add one entry per job to crewBackupRequests
       const { UserResearchFeature } = await import('../models/UserResearchFeature');
@@ -359,8 +361,10 @@ router.post('/request-backup', auth, async (req: Request<{}, {}, RequestBackupBo
       return;
     }
     // Build/remodel backup: add one entry per job to crewBackupRequests so completing one job doesn't clear the other
+    const rentalBuildOptions =
+      bodyJobType === 'rentalBuild' && bodyJobKey != null ? { jobKey: bodyJobKey } : null;
     const job = bodyJobType
-      ? await getActiveJobInfo(user, bodyJobType)
+      ? await getActiveJobInfo(user, bodyJobType, rentalBuildOptions)
       : await getActiveJobInfo(user);
     if (!job) {
       res.status(400).json({ error: 'No active build or remodel to request backup for' });
@@ -478,7 +482,7 @@ router.post('/backup/:userId', auth, async (req: Request<{ userId: string }, {},
       newCompletesAt: result.newCompletesAt.toISOString()
     });
   } catch (error: any) {
-    if (['No active build or remodel to back up', 'User has not requested backup', 'You have already backed up this crew member for this job', 'Maximum crew backup for this job has been reached', 'Build or remodel is already complete'].includes(error.message)) {
+    if (['No active build or remodel to back up', 'User has not requested backup', 'User has not requested backup for this job', 'You have already backed up this crew member for this job', 'Maximum crew backup for this job has been reached', 'Build or remodel is already complete'].includes(error.message)) {
       res.status(400).json({ error: error.message });
       return;
     }

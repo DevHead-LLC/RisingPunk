@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, memo, useState } from 'react';
+import React, { useRef, useEffect, memo, useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, Text, Modal, TouchableOpacity, Alert } from 'react-native';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
@@ -121,10 +121,13 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   });
   const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
   const backupRequests = crewDetails?.crew?.backupRequests ?? [];
-  const mine = (pred: (r: { userId?: string; jobType?: string; jobLabel?: string }) => boolean) =>
+  const mine = (pred: (r: { userId?: string; jobType?: string; jobLabel?: string; jobKey?: string }) => boolean) =>
     Boolean(currentUserId && backupRequests.some((r) => String(r.userId) === String(currentUserId) && pred(r)));
+  const rentalBuildJobKey = `property${propertyId}`;
   const hasRequestedBackupForBuild = mine(
-    (r) => r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false)
+    (r) =>
+      (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false)) &&
+      r.jobKey === rentalBuildJobKey
   );
   const hasRequestedBackupForRemodel = mine(
     (r) => r.jobType === 'remodel' || (r.jobLabel?.toLowerCase().includes('remodel') ?? false)
@@ -173,17 +176,18 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     ? Math.max(0, (new Date(activeRemodel.completesAt).getTime() - modalCountdownNow) / 1000)
     : 0;
   const timeUp = remainingSec <= 0;
+  const closeRemodelModal = useCallback(() => {
+    setRemodelRoom(null);
+    refetchRentalStatus();
+    dispatch(balanceApi.util.invalidateTags(['Balance']));
+    dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+    refetchCrewDetails();
+  }, [dispatch, refetchRentalStatus, refetchCrewDetails]);
   // Bugbot: Refetch triggers server-side remodel auto-complete (GET rental-housing-status auto-completes when timer has ended); no explicit complete-remodel call needed.
   // When timer hits zero while modal is open, close the modal so we don't jump to "Start new Remodel" after refetch clears activeRemodel (Bugbot).
   useEffect(() => {
-    if (timeUp && isModalShowingInProgress) {
-      setRemodelRoom(null);
-      refetchRentalStatus();
-      dispatch(balanceApi.util.invalidateTags(['Balance']));
-      dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
-      refetchCrewDetails();
-    }
-  }, [timeUp, isModalShowingInProgress, refetchRentalStatus, refetchCrewDetails, dispatch]);
+    if (timeUp && isModalShowingInProgress) closeRemodelModal();
+  }, [timeUp, isModalShowingInProgress, closeRemodelModal]);
   useEffect(() => {
     if (!isModalShowingInProgress) return;
     setModalCountdownNow(Date.now());
@@ -261,7 +265,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
             <TouchableOpacity
               style={[styles.propertyBuildBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                requestCrewBackup({ jobType: 'rentalBuild' });
+                requestCrewBackup({ jobType: 'rentalBuild', jobKey: `property${propertyId}` });
               }}
             >
               <Text style={[styles.propertyBuildBackupButtonText, { color: colors.background ?? '#fff' }]}>Request back-up</Text>
@@ -282,13 +286,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 3 && hasRemodelConfig ? setRemodelRoom : undefined}
-                onCloseRemodel={() => {
-                  setRemodelRoom(null);
-                  refetchRentalStatus();
-                  dispatch(balanceApi.util.invalidateTags(['Balance']));
-                  dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
-                  refetchCrewDetails();
-                }}
+                onCloseRemodel={closeRemodelModal}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
@@ -313,13 +311,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                 propertyId={propertyId}
                 propertyLevel={propertyLevel}
                 onRemodel={propertyLevel >= 7 && hasRemodelConfig ? setRemodelRoom : undefined}
-                onCloseRemodel={() => {
-                  setRemodelRoom(null);
-                  refetchRentalStatus();
-                  dispatch(balanceApi.util.invalidateTags(['Balance']));
-                  dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
-                  refetchCrewDetails();
-                }}
+                onCloseRemodel={closeRemodelModal}
                 activeRemodelRoom={activeRemodelRoom}
                 activeRemodelCompletesAt={activeRemodel?.completesAt ?? null}
                 showRequestBackup={Boolean(crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackupForRemodel)}
@@ -405,53 +397,43 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                         {timeUp ? (
                           <TouchableOpacity
                             style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                            onPress={() => {
-                              setRemodelRoom(null);
-                              refetchRentalStatus();
-                              dispatch(balanceApi.util.invalidateTags(['Balance']));
-                              dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
-                              refetchCrewDetails();
-                            }}
+                            onPress={closeRemodelModal}
                           >
                             <Text style={styles.modalButtonText}>Close</Text>
                           </TouchableOpacity>
                         ) : (
-                          <TouchableOpacity
-                            style={[styles.modalButton, { backgroundColor: canSpeedup ? colors.primary : '#666' }]}
-                            onPress={async () => {
-                              if (!canSpeedup) return;
-                              try {
-                                const res = await speedupRemodel({ propertyId, room: remodelRoom }).unwrap();
-                                dispatch(updateBalance({
-                                  total: res.newBalance,
-                                  ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
-                                  lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
-                                  fractionalRemainder: balanceState.fractionalRemainder
-                                }));
-                                setRemodelRoom(null);
-                                refetchRentalStatus();
-                                refetchCrewDetails();
-                              } catch {
-                                // keep modal open
-                              }
-                            }}
-                            disabled={!canSpeedup}
-                          >
-                            <Text style={styles.modalButtonText}>Speedup (${speedupCost})</Text>
-                          </TouchableOpacity>
+                          <>
+                            <TouchableOpacity
+                              style={[styles.modalButton, { backgroundColor: canSpeedup ? colors.primary : '#666' }]}
+                              onPress={async () => {
+                                if (!canSpeedup) return;
+                                try {
+                                  const res = await speedupRemodel({ propertyId, room: remodelRoom }).unwrap();
+                                  dispatch(updateBalance({
+                                    total: res.newBalance,
+                                    ratePerSecond: res.ratePerSecond ?? balanceState.ratePerSecond,
+                                    lastUpdated: balanceState.lastUpdated ? new Date(balanceState.lastUpdated) : null,
+                                    fractionalRemainder: balanceState.fractionalRemainder
+                                  }));
+                                  setRemodelRoom(null);
+                                  refetchRentalStatus();
+                                  refetchCrewDetails();
+                                } catch {
+                                  // keep modal open
+                                }
+                              }}
+                              disabled={!canSpeedup}
+                            >
+                              <Text style={styles.modalButtonText}>Speedup (${speedupCost})</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.modalButton, { backgroundColor: '#444' }]}
+                              onPress={() => setRemodelRoom(null)}
+                            >
+                              <Text style={styles.modalButtonText}>Close</Text>
+                            </TouchableOpacity>
+                          </>
                         )}
-                        <TouchableOpacity
-                          style={[styles.modalButton, { backgroundColor: '#444' }]}
-                          onPress={() => {
-                            setRemodelRoom(null);
-                            refetchRentalStatus();
-                            dispatch(balanceApi.util.invalidateTags(['Balance']));
-                            dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
-                            refetchCrewDetails();
-                          }}
-                        >
-                          <Text style={styles.modalButtonText}>Close</Text>
-                        </TouchableOpacity>
                       </View>
                     </>
                   );
