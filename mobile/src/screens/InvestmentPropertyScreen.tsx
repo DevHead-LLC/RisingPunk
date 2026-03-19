@@ -405,7 +405,13 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                         {timeUp ? (
                           <TouchableOpacity
                             style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                            onPress={() => setRemodelRoom(null)}
+                            onPress={() => {
+                              setRemodelRoom(null);
+                              refetchRentalStatus();
+                              dispatch(balanceApi.util.invalidateTags(['Balance']));
+                              dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+                              refetchCrewDetails();
+                            }}
                           >
                             <Text style={styles.modalButtonText}>Close</Text>
                           </TouchableOpacity>
