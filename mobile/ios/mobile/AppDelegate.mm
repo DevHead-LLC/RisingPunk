@@ -1,5 +1,6 @@
 #import "AppDelegate.h"
 
+#import <AppTrackingTransparency/AppTrackingTransparency.h>
 #import <React/RCTBundleURLProvider.h>
 #import <FirebaseCore/FirebaseCore.h>
 
@@ -45,7 +46,17 @@
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
 
-  return [super application:application didFinishLaunchingWithOptions:launchOptions];
+  BOOL didLaunch = [super application:application didFinishLaunchingWithOptions:launchOptions];
+
+  // ATT after RN startup so the system can attach the prompt to a window; async avoids blocking launch.
+  if (@available(iOS 14.0, *)) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [ATTrackingManager requestTrackingAuthorizationWithCompletionHandler:^(__unused ATTrackingManagerAuthorizationStatus status) {
+      }];
+    });
+  }
+
+  return didLaunch;
 }
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge

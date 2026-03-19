@@ -359,7 +359,7 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                requestCrewBackup({ jobType: 'rentalBuild' });
+                requestCrewBackup({ jobType: 'rentalBuild', jobKey: `property${propertyId}` });
               }}
             >
               <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>

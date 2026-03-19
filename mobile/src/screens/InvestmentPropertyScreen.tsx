@@ -262,7 +262,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
             <TouchableOpacity
               style={[styles.propertyBuildBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                requestCrewBackup({ jobType: 'rentalBuild' });
+                requestCrewBackup({ jobType: 'rentalBuild', jobKey: `property${propertyId}` });
               }}
             >
               <Text style={[styles.propertyBuildBackupButtonText, { color: colors.background ?? '#fff' }]}>Request back-up</Text>

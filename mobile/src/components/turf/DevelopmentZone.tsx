@@ -79,7 +79,10 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buil
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                requestCrewBackup({ jobType: 'rentalBuild' });
+                requestCrewBackup({
+                  jobType: 'rentalBuild',
+                  jobKey: `property${activeBuilds[0].propertyId}`,
+                });
               }}
             >
               <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>

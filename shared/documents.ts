@@ -2,12 +2,12 @@
  * Shared document data for Privacy Policy and Terms of Service
  * Used by web, mobile, and server applications
  * 
- * Last Updated: January 24, 2026
+ * Last Updated: March 19, 2026
  */
 
 export const DOCUMENTS = {
   privacyPolicy: {
-    effectiveDate: 'January 24, 2026',
+    effectiveDate: 'March 19, 2026',
     sections: [
       {
         title: 'Data Controller',
@@ -35,6 +35,10 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
             text: 'stored only as a bcrypt hash.'
           },
           {
+            label: 'Device and vendor identifiers (guest accounts)',
+            text: 'for guest play we store a device-linked identifier and an optional stable device (vendor) identifier to persist your guest session and to attempt account recovery if you contact support; we do not guarantee that recovery is possible. Share these identifiers only with support@risingpunk.com when requesting recovery; never share them with anyone else.'
+          },
+          {
             label: 'Server logs',
             text: 'IP address, device ID, and usage data retained for 30 days to detect fraud and maintain security.'
           },
@@ -56,7 +60,7 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           },
           {
             label: 'Advertising and attribution data',
-            text: 'we use advertising platforms (Google Ads, YouTube Ads, and Apple Search Ads) to promote our app. These platforms may collect data about ad interactions, conversions, and device identifiers for attribution purposes (to understand which ads led to app installs). This data is used solely for measuring advertising effectiveness and is processed by the respective advertising platforms according to their privacy policies. We do not use this data to track individual users across apps or websites for advertising purposes.'
+            text: 'we use advertising platforms (Google Ads, YouTube Ads, and Apple Search Ads) to promote our app. These platforms may collect data about ad interactions, conversions, and device identifiers for attribution (to understand which ads led to installs). On iOS we support Apple\'s SKAdNetwork and may request permission to track through App Tracking Transparency (ATT); see "iOS: Advertising measurement (ATT and SKAdNetwork)" below. Data is used to measure advertising effectiveness and is processed by the respective platforms according to their privacy policies.'
           }
         ]
       },
@@ -73,7 +77,7 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           },
           {
             label: 'Consent',
-            text: 'for newsletter subscriptions and user-generated content in chat.'
+            text: 'for newsletter subscriptions, user-generated content in chat, and—on iOS—optional tracking when you allow it through Apple\'s App Tracking Transparency prompt.'
           }
         ]
       },
@@ -85,7 +89,8 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           'Send email verification links and password recovery emails.',
           'Protect the service against fraud or abuse.',
           'Send newsletter updates (only if you subscribed) with game updates, strategy tips, and exclusive rewards like balance increases you can claim in-game.',
-          'Moderate user-generated content in chat to ensure a safe and respectful community environment.'
+          'Moderate user-generated content in chat to ensure a safe and respectful community environment.',
+          'Measure advertising effectiveness and app install attribution (including Google Ads and Apple frameworks on iOS, as described in this Policy).'
         ],
         note: 'We do not sell personal data. We do not share your email address or personal information with third parties for marketing purposes. Newsletter subscribers will only receive emails from RisingPunk and can unsubscribe at any time.'
       },
@@ -120,6 +125,15 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           'We will attempt to notify users of verification requirements through in-app notifications.'
         ],
         note: 'Verification emails contain secure tokens that expire within 72 hours. You can request new verification emails as needed from your account settings.'
+      },
+      {
+        title: 'Guest Accounts and Device Linking',
+        content: `You may play as a guest without providing an email. Guest accounts are linked to your device using device and vendor identifiers so you can resume the same account when you return. We store these identifiers to support guest session persistence and optional account recovery.
+
+We cannot guarantee that a previously used guest account can be found or re-linked to your device if you lose access (for example after an app reinstall or device change). If you need to recover a guest account, you may contact support with your device and vendor IDs (shown in Profile → Account → Account recovery); we will attempt to re-link when possible but make no guarantees. Only share your device and vendor IDs with support@risingpunk.com when requesting account recovery; never share them elsewhere.
+
+For better protection and the ability to use your account across devices, we strongly recommend that you link an email and password to your guest account and verify your email. Linked and verified accounts can sign in from any device and use password recovery.`,
+        note: 'Guest accounts that are not linked to email have no cross-device recovery option and may be lost if device linking cannot be restored.'
       },
       {
         title: 'Third‑Party Processors',
@@ -158,7 +172,7 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           },
           {
             label: 'Google Ads / YouTube Ads',
-            text: 'used for advertising and attribution tracking to measure ad effectiveness. Data is processed according to Google\'s Privacy Policy.'
+            text: 'used for advertising and install attribution; on iOS our app declares compatible SKAdNetwork identifiers and we may request App Tracking Transparency permission for measurement. Data is processed according to Google\'s Privacy Policy.'
           },
           {
             label: 'Apple Search Ads',
@@ -166,6 +180,14 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           }
         ],
         note: 'Each processor operates under a written data‑processing agreement.'
+      },
+      {
+        title: 'iOS: Advertising measurement (ATT and SKAdNetwork)',
+        content: `On Apple devices, we may use Apple\'s App Tracking Transparency (ATT). If we request access, Apple shows a system permission dialog; you can allow or deny tracking. That choice controls whether the Identifier for Advertisers (IDFA) may be used for advertising measurement as described by Apple and our partners (for example, Google).
+
+Our iOS app includes SKAdNetwork identifiers so participating ad networks can use Apple\'s SKAdNetwork framework for privacy-preserving, aggregated install and campaign measurement. SKAdNetwork operates separately from ATT/IDFA; Apple publishes technical details in its developer documentation.
+
+Whether you allow or deny tracking in the ATT prompt, we may still use Firebase Analytics and other tools described in this Policy, subject to your settings and applicable law.`
       },
       {
         title: 'International Data Transfers',
@@ -233,7 +255,7 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
     ]
   },
   termsOfService: {
-    effectiveDate: 'January 15, 2026',
+    effectiveDate: 'March 19, 2026',
     sections: [
       {
         title: 'Acceptance of Terms',
@@ -252,6 +274,13 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           'Unverified accounts may have limited functionality and may be unrecoverable if locked.',
           'We may suspend or terminate accounts for violations or security concerns.'
         ]
+      },
+      {
+        title: 'Guest Accounts',
+        content: `You may play as a guest without registering an email. Guest accounts are tied to your device. We collect device and vendor identifiers to support guest session persistence and account recovery. We cannot guarantee that a guest account can be found or re-linked if you lose access (e.g., after an app reinstall or if you are prompted to create a new guest). Account recovery may be attempted via support but is not assured. If you contact support for recovery, share your device and vendor IDs only with support@risingpunk.com; never share them with anyone else.
+
+For better protection and to use your account across devices, we strongly recommend linking an email and password to your guest account and verifying your email. Linked and verified accounts can sign in from any device and use password recovery.`,
+        note: 'We do not guarantee recovery of guest accounts that are not linked to email.'
       },
       {
         title: 'User Conduct',
@@ -301,7 +330,9 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
       },
       {
         title: 'Purchases and Ads',
-        content: 'The game currently contains no in‑app purchases or advertising. Terms will be updated if this changes.'
+        content: `The game does not currently offer in‑app purchases. We do not show third‑party advertising inside the app today; if that changes, we will update these Terms.
+
+We run marketing campaigns through third‑party platforms (including Google Ads). We use measurement and attribution tools so we can understand which campaigns drive installs—including, on Apple devices, Apple\'s App Tracking Transparency prompt and SKAdNetwork as described in our Privacy Policy. By using the app on iOS, you may see Apple\'s tracking permission dialog; your choice applies as described by Apple and in the Privacy Policy.`
       },
       {
         title: 'Suspension and Termination',

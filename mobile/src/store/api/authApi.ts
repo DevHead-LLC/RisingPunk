@@ -641,14 +641,14 @@ export const authApi = createApi({
 
     requestCrewBackup: builder.mutation<
       { success: boolean; message: string },
-      { categoryId?: string; featureId?: string; jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' } | void
+      { categoryId?: string; featureId?: string; jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel'; jobKey?: string } | void
     >({
       query: (body) => {
-        let sent: { categoryId?: string; featureId?: string; jobType?: string } | undefined;
+        let sent: { categoryId?: string; featureId?: string; jobType?: string; jobKey?: string } | undefined;
         if (body && body.categoryId != null && body.featureId != null) {
           sent = { categoryId: body.categoryId, featureId: body.featureId };
         } else if (body && typeof body === 'object' && 'jobType' in body && body.jobType) {
-          sent = { jobType: body.jobType };
+          sent = { jobType: body.jobType, ...(body.jobKey != null && { jobKey: body.jobKey }) };
         }
         return {
           url: '/api/crew/request-backup',
@@ -667,6 +667,7 @@ export const authApi = createApi({
           return;
         }
         const jobType = arg && typeof arg === 'object' && 'jobType' in arg ? arg.jobType : undefined;
+        const jobKey = arg && typeof arg === 'object' && 'jobKey' in arg ? arg.jobKey : undefined;
         const categoryId = arg && typeof arg === 'object' && 'categoryId' in arg ? arg.categoryId : undefined;
         const featureId = arg && typeof arg === 'object' && 'featureId' in arg ? arg.featureId : undefined;
         const resolvedJobType = jobType ?? (categoryId != null && featureId != null ? 'research' : undefined);
@@ -679,6 +680,7 @@ export const authApi = createApi({
           jobType: (resolvedJobType ?? 'research') as 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research',
           ...(categoryId != null && { categoryId }),
           ...(featureId != null && { featureId }),
+          ...(jobKey != null && { jobKey }),
         };
         const crewIdStr = String(crewId);
         const patchResult = dispatch(
@@ -687,11 +689,17 @@ export const authApi = createApi({
               return;
             }
             const list = draft.crew.backupRequests ?? [];
-            const alreadyHas = list.some(
-              (r) =>
-                String(r.userId) === String(userId) &&
-                (jobType ? r.jobType === jobType : categoryId != null && featureId != null && r.categoryId === categoryId && r.featureId === featureId)
-            );
+            // Align with server hasRequestForJob / entryMatchesRequest (Bugbot: rentalBuild must match jobKey).
+            const alreadyHas = list.some((r) => {
+              if (String(r.userId) !== String(userId)) return false;
+              if (categoryId != null && featureId != null) {
+                return r.categoryId === categoryId && r.featureId === featureId;
+              }
+              if (!jobType) return false;
+              if (r.jobType !== jobType) return false;
+              if (jobType === 'rentalBuild') return r.jobKey === jobKey;
+              return true;
+            });
             if (!alreadyHas) {
               draft.crew.backupRequests = [...list, newRow];
             }
