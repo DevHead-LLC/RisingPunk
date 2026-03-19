@@ -478,7 +478,7 @@ router.post('/backup/:userId', auth, async (req: Request<{ userId: string }, {},
       newCompletesAt: result.newCompletesAt.toISOString()
     });
   } catch (error: any) {
-    if (['No active build or remodel to back up', 'User has not requested backup', 'You have already backed up this crew member for this job', 'Maximum crew backup for this job has been reached', 'Build or remodel is already complete'].includes(error.message)) {
+    if (['No active build or remodel to back up', 'User has not requested backup', 'User has not requested backup for this job', 'You have already backed up this crew member for this job', 'Maximum crew backup for this job has been reached', 'Build or remodel is already complete'].includes(error.message)) {
       res.status(400).json({ error: error.message });
       return;
     }
