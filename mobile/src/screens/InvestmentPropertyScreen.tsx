@@ -440,7 +440,16 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                             <Text style={styles.modalButtonText}>Speedup (${speedupCost})</Text>
                           </TouchableOpacity>
                         )}
-                        <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#444' }]} onPress={() => setRemodelRoom(null)}>
+                        <TouchableOpacity
+                          style={[styles.modalButton, { backgroundColor: '#444' }]}
+                          onPress={() => {
+                            setRemodelRoom(null);
+                            refetchRentalStatus();
+                            dispatch(balanceApi.util.invalidateTags(['Balance']));
+                            dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
+                            refetchCrewDetails();
+                          }}
+                        >
                           <Text style={styles.modalButtonText}>Close</Text>
                         </TouchableOpacity>
                       </View>
