@@ -68,13 +68,15 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
     pollingInterval: isBuildingFromStatus ? 5000 : 0,
   });
   const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
-  // Match rental build by jobType (same as DevelopmentZone) so we hide only when user requested for this build
+  // Hide only when user requested backup for this property's rental build (match jobKey; Bugbot).
+  const rentalBuildJobKey = `property${propertyId}`;
   const hasRequestedBackup = Boolean(
     currentUserId &&
     crewDetails?.crew?.backupRequests?.some(
       (r) =>
         String(r.userId) === String(currentUserId) &&
-        (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false))
+        (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false)) &&
+        r.jobKey === rentalBuildJobKey
     )
   );
 
