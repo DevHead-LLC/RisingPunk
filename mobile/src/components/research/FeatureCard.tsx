@@ -38,6 +38,19 @@ export interface ResearchFeature {
   };
 }
 
+/** True when this backup row is the user's research request for the given feature. Server/legacy rows may omit jobType; only research uses categoryId+featureId together (align with authApi requestCrewBackup optimistic dedupe). */
+export function matchesResearchCrewBackupRequest(
+  r: { userId: string; jobType?: string; categoryId?: string; featureId?: string },
+  currentUserId: string,
+  categoryId: string,
+  featureId: string
+): boolean {
+  if (String(r.userId) !== String(currentUserId)) return false;
+  if (r.categoryId !== categoryId || r.featureId !== featureId) return false;
+  const jt = r.jobType;
+  return jt === 'research' || jt == null || jt === '';
+}
+
 interface FeatureCardProps {
   feature: ResearchFeature;
   timerRemaining: number;

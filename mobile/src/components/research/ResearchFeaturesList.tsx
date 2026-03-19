@@ -10,7 +10,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useAppSelector } from '../../store/hooks';
 import { FeatureModal } from './FeatureModal';
-import { FeatureCard, ResearchFeature } from './FeatureCard';
+import { FeatureCard, ResearchFeature, matchesResearchCrewBackupRequest } from './FeatureCard';
 
 export type { ResearchFeature };
 
@@ -49,13 +49,7 @@ export function ResearchFeaturesList({
     return (feature: ResearchFeature) =>
       Boolean(
         currentUserId &&
-          backupRequests.some(
-            (r) =>
-              String(r.userId) === String(currentUserId) &&
-              r.jobType === 'research' &&
-              r.categoryId === categoryId &&
-              r.featureId === feature.id
-          )
+          backupRequests.some((r) => matchesResearchCrewBackupRequest(r, currentUserId, categoryId, feature.id))
       );
   }, [crewDetails?.crew?.backupRequests, currentUserId, categoryId]);
 
