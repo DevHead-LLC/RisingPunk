@@ -121,10 +121,13 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
   });
   const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
   const backupRequests = crewDetails?.crew?.backupRequests ?? [];
-  const mine = (pred: (r: { userId?: string; jobType?: string; jobLabel?: string }) => boolean) =>
+  const mine = (pred: (r: { userId?: string; jobType?: string; jobLabel?: string; jobKey?: string }) => boolean) =>
     Boolean(currentUserId && backupRequests.some((r) => String(r.userId) === String(currentUserId) && pred(r)));
+  const rentalBuildJobKey = `property${propertyId}`;
   const hasRequestedBackupForBuild = mine(
-    (r) => r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false)
+    (r) =>
+      (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false)) &&
+      r.jobKey === rentalBuildJobKey
   );
   const hasRequestedBackupForRemodel = mine(
     (r) => r.jobType === 'remodel' || (r.jobLabel?.toLowerCase().includes('remodel') ?? false)
@@ -262,7 +265,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
             <TouchableOpacity
               style={[styles.propertyBuildBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                requestCrewBackup({ jobType: 'rentalBuild' });
+                requestCrewBackup({ jobType: 'rentalBuild', jobKey: `property${propertyId}` });
               }}
             >
               <Text style={[styles.propertyBuildBackupButtonText, { color: colors.background ?? '#fff' }]}>Request back-up</Text>

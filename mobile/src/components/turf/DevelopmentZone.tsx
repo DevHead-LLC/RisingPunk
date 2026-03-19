@@ -26,14 +26,17 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buil
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew || !hasActiveBuild,
     pollingInterval: hasActiveBuild ? 3000 : 0,
   });
-  // Only hide "Request back-up" when user has requested backup for an *investment property* build (rentalBuild).
-  // Do not match Research Center or research requests — those are different job types and would wrongly hide this button.
+  // Hide only for the displayed active build's property (jobKey); not for other properties' rentalBuild requests (Bugbot).
+  const displayedRentalJobKey =
+    activeBuilds.length > 0 ? `property${activeBuilds[0].propertyId}` : '';
   const hasRequestedBackupForRentalBuild = Boolean(
     currentUserId &&
+    activeBuilds.length > 0 &&
     crewDetails?.crew?.backupRequests?.some(
       (r) =>
         String(r.userId) === String(currentUserId) &&
-        (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false))
+        (r.jobType === 'rentalBuild' || (r.jobLabel?.includes('Investment property') ?? false)) &&
+        r.jobKey === displayedRentalJobKey
     )
   );
   const hadActiveBuildRef = useRef(false);
@@ -79,7 +82,10 @@ export const DevelopmentZone: React.FC<DevelopmentZoneProps> = ({ children, buil
             <TouchableOpacity
               style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
               onPress={() => {
-                requestCrewBackup({ jobType: 'rentalBuild' });
+                requestCrewBackup({
+                  jobType: 'rentalBuild',
+                  jobKey: `property${activeBuilds[0].propertyId}`,
+                });
               }}
             >
               <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
