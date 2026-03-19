@@ -23,9 +23,10 @@ import { SIZING } from '../../styles/theme';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
 import { UserReportModal } from '../modals/UserReportModal';
-import { PROBE_REPORT_SENDER_ID } from '../../constants/systemSenders';
+import { PROBE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_ID } from '../../constants/systemSenders';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
+const BATTLE_REPORT_PREFIX = 'BTL|';
 
 export interface ProbeReportPayload {
   pr: 1;
@@ -43,6 +44,38 @@ function parseProbeReportMessage(message: string): ProbeReportPayload | null {
     const json = message.slice(PROBE_REPORT_PREFIX.length);
     const payload = JSON.parse(json) as ProbeReportPayload;
     if (payload?.pr === 1 && payload.n != null && payload.b) return payload;
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
+
+export interface BattleReportBotCounts {
+  guardian: number;
+  breacher: number;
+  phreak: number;
+}
+
+export interface BattleReportPayload {
+  br: 1;
+  attackerId: string;
+  defenderId: string;
+  attackerHandle: string;
+  defenderHandle: string;
+  attackerStart: BattleReportBotCounts;
+  defenderStart: BattleReportBotCounts;
+  attackerLost: BattleReportBotCounts;
+  defenderLost: BattleReportBotCounts;
+  winner: 'user' | 'enemy';
+}
+
+function parseBattleReportMessage(message: string): BattleReportPayload | null {
+  if (!message.startsWith(BATTLE_REPORT_PREFIX)) return null;
+  try {
+    const json = message.slice(BATTLE_REPORT_PREFIX.length);
+    const payload = JSON.parse(json) as BattleReportPayload;
+    if (payload?.br !== 1 || payload.attackerHandle == null || payload.defenderHandle == null) return null;
+    return payload;
   } catch (_) {
     // ignore
   }
@@ -324,6 +357,72 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 </Text>
                                 <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
                                   Breacher: {report.b.breacher} · Guardian: {report.b.guardian} · Phreak: {report.b.phreak}
+                                </Text>
+                              </View>
+                            );
+                          })() : message.userId === BATTLE_REPORT_SENDER_ID ? (() => {
+                            const report = parseBattleReportMessage(message.message);
+                            if (!report) {
+                              return (
+                                <FilteredText
+                                  style={[
+                                    styles.messageText,
+                                    isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
+                                  ]}
+                                >
+                                  {message.message}
+                                </FilteredText>
+                              );
+                            }
+                            const currentUserId = String(currentUser?._id ?? currentUser?.id ?? '');
+                            const isAttacker = String(report.attackerId) === currentUserId;
+                            const status =
+                              isAttacker
+                                ? (report.winner === 'user' ? 'Successful Breach' : 'Hack Failed')
+                                : (report.winner === 'enemy' ? 'Defended Breach' : 'Attacker Breach');
+                            const fmt = (n: number) => n.toLocaleString();
+                            const line = (label: string, start: number, lost: number) =>
+                              `${label} - ${fmt(start)} > ${fmt(lost)} Lost`;
+                            const renderSide = (
+                              title: string,
+                              start: BattleReportBotCounts,
+                              lost: BattleReportBotCounts,
+                            ) => (
+                              <>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {title}
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {line('Guardians', start.guardian, lost.guardian)}
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {line('Breachers', start.breacher, lost.breacher)}
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {line('Phreaks', start.phreak, lost.phreak)}
+                                </Text>
+                              </>
+                            );
+                            return (
+                              <View style={styles.probeReportBlock}>
+                                <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
+                                  Battle Report
+                                </Text>
+                                {renderSide(
+                                  `Attacker (${isAttacker ? 'You' : 'Opponent'}):`,
+                                  report.attackerStart,
+                                  report.attackerLost,
+                                )}
+                                {renderSide(
+                                  `Defender (${isAttacker ? 'Opponent' : 'You'}):`,
+                                  report.defenderStart,
+                                  report.defenderLost,
+                                )}
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  Result:
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {status}
                                 </Text>
                               </View>
                             );

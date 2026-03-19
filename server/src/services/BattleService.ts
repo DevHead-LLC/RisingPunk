@@ -14,6 +14,7 @@ import { NPCService } from './NPCService';
 import { BattleRewardService } from './BattleRewardService';
 import { DefenderDeploymentService } from './DefenderDeploymentService';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
+import { sendBattleNotifications } from './BattleNotificationService';
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -254,6 +255,13 @@ export class BattleService {
       } catch (e) {
         console.error('Battle statistics recording failed for', battleId, e);
         // Continue with battle end even if statistics recording fails
+      }
+
+      // Send battle result DMs to attacker and defender (same pattern as Probe Report)
+      try {
+        await sendBattleNotifications(battle);
+      } catch (e) {
+        console.error('Battle notifications failed for', battleId, e);
       }
     }
 
