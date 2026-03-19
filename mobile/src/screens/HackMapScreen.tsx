@@ -8,6 +8,7 @@ import { CollapsibleToolbar } from '../components/hackMap/CollapsibleToolbar';
 import { AntivirusModal } from '../components/hackMap/AntivirusModal';
 import { CrewOnboardingModal } from '../components/hackMap/CrewOnboardingModal';
 import { CrewModal } from '../components/hackMap/CrewModal';
+import { CrewBackupBanner } from '../components/turf/CrewBackupBanner';
 import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
 import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
 import { WorldChatIconButton } from '../components/hackMap/WorldChatIconButton';
@@ -1234,6 +1235,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [showJumpToModal, setShowJumpToModal] = useState(false);
   const [showSearchUserModal, setShowSearchUserModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
+  const [crewModalInitialCategory, setCrewModalInitialCategory] = useState<'backup-requests' | null>(null);
+  const [crewModalFocusBackupKey, setCrewModalFocusBackupKey] = useState(0);
   const [showCrewOnboardingModal, setShowCrewOnboardingModal] = useState(false);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
@@ -3857,6 +3860,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   const handleCrewClose = useCallback(() => {
     setShowCrewModal(false);
+    setCrewModalInitialCategory(null);
     if (showCrewModalFromUser) {
       setShowCrewModalFromUser(false);
     }
@@ -4209,6 +4213,14 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
 
   return (
     <View style={styles.container} onLayout={onContainerLayout}>
+      <CrewBackupBanner
+        canShowBanner={!showProbeFollowModal}
+        onPressOpenCrewToBackup={() => {
+          setCrewModalInitialCategory('backup-requests');
+          setCrewModalFocusBackupKey((k) => k + 1);
+          setShowCrewModal(true);
+        }}
+      />
       <CloseButton onPress={onClose} />
 
       <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
@@ -4270,6 +4282,8 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
       <CrewModal
         visible={showCrewModal}
         onClose={handleCrewClose}
+        initialCategory={crewModalInitialCategory}
+        focusInitialCategoryKey={crewModalInitialCategory === 'backup-requests' ? crewModalFocusBackupKey : undefined}
       />
 
       <CrewOnboardingModal

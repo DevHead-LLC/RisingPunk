@@ -6,6 +6,7 @@
 import { createListenerMiddleware } from '@reduxjs/toolkit';
 import { logoutUser } from '../slices/authSlice';
 import { clearPersistedTurfNavState } from '../../utils/turfNavStatePersistence';
+import { resetAllApiCaches } from '../api/resetApiCaches';
 
 export const authLogoutListener = createListenerMiddleware();
 
@@ -16,10 +17,11 @@ authLogoutListener.startListening({
   },
 });
 
-// Account switch clears Redux state but does not run logoutUser; clear persisted turf nav so next user doesn't restore previous user's screen.
+// Account switch clears Redux state but does not run logoutUser; clear API caches and persisted turf nav so next user doesn't see previous user's data (e.g. crew backup requests).
 authLogoutListener.startListening({
   predicate: (action) => action.type === 'auth/handleAccountSwitched',
-  effect: async () => {
+  effect: async (_action, listenerApi) => {
+    resetAllApiCaches({ dispatch: listenerApi.dispatch } as any);
     await clearPersistedTurfNavState();
   },
 });

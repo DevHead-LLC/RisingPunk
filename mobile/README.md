@@ -60,6 +60,20 @@ npm run ios
 yarn ios
 ```
 
+### iOS build troubleshooting (LaunchScreen / DerivedData)
+
+If the Xcode build fails (e.g. **Compile Storyboard file LaunchScreen.storyboard** or **Command CompileStoryboard failed**) or `npm run ios:clean:derived` fails with "Directory not empty":
+
+1. **Quit Xcode and Simulator completely** (Cmd+Q). DerivedData cannot be removed while they hold files.
+2. In the `mobile` folder run:
+   ```bash
+   npm run ios:clean:full
+   ```
+   If that still fails, run `npm run ios:clean:derived` again after ensuring Xcode and Simulator are quit.
+3. Reopen Xcode and build the **mobile-dev** scheme for your simulator.
+
+Optional: `npm run ios:clean:xcode` runs `xcodebuild clean` (no DerivedData delete) and can be used when Xcode is open.
+
 ## Battle System Overview
 
 The battle system features:
