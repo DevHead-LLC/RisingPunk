@@ -46,17 +46,20 @@
   // They will be passed down to the ViewController used by React Native.
   self.initialProps = @{};
 
-  BOOL didLaunch = [super application:application didFinishLaunchingWithOptions:launchOptions];
+  return [super application:application didFinishLaunchingWithOptions:launchOptions];
+}
 
-  // ATT after RN startup so the system can attach the prompt to a window; async avoids blocking launch.
+- (void)applicationDidBecomeActive:(UIApplication *)application
+{
+  [super applicationDidBecomeActive:application];
+
+  // ATT must run while UIApplicationStateActive; didFinishLaunching is too early on iOS 15+.
   if (@available(iOS 14.0, *)) {
-    dispatch_async(dispatch_get_main_queue(), ^{
+    if ([ATTrackingManager trackingAuthorizationStatus] == ATTrackingManagerAuthorizationStatusNotDetermined) {
       [ATTrackingManager requestTrackingAuthorizationWithCompletionHandler:^(__unused ATTrackingManagerAuthorizationStatus status) {
       }];
-    });
+    }
   }
-
-  return didLaunch;
 }
 
 - (NSURL *)sourceURLForBridge:(RCTBridge *)bridge
