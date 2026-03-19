@@ -425,7 +425,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                         )}
                         <TouchableOpacity
                           style={[styles.modalButton, { backgroundColor: '#444' }]}
-                          onPress={closeRemodelModal}
+                          onPress={timeUp ? closeRemodelModal : () => setRemodelRoom(null)}
                         >
                           <Text style={styles.modalButtonText}>Close</Text>
                         </TouchableOpacity>
