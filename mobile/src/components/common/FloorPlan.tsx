@@ -75,7 +75,8 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
   const timeLabel = timeUp ? 'Remodel complete! (Completion is automatic.)' : `${formatRemodelTimeLeft(remainingSec)} left`;
   const actionButtonLabel = timeUp ? 'Close' : 'Speedup';
 
-  const renderRemodelActions = (room: RemodelRoomType) => (
+  // Speedup/Close always targets the active remodel (activeRemodelRoom), not a room param (Bugbot).
+  const renderRemodelActions = () => (
     <View style={styles.remodelingRow}>
       <Text style={styles.remodelingText}>Remodeling... {timeLabel}</Text>
       <View style={styles.remodelActions}>
@@ -85,7 +86,11 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           </TouchableOpacity>
         )}
         <TouchableOpacity
-          onPress={() => (timeUp ? (onCloseRemodel?.() ?? undefined) : onRemodel!(room))}
+          onPress={() =>
+            timeUp
+              ? (onCloseRemodel?.() ?? undefined)
+              : (activeRemodelRoom ? onRemodel!(activeRemodelRoom as RemodelRoomType) : undefined)
+          }
           style={styles.remodelButton}
         >
           <Text style={styles.remodelButtonText}>{actionButtonLabel}</Text>
@@ -131,7 +136,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.00' : formatCurrencyThousandths(garageValue)}
           </Text>
-          {activeRemodelRoom === 'garage' && onRemodel && renderRemodelActions('garage')}
+          {activeRemodelRoom === 'garage' && onRemodel && renderRemodelActions()}
         </View>
       </View>
     );
@@ -158,7 +163,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.010' : formatCurrencyThousandths(roomValues?.bathroom ?? 0)}
           </Text>
-          {activeRemodelRoom === 'bathroom' && onRemodel && renderRemodelActions('bathroom')}
+          {activeRemodelRoom === 'bathroom' && onRemodel && renderRemodelActions()}
         </View>
       </View>
       
@@ -184,7 +189,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.010' : formatCurrencyThousandths(roomValues?.kitchen ?? 0)}
           </Text>
-          {activeRemodelRoom === 'kitchen' && onRemodel && renderRemodelActions('kitchen')}
+          {activeRemodelRoom === 'kitchen' && onRemodel && renderRemodelActions()}
         </View>
       </View>
       
@@ -204,7 +209,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.020' : formatCurrencyThousandths(roomValues?.bedroom ?? 0)}
           </Text>
-          {activeRemodelRoom === 'bedroom' && onRemodel && renderRemodelActions('bedroom')}
+          {activeRemodelRoom === 'bedroom' && onRemodel && renderRemodelActions()}
         </View>
       </View>
       
@@ -223,7 +228,7 @@ export const FloorPlan: React.FC<FloorPlanProps> = ({
           <Text style={styles.roomValue}>
             {isLoading ? '+$0.020' : formatCurrencyThousandths(roomValues?.livingRoom ?? 0)}
           </Text>
-          {activeRemodelRoom === 'livingRoom' && onRemodel && renderRemodelActions('livingRoom')}
+          {activeRemodelRoom === 'livingRoom' && onRemodel && renderRemodelActions()}
         </View>
       </View>
     </View>
