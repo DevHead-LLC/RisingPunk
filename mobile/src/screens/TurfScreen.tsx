@@ -191,6 +191,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
+  const [pendingHackMapCell, setPendingHackMapCell] = useState<{ x: number; y: number } | null>(null);
   const [previousScreen, setPreviousScreen] = useState<TurfScreenName>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
   const [packetBreachLevelId, setPacketBreachLevelId] = useState<string | null>(null);
@@ -852,6 +853,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       setPendingDefenderUserId(null);
       setPendingNpcSlug(null);
       setPendingNpcInstanceId(null);
+      setPendingHackMapCell(null);
     }
   }, [currentScreen]);
 
@@ -1097,6 +1099,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               (globalThis as any).pendingNpcSlug = undefined;
               (globalThis as any).pendingNpcInstanceId = undefined;
               (globalThis as any).pendingMapPan = undefined;
+              setPendingHackMapCell(
+                mapPan != null && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
+                  ? { x: mapPan.x, y: mapPan.y }
+                  : null
+              );
               setReturnContext({ origin: 'map', mapPan });
               navigateToScreen('battlePrep');
               return;
@@ -1107,6 +1114,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
               (globalThis as any).pendingDefenderUserId = undefined;
               (globalThis as any).pendingMapPan = undefined;
+              setPendingHackMapCell(
+                mapPan != null && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
+                  ? { x: mapPan.x, y: mapPan.y }
+                  : null
+              );
               setReturnContext({ origin: 'map', mapPan });
               navigateToScreen('battlePrep');
               return;
@@ -1137,6 +1149,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           defenderId={pendingDefenderUserId || undefined}
           defenderNpcSlug={pendingNpcSlug || undefined}
           defenderNpcInstanceId={pendingNpcInstanceId || undefined}
+          hackMapCell={pendingHackMapCell ?? undefined}
         />;
       case 'battle':
         if (!battleId) {

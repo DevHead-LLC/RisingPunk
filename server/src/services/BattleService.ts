@@ -15,6 +15,7 @@ import { BattleRewardService } from './BattleRewardService';
 import { DefenderDeploymentService } from './DefenderDeploymentService';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 import { sendBattleNotifications } from './BattleNotificationService';
+import { processPvPBattleMoneyTransfer } from './PvPBattleMoneyService';
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -36,9 +37,31 @@ export class BattleService {
     return BattalionService.triggerInitialTargeting(battle.battalions, battle.nodes, battleId);
   }
 
-  async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<IBattleDocument> {
+  async createBattle(
+    attackerId: string,
+    defenderId: string,
+    screenWidth: number,
+    screenHeight: number,
+    userBattalions?: Array<{ type: string; quantity: number }>,
+    defenderNpcSlug?: string,
+    unlockHackRigOnWin?: boolean,
+    defenderNpcInstanceId?: string,
+    hackMapCellX?: number,
+    hackMapCellY?: number
+  ): Promise<IBattleDocument> {
     try {
-      const battle = await BattleSetupService.createBattle(attackerId, defenderId, screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
+      const battle = await BattleSetupService.createBattle(
+        attackerId,
+        defenderId,
+        screenWidth,
+        screenHeight,
+        userBattalions,
+        defenderNpcSlug,
+        unlockHackRigOnWin === true,
+        defenderNpcInstanceId,
+        hackMapCellX,
+        hackMapCellY
+      );
       
       ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);
       
@@ -257,9 +280,18 @@ export class BattleService {
         // Continue with battle end even if statistics recording fails
       }
 
+      // PvP wallet theft (defender → attacker) when attacker wins; idempotent per battle
+      let pvpCashTransferred = 0;
+      try {
+        const pvpResult = await processPvPBattleMoneyTransfer(battleId);
+        pvpCashTransferred = pvpResult.transferredAmount;
+      } catch (e) {
+        console.error('PvP battle money transfer failed for', battleId, e);
+      }
+
       // Send battle result DMs to attacker and defender (same pattern as Probe Report)
       try {
-        await sendBattleNotifications(battle);
+        await sendBattleNotifications(battle, pvpCashTransferred);
       } catch (e) {
         console.error('Battle notifications failed for', battleId, e);
       }

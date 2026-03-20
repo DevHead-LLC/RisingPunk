@@ -69,11 +69,14 @@ type Props = {
   defenderId?: string;
   defenderNpcSlug?: string;
   defenderNpcInstanceId?: string;
+  /** Set when battle was initiated from Hack Map (target cell). */
+  hackMapCell?: { x: number; y: number };
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, defenderId, defenderNpcSlug, defenderNpcInstanceId }: Props) => {
+export const BattlePreparationScreen = React.memo(
+  ({ onClose, onBattleStart, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell }: Props) => {
   const colors = useThemeColors();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -292,6 +295,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   const battleStartData = React.useMemo(() => {
     const isHackRigBattle = !defenderId && !defenderNpcSlug;
+    const hasCell =
+      hackMapCell != null &&
+      Number.isFinite(hackMapCell.x) &&
+      Number.isFinite(hackMapCell.y);
     return {
       userBattalions,
       screenWidth: SCREEN_WIDTH,
@@ -300,8 +307,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       defenderNpcSlug: isHackRigBattle ? undefined : defenderNpcSlug,
       unlockHackRigOnWin: isHackRigBattle,
       defenderNpcInstanceId,
+      ...(hasCell ? { hackMapCellX: hackMapCell!.x, hackMapCellY: hackMapCell!.y } : {}),
     };
-  }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId]);
+  }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell]);
 
   const { clearHighlight } = useTaskGuideHighlight();
   

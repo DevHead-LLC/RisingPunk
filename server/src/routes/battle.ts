@@ -19,6 +19,9 @@ interface StartBattleRequest extends Request {
     unlockHackRigOnWin?: boolean;
     screenWidth: number;
     screenHeight: number;
+    /** Hack Map grid cell when starting battle from map (optional; must send both or neither). */
+    hackMapCellX?: number;
+    hackMapCellY?: number;
   }
 }
 
@@ -37,7 +40,17 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
   auth,
   async (req, res): Promise<void> => {
     try {
-      const { userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId, screenWidth, screenHeight, unlockHackRigOnWin } = req.body;
+      const {
+        userBattalions,
+        defenderId,
+        defenderNpcSlug,
+        defenderNpcInstanceId,
+        screenWidth,
+        screenHeight,
+        unlockHackRigOnWin,
+        hackMapCellX,
+        hackMapCellY,
+      } = req.body;
       
       if (!screenWidth || !screenHeight) {
         res.status(400).json({ success: false, error: 'Screen dimensions are required' });
@@ -104,8 +117,43 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
           return;
         }
       }
-      
-      const battle = await battleController.startBattle(req.user._id, defenderId || 'computer', screenWidth, screenHeight, userBattalions, defenderNpcSlug, unlockHackRigOnWin === true, defenderNpcInstanceId);
+
+      let resolvedHackCellX: number | undefined;
+      let resolvedHackCellY: number | undefined;
+      const hasX = hackMapCellX !== undefined && hackMapCellX !== null;
+      const hasY = hackMapCellY !== undefined && hackMapCellY !== null;
+      if (hasX && hasY) {
+        const x = Number(hackMapCellX);
+        const y = Number(hackMapCellY);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          res.status(400).json({
+            success: false,
+            error: 'hackMapCellX and hackMapCellY must be finite numbers',
+          });
+          return;
+        }
+        resolvedHackCellX = x;
+        resolvedHackCellY = y;
+      } else if (hasX || hasY) {
+        res.status(400).json({
+          success: false,
+          error: 'hackMapCellX and hackMapCellY must be sent together or omitted',
+        });
+        return;
+      }
+
+      const battle = await battleController.startBattle(
+        req.user._id,
+        defenderId || 'computer',
+        screenWidth,
+        screenHeight,
+        userBattalions,
+        defenderNpcSlug,
+        unlockHackRigOnWin === true,
+        defenderNpcInstanceId,
+        resolvedHackCellX,
+        resolvedHackCellY
+      );
       
       try {
         const battleDoc = await Battle.findOne({ battleId: battle.battleId });

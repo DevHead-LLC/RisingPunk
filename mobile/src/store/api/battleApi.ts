@@ -99,6 +99,9 @@ export interface StartBattleRequest {
   defenderNpcSlug?: string;
   unlockHackRigOnWin?: boolean;
   defenderNpcInstanceId?: string;
+  /** Hack Map cell when attack started from map (optional; both or neither). */
+  hackMapCellX?: number;
+  hackMapCellY?: number;
 }
 
 const battleBaseQuery = async (args: any, api: any, extraOptions: any) => {

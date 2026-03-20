@@ -8,6 +8,7 @@ import { PrivateMessage } from '../models/PrivateMessage';
 import { User } from '../models/User';
 import { BATTLE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_USERNAME } from '../constants/systemSenders';
 import { NodeOwner, IBattalion } from '../types/battle';
+import { formatHackLocationDisplay } from '../utils/battleHackLocation';
 
 const BATTLE_REPORT_PREFIX = 'BTL|';
 const MAX_MESSAGE_LENGTH = 600;
@@ -26,9 +27,13 @@ function sumByOwnerAndType(battalions: IBattalion[], owner: NodeOwner): BotCount
 
 /**
  * Send battle result DMs to attacker and defender. Only call for user-vs-user battles (isUserDefender).
+ * @param cashTransferred dollars moved defender → attacker when attacker won (0 if none).
  * Does not throw; logs errors so battle end is not blocked.
  */
-export async function sendBattleNotifications(battle: IBattleDocument): Promise<void> {
+export async function sendBattleNotifications(
+  battle: IBattleDocument,
+  cashTransferred: number = 0
+): Promise<void> {
   if (!battle.isUserDefender) return;
 
   const startingBattalions = battle.startingBattalions ?? [];
@@ -64,6 +69,10 @@ export async function sendBattleNotifications(battle: IBattleDocument): Promise<
   }
 
   const winner = battle.winner === NodeOwner.USER ? 'user' : 'enemy';
+  const cash =
+    typeof cashTransferred === 'number' && Number.isFinite(cashTransferred)
+      ? Math.max(0, Math.floor(cashTransferred))
+      : 0;
   let payload: Record<string, unknown> = {
     br: 1,
     attackerId: String(battle.attackerId),
@@ -75,7 +84,22 @@ export async function sendBattleNotifications(battle: IBattleDocument): Promise<
     attackerLost,
     defenderLost,
     winner,
+    cash,
   };
+  const bx = (battle as any).hackMapCellX;
+  const by = (battle as any).hackMapCellY;
+  if (
+    typeof bx === 'number' &&
+    Number.isFinite(bx) &&
+    typeof by === 'number' &&
+    Number.isFinite(by)
+  ) {
+    try {
+      (payload as any).hl = formatHackLocationDisplay(bx, by);
+    } catch (e) {
+      console.error('BattleNotificationService: formatHackLocationDisplay failed', e);
+    }
+  }
   let messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
   if (messageBody.length > MAX_MESSAGE_LENGTH) {
     payload.attackerHandle = String(attackerHandle).slice(0, 20);

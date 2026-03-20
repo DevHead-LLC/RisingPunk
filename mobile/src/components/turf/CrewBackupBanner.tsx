@@ -22,7 +22,7 @@ export function CrewBackupBanner({ canShowBanner, onPressOpenCrewToBackup }: Cre
   const colors = useThemeColors();
   const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
   const { data: crewStatus } = useGetCrewStatusQuery(undefined, { skip: !currentUserId });
-  const { data: crewData } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+  const { data: crewData } = useGetCrewDetailsQuery(String(crewStatus?.crewId ?? ''), {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
     pollingInterval: 15000,
   });
