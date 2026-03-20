@@ -158,7 +158,6 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
   };
 
   const handleClose = useCallback(() => {
-    if (__DEV__) console.log('[BaseChatModal] close (×) pressed');
     setMessageInput('');
     setShowReportModal(false);
     setReportedMessage(null);

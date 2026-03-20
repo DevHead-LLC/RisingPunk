@@ -60,6 +60,7 @@ export interface ProfileResponse {
   };
   profileGender: 'male' | 'female';
   totalGuardiansBuilt?: number;
+  crewBackupHelpCount?: number;
 }
 
 export interface UserLookupResponse {
@@ -80,6 +81,7 @@ export interface UserProfileResponse {
     successfulDefenses: number;
     failedDefenses: number;
   };
+  crewBackupHelpCount?: number;
 }
 
 export interface UnlockResearchCenterResponse {
@@ -419,7 +421,10 @@ export const authApi = createApi({
         url: `/api/users/unlock-rental-housing/${propertyId}`,
         method: 'POST',
       }),
-      invalidatesTags: ['User'],
+      invalidatesTags: (result, error, propertyId) =>
+        propertyId != null
+          ? [{ type: 'User' as const, id: `rentalHousingStatus-${propertyId}` }, 'Crew']
+          : ['User', 'Crew'],
     }),
 
     completeRentalHousing: builder.mutation<CompleteRentalHousingResponse, number>({
@@ -438,7 +443,8 @@ export const authApi = createApi({
         }
       },
       invalidatesTags: (result, error, propertyId) => [
-        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` },
+        'Crew',
       ],
     }),
 
@@ -458,7 +464,8 @@ export const authApi = createApi({
         }
       },
       invalidatesTags: (result, error, propertyId) => [
-        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` },
+        'Crew',
       ],
     }),
 
@@ -479,7 +486,8 @@ export const authApi = createApi({
         }
       },
       invalidatesTags: (result, error, { propertyId }) => [
-        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` },
+        'Crew',
       ],
     }),
 
@@ -500,7 +508,8 @@ export const authApi = createApi({
         }
       },
       invalidatesTags: (result, error, { propertyId }) => [
-        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` },
+        'Crew',
       ],
     }),
 
@@ -521,7 +530,8 @@ export const authApi = createApi({
         }
       },
       invalidatesTags: (result, error, { propertyId }) => [
-        { type: 'User', id: `rentalHousingStatus-${propertyId}` }
+        { type: 'User', id: `rentalHousingStatus-${propertyId}` },
+        'Crew',
       ],
     }),
 
@@ -623,10 +633,112 @@ export const authApi = createApi({
       providesTags: ['User'],
     }),
 
-    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }> } }, string>({
+    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }>; backupRequests?: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean; jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research'; jobKey?: string; categoryId?: string; featureId?: string }> } }, string>({
       query: (crewId) => `/api/crew/${crewId}`,
       providesTags: ['User', 'Crew'],
       refetchOnMountOrArgChange: true,
+    }),
+
+    requestCrewBackup: builder.mutation<
+      { success: boolean; message: string },
+      { categoryId?: string; featureId?: string; jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel'; jobKey?: string } | void
+    >({
+      query: (body) => {
+        let sent: { categoryId?: string; featureId?: string; jobType?: string; jobKey?: string } | undefined;
+        if (body && body.categoryId != null && body.featureId != null) {
+          sent = { categoryId: body.categoryId, featureId: body.featureId };
+        } else if (body && typeof body === 'object' && 'jobType' in body && body.jobType) {
+          sent = { jobType: body.jobType, ...(body.jobKey != null && { jobKey: body.jobKey }) };
+        }
+        return {
+          url: '/api/crew/request-backup',
+          method: 'POST',
+          body: sent,
+        };
+      },
+      invalidatesTags: ['Crew'],
+      async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
+        const state = getState() as RootState;
+        const userId = state.auth?.user?._id ?? (state.auth?.user as { id?: string })?.id;
+        const handle = (state.auth?.user as { handle?: string })?.handle ?? '';
+        const crewId = (authApi.endpoints.getCrewStatus.select()(state) as { data?: { crewId?: string } })?.data?.crewId;
+        if (!crewId || !userId) {
+          try { await queryFulfilled; } catch { /* noop */ }
+          return;
+        }
+        const jobType = arg && typeof arg === 'object' && 'jobType' in arg ? arg.jobType : undefined;
+        const jobKey = arg && typeof arg === 'object' && 'jobKey' in arg ? arg.jobKey : undefined;
+        const categoryId = arg && typeof arg === 'object' && 'categoryId' in arg ? arg.categoryId : undefined;
+        const featureId = arg && typeof arg === 'object' && 'featureId' in arg ? arg.featureId : undefined;
+        const resolvedJobType = jobType ?? (categoryId != null && featureId != null ? 'research' : undefined);
+        const newRow = {
+          userId: String(userId),
+          handle: handle || 'You',
+          requestedAt: new Date().toISOString(),
+          jobLabel: resolvedJobType === 'remodel' ? 'Remodel' : resolvedJobType === 'rentalBuild' ? 'Investment property' : resolvedJobType === 'researchCenterBuild' ? 'Research Center build' : 'Research',
+          hasCurrentUserHelped: false,
+          jobType: (resolvedJobType ?? 'research') as 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research',
+          ...(categoryId != null && { categoryId }),
+          ...(featureId != null && { featureId }),
+          ...(jobKey != null && { jobKey }),
+        };
+        const crewIdStr = String(crewId);
+        const patchResult = dispatch(
+          authApi.util.updateQueryData('getCrewDetails', crewIdStr, (draft) => {
+            if (!draft?.crew) {
+              return;
+            }
+            const list = draft.crew.backupRequests ?? [];
+            // Align with server hasRequestForJob / entryMatchesRequest (Bugbot: rentalBuild must match jobKey).
+            const alreadyHas = list.some((r) => {
+              if (String(r.userId) !== String(userId)) return false;
+              if (categoryId != null && featureId != null) {
+                return r.categoryId === categoryId && r.featureId === featureId;
+              }
+              if (!jobType) return false;
+              if (r.jobType !== jobType) return false;
+              if (jobType === 'rentalBuild') return r.jobKey === jobKey;
+              return true;
+            });
+            if (!alreadyHas) {
+              draft.crew.backupRequests = [...list, newRow];
+            }
+          })
+        );
+        try {
+          await queryFulfilled;
+        } catch (err) {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    backupCrewMember: builder.mutation<
+      { success: boolean; reduction: number; newCompletesAt: string },
+      { targetUserId: string; jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research'; jobKey?: string; categoryId?: string; featureId?: string }
+    >({
+      query: ({ targetUserId, jobType, jobKey, categoryId, featureId }) => {
+        return {
+          url: `/api/crew/backup/${targetUserId}`,
+          method: 'POST',
+          body: jobType != null ? { jobType, jobKey, categoryId, featureId } : undefined,
+        };
+      },
+      invalidatesTags: ['Crew'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(
+            authApi.util.updateQueryData('getProfile', undefined, (draft) => {
+              if (draft) {
+                draft.crewBackupHelpCount = (draft.crewBackupHelpCount ?? 0) + 1;
+              }
+            })
+          );
+        } catch {
+          // Only update cache on success
+        }
+      },
     }),
 
     updateCrewRules: builder.mutation<{ success: boolean; crewRules: string[] }, { crewId: string; crewRules: string[] }>({
@@ -876,6 +988,8 @@ export const {
   useApplyToCrewMutation,
   useWithdrawApplicationMutation,
   useGetCrewDetailsQuery,
+  useRequestCrewBackupMutation,
+  useBackupCrewMemberMutation,
   useAcceptApplicantMutation,
   useDenyApplicantMutation,
   useLeaveCrewMutation,

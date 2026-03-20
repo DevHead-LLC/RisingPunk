@@ -262,6 +262,21 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
               </View>
             </View>
           )}
+          <View style={styles.battleStatsSection}>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+              CREW BACK-UP
+            </Text>
+            <View style={styles.battleStatsGrid}>
+              <View style={[styles.battleStatCard, { borderColor: colors.matrix }]}>
+                <Text style={[styles.battleStatLabel, { color: colors.text.secondary }]}>
+                  Back-ups given
+                </Text>
+                <Text style={[styles.battleStatValue, { color: colors.matrix }]}>
+                  {userProfile.crewBackupHelpCount ?? 0}
+                </Text>
+              </View>
+            </View>
+          </View>
         </>
       ) : null}
     </View>

@@ -61,6 +61,7 @@ interface UserProfile {
     successfulDefenses: number;
     failedDefenses: number;
   };
+  crewBackupHelpCount?: number;
 }
 
 type TabType = 'profile' | 'stats' | 'settings' | 'account' | 'content';
@@ -957,7 +958,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     if (opened) setHasOpenedReview(true);
   }, [userId]);
 
-  // Transform API data to match our interface
+  // Transform API data to match our interface (include crewBackupHelpCount so stats tab shows back-ups given)
   const profile: UserProfile | null = profileData ? {
     handle: profileData.handle,
     email: profileData.email,
@@ -968,7 +969,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       hackRig: profileData.unlockedFeatures?.hackRig || false,
       researchCenter: researchCenterData?.isUnlocked || false,
     },
-    battleStats: profileData.battleStats
+    battleStats: profileData.battleStats,
+    crewBackupHelpCount: profileData.crewBackupHelpCount ?? 0,
   } : null;
 
   const calculateWinPercentage = (successful: number, failed: number): string => {
@@ -1236,6 +1238,17 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
                   </View>
                 </View>
               )}
+              <View style={styles.statsTabSection}>
+                <Text style={styles.statsTabSectionTitle}>CREW BACK-UP</Text>
+                <View style={styles.statsCompactCard}>
+                  <View style={styles.statsCompactGrid}>
+                    <View style={styles.statsCompactBattleItem}>
+                      <Text style={styles.statsCompactBattleLabel}>Back-ups given</Text>
+                      <Text style={styles.statsCompactBattleValue}>{profile?.crewBackupHelpCount ?? 0}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
             </ScrollView>
           ) : activeTab === 'settings' ? (
             <ScrollView style={styles.settingsContainer} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>

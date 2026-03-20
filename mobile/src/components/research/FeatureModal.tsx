@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { ResearchFeature } from './ResearchFeaturesList';
+import { ResearchFeature, matchesResearchCrewBackupRequest } from './FeatureCard';
 import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatureResearchMutation, useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
-import { useGetResearchCenterStatusQuery } from '../../store/api/authApi';
+import { useGetResearchCenterStatusQuery, useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
@@ -53,7 +53,12 @@ export function FeatureModal({
   const dispatch = useAppDispatch();
   const currentBalanceState = useAppSelector((state) => state.balance);
   const userId = useAppSelector((state) => state.auth.user?._id);
+  const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
   const [isResearching, setIsResearching] = useState(false);
+  // Sync local isResearching when modal opens or feature changes so we never show crew UI for a different feature (Bugbot).
+  useEffect(() => {
+    if (visible) setIsResearching(!!feature.isResearching);
+  }, [visible, feature.id, feature.isResearching]);
   const [researchTimeRemaining, setResearchTimeRemaining] = useState(0);
   const [isSpeedupLoading, setIsSpeedupLoading] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -63,6 +68,18 @@ export function FeatureModal({
   const [startResearch, { isLoading: isStartingResearch }] = useStartResearchMutation();
   const [completeResearch, { isLoading: isCompletingResearch }] = useCompleteResearchMutation();
   const [speedupFeatureResearch] = useSpeedupFeatureResearchMutation();
+  const [requestCrewBackup] = useRequestCrewBackupMutation();
+  const { data: crewStatus } = useGetCrewStatusQuery(undefined, { skip: !visible });
+  // Use ?? so server's explicit false is respected; local isResearching only used when feature.isResearching is null/undefined (Bugbot).
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+    skip: !visible || !crewStatus?.crewId || !crewStatus?.isInCrew || !(feature.isResearching ?? isResearching),
+  });
+  const hasRequestedBackup = Boolean(
+    currentUserId &&
+      crewDetails?.crew?.backupRequests?.some((r) =>
+        matchesResearchCrewBackupRequest(r, currentUserId, categoryId, feature.id)
+      )
+  );
   const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
 
   const refs = feature.requiredFeatureRefs ?? [];
@@ -505,6 +522,16 @@ export function FeatureModal({
               </TouchableOpacity>
             </View>
           )}
+          {crewStatus?.isInCrew && crewDetails != null && !hasRequestedBackup && researchTimeRemaining > 0 && (
+            <TouchableOpacity
+              style={[styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
+              onPress={() => {
+                requestCrewBackup({ categoryId, featureId: feature.id });
+              }}
+            >
+              <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.closeButton, { backgroundColor: '#475569', marginTop: SIZING.spacing.sm }]}
             onPress={onClose}
@@ -797,6 +824,17 @@ const styles = StyleSheet.create({
   },
   speedupButtonText: {
     fontSize: SIZING.font.body,
+    fontWeight: '600',
+  },
+  requestBackupButton: {
+    marginTop: SIZING.spacing.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  requestBackupText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   unlockedStatus: {
