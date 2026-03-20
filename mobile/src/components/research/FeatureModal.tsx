@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { ResearchFeature } from './ResearchFeaturesList';
+import { ResearchFeature, matchesResearchCrewBackupRequest } from './FeatureCard';
 import { useStartResearchMutation, useCompleteResearchMutation, useSpeedupFeatureResearchMutation, useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { useGetResearchCenterStatusQuery, useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -76,13 +76,9 @@ export function FeatureModal({
   });
   const hasRequestedBackup = Boolean(
     currentUserId &&
-    crewDetails?.crew?.backupRequests?.some(
-      (r) =>
-        String(r.userId) === String(currentUserId) &&
-        r.jobType === 'research' &&
-        r.categoryId === categoryId &&
-        r.featureId === feature.id
-    )
+      crewDetails?.crew?.backupRequests?.some((r) =>
+        matchesResearchCrewBackupRequest(r, currentUserId, categoryId, feature.id)
+      )
   );
   const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
 
@@ -162,10 +158,17 @@ export function FeatureModal({
   const isCurrentlyResearching = feature.isResearching || false;
   
   const requirementsOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Prevents completeResearch from firing every 1s while timer is at 0 (matches ResearchFeaturesList completedFeaturesRef pattern). */
+  const researchCompleteRequestSentRef = useRef(false);
+
+  useEffect(() => {
+    researchCompleteRequestSentRef.current = false;
+  }, [feature.id, feature.researchCompletesAt]);
 
   // Reset error state when modal opens or closes; clear requirements overlay timer to avoid setState after unmount (Bugbot).
   useEffect(() => {
     if (!visible) {
+      researchCompleteRequestSentRef.current = false;
       if (requirementsOverlayTimerRef.current) {
         clearTimeout(requirementsOverlayTimerRef.current);
         requirementsOverlayTimerRef.current = null;
@@ -192,14 +195,17 @@ export function FeatureModal({
         const remaining = Math.max(0, completesAt - now);
         setResearchTimeRemaining(remaining);
         
-        if (remaining === 0) {
-          // Research completed - automatically complete it
-          completeResearch({ categoryId, featureId: feature.id }).unwrap().then((result) => {
-            setIsResearching(false);
-            // RTK Query will automatically invalidate cache and refetch data
-          }).catch((error) => {
-            console.error('🔬 RESEARCH: Failed to complete research:', error);
-          });
+        if (remaining === 0 && !researchCompleteRequestSentRef.current) {
+          researchCompleteRequestSentRef.current = true;
+          completeResearch({ categoryId, featureId: feature.id })
+            .unwrap()
+            .then(() => {
+              setIsResearching(false);
+            })
+            .catch((error) => {
+              researchCompleteRequestSentRef.current = false;
+              console.error('🔬 RESEARCH: Failed to complete research:', error);
+            });
         }
       };
       

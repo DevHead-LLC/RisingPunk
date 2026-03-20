@@ -181,7 +181,9 @@ export async function removeCrewBackupRequestForJob(
   jobType: CrewBackupJobType,
   jobKey?: string,
   categoryId?: string,
-  featureId?: string
+  featureId?: string,
+  /** When set, include in the same multi-document transaction (required for callers using withTransaction). */
+  session?: mongoose.ClientSession
 ): Promise<void> {
   const pullMatch = {
     jobType,
@@ -189,9 +191,10 @@ export async function removeCrewBackupRequestForJob(
     ...(categoryId != null && { categoryId }),
     ...(featureId != null && { featureId }),
   };
-  const result = await User.updateOne(
+  await User.updateOne(
     { _id: userId },
-    { $pull: { crewBackupRequests: pullMatch } }
+    { $pull: { crewBackupRequests: pullMatch } },
+    session ? { session } : {}
   );
 }
 
