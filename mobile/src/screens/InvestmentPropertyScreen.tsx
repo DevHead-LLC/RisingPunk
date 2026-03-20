@@ -406,12 +406,8 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
               </Text>
               {activeRemodel?.room === remodelRoom ? (
                 (() => {
-                  const remainingSec = activeRemodel.completesAt
-                    ? Math.max(0, (new Date(activeRemodel.completesAt).getTime() - modalCountdownNow) / 1000)
-                    : 0;
                   const speedupCost = Math.ceil(remainingSec) * 5;
                   const canSpeedup = (balanceState.total ?? 0) >= speedupCost && remainingSec > 0;
-                  const timeUp = remainingSec <= 0;
                   return (
                     <>
                       <Text style={[styles.modalSubtitle, { color: colors.text?.secondary || '#ccc' }]}>

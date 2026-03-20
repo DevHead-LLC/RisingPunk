@@ -75,3 +75,5 @@ Session log for conflict resolutions. Priority: Android deploy / Play Console fi
 **Rejected:** Staging-only `useCompleteRemodelMutation` / Complete button when `timeUp` (superseded by dev’s auto-complete + `closeRemodelModal`). Rejected a line-by-line conflict merge (produced duplicate/broken JSX).
 
 **If something breaks:** Modal off-center on Android → check overlay `Platform.OS === 'android'` block and task doc `taskItems/android/turf/investment-property-remodel-modal-android.md`. Double speedup/start on one tap → review `onPress` + `onPressOut` overlap on Android.
+
+**Follow-up (bugbot, March 19, 2026):** In-progress remodel modal IIFE reuses component-level `remainingSec` / `timeUp` (same inputs: `activeRemodel`, `modalCountdownNow` when `activeRemodel?.room === remodelRoom`) instead of duplicating those calculations inside the IIFE.
