@@ -38,6 +38,19 @@ export interface ResearchFeature {
   };
 }
 
+/** True when this backup row is the user's research request for the given feature. Server/legacy rows may omit jobType; only research uses categoryId+featureId together (align with authApi requestCrewBackup optimistic dedupe). */
+export function matchesResearchCrewBackupRequest(
+  r: { userId: string; jobType?: string; categoryId?: string; featureId?: string },
+  currentUserId: string,
+  categoryId: string,
+  featureId: string
+): boolean {
+  if (String(r.userId) !== String(currentUserId)) return false;
+  if (r.categoryId !== categoryId || r.featureId !== featureId) return false;
+  const jt = r.jobType;
+  return jt === 'research' || jt == null || jt === '';
+}
+
 interface FeatureCardProps {
   feature: ResearchFeature;
   timerRemaining: number;
@@ -45,6 +58,9 @@ interface FeatureCardProps {
   isLightMode: boolean;
   onPress: () => void;
   backgroundImage?: ImageSourcePropType;
+  /** When true and feature is researching, show "Request back-up" on the card. */
+  showRequestBackup?: boolean;
+  onRequestBackup?: () => void;
 }
 
 const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
@@ -89,6 +105,8 @@ export function FeatureCard({
   isLightMode,
   onPress,
   backgroundImage,
+  showRequestBackup,
+  onRequestBackup,
 }: FeatureCardProps) {
   const colors = useThemeColors();
   const isActuallyUnlocked = feature.isUnlocked || (feature.isResearching && timerRemaining === 0);
@@ -143,16 +161,16 @@ export function FeatureCard({
       ]}>
         <Text style={[
           styles.statusText,
-          { 
+          {
             color: feature.isResearching ? (isLightMode ? '#059669' : '#10B981') :
                   feature.isUnlocked ? (isLightMode ? '#2563EB' : '#3B82F6') :
                   currentBalance >= feature.unlockCost ? (isLightMode ? '#2563EB' : '#3B82F6') : (isLightMode ? '#DC2626' : colors.error),
             fontWeight: '600'
           }
         ]}>
-          {feature.isResearching && timerRemaining > 0 ? 
-            formatTimeRemaining(timerRemaining) :
-            `$${feature.unlockCost.toLocaleString()}`}
+          {feature.isResearching && timerRemaining > 0
+            ? formatTimeRemaining(timerRemaining)
+            : `$${feature.unlockCost.toLocaleString()}`}
         </Text>
       </View>
     </View>
@@ -196,6 +214,8 @@ export function FeatureCard({
     }
   ];
 
+  const showRequestBackupInCorner = Boolean(showRequestBackup && onRequestBackup && feature.isResearching && timerRemaining > 0);
+
   const content = (
     <>
       {isActuallyUnlocked && hasBackgroundImage ? (
@@ -203,7 +223,7 @@ export function FeatureCard({
           <View style={styles.featureNameContainer}>
             <Text style={[
               styles.antivirusTitle,
-              { 
+              {
                 color: isLightMode ? '#FFFFFF' : '#00FF00',
                 fontWeight: '600'
               }
@@ -225,31 +245,50 @@ export function FeatureCard({
   );
 
   return (
-    <TouchableOpacity 
-      key={feature.id} 
-      style={cardStyle}
-      activeOpacity={0.7}
-      onPress={onPress}
-    >
-      {hasBackgroundImage ? (
-        <ImageBackground
-          source={imageSource}
-          style={styles.backgroundImage}
-          resizeMode="cover"
-        >
-          {content}
-        </ImageBackground>
-      ) : (
-        content
+    <View key={feature.id} style={styles.cardWrapper} collapsable={false}>
+      <TouchableOpacity
+        style={cardStyle}
+        activeOpacity={0.7}
+        onPress={onPress}
+      >
+        {hasBackgroundImage ? (
+          <ImageBackground
+            source={imageSource}
+            style={styles.backgroundImage}
+            resizeMode="cover"
+          >
+            {content}
+          </ImageBackground>
+        ) : (
+          content
+        )}
+      </TouchableOpacity>
+      {showRequestBackupInCorner && (
+        <View style={styles.requestBackupTouchTarget} pointerEvents="box-none">
+          <TouchableOpacity
+            style={[styles.bottomRightBlock, styles.requestBackupButton, { backgroundColor: colors.primary, borderColor: colors.matrix }]}
+            onPress={() => onRequestBackup!()}
+            activeOpacity={0.8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={[styles.requestBackupText, { color: colors.background }]}>Request back-up</Text>
+          </TouchableOpacity>
+        </View>
       )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  featureCard: {
+  cardWrapper: {
+    position: 'relative',
     width: '48%',
     height: 120,
+    marginBottom: SIZING.spacing.md,
+  },
+  featureCard: {
+    width: '100%',
+    height: '100%',
     borderRadius: 12,
     padding: SIZING.spacing.md,
     borderWidth: 2,
@@ -262,7 +301,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    marginBottom: SIZING.spacing.md,
   },
   featureContent: {
     flex: 1,
@@ -300,6 +338,32 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: SIZING.font.small,
+    fontWeight: '600',
+  },
+  requestBackupTouchTarget: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 10,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  bottomRightBlock: {
+    alignItems: 'flex-end',
+  },
+  requestBackupButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    alignSelf: 'flex-end',
+    minHeight: 32,
+  },
+  requestBackupText: {
+    fontSize: 10,
     fontWeight: '600',
   },
   disabledOverlay: {

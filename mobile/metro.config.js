@@ -1,3 +1,4 @@
+const path = require('path');
 const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
 
 /**
@@ -7,6 +8,8 @@ const {getDefaultConfig, mergeConfig} = require('@react-native/metro-config');
  * @type {import('metro-config').MetroConfig}
  */
 const config = {
+  // Only `shared/` is imported from outside `mobile/` (e.g. shared/documents.ts). Avoid watching the whole repo (server/node_modules, etc.).
+  watchFolders: [path.resolve(__dirname, '..', 'shared')],
   resolver: {
     // Disable package exports to fix EventEmitter parsing issues in RN 0.76+
     unstable_enablePackageExports: false,

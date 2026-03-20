@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useCompleteResearchMutation } from '../../store/api/researchFeaturesApi';
+import { useGetCrewStatusQuery, useGetCrewDetailsQuery, useRequestCrewBackupMutation } from '../../store/api/authApi';
 import {
   View,
   StyleSheet,
@@ -7,8 +8,9 @@ import {
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
+import { useAppSelector } from '../../store/hooks';
 import { FeatureModal } from './FeatureModal';
-import { FeatureCard, ResearchFeature } from './FeatureCard';
+import { FeatureCard, ResearchFeature, matchesResearchCrewBackupRequest } from './FeatureCard';
 
 export type { ResearchFeature };
 
@@ -28,11 +30,28 @@ export function ResearchFeaturesList({
   onResearchStarted,
 }: ResearchFeaturesListProps) {
   const colors = useThemeColors();
+  const currentUserId = useAppSelector((state) => state.auth.user?._id ?? (state.auth.user as any)?.id);
   const [selectedFeature, setSelectedFeature] = useState<ResearchFeature | null>(null);
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [researchTimers, setResearchTimers] = useState<Record<string, number>>({});
   const [completeResearch] = useCompleteResearchMutation();
+  const [requestCrewBackup] = useRequestCrewBackupMutation();
   const completedFeaturesRef = useRef<Set<string>>(new Set());
+
+  const hasAnyResearching = useMemo(() => features.some((f) => f.isResearching), [features]);
+  const { data: crewStatus } = useGetCrewStatusQuery(undefined, { skip: !hasAnyResearching });
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
+    skip: !hasAnyResearching || !crewStatus?.crewId || !crewStatus?.isInCrew,
+  });
+
+  const hasRequestedBackupForFeature = useMemo(() => {
+    const backupRequests = crewDetails?.crew?.backupRequests ?? [];
+    return (feature: ResearchFeature) =>
+      Boolean(
+        currentUserId &&
+          backupRequests.some((r) => matchesResearchCrewBackupRequest(r, currentUserId, categoryId, feature.id))
+      );
+  }, [crewDetails?.crew?.backupRequests, currentUserId, categoryId]);
 
   // Update research timers and handle automatic completion
   useEffect(() => {
@@ -84,7 +103,10 @@ export function ResearchFeaturesList({
   const renderFeatureCard = (feature: ResearchFeature) => {
     const isLightMode = colors.background === '#FAFAFA' || colors.background === '#F5F5DC';
     const timerRemaining = researchTimers[feature.id] || 0;
-    
+    const showRequestBackup =
+      Boolean(crewStatus?.isInCrew && crewDetails != null && feature.isResearching && (researchTimers[feature.id] ?? 0) > 0) &&
+      !hasRequestedBackupForFeature(feature);
+
     return (
       <FeatureCard
         key={feature.id}
@@ -96,6 +118,14 @@ export function ResearchFeaturesList({
           setSelectedFeature(feature);
           setShowFeatureModal(true);
         }}
+        showRequestBackup={showRequestBackup}
+        onRequestBackup={
+          showRequestBackup
+            ? () => {
+                requestCrewBackup({ categoryId, featureId: feature.id });
+              }
+            : undefined
+        }
       />
     );
   };
