@@ -40,7 +40,7 @@ jobs:
 
       - name: Create Procfile for staging
         run: |
-          echo 'web: NODE_ENV=staging node dist/server/server.js' > Procfile
+          echo 'web: NODE_ENV=staging node dist/server.js' > Procfile
 
       - name: Zip artifact (dist + runtime files)
         run: |

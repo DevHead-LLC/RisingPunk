@@ -4,37 +4,18 @@ Session log for conflict resolutions. Priority: Android deploy / Play Console fi
 
 ---
 
-## `.github/workflows/deploy-production.yml`
+## `.github/workflows/deploy-production.yml` / `deploy-staging.yml` (correction)
 
-| Side | Content |
-|------|---------|
-| HEAD (`androidStaging`) | `NODE_ENV=production node dist/server.js` |
-| `origin/dev` | `node dist/server/server.js` (no `NODE_ENV`) |
+**March 21 merge mistake:** Conflicts were resolved to `dist/server/server.js`. **That was wrong** for this repo’s EB pipeline.
 
-**Resolution:** `NODE_ENV=production node dist/server/server.js`
+**Authoritative rule:** Per [merge-flow.md](merge-flow.md), Android merge **must not** change deploy workflows except to **keep `androidStaging` (HEAD)**. Correct Procfile paths are:
 
-**Rationale:** `server/package.json` `start:prod` uses `dist/server/server.js` (current `tsc` output). Staging’s `NODE_ENV=production` keeps Elastic Beanstalk behavior aligned with local prod start. Old `dist/server.js` path is obsolete.
+- Production: `NODE_ENV=production node dist/server.js`
+- Staging: `NODE_ENV=staging node dist/server.js`
 
-**Rejected:** HEAD-only path (wrong entry for current build). Dev-only line without `NODE_ENV` (less explicit for production).
+**Never** `dist/server/server.js` in these workflow Procfile lines.
 
-**If something breaks:** EB health check fails or wrong app behavior → confirm `server` build emits `dist/server/server.js` and `npm run start:prod` locally.
-
----
-
-## `.github/workflows/deploy-staging.yml`
-
-| Side | Content |
-|------|---------|
-| HEAD | `NODE_ENV=staging node dist/server.js` |
-| `origin/dev` | `node dist/server/server.js` |
-
-**Resolution:** `NODE_ENV=staging node dist/server/server.js`
-
-**Rationale:** Same as production: correct compiled entry + explicit staging env per `server/package.json` `start:staging`.
-
-**Rejected:** Old `dist/server.js` path; dev Procfile without `NODE_ENV=staging`.
-
-**If something breaks:** Staging API wrong env → verify Procfile line matches `npm run start:staging` from `server/`.
+**If something breaks:** Wrong entry on EB → restore the exact YAML from `androidStaging` / merge-flow; do not infer paths from `server/package.json` local `start` scripts during Android merges.
 
 ---
 
