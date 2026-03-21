@@ -725,7 +725,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const [hasOpenedReview, setHasOpenedReview] = useState(false);
   const userId = user?._id ?? null;
   const { data: battlePresetsData } = useGetBattlePresetsQuery();
-  const hasUnlockedAnyPreset = !!battlePresetsData?.presets?.['1']?.unlocked;
+  const hasUnlockedAnyPreset = ['1', '2', '3'].some((id) => battlePresetsData?.presets?.[id]?.unlocked);
 
   // Load device ID, vendor ID, and "has opened review" for Account tab (per-user keys)
   useEffect(() => {

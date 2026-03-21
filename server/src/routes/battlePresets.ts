@@ -101,8 +101,15 @@ router.post('/:presetId/unlock', auth, async (req: Request, res: Response): Prom
 
     const newBalance = accrued.total - def.cost;
 
+    // Atomic guard: only one concurrent unlock can match — preset must still be locked (Bugbot: double-charge race if filter is only _id).
     const updateResult = await User.findOneAndUpdate(
-      { _id: req.user._id },
+      {
+        _id: req.user._id,
+        $or: [
+          { [`battlePresets.${key}.unlockedAt`]: { $exists: false } },
+          { [`battlePresets.${key}.unlockedAt`]: null },
+        ],
+      },
       {
         $set: {
           'balance.total': newBalance,
@@ -115,6 +122,15 @@ router.post('/:presetId/unlock', auth, async (req: Request, res: Response): Prom
     );
 
     if (!updateResult) {
+      const existing = await User.findById(req.user._id).select(`battlePresets.${key}`);
+      if (!existing) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      if (existing.battlePresets?.[key]?.unlockedAt) {
+        res.status(400).json({ error: 'Preset already unlocked.' });
+        return;
+      }
       res.status(500).json({ error: 'Failed to unlock preset.' });
       return;
     }
