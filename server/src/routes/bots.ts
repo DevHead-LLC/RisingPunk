@@ -644,6 +644,8 @@ router.post('/assign-preset', auth, async (req, res) => {
             battalionAssignments: [],
           });
           await newBot.save();
+          retryCount++;
+          await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
           continue;
         }
 
@@ -784,6 +786,8 @@ router.post('/assign', auth, async (req, res) => {
             battalionAssignments: []
           });
           await newBot.save();
+          retryCount++;
+          await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
           continue; // Retry with the new bot
         }
 
