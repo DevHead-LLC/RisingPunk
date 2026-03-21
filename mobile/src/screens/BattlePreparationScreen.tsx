@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated, Platform, Alert } from 'react-native';
 import { SIZING } from '../styles/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { CloseButton } from '../components/common/CloseButton';
@@ -10,7 +10,7 @@ import { BattalionAssignment } from '../components/battle/BattalionSlot';
 import { ShieldCheckModal } from '../components/battle/ShieldCheckModal';
 import { BotType } from '../types/bots';
 import { useAppSelector } from '../store/hooks';
-import { useAssignToBattalionMutation } from '../store/api/botsApi';
+import { useAssignToBattalionMutation, useFetchBotsQuery } from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
 import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
@@ -89,6 +89,7 @@ export const BattlePreparationScreen = React.memo(
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const userBalance = useAppSelector((state) => state.balance.total ?? 0);
   const [assignToBattalion] = useAssignToBattalionMutation();
+  const { refetch: refetchBots } = useFetchBotsQuery();
   const [startBattle] = useStartBattleMutation();
   const [deactivateShield] = useDeactivateShieldMutation();
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
@@ -181,11 +182,11 @@ export const BattlePreparationScreen = React.memo(
     }
 
     try {
-      const result = await assignToBattalion({
+      await assignToBattalion({
         botType: data.botType,
         quantity: data.quantity,
         battalionId: selectedBattalion,
-      });
+      }).unwrap();
 
       setAssignments(prev => {
         const newAssignments = {
@@ -204,30 +205,26 @@ export const BattlePreparationScreen = React.memo(
       setSelectorVisible(false);
       throw error;
     }
-  }, [selectedBattalion, assignToBattalion, botCounts, assignments]);
+  }, [selectedBattalion, assignToBattalion]);
 
   const resetBattalions = React.useCallback(async () => {
-    try {
-      const resetPromises = [
-        assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'A' }),
-        assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'B' }),
-      ];
-      if (isBattalionCUnlocked) {
-        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'C' }));
-      }
-      if (isBattalionDUnlocked) {
-        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'D' }));
-      }
-      if (isBattalionEUnlocked) {
-        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'E' }));
-      }
-      if (isBattalionFUnlocked) {
-        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'F' }));
-      }
-      await Promise.all(resetPromises);
-    } catch (error) {
-      console.error('Failed to reset battalions:', error);
+    const resetPromises = [
+      assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'A' }).unwrap(),
+      assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'B' }).unwrap(),
+    ];
+    if (isBattalionCUnlocked) {
+      resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'C' }).unwrap());
     }
+    if (isBattalionDUnlocked) {
+      resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'D' }).unwrap());
+    }
+    if (isBattalionEUnlocked) {
+      resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'E' }).unwrap());
+    }
+    if (isBattalionFUnlocked) {
+      resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'F' }).unwrap());
+    }
+    await Promise.all(resetPromises);
   }, [assignToBattalion, isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked]);
 
   const handleApplyPreset = React.useCallback(async (presetAssignments: Record<string, BattalionAssignment>) => {
@@ -241,15 +238,40 @@ export const BattlePreparationScreen = React.memo(
           botType: assignment.botType as BotType,
           quantity: assignment.quantity,
           battalionId,
-        });
+        }).unwrap();
       });
       await Promise.all(assignPromises);
 
       setAssignments(presetAssignments);
     } catch (error) {
       console.error('Failed to apply preset:', error);
+      Alert.alert(
+        'Could not apply preset',
+        'Your battalion lineup may not match the server. Try again or assign manually.',
+      );
+      try {
+        const { data } = await refetchBots();
+        const list = data?.battalionAssignments as
+          | Array<{ battalionId: string; botType: BotType; quantity: number; markLevel?: number }>
+          | undefined;
+        if (list) {
+          const next: Record<string, BattalionAssignment> = {};
+          for (const a of list) {
+            if (a.battalionId && a.quantity > 0) {
+              next[a.battalionId] = {
+                botType: a.botType,
+                quantity: a.quantity,
+                markLevel: a.markLevel ?? 1,
+              };
+            }
+          }
+          setAssignments(next);
+        }
+      } catch (refetchErr) {
+        console.error('Failed to refetch bots after preset error:', refetchErr);
+      }
     }
-  }, [resetBattalions, assignToBattalion]);
+  }, [resetBattalions, assignToBattalion, refetchBots]);
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {

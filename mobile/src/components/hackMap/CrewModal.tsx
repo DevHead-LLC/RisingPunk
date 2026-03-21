@@ -374,7 +374,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         }
       }
     },
-    [backupCrewMember, crewStatus?.crewId, getBackupRequestKey, refetchCrewStatus]
+    [backupCrewMember, getBackupRequestKey, refetchCrewStatus]
   );
 
   const hasApplicants = useMemo(() => {
