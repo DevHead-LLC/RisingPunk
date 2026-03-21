@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Response } from 'express';
 const Bot = require('../models/Bot');
 import auth from '../middleware/auth';
 import { User } from '../models/User';
@@ -9,7 +9,11 @@ const router = express.Router();
 
 const battalionAssignmentAttempts = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW = 60000;
+/** Single-slot /assign uses this. Preset apply uses POST /assign-preset (one request) to stay under the limit when switching presets quickly. */
 const MAX_BATTALION_ASSIGNMENT_ATTEMPTS = 20;
+
+const PRESET_VALID_BATTALION_IDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
+const PRESET_VALID_BOT_TYPES = ['breacher', 'guardian', 'phreak'] as const;
 
 // Test bot creation
 router.post('/test', auth, async (req, res) => {
@@ -523,6 +527,190 @@ router.post('/speedup-build', auth, async (req, res) => {
   }
 });
 
+function consumeBattalionRateLimit(userId: string, now: number, res: Response): boolean {
+  const userAttempts = battalionAssignmentAttempts.get(userId);
+  if (userAttempts) {
+    if (userAttempts.resetAt <= now) {
+      battalionAssignmentAttempts.delete(userId);
+      battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    } else {
+      if (userAttempts.count >= MAX_BATTALION_ASSIGNMENT_ATTEMPTS) {
+        res.status(429).json({ error: 'Too many requests. Please try again later.' });
+        return false;
+      }
+      userAttempts.count++;
+    }
+  } else {
+    battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+  }
+  if (battalionAssignmentAttempts.size > 1000) {
+    for (const [key, value] of battalionAssignmentAttempts.entries()) {
+      if (value.resetAt <= now) {
+        battalionAssignmentAttempts.delete(key);
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Replace all battalion assignments in one atomic write (used by battle preset apply).
+ * Counts as one rate-limit hit instead of N× /assign (avoids 429 when switching presets quickly).
+ */
+router.post('/assign-preset', auth, async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+    const now = Date.now();
+    const { assignments: raw } = req.body;
+
+    if (!Array.isArray(raw)) {
+      res.status(400).json({ error: 'assignments must be an array of { battalionId, botType, quantity }.' });
+      return;
+    }
+
+    if (!consumeBattalionRateLimit(userId, now, res)) {
+      return;
+    }
+
+    const maxLimit = await getMaxBattalionSize(userId, new Date(now));
+
+    const seenBattalions = new Set<string>();
+    const normalized: Array<{ battalionId: string; botType: string; quantity: number; markLevel: number }> = [];
+
+    for (const entry of raw) {
+      if (!entry || typeof entry !== 'object') {
+        res.status(400).json({ error: 'Each assignment must be an object.' });
+        return;
+      }
+      const { battalionId, botType, quantity } = entry as Record<string, unknown>;
+      if (typeof battalionId !== 'string' || !PRESET_VALID_BATTALION_IDS.includes(battalionId as any)) {
+        res.status(400).json({ error: 'Invalid battalionId. Must be A–F.' });
+        return;
+      }
+      if (seenBattalions.has(battalionId)) {
+        res.status(400).json({ error: `Duplicate battalionId: ${battalionId}` });
+        return;
+      }
+      seenBattalions.add(battalionId);
+
+      if (typeof botType !== 'string' || !PRESET_VALID_BOT_TYPES.includes(botType as any)) {
+        res.status(400).json({ error: 'Invalid botType. Must be breacher, guardian, or phreak.' });
+        return;
+      }
+
+      if (typeof quantity !== 'number' || !Number.isFinite(quantity) || !Number.isInteger(quantity)) {
+        res.status(400).json({ error: 'Quantity must be a valid integer' });
+        return;
+      }
+      if (quantity < 0) {
+        res.status(400).json({ error: 'Quantity must be non-negative' });
+        return;
+      }
+      if (quantity > maxLimit) {
+        res.status(400).json({ error: `Maximum troops per battalion is ${maxLimit.toLocaleString()}.` });
+        return;
+      }
+
+      if (battalionId === 'C' || battalionId === 'D' || battalionId === 'E' || battalionId === 'F') {
+        const unlocked = await isBattalionSlotUnlocked(userId, battalionId as 'C' | 'D' | 'E' | 'F');
+        if (!unlocked) {
+          res.status(403).json({
+            error: `Battalion ${battalionId} is locked. Complete the "Add Battalion ${battalionId}" research feature to unlock it.`,
+          });
+          return;
+        }
+      }
+
+      const markLevel =
+        typeof (entry as any).markLevel === 'number' && Number.isInteger((entry as any).markLevel) && (entry as any).markLevel > 0
+          ? (entry as any).markLevel
+          : 1;
+
+      if (quantity > 0) {
+        normalized.push({ battalionId, botType, quantity, markLevel });
+      }
+    }
+
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    while (retryCount < maxRetries) {
+      try {
+        const bot = await Bot.findOne({ userId: req.user._id });
+        if (!bot) {
+          const newBot = new Bot({
+            userId: req.user._id,
+            bots: { breacher: 0, guardian: 0, phreak: 0 },
+            battalionAssignments: [],
+          });
+          await newBot.save();
+          retryCount++;
+          await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
+          continue;
+        }
+
+        const sumByType: Record<string, number> = { breacher: 0, guardian: 0, phreak: 0 };
+        for (const a of normalized) {
+          sumByType[a.botType] = (sumByType[a.botType] || 0) + a.quantity;
+        }
+
+        // Bugbot: compare to total bot.bots (not “available after other battalions”) — preset replaces battalionAssignments atomically, so prior deployments are cleared in the same write. Concurrent bot.bots / assignment changes on this doc bump __v; findOneAndUpdate below retries.
+        for (const t of PRESET_VALID_BOT_TYPES) {
+          const owned = bot.bots[t] || 0;
+          if (sumByType[t] > owned) {
+            res.status(400).json({ error: 'Insufficient Bots Available' });
+            return;
+          }
+        }
+
+        const newAssignments = normalized.map((a) => ({
+          battalionId: a.battalionId,
+          botType: a.botType,
+          quantity: a.quantity,
+          markLevel: a.markLevel,
+        }));
+
+        const updatedBot = await Bot.findOneAndUpdate(
+          {
+            userId: req.user._id,
+            $or: [{ __v: bot.__v }, { __v: { $exists: false } }],
+          },
+          {
+            battalionAssignments: newAssignments,
+            $inc: { __v: 1 },
+          },
+          { new: true, upsert: false }
+        );
+
+        if (!updatedBot) {
+          retryCount++;
+          await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
+          continue;
+        }
+
+        res.json({
+          success: true,
+          bots: updatedBot.bots,
+          battalionAssignments: updatedBot.battalionAssignments,
+        });
+        return;
+      } catch (updateError: any) {
+        if (updateError.code === 11000) {
+          retryCount++;
+          await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
+          continue;
+        }
+        throw updateError;
+      }
+    }
+
+    res.status(500).json({ error: 'Assignment failed due to concurrency conflicts' });
+  } catch (error: any) {
+    console.error('assign-preset error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Assign bots to battalion
 router.post('/assign', auth, async (req, res) => {
   try {
@@ -578,32 +766,10 @@ router.post('/assign', auth, async (req, res) => {
         return;
       }
     }
-    const userAttempts = battalionAssignmentAttempts.get(userId);
-    
-    if (userAttempts) {
-      if (userAttempts.resetAt <= now) {
-        battalionAssignmentAttempts.delete(userId);
-        battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-      } else {
-        if (userAttempts.count >= MAX_BATTALION_ASSIGNMENT_ATTEMPTS) {
-          res.status(429).json({ error: 'Too many requests. Please try again later.' });
-          return;
-        }
-        userAttempts.count++;
-      }
-    } else {
-      battalionAssignmentAttempts.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
+    if (!consumeBattalionRateLimit(userId, now, res)) {
+      return;
     }
-    
-    if (battalionAssignmentAttempts.size > 1000) {
-      for (const [key, value] of battalionAssignmentAttempts.entries()) {
-        if (value.resetAt <= now) {
-          battalionAssignmentAttempts.delete(key);
-        }
-      }
-    }
-    
-    
+
     // Use atomic operation with retry logic to handle race conditions
     let retryCount = 0;
     const maxRetries = 3;
@@ -620,6 +786,8 @@ router.post('/assign', auth, async (req, res) => {
             battalionAssignments: []
           });
           await newBot.save();
+          retryCount++;
+          await new Promise((resolve) => setTimeout(resolve, 50 * retryCount));
           continue; // Retry with the new bot
         }
 
