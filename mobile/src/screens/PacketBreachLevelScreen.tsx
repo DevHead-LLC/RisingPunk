@@ -54,7 +54,7 @@ RULES BY TIER
 • Tier 13 and above: The node pool has five nodes; one is a decoy. The solution uses three of the other four. Same decoy rule: including the decoy gives no hint. The anti-solution (trap) still applies.
 
 WIN
-Your sequence exactly matches the solution → you breach the node and complete the level. Complete all levels in a tier to unlock that tier's Infantry reward.`;
+Your sequence exactly matches the solution → you breach the node and complete the level. Complete all levels in a tier to unlock that tier's Brute reward.`;
 
 type PacketBreachLevelScreenProps = {
   onClose: () => void;
@@ -114,7 +114,7 @@ export function PacketBreachLevelScreen({ onClose, onSelectLevel }: PacketBreach
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={handleClose} />
       <Balance />
-      <Text style={[styles.title, { color: colors.primary }]}>Program Infantry for Tiered Awards</Text>
+      <Text style={[styles.title, { color: colors.primary }]}>Program Brute for Tiered Awards</Text>
       <TouchableOpacity
         onPress={() => setShowRules(true)}
         style={[styles.rulesButton, { borderColor: colors.primary }]}

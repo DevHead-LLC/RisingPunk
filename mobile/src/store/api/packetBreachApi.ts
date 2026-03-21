@@ -170,7 +170,7 @@ export const packetBreachApi = createApi({
       async onQueryStarted(_, { queryFulfilled, dispatch }) {
         try {
           await queryFulfilled;
-          // Bots/army stats updated by claim; refetch so UI shows new Infantry bonus.
+          // Bots/army stats updated by claim; refetch so UI shows new Brute bonus.
           dispatch(
             botsApi.endpoints.fetchBotStatsBreakdown.initiate(undefined, { forceRefetch: true })
           );

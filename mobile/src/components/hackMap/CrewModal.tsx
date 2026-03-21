@@ -21,7 +21,7 @@ import { LeaderboardModal } from './LeaderboardModal';
 import { UserReportModal } from '../modals/UserReportModal';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
-import { authApi, useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery, useBackupCrewMemberMutation } from '../../store/api/authApi';
+import { useDisbandCrewMutation, useGetCrewStatusQuery, useGetCrewDetailsQuery, useAcceptApplicantMutation, useDenyApplicantMutation, useLeaveCrewMutation, useUpdateCrewNameMutation, useUpdateCrewIdentifierMutation, useUpdateCrewLanguageMutation, useUpdateInternalMessageMutation, useUpdateExternalMessageMutation, useGiftAllMembersMutation, usePromoteMemberMutation, useDemoteExecutiveMutation, useChooseSuccessorMutation, useResignMutation, useGetWarStatusQuery, useBackupCrewMemberMutation } from '../../store/api/authApi';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CREW_MODAL_PADDING = SIZING.spacing.md * 2;
@@ -144,13 +144,11 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   const userRole = crewStatus?.role;
   const currentUserId = currentUser?._id || (currentUser as any)?.id;
   
-  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(
-    crewStatus?.crewId || '',
-    {
-      skip: !crewStatus?.crewId || !visible || !crewStatus?.isInCrew,
-      pollingInterval: visible && crewStatus?.crewId && crewStatus?.isInCrew ? 3000 : 0,
-    }
-  );
+  const crewIdForDetails = String(crewStatus?.crewId ?? '');
+  const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewIdForDetails, {
+    skip: !crewStatus?.crewId || !visible || !crewStatus?.isInCrew,
+    pollingInterval: visible && crewStatus?.crewId && crewStatus?.isInCrew ? 3000 : 0,
+  });
   
   const activeCrewDetails = crewDetails;
   const executives = activeCrewDetails?.crew?.executives || [];
@@ -364,27 +362,6 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           categoryId: req.categoryId,
           featureId: req.featureId,
         }).unwrap();
-        const crewId = crewStatus?.crewId ?? '';
-        if (crewId) {
-          dispatch(
-            authApi.util.updateQueryData('getCrewDetails', crewId, (draft) => {
-              if (draft?.crew?.backupRequests) {
-                const match = draft.crew.backupRequests.find(
-                  (r) =>
-                    String(r.userId ?? '').trim() === String(req.userId ?? '').trim() &&
-                    (r.jobType ?? '') === (req.jobType ?? '') &&
-                    (r.jobKey ?? '') === (req.jobKey ?? '') &&
-                    (r.categoryId ?? '') === (req.categoryId ?? '') &&
-                    (r.featureId ?? '') === (req.featureId ?? '')
-                );
-                if (match) {
-                  match.hasCurrentUserHelped = true;
-                }
-              }
-            })
-          );
-        }
-        await refetchCrewDetails();
         await refetchCrewStatus();
       } catch (err) {
         console.error('Error backing up crew member:', err);
@@ -397,7 +374,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
         }
       }
     },
-    [backupCrewMember, crewStatus?.crewId, dispatch, getBackupRequestKey, refetchCrewDetails, refetchCrewStatus]
+    [backupCrewMember, getBackupRequestKey, refetchCrewStatus]
   );
 
   const hasApplicants = useMemo(() => {

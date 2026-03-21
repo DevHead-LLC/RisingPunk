@@ -176,6 +176,16 @@ export interface RentalHousingStatusResponse {
   }>;
 }
 
+export interface ActiveJobEntry {
+  jobType: string;
+  label: string;
+  completesAt: string;
+}
+
+export interface ActiveJobsResponse {
+  jobs: ActiveJobEntry[];
+}
+
 export interface UnlockRentalHousingResponse {
   success: boolean;
   message: string;
@@ -297,6 +307,17 @@ const authBaseQuery = async (args: any, api: any, extraOptions: any) => {
   return result;
 };
 
+/** Same tuple as CrewModal `getBackupRequestKey` — keep RTK `getCrewDetails` cache rows in sync when patching. */
+function crewBackupRequestCacheKey(parts: {
+  userId: string;
+  jobType?: string;
+  jobKey?: string;
+  categoryId?: string;
+  featureId?: string;
+}): string {
+  return `${String(parts.userId)}-${parts.jobType ?? ''}-${parts.jobKey ?? ''}-${parts.categoryId ?? ''}-${parts.featureId ?? ''}`;
+}
+
 export const authApi = createApi({
   reducerPath: 'authApi',
   baseQuery: authBaseQuery,
@@ -389,6 +410,11 @@ export const authApi = createApi({
 
     getResearchCenterStatus: builder.query<ResearchCenterStatusResponse, void>({
       query: () => '/api/users/research-center-status',
+      providesTags: ['User'],
+    }),
+
+    getActiveJobs: builder.query<ActiveJobsResponse, void>({
+      query: () => '/api/users/active-jobs',
       providesTags: ['User'],
     }),
 
@@ -709,7 +735,11 @@ export const authApi = createApi({
           await queryFulfilled;
         } catch (err) {
           patchResult.undo();
+          return;
         }
+        dispatch(
+          authApi.endpoints.getCrewDetails.initiate(crewIdStr, { forceRefetch: true, subscribe: false })
+        );
       },
     }),
 
@@ -725,7 +755,7 @@ export const authApi = createApi({
         };
       },
       invalidatesTags: ['Crew'],
-      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+      async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
         try {
           await queryFulfilled;
           dispatch(
@@ -735,6 +765,39 @@ export const authApi = createApi({
               }
             })
           );
+          const state = getState() as RootState;
+          const crewIdRaw = (authApi.endpoints.getCrewStatus.select()(state) as { data?: { crewId?: string | null } })
+            ?.data?.crewId;
+          if (!crewIdRaw) return;
+          const crewIdStr = String(crewIdRaw);
+          dispatch(
+            authApi.util.updateQueryData('getCrewDetails', crewIdStr, (draft) => {
+              if (!draft?.crew) return;
+              if (!draft.crew.backupRequests) draft.crew.backupRequests = [];
+              const rows = draft.crew.backupRequests;
+              const argKey = crewBackupRequestCacheKey({
+                userId: String(arg.targetUserId),
+                jobType: arg.jobType,
+                jobKey: arg.jobKey,
+                categoryId: arg.categoryId,
+                featureId: arg.featureId,
+              });
+              const match = rows.find((r) =>
+                crewBackupRequestCacheKey({
+                  userId: String(r.userId),
+                  jobType: r.jobType,
+                  jobKey: r.jobKey,
+                  categoryId: r.categoryId,
+                  featureId: r.featureId,
+                }) === argKey
+              );
+              const forTarget = rows.filter((r) => String(r.userId) === String(arg.targetUserId));
+              const fallback = !arg.jobType && forTarget.length === 1 ? forTarget[0] : undefined;
+              const row = match ?? fallback;
+              if (row) row.hasCurrentUserHelped = true;
+            })
+          );
+          dispatch(authApi.endpoints.getCrewDetails.initiate(crewIdStr, { forceRefetch: true, subscribe: false }));
         } catch {
           // Only update cache on success
         }
@@ -966,6 +1029,7 @@ export const {
   useUnlockResearchCenterMutation,
   useUnlockProgrammingFacilityMutation,
   useGetResearchCenterStatusQuery,
+  useGetActiveJobsQuery,
   useSpeedupResearchCenterConstructionMutation,
   useGetRentalHousingStatusQuery,
   useUnlockRentalHousingMutation,

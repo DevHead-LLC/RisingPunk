@@ -35,6 +35,7 @@ import dailyHaulRoutes from './src/routes/dailyHaul';
 import packetBreachRoutes from './src/routes/packetBreach';
 import raceConditionHeistRoutes from './src/routes/raceConditionHeist';
 import binaryBankCrackRoutes from './src/routes/binaryBankCrack';
+import battlePresetsRoutes from './src/routes/battlePresets';
 
 declare global {
   namespace Express {
@@ -607,6 +608,7 @@ app.use('/api/daily-haul', dailyHaulRoutes);
 app.use('/api/packet-breach', packetBreachRoutes);
 app.use('/api/race-condition-heist', raceConditionHeistRoutes);
 app.use('/api/binary-bank-crack', binaryBankCrackRoutes);
+app.use('/api/battle-presets', battlePresetsRoutes);
 app.use('/documents', documentsRoutes);
 
 // Test routes for privacy policy compliance verification

@@ -18,7 +18,18 @@ import { BattleInventorySettlementService } from './BattleInventorySettlementSer
 
 export class BattleSetupService {
 
-  static async createBattle(attackerId: string, defenderId: string, screenWidth: number, screenHeight: number, userBattalions?: Array<{type: string, quantity: number}>, defenderNpcSlug?: string, unlockHackRigOnWin?: boolean, defenderNpcInstanceId?: string): Promise<IBattleDocument> {
+  static async createBattle(
+    attackerId: string,
+    defenderId: string,
+    screenWidth: number,
+    screenHeight: number,
+    userBattalions?: Array<{ type: string; quantity: number }>,
+    defenderNpcSlug?: string,
+    unlockHackRigOnWin?: boolean,
+    defenderNpcInstanceId?: string,
+    hackMapCellX?: number,
+    hackMapCellY?: number
+  ): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     // Get attacker level and army/guardian/phreak bonus (e.g. Packet Breach, RCH, Binary Bank Crack) for bot stat calculations.
@@ -214,6 +225,12 @@ export class BattleSetupService {
         defenderDeploymentExhausted: false,
         lastTickProcessed: 0
       } as any : {}),
+      ...(typeof hackMapCellX === 'number' &&
+      Number.isFinite(hackMapCellX) &&
+      typeof hackMapCellY === 'number' &&
+      Number.isFinite(hackMapCellY)
+        ? { hackMapCellX, hackMapCellY }
+        : {}),
     });
 
     return await battle.save();
