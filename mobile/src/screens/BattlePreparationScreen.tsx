@@ -10,7 +10,11 @@ import { BattalionAssignment } from '../components/battle/BattalionSlot';
 import { ShieldCheckModal } from '../components/battle/ShieldCheckModal';
 import { BotType } from '../types/bots';
 import { useAppSelector } from '../store/hooks';
-import { useAssignToBattalionMutation, useFetchBotsQuery } from '../store/api/botsApi';
+import {
+  useAssignToBattalionMutation,
+  useAssignPresetBattalionsMutation,
+  useFetchBotsQuery,
+} from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
 import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
@@ -89,6 +93,7 @@ export const BattlePreparationScreen = React.memo(
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const userBalance = useAppSelector((state) => state.balance.total ?? 0);
   const [assignToBattalion] = useAssignToBattalionMutation();
+  const [assignPresetBattalions] = useAssignPresetBattalionsMutation();
   const { refetch: refetchBots } = useFetchBotsQuery();
   const [startBattle] = useStartBattleMutation();
   const [deactivateShield] = useDeactivateShieldMutation();
@@ -207,71 +212,87 @@ export const BattlePreparationScreen = React.memo(
     }
   }, [selectedBattalion, assignToBattalion]);
 
-  const resetBattalions = React.useCallback(async () => {
-    const resetPromises = [
-      assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'A' }).unwrap(),
-      assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'B' }).unwrap(),
-    ];
-    if (isBattalionCUnlocked) {
-      resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'C' }).unwrap());
-    }
-    if (isBattalionDUnlocked) {
-      resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'D' }).unwrap());
-    }
-    if (isBattalionEUnlocked) {
-      resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'E' }).unwrap());
-    }
-    if (isBattalionFUnlocked) {
-      resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'F' }).unwrap());
-    }
-    await Promise.all(resetPromises);
-  }, [assignToBattalion, isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked]);
+  /** Serialize preset applies; skip identical successful lineup. Preset uses POST /assign-preset (one request) to avoid per-slot rate limits. */
+  const presetApplyChainRef = useRef(Promise.resolve());
+  const lastSuccessfulPresetSigRef = useRef<string | null>(null);
 
-  const handleApplyPreset = React.useCallback(async (presetAssignments: Record<string, BattalionAssignment>) => {
-    try {
-      await resetBattalions();
-      setAssignments({});
+  const handleApplyPreset = React.useCallback(
+    (presetId: string, presetAssignments: Record<string, BattalionAssignment>) => {
+      const sig = `${presetId}:${JSON.stringify(
+        ['A', 'B', 'C', 'D', 'E', 'F'].map((id) => presetAssignments[id] ?? null)
+      )}`;
 
-      const assignPromises = Object.entries(presetAssignments).map(([battalionId, assignment]) => {
-        if (!assignment || assignment.quantity <= 0) return Promise.resolve();
-        return assignToBattalion({
-          botType: assignment.botType as BotType,
-          quantity: assignment.quantity,
-          battalionId,
-        }).unwrap();
-      });
-      await Promise.all(assignPromises);
-
-      setAssignments(presetAssignments);
-    } catch (error) {
-      console.error('Failed to apply preset:', error);
-      Alert.alert(
-        'Could not apply preset',
-        'Your battalion lineup may not match the server. Try again or assign manually.',
-      );
-      try {
-        const { data } = await refetchBots();
-        const list = data?.battalionAssignments as
-          | Array<{ battalionId: string; botType: BotType; quantity: number; markLevel?: number }>
-          | undefined;
-        if (list) {
-          const next: Record<string, BattalionAssignment> = {};
-          for (const a of list) {
-            if (a.battalionId && a.quantity > 0) {
-              next[a.battalionId] = {
-                botType: a.botType,
+      const task = async () => {
+        if (lastSuccessfulPresetSigRef.current === sig) {
+          return;
+        }
+        setAssignments(presetAssignments);
+        try {
+          const assignmentList = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((battalionId) => {
+            const a = presetAssignments[battalionId];
+            if (!a || a.quantity <= 0) return [];
+            return [
+              {
+                battalionId,
+                botType: a.botType as BotType,
                 quantity: a.quantity,
                 markLevel: a.markLevel ?? 1,
-              };
-            }
+              },
+            ];
+          });
+          await assignPresetBattalions({ assignments: assignmentList }).unwrap();
+          setAssignments(presetAssignments);
+          lastSuccessfulPresetSigRef.current = sig;
+          refetchBots().catch(() => {});
+        } catch (error: unknown) {
+          console.error('Failed to apply preset:', error);
+          lastSuccessfulPresetSigRef.current = null;
+          const status =
+            error && typeof error === 'object' && 'status' in error
+              ? (error as { status?: number }).status
+              : undefined;
+          if (status === 429) {
+            Alert.alert(
+              'Slow down',
+              'Too many battalion updates at once. Wait a few seconds and try again.',
+            );
+          } else {
+            Alert.alert(
+              'Could not apply preset',
+              'Your battalion lineup may not match the server. Try again or assign manually.',
+            );
           }
-          setAssignments(next);
+          try {
+            const { data } = await refetchBots();
+            const list = data?.battalionAssignments as
+              | Array<{ battalionId: string; botType: BotType; quantity: number; markLevel?: number }>
+              | undefined;
+            if (list) {
+              const next: Record<string, BattalionAssignment> = {};
+              for (const a of list) {
+                if (a.battalionId && a.quantity > 0) {
+                  next[a.battalionId] = {
+                    botType: a.botType,
+                    quantity: a.quantity,
+                    markLevel: a.markLevel ?? 1,
+                  };
+                }
+              }
+              setAssignments(next);
+            }
+          } catch (refetchErr) {
+            console.error('Failed to refetch bots after preset error:', refetchErr);
+          }
         }
-      } catch (refetchErr) {
-        console.error('Failed to refetch bots after preset error:', refetchErr);
-      }
-    }
-  }, [resetBattalions, assignToBattalion, refetchBots]);
+      };
+
+      presetApplyChainRef.current = presetApplyChainRef.current.then(task).catch(() => {
+        /* task handles errors; keep chain usable for the next preset tap */
+      });
+      return presetApplyChainRef.current;
+    },
+    [assignPresetBattalions, refetchBots]
+  );
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {

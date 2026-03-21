@@ -17,6 +17,48 @@ function presetKey(id: string): PresetKey {
   return `preset${id}` as PresetKey;
 }
 
+/**
+ * Mixed/legacy documents may store battalion keys as lowercase or odd shapes; API always returns A–F keys.
+ */
+function normalizeBattalionsFromRaw(raw: unknown): Record<string, { botType: string; quantity: number }> | null {
+  if (raw == null) return null;
+  let obj: Record<string, unknown>;
+  if (raw instanceof Map) {
+    obj = Object.fromEntries(raw);
+  } else if (typeof raw === 'object' && !Array.isArray(raw)) {
+    obj = raw as Record<string, unknown>;
+  } else {
+    return null;
+  }
+  const out: Record<string, { botType: string; quantity: number }> = {};
+  for (const id of VALID_BATTALION_IDS) {
+    const v = obj[id] ?? obj[id.toLowerCase()];
+    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+    const cfg = v as Record<string, unknown>;
+    const rawBt = typeof cfg.botType === 'string' ? cfg.botType.trim().toLowerCase() : '';
+    if (!rawBt || !VALID_BOT_TYPES.includes(rawBt as (typeof VALID_BOT_TYPES)[number])) {
+      continue;
+    }
+    const botType = rawBt;
+    const rawQty = cfg.quantity;
+    let qty: number;
+    if (typeof rawQty === 'number' && Number.isFinite(rawQty)) {
+      qty = Math.round(rawQty);
+    } else if (typeof rawQty === 'string' && /^\d+$/.test(rawQty.trim())) {
+      qty = parseInt(rawQty.trim(), 10);
+    } else {
+      continue;
+    }
+    if (!Number.isInteger(qty) || qty < 0) {
+      continue;
+    }
+    if (qty > 0) {
+      out[id] = { botType, quantity: qty };
+    }
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 function buildPresetsResponse(user: any) {
   const presets: Record<string, any> = {};
   for (const id of VALID_PRESET_IDS) {
@@ -29,7 +71,7 @@ function buildPresetsResponse(user: any) {
       cost: def.cost,
       unlocked: isUnlocked,
       unlockedAt: isUnlocked ? data.unlockedAt : null,
-      battalions: isUnlocked && data.battalions ? data.battalions : null,
+      battalions: isUnlocked ? normalizeBattalionsFromRaw(data?.battalions) : null,
     };
   }
   return presets;
@@ -101,13 +143,36 @@ router.post('/:presetId/unlock', auth, async (req: Request, res: Response): Prom
 
     const newBalance = accrued.total - def.cost;
 
-    // Atomic guard: only one concurrent unlock can match — preset must still be locked (Bugbot: double-charge race if filter is only _id).
+    const frRead = user.balance.fractionalRemainder ?? 0;
+    const fractionalFingerprint =
+      frRead === 0
+        ? {
+            $or: [
+              { 'balance.fractionalRemainder': 0 },
+              { 'balance.fractionalRemainder': null },
+              { 'balance.fractionalRemainder': { $exists: false } },
+            ],
+          }
+        : { 'balance.fractionalRemainder': frRead };
+
+    // Atomic guard: preset still locked + balance row unchanged since read (Bugbot: concurrent unlocks of
+    // different presets must not both deduct from the same stale balance snapshot).
     const updateResult = await User.findOneAndUpdate(
       {
         _id: req.user._id,
-        $or: [
-          { [`battlePresets.${key}.unlockedAt`]: { $exists: false } },
-          { [`battlePresets.${key}.unlockedAt`]: null },
+        $and: [
+          {
+            $or: [
+              { [`battlePresets.${key}.unlockedAt`]: { $exists: false } },
+              { [`battlePresets.${key}.unlockedAt`]: null },
+            ],
+          },
+          {
+            'balance.total': user.balance.total,
+            'balance.ratePerSecond': user.balance.ratePerSecond,
+            'balance.lastUpdated': user.balance.lastUpdated,
+          },
+          fractionalFingerprint,
         ],
       },
       {
@@ -131,14 +196,14 @@ router.post('/:presetId/unlock', auth, async (req: Request, res: Response): Prom
         res.status(400).json({ error: 'Preset already unlocked.' });
         return;
       }
-      res.status(500).json({ error: 'Failed to unlock preset.' });
+      res.status(409).json({ error: 'Balance changed. Please try again.' });
       return;
     }
 
     res.json({
       success: true,
       presets: buildPresetsResponse(updateResult),
-      newBalance,
+      newBalance: updateResult.balance.total,
     });
   } catch (error) {
     console.error('Error unlocking battle preset:', error);
@@ -175,9 +240,10 @@ router.put('/:presetId', auth, async (req: Request, res: Response): Promise<void
     }
 
     const validatedBattalions: Record<string, { botType: string; quantity: number }> = {};
-    for (const [battalionId, config] of Object.entries(battalions)) {
+    for (const [battalionIdRaw, config] of Object.entries(battalions)) {
+      const battalionId = String(battalionIdRaw).toUpperCase();
       if (!VALID_BATTALION_IDS.includes(battalionId as any)) {
-        res.status(400).json({ error: `Invalid battalion ID: ${battalionId}. Must be A–F.` });
+        res.status(400).json({ error: `Invalid battalion ID: ${battalionIdRaw}. Must be A–F.` });
         return;
       }
       const cfg = config as any;

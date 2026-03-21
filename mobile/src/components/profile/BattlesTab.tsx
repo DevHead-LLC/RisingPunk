@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -49,7 +49,16 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
     return result;
   }, [preset.battalions]);
 
-  const [battalions, setBattalions] = useState(initialBattalions);
+  const serverBattalionsSig = useMemo(
+    () => JSON.stringify(preset.battalions ?? {}),
+    [preset.battalions]
+  );
+
+  const [battalions, setBattalions] = useState(() => initialBattalions());
+
+  useEffect(() => {
+    setBattalions(initialBattalions());
+  }, [preset.id, serverBattalionsSig, initialBattalions]);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [openBotPickerForRow, setOpenBotPickerForRow] = useState<string | null>(null);
 
@@ -196,7 +205,9 @@ const LockedPreset = React.memo(({ preset, colors }: LockedPresetProps) => (
 
 export function BattlesTab(): React.JSX.Element {
   const colors = useThemeColors();
-  const { data, isLoading } = useGetBattlePresetsQuery();
+  const { data, isLoading } = useGetBattlePresetsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
 
   if (isLoading || !data) {
     return (

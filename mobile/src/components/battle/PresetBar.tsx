@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,47 @@ import { NotificationBanner } from '../common/NotificationBanner';
 import type { BattalionAssignment } from './BattalionSlot';
 import type { BotType } from '../../types/bots';
 import { useBattalionMaxSize } from '../../hooks/useBattalionSlotUnlocks';
+import { useFetchBotsQuery } from '../../store/api/botsApi';
+
+const BOT_TYPES: readonly BotType[] = ['breacher', 'guardian', 'phreak'];
+
+function normalizePresetBotType(raw: string): BotType | null {
+  const s = raw.trim().toLowerCase();
+  return BOT_TYPES.includes(s as BotType) ? (s as BotType) : null;
+}
+
+function labelForBotType(t: BotType): string {
+  if (t === 'breacher') return 'Breacher';
+  if (t === 'guardian') return 'Guardian';
+  return 'Phreak';
+}
+
+function collectPresetBotTypes(preset: PresetData): BotType[] {
+  const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
+  const seen = new Set<BotType>();
+  const out: BotType[] = [];
+  if (!preset.battalions) return out;
+  const rec = preset.battalions as Record<string, { botType: string; quantity: number }>;
+  for (const slotId of fillOrder) {
+    const c = rec[slotId] ?? rec[slotId.toLowerCase()];
+    if (!c || c.quantity <= 0) continue;
+    const bt = normalizePresetBotType(c.botType);
+    if (!bt || seen.has(bt)) continue;
+    seen.add(bt);
+    out.push(bt);
+  }
+  return out;
+}
+
+function presetHasConfiguredSlots(preset: PresetData): boolean {
+  const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
+  if (!preset.battalions) return false;
+  const rec = preset.battalions as Record<string, { botType: string; quantity: number }>;
+  return fillOrder.some((id) => {
+    const c = rec[id] ?? rec[id.toLowerCase()];
+    return c != null && c.quantity > 0 && normalizePresetBotType(c.botType) != null;
+  });
+}
 
 interface PresetBarProps {
   botCounts: Record<BotType, number>;
@@ -28,16 +69,29 @@ interface PresetBarProps {
     isBattalionEUnlocked: boolean;
     isBattalionFUnlocked: boolean;
   };
-  onApplyPreset: (assignments: Record<string, BattalionAssignment>) => void;
+  /** presetId + assignments; returns a promise so the bar can debounce UI and await one sync at a time. */
+  onApplyPreset: (presetId: string, assignments: Record<string, BattalionAssignment>) => Promise<void>;
 }
 
 export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, onApplyPreset }: PresetBarProps) => {
   const colors = useThemeColors();
-  const { data: presetsData } = useGetBattlePresetsQuery();
+  const { data: presetsData, refetch: refetchPresets } = useGetBattlePresetsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const { data: botsQueryData } = useFetchBotsQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const effectiveBotCounts = useMemo(
+    () => botsQueryData?.bots ?? botCounts,
+    [botsQueryData?.bots, botCounts]
+  );
   const [unlockPreset] = useUnlockPresetMutation();
   const maxBattalionSize = useBattalionMaxSize();
   const [bannerVisible, setBannerVisible] = useState(false);
   const [bannerMessage, setBannerMessage] = useState('');
+  /** Sync gate so two taps in the same tick cannot both start onApplyPreset (state updates are async). */
+  const presetApplyGateRef = useRef(false);
+  const [presetApplyBusy, setPresetApplyBusy] = useState(false);
 
   const showBanner = useCallback((msg: string) => {
     setBannerVisible(false);
@@ -56,42 +110,57 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     return false;
   }, [unlockedSlots]);
 
-  const applyPreset = useCallback((preset: PresetData) => {
-    if (!preset.battalions || Object.keys(preset.battalions).length === 0) {
-      showBanner('Set up this preset in Profile > Battles.');
-      return;
-    }
+  const getSlotConfig = useCallback((battalions: PresetData['battalions'], slotId: string) => {
+    if (!battalions) return undefined;
+    const rec = battalions as Record<string, { botType: string; quantity: number }>;
+    return rec[slotId] ?? rec[slotId.toLowerCase()];
+  }, []);
 
-    const remaining: Record<string, number> = {
-      breacher: botCounts.breacher ?? 0,
-      guardian: botCounts.guardian ?? 0,
-      phreak: botCounts.phreak ?? 0,
-    };
+  const buildAssignmentsForPreset = useCallback(
+    (preset: PresetData, counts: Record<BotType, number>): Record<string, BattalionAssignment> | null => {
+      const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
+      const hasConfigured = fillOrder.some((id) => {
+        const c = getSlotConfig(preset.battalions, id);
+        return c != null && c.quantity > 0 && normalizePresetBotType(c.botType) != null;
+      });
+      if (!hasConfigured) {
+        return null;
+      }
 
-    const newAssignments: Record<string, BattalionAssignment> = {};
-    const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
-
-    for (const slotId of fillOrder) {
-      if (!isSlotUnlocked(slotId)) continue;
-
-      const config = preset.battalions[slotId];
-      if (!config || config.quantity <= 0) continue;
-
-      const available = remaining[config.botType] ?? 0;
-      if (available <= 0) continue;
-
-      const toAssign = Math.min(config.quantity, available, maxBattalionSize);
-      remaining[config.botType] -= toAssign;
-
-      newAssignments[slotId] = {
-        botType: config.botType,
-        quantity: toAssign,
-        markLevel: 1,
+      const remaining: Record<string, number> = {
+        breacher: counts.breacher ?? 0,
+        guardian: counts.guardian ?? 0,
+        phreak: counts.phreak ?? 0,
       };
-    }
 
-    onApplyPreset(newAssignments);
-  }, [botCounts, isSlotUnlocked, onApplyPreset, showBanner, maxBattalionSize]);
+      const newAssignments: Record<string, BattalionAssignment> = {};
+
+      for (const slotId of fillOrder) {
+        if (!isSlotUnlocked(slotId)) continue;
+
+        const config = getSlotConfig(preset.battalions, slotId);
+        if (!config || config.quantity <= 0) continue;
+
+        const bt = normalizePresetBotType(config.botType);
+        if (!bt) continue;
+
+        const available = remaining[bt] ?? 0;
+        if (available <= 0) continue;
+
+        const toAssign = Math.min(config.quantity, available, maxBattalionSize);
+        remaining[bt] -= toAssign;
+
+        newAssignments[slotId] = {
+          botType: bt,
+          quantity: toAssign,
+          markLevel: 1,
+        };
+      }
+
+      return Object.keys(newAssignments).length > 0 ? newAssignments : null;
+    },
+    [isSlotUnlocked, maxBattalionSize, getSlotConfig]
+  );
 
   const handlePresetPress = useCallback(async (preset: PresetData) => {
     const userLevel = presetsData?.userLevel ?? 0;
@@ -134,8 +203,56 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
       return;
     }
 
-    applyPreset(preset);
-  }, [presetsData?.userLevel, userBalance, unlockPreset, applyPreset, showBanner]);
+    const presetFromCache = presetsData.presets[preset.id];
+    if (!presetFromCache) {
+      showBanner('Preset data not loaded.');
+      return;
+    }
+
+    const built = buildAssignmentsForPreset(presetFromCache, effectiveBotCounts);
+    if (!built) {
+      if (!presetHasConfiguredSlots(presetFromCache)) {
+        showBanner('Set up this preset in Profile > Battles.');
+        return;
+      }
+      const needed = collectPresetBotTypes(presetFromCache);
+      const missing = needed.filter((t) => (effectiveBotCounts[t] ?? 0) <= 0);
+      if (missing.length > 0) {
+        const names = missing.map(labelForBotType).join(', ');
+        showBanner(
+          `This preset needs ${names}, but you have none in your army. Build them in Digital Barracks, or use a preset that matches troops you already have.`,
+        );
+        return;
+      }
+      showBanner('Could not fill this preset. Some battalion slots may be locked — unlock them in research or assign manually.');
+      return;
+    }
+
+    if (presetApplyGateRef.current) {
+      return;
+    }
+    presetApplyGateRef.current = true;
+    setPresetApplyBusy(true);
+    try {
+      await onApplyPreset(preset.id, built);
+      refetchPresets().catch(() => {});
+    } catch {
+      // Parent handles alert; applies are serialized in BattlePreparationScreen.
+    } finally {
+      presetApplyGateRef.current = false;
+      setPresetApplyBusy(false);
+    }
+  }, [
+    presetsData?.userLevel,
+    presetsData?.presets,
+    userBalance,
+    unlockPreset,
+    buildAssignmentsForPreset,
+    onApplyPreset,
+    showBanner,
+    refetchPresets,
+    effectiveBotCounts,
+  ]);
 
   if (!presetsData) return null;
 
@@ -144,7 +261,7 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
 
   return (
     <>
-      <View style={styles.container}>
+      <View style={[styles.container, presetApplyBusy && { opacity: 0.55 }]} pointerEvents={presetApplyBusy ? 'none' : 'auto'}>
         {presetList.map(preset => {
           const isUnderLevel = userLevel < preset.levelRequired;
           const isPurchased = preset.unlocked;
@@ -160,6 +277,7 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
               ]}
               onPress={() => handlePresetPress(preset)}
               activeOpacity={0.7}
+              disabled={presetApplyBusy}
             >
               <Text style={[
                 styles.presetLabel,
