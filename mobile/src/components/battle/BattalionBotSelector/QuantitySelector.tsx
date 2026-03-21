@@ -6,8 +6,8 @@ import { useTheme } from '../../../context/ThemeContext';
 import { KeyboardAwareInput } from '../../common/KeyboardAwareInput';
 import { useGetUserFeaturesQuery } from '../../../store/api/researchFeaturesApi';
 import {
-  BATTALION_SIZE_FEATURE_IDS,
   computeBattalionMaxSizeFromFeatures,
+  useBattalionSizeResearchNowMs,
 } from '../../../hooks/useBattalionSlotUnlocks';
 
 type Props = {
@@ -21,22 +21,11 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
-  const [currentTime, setCurrentTime] = React.useState(() => Date.now());
-
-  React.useEffect(() => {
-    const anyResearching = BATTALION_SIZE_FEATURE_IDS.some(id => {
-      const f = hackAbilityFeatures?.find(feature => feature.id === id);
-      return f?.isResearching && f?.researchCompletesAt;
-    });
-    if (anyResearching) {
-      const interval = setInterval(() => setCurrentTime(Date.now()), 1000);
-      return () => clearInterval(interval);
-    }
-  }, [hackAbilityFeatures]);
+  const researchNowMs = useBattalionSizeResearchNowMs(hackAbilityFeatures);
 
   const MAX_BATTALION_SIZE = React.useMemo(
-    () => computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, currentTime),
-    [hackAbilityFeatures, currentTime]
+    () => computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, researchNowMs),
+    [hackAbilityFeatures, researchNowMs]
   );
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
 

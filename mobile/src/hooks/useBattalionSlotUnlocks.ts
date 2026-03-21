@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 
 /** Feature shape from getUserFeatures (hack-ability). */
@@ -27,8 +27,22 @@ function isResearchFeatureEffectivelyUnlockedAt(
   return !!(feature.isResearching && researchCompletesAtMs <= nowMs);
 }
 
-function isResearchFeatureEffectivelyUnlocked(feature: FeatureWithResearch | null | undefined): boolean {
-  return isResearchFeatureEffectivelyUnlockedAt(feature, Date.now());
+/** While any listed feature is researching toward a completion time, tick once per second so unlock/size logic updates when `researchCompletesAt` passes (without waiting for RTK refetch). */
+function useResearchCompletesAtTicker(
+  features: FeatureWithResearch[] | undefined,
+  watchIds: readonly string[]
+): number {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const anyResearching = watchIds.some((id) => {
+      const f = features?.find((x) => x.id === id);
+      return f?.isResearching && f?.researchCompletesAt;
+    });
+    if (!anyResearching) return;
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [features, watchIds]);
+  return nowMs;
 }
 
 /** Ordered battalion-size research feature ids; max cap per tier is in `BATTALION_SIZE_MAP`. */
@@ -69,15 +83,38 @@ export function computeBattalionMaxSizeFromFeatures(
 }
 
 /**
+ * Monotonic clock while any battalion-size research is in progress (matches QuantitySelector / PresetBar).
+ */
+export function useBattalionSizeResearchNowMs(
+  hackAbilityFeatures: FeatureWithResearch[] | undefined
+): number {
+  return useResearchCompletesAtTicker(hackAbilityFeatures, BATTALION_SIZE_FEATURE_IDS);
+}
+
+const ADD_BATTALION_SLOT_FEATURE_IDS = [
+  'add-battalion-c',
+  'add-battalion-d',
+  'add-battalion-e',
+  'add-battalion-f',
+] as const;
+
+function useAddBattalionSlotResearchNowMs(
+  hackAbilityFeatures: FeatureWithResearch[] | undefined
+): number {
+  return useResearchCompletesAtTicker(hackAbilityFeatures, ADD_BATTALION_SLOT_FEATURE_IDS);
+}
+
+/**
  * Returns the current maximum troops allowed per battalion based on research unlocks.
  * Base is 250; each successive battalion-size research doubles/raises it.
  */
 export function useBattalionMaxSize(): number {
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+  const nowMs = useBattalionSizeResearchNowMs(hackAbilityFeatures);
 
   return useMemo(
-    () => computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, Date.now()),
-    [hackAbilityFeatures]
+    () => computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, nowMs),
+    [hackAbilityFeatures, nowMs]
   );
 }
 
@@ -92,6 +129,7 @@ export function useBattalionSlotUnlocks(): {
   isBattalionFUnlocked: boolean;
 } {
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+  const nowMs = useAddBattalionSlotResearchNowMs(hackAbilityFeatures);
 
   return useMemo(() => {
     const battalionC = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-c');
@@ -99,10 +137,10 @@ export function useBattalionSlotUnlocks(): {
     const battalionE = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-e');
     const battalionF = hackAbilityFeatures?.find((f: { id?: string }) => f.id === 'add-battalion-f');
     return {
-      isBattalionCUnlocked: isResearchFeatureEffectivelyUnlocked(battalionC),
-      isBattalionDUnlocked: isResearchFeatureEffectivelyUnlocked(battalionD),
-      isBattalionEUnlocked: isResearchFeatureEffectivelyUnlocked(battalionE),
-      isBattalionFUnlocked: isResearchFeatureEffectivelyUnlocked(battalionF),
+      isBattalionCUnlocked: isResearchFeatureEffectivelyUnlockedAt(battalionC, nowMs),
+      isBattalionDUnlocked: isResearchFeatureEffectivelyUnlockedAt(battalionD, nowMs),
+      isBattalionEUnlocked: isResearchFeatureEffectivelyUnlockedAt(battalionE, nowMs),
+      isBattalionFUnlocked: isResearchFeatureEffectivelyUnlockedAt(battalionF, nowMs),
     };
-  }, [hackAbilityFeatures]);
+  }, [hackAbilityFeatures, nowMs]);
 }

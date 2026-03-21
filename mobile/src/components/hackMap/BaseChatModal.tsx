@@ -126,7 +126,8 @@ function battleReportViewerIsAttacker(
   if (ch && ah && ch === ah) return true;
   if (ch && dh && ch === dh) return false;
 
-  return ul === al;
+  // Non-empty id matches are handled above; remaining '' === '' must not count as attacker (Bugbot).
+  return false;
 }
 
 export interface ChatMessageForModal {
