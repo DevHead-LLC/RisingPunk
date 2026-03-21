@@ -60,6 +60,27 @@ export interface BattleReportBotCounts {
   phreak: number;
 }
 
+/** Parse/validate bot count object from BTL JSON; returns null if shape is unusable (Bugbot: matches probe `b` guard). */
+function normalizeBattleReportBotCounts(raw: unknown): BattleReportBotCounts | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const n = (v: unknown): number | null => {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      return Math.max(0, Math.floor(v));
+    }
+    if (typeof v === 'string' && v.trim() !== '') {
+      const parsed = Number(v);
+      if (Number.isFinite(parsed)) return Math.max(0, Math.floor(parsed));
+    }
+    return null;
+  };
+  const guardian = n(o.guardian);
+  const breacher = n(o.breacher);
+  const phreak = n(o.phreak);
+  if (guardian === null || breacher === null || phreak === null) return null;
+  return { guardian, breacher, phreak };
+}
+
 export interface BattleReportPayload {
   br: 1;
   attackerId: string;
@@ -88,7 +109,19 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
     const json = message.slice(BATTLE_REPORT_PREFIX.length);
     const payload = JSON.parse(json) as BattleReportPayload;
     if (payload?.br !== 1 || payload.attackerHandle == null || payload.defenderHandle == null) return null;
-    return payload;
+    if (payload.winner !== 'user' && payload.winner !== 'enemy') return null;
+    const attackerStart = normalizeBattleReportBotCounts(payload.attackerStart);
+    const defenderStart = normalizeBattleReportBotCounts(payload.defenderStart);
+    const attackerLost = normalizeBattleReportBotCounts(payload.attackerLost);
+    const defenderLost = normalizeBattleReportBotCounts(payload.defenderLost);
+    if (!attackerStart || !defenderStart || !attackerLost || !defenderLost) return null;
+    return {
+      ...payload,
+      attackerStart,
+      defenderStart,
+      attackerLost,
+      defenderLost,
+    };
   } catch (_) {
     // ignore
   }
