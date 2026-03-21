@@ -5,15 +5,10 @@ import { useThemeColors } from '../../../hooks/useThemeColors';
 import { useTheme } from '../../../context/ThemeContext';
 import { KeyboardAwareInput } from '../../common/KeyboardAwareInput';
 import { useGetUserFeaturesQuery } from '../../../store/api/researchFeaturesApi';
-
-const BATTALION_SIZE_FEATURE_IDS = [
-  'battalion-size-250',
-  'battalion-size-500',
-  'battalion-size-1000',
-  'battalion-size-2000',
-  'battalion-size-4500',
-  'battalion-size-6500',
-] as const;
+import {
+  BATTALION_SIZE_FEATURE_IDS,
+  computeBattalionMaxSizeFromFeatures,
+} from '../../../hooks/useBattalionSlotUnlocks';
 
 type Props = {
   quantity: number;
@@ -39,26 +34,10 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
     }
   }, [hackAbilityFeatures]);
 
-  const MAX_BATTALION_SIZE = React.useMemo(() => {
-    const now = currentTime;
-    let max = 250;
-    for (const id of BATTALION_SIZE_FEATURE_IDS) {
-      const f = hackAbilityFeatures?.find(feature => feature.id === id);
-      if (!f) break;
-      const researchCompletesAt = f.researchCompletesAt ? new Date(f.researchCompletesAt).getTime() : null;
-      const effectivelyUnlocked =
-        f.isUnlocked || (!!f.isResearching && researchCompletesAt !== null && researchCompletesAt <= now);
-      if (effectivelyUnlocked) {
-        if (id === 'battalion-size-250') max = 500;
-        else if (id === 'battalion-size-500') max = 1000;
-        else if (id === 'battalion-size-1000') max = 2000;
-        else if (id === 'battalion-size-2000') max = 4000;
-        else if (id === 'battalion-size-4500') max = 8500;
-        else if (id === 'battalion-size-6500') max = 15000;
-      } else break;
-    }
-    return max;
-  }, [hackAbilityFeatures, currentTime]);
+  const MAX_BATTALION_SIZE = React.useMemo(
+    () => computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, currentTime),
+    [hackAbilityFeatures, currentTime]
+  );
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
 
   const adjustQuantity = React.useCallback((adjustment: number) => {
@@ -84,7 +63,7 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
     
     const safeValue = Math.min(Math.max(0, maxQuantity), MAX_BATTALION_SIZE);
     onChangeQuantity(safeValue);
-  }, [maxQuantity, onChangeQuantity]);
+  }, [maxQuantity, onChangeQuantity, MAX_BATTALION_SIZE]);
 
   return (
     <View style={styles.container}>

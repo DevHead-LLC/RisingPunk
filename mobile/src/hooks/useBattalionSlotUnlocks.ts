@@ -10,21 +10,29 @@ interface FeatureWithResearch {
 }
 
 /**
- * Whether a research feature is effectively unlocked (unlocked or research just completed).
+ * Whether a research feature is effectively unlocked at `nowMs` (unlocked or research just completed).
  * Matches server-side isBattalionSlotUnlocked: requires a valid researchCompletesAt before
  * treating "researching" as complete; missing timestamp is not treated as epoch (unlocked).
  */
-function isResearchFeatureEffectivelyUnlocked(feature: FeatureWithResearch | null | undefined): boolean {
+function isResearchFeatureEffectivelyUnlockedAt(
+  feature: FeatureWithResearch | null | undefined,
+  nowMs: number
+): boolean {
   if (!feature) return false;
   if (feature.isUnlocked) return true;
   const researchCompletesAtMs = feature.researchCompletesAt
     ? new Date(feature.researchCompletesAt).getTime()
     : null;
   if (researchCompletesAtMs === null) return false;
-  return !!(feature.isResearching && researchCompletesAtMs <= Date.now());
+  return !!(feature.isResearching && researchCompletesAtMs <= nowMs);
 }
 
-const BATTALION_SIZE_FEATURE_IDS = [
+function isResearchFeatureEffectivelyUnlocked(feature: FeatureWithResearch | null | undefined): boolean {
+  return isResearchFeatureEffectivelyUnlockedAt(feature, Date.now());
+}
+
+/** Ordered battalion-size research feature ids; max cap per tier is in `BATTALION_SIZE_MAP`. */
+export const BATTALION_SIZE_FEATURE_IDS = [
   'battalion-size-250',
   'battalion-size-500',
   'battalion-size-1000',
@@ -33,7 +41,7 @@ const BATTALION_SIZE_FEATURE_IDS = [
   'battalion-size-6500',
 ] as const;
 
-const BATTALION_SIZE_MAP: Record<string, number> = {
+const BATTALION_SIZE_MAP: Record<(typeof BATTALION_SIZE_FEATURE_IDS)[number], number> = {
   'battalion-size-250': 500,
   'battalion-size-500': 1000,
   'battalion-size-1000': 2000,
@@ -43,22 +51,34 @@ const BATTALION_SIZE_MAP: Record<string, number> = {
 };
 
 /**
+ * Pure max battalion size from hack-ability features at a given time (e.g. `Date.now()` or a ticking clock while research completes).
+ * Single source of truth with `useBattalionMaxSize`.
+ */
+export function computeBattalionMaxSizeFromFeatures(
+  hackAbilityFeatures: FeatureWithResearch[] | undefined,
+  nowMs: number
+): number {
+  let max = 250;
+  for (const id of BATTALION_SIZE_FEATURE_IDS) {
+    const f = hackAbilityFeatures?.find((feat) => feat.id === id);
+    if (!f) break;
+    if (!isResearchFeatureEffectivelyUnlockedAt(f, nowMs)) break;
+    max = BATTALION_SIZE_MAP[id] ?? max;
+  }
+  return max;
+}
+
+/**
  * Returns the current maximum troops allowed per battalion based on research unlocks.
  * Base is 250; each successive battalion-size research doubles/raises it.
  */
 export function useBattalionMaxSize(): number {
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
 
-  return useMemo(() => {
-    let max = 250;
-    for (const id of BATTALION_SIZE_FEATURE_IDS) {
-      const f = hackAbilityFeatures?.find((feat: { id?: string }) => feat.id === id);
-      if (!f) break;
-      if (!isResearchFeatureEffectivelyUnlocked(f)) break;
-      max = BATTALION_SIZE_MAP[id] ?? max;
-    }
-    return max;
-  }, [hackAbilityFeatures]);
+  return useMemo(
+    () => computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, Date.now()),
+    [hackAbilityFeatures]
+  );
 }
 
 /**
