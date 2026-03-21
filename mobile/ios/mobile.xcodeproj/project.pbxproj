@@ -182,6 +182,7 @@
 				B94813282E870CC50020DD49 /* FontAwesome.ttf */,
 				B94813292E870CC50020DD49 /* Ionicons.ttf */,
 			);
+			name = fonts;
 			path = ../src/assets/fonts;
 			sourceTree = "<group>";
 		};
