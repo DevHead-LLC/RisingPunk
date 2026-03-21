@@ -291,7 +291,13 @@ export class BattleService {
 
       // Send battle result DMs to attacker and defender (same pattern as Probe Report)
       try {
-        await sendBattleNotifications(battle, pvpCashTransferred);
+        const battleForNotifications = await this.getBattle(battleId);
+        if (!battleForNotifications) {
+          console.error('Battle document missing before notifications for', battleId);
+        } else {
+          // Fresh read so BTL payload uses persisted battalions (in-memory battle can diverge if battle doc is updated between save and send).
+          await sendBattleNotifications(battleForNotifications, pvpCashTransferred);
+        }
       } catch (e) {
         console.error('Battle notifications failed for', battleId, e);
       }

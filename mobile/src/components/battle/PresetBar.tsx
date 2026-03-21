@@ -22,6 +22,29 @@ import { useFetchBotsQuery } from '../../store/api/botsApi';
 
 const BOT_TYPES: readonly BotType[] = ['breacher', 'guardian', 'phreak'];
 
+/** Strict `Record<BotType, number>` from RTK/API or props; ignores extra keys and bad values (Bugbot). */
+function normalizeBotCountsToRecord(raw: unknown): Record<BotType, number> {
+  const n = (v: unknown): number => {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      return Math.max(0, Math.floor(v));
+    }
+    if (typeof v === 'string' && v.trim() !== '') {
+      const parsed = Number(v);
+      if (Number.isFinite(parsed)) return Math.max(0, Math.floor(parsed));
+    }
+    return 0;
+  };
+  if (!raw || typeof raw !== 'object') {
+    return { breacher: 0, guardian: 0, phreak: 0 };
+  }
+  const o = raw as Record<string, unknown>;
+  return {
+    breacher: n(o.breacher),
+    guardian: n(o.guardian),
+    phreak: n(o.phreak),
+  };
+}
+
 function normalizePresetBotType(raw: string): BotType | null {
   const s = raw.trim().toLowerCase();
   return BOT_TYPES.includes(s as BotType) ? (s as BotType) : null;
@@ -81,10 +104,10 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
   const { data: botsQueryData } = useFetchBotsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
-  const effectiveBotCounts = useMemo(
-    () => botsQueryData?.bots ?? botCounts,
-    [botsQueryData?.bots, botCounts]
-  );
+  const effectiveBotCounts = useMemo(() => {
+    const src = botsQueryData?.bots != null ? botsQueryData.bots : botCounts;
+    return normalizeBotCountsToRecord(src);
+  }, [botsQueryData?.bots, botCounts]);
   const [unlockPreset] = useUnlockPresetMutation();
   const maxBattalionSize = useBattalionMaxSize();
   const [bannerVisible, setBannerVisible] = useState(false);
