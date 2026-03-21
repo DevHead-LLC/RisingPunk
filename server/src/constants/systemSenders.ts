@@ -9,3 +9,9 @@ export const PROBE_REPORT_SENDER_ID: mongoose.Types.ObjectId =
   new mongoose.Types.ObjectId('000000000000000000000001');
 
 export const PROBE_REPORT_SENDER_USERNAME = 'Probe Report';
+
+/** System sender for battle result DMs (PvP hack attack notifications). */
+export const BATTLE_REPORT_SENDER_ID: mongoose.Types.ObjectId =
+  new mongoose.Types.ObjectId('000000000000000000000002');
+
+export const BATTLE_REPORT_SENDER_USERNAME = 'Battle Report';

@@ -383,89 +383,117 @@ export class ResearchFeatureService {
     categoryId: string,
     featureId: string
   ): Promise<CompleteResearchResult> {
-    const session = await mongoose.startSession();
-    
-    try {
-      return await session.withTransaction(async () => {
-        const userResearchFeature = await UserResearchFeature.findOne({
-          userId,
-          ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
-        }).session(session);
+    const maxAttempts = 5;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const session = await mongoose.startSession();
+      try {
+        const result = await session.withTransaction(async () => {
+          const userResearchFeature = await UserResearchFeature.findOne({
+            userId,
+            ...ResearchFeatureService.getFeatureIdFindFilter(categoryId, featureId),
+          }).session(session);
 
-        if (!userResearchFeature) {
-          return {
-            success: false,
-            message: 'Research feature not found'
-          };
-        }
-
-        if (!userResearchFeature.isResearching) {
-          return {
-            success: false,
-            message: 'No research in progress for this feature'
-          };
-        }
-
-        if (userResearchFeature.isUnlocked) {
-          return {
-            success: false,
-            message: 'Feature already unlocked'
-          };
-        }
-
-        // Check if research time has completed
-        const now = new Date();
-        if (userResearchFeature.researchCompletesAt && now < userResearchFeature.researchCompletesAt) {
-          return {
-            success: false,
-            message: 'Research time not yet completed'
-          };
-        }
-
-        // Mark as unlocked
-        const unlockedAt = new Date();
-        await UserResearchFeature.findByIdAndUpdate(
-          userResearchFeature._id,
-          {
-            isUnlocked: true,
-            unlockedAt,
-            isResearching: false,
-            researchStartedAt: null,
-            researchCompletesAt: null
-          },
-          { session }
-        );
-
-        if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015' || featureId === 'rental-profit-02-i' || featureId === 'rental-profit-02-ii' || featureId === 'rental-profit-02-iii')) {
-          const { RentalHousingSyncService } = await import('./RentalHousingSyncService');
-          const { User } = await import('../models/User');
-          const updatedUser = await User.findById(userId).session(session);
-          if (updatedUser) {
-            updatedUser.balance.rentalHousingIncomeLastSynced = null;
-            await updatedUser.save({ session });
+          if (!userResearchFeature) {
+            return {
+              success: false,
+              message: 'Research feature not found'
+            };
           }
+
+          if (!userResearchFeature.isResearching) {
+            return {
+              success: false,
+              message: 'No research in progress for this feature'
+            };
+          }
+
+          if (userResearchFeature.isUnlocked) {
+            return {
+              success: false,
+              message: 'Feature already unlocked'
+            };
+          }
+
+          // Check if research time has completed
+          const now = new Date();
+          if (userResearchFeature.researchCompletesAt && now < userResearchFeature.researchCompletesAt) {
+            return {
+              success: false,
+              message: 'Research time not yet completed'
+            };
+          }
+
+          // Mark as unlocked
+          const unlockedAt = new Date();
+          await UserResearchFeature.findByIdAndUpdate(
+            userResearchFeature._id,
+            {
+              isUnlocked: true,
+              unlockedAt,
+              isResearching: false,
+              researchStartedAt: null,
+              researchCompletesAt: null
+            },
+            { session }
+          );
+
+          if (categoryId === 'investments' && (featureId === 'rental-profit-01' || featureId === 'rental-profit-015' || featureId === 'rental-profit-02-i' || featureId === 'rental-profit-02-ii' || featureId === 'rental-profit-02-iii')) {
+            const { User } = await import('../models/User');
+            const updatedUser = await User.findById(userId).session(session);
+            if (updatedUser) {
+              updatedUser.balance.rentalHousingIncomeLastSynced = null;
+              await updatedUser.save({ session });
+            }
+          }
+
+          // Remove only this research's backup request when it completes (per-job state)
+          const { removeCrewBackupRequestForJob } = await import('./CrewBackupService');
+          await removeCrewBackupRequestForJob(
+            new mongoose.Types.ObjectId(String(userId)),
+            'research',
+            undefined,
+            categoryId,
+            featureId,
+            session
+          );
+
+          return {
+            success: true,
+            message: 'Research completed successfully',
+            isUnlocked: true,
+            unlockedAt
+          };
+        });
+        return result;
+      } catch (error) {
+        const retry =
+          ResearchFeatureService.isTransientMongoTransactionError(error) && attempt < maxAttempts - 1;
+        if (retry) {
+          await new Promise((r) => setTimeout(r, 50 * Math.pow(2, attempt)));
+          continue;
         }
-
-        // Remove only this research's backup request when it completes (per-job state)
-        const { removeCrewBackupRequestForJob } = await import('./CrewBackupService');
-        await removeCrewBackupRequestForJob(new mongoose.Types.ObjectId(String(userId)), 'research', undefined, categoryId, featureId);
-
+        console.error('Error completing research:', error);
         return {
-          success: true,
-          message: 'Research completed successfully',
-          isUnlocked: true,
-          unlockedAt
+          success: false,
+          message: 'Error completing research'
         };
-      });
-    } catch (error) {
-      console.error('Error completing research:', error);
-      return {
-        success: false,
-        message: 'Error completing research'
-      };
-    } finally {
-      await session.endSession();
+      } finally {
+        await session.endSession();
+      }
     }
+    return {
+      success: false,
+      message: 'Error completing research'
+    };
+  }
+
+  private static isTransientMongoTransactionError(err: unknown): boolean {
+    if (err == null || typeof err !== 'object') return false;
+    const e = err as { code?: number; codeName?: string; errorLabels?: string[] };
+    if (e.code === 112 || e.codeName === 'WriteConflict') return true;
+    if (e.code === 251 || e.codeName === 'NoSuchTransaction') return true;
+    if (Array.isArray(e.errorLabels) && e.errorLabels.includes('TransientTransactionError')) return true;
+    return false;
   }
 
   /**

@@ -23,9 +23,11 @@ import { SIZING } from '../../styles/theme';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
 import { UserReportModal } from '../modals/UserReportModal';
-import { PROBE_REPORT_SENDER_ID } from '../../constants/systemSenders';
+import { PROBE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_ID } from '../../constants/systemSenders';
+import { formatHackLocationDisplay } from '../../../../shared/hackMapLocationDisplay';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
+const BATTLE_REPORT_PREFIX = 'BTL|';
 
 export interface ProbeReportPayload {
   pr: 1;
@@ -42,11 +44,91 @@ function parseProbeReportMessage(message: string): ProbeReportPayload | null {
   try {
     const json = message.slice(PROBE_REPORT_PREFIX.length);
     const payload = JSON.parse(json) as ProbeReportPayload;
-    if (payload?.pr === 1 && payload.n != null && payload.b) return payload;
+    if (payload?.pr === 1 && payload.n != null && payload.b) {
+      if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) return null;
+      return payload;
+    }
   } catch (_) {
     // ignore
   }
   return null;
+}
+
+export interface BattleReportBotCounts {
+  guardian: number;
+  breacher: number;
+  phreak: number;
+}
+
+export interface BattleReportPayload {
+  br: 1;
+  attackerId: string;
+  defenderId: string;
+  attackerHandle: string;
+  defenderHandle: string;
+  attackerStart: BattleReportBotCounts;
+  defenderStart: BattleReportBotCounts;
+  attackerLost: BattleReportBotCounts;
+  defenderLost: BattleReportBotCounts;
+  /** Attacker won when `user`; defender won when `enemy` (server `battle` / `BattleNotificationService`). */
+  winner: 'user' | 'enemy';
+  /** Dollars moved from defender wallet to attacker when attacker won (0 or omitted if none). */
+  cash?: number;
+  /** Synthetic IP-style hack location (server `hl`); not real map data. */
+  hl?: string;
+}
+
+function parseBattleReportMessage(message: string): BattleReportPayload | null {
+  if (!message.startsWith(BATTLE_REPORT_PREFIX)) return null;
+  try {
+    const json = message.slice(BATTLE_REPORT_PREFIX.length);
+    const payload = JSON.parse(json) as BattleReportPayload;
+    if (payload?.br !== 1 || payload.attackerHandle == null || payload.defenderHandle == null) return null;
+    return payload;
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
+
+/** Normalize user ids for comparison (Mongo hex, $oid, trim). */
+function normalizeMongoId(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object' && value !== null) {
+    const o = value as Record<string, unknown>;
+    if (typeof o.$oid === 'string') return o.$oid.trim();
+    if (o._id != null) return normalizeMongoId(o._id);
+  }
+  const s = String(value);
+  return s === 'undefined' || s === 'null' ? '' : s.trim();
+}
+
+/**
+ * Whether the viewer is the attacker (hacker) vs defender (hackee).
+ * Uses id match (case-insensitive hex) and handle fallback when ids differ in shape.
+ */
+function battleReportViewerIsAttacker(
+  report: BattleReportPayload,
+  currentUser: BaseChatModalProps['currentUser']
+): boolean {
+  const uid = normalizeMongoId(currentUser?._id ?? currentUser?.id);
+  const aid = normalizeMongoId(report.attackerId);
+  const did = normalizeMongoId(report.defenderId);
+  const ul = uid.toLowerCase();
+  const al = aid.toLowerCase();
+  const dl = did.toLowerCase();
+  if (ul && al && ul === al) return true;
+  if (ul && dl && ul === dl) return false;
+
+  const ch = (currentUser?.handle ?? '').trim().toLowerCase();
+  const ah = (report.attackerHandle ?? '').trim().toLowerCase();
+  const dh = (report.defenderHandle ?? '').trim().toLowerCase();
+  if (ch && ah && ch === ah) return true;
+  if (ch && dh && ch === dh) return false;
+
+  // Non-empty id matches are handled above; remaining '' === '' must not count as attacker (Bugbot).
+  return false;
 }
 
 export interface ChatMessageForModal {
@@ -314,17 +396,142 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 </FilteredText>
                               );
                             }
+                            const probeHackLocLine = formatHackLocationDisplay(report.x, report.y);
                             return (
                               <View style={styles.probeReportBlock}>
                                 <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
                                   Probe Report
                                 </Text>
                                 <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  Target: {report.n} ({report.t === 'npc' ? 'NPC' : 'Player'}) | Level: {report.l} | Map: ({report.x}, {report.y})
+                                  Target: {report.n} ({report.t === 'npc' ? 'NPC' : 'Player'}) | Level: {report.l}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.messageText,
+                                    styles.probeReportLine,
+                                    { color: colors.text.primary },
+                                  ]}
+                                >
+                                  Hack Location
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.messageText,
+                                    styles.probeReportLine,
+                                    styles.hackLocationMono,
+                                    { color: colors.text.secondary },
+                                  ]}
+                                >
+                                  {probeHackLocLine}
                                 </Text>
                                 <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
                                   Breacher: {report.b.breacher} · Guardian: {report.b.guardian} · Phreak: {report.b.phreak}
                                 </Text>
+                              </View>
+                            );
+                          })() : message.userId === BATTLE_REPORT_SENDER_ID ? (() => {
+                            const report = parseBattleReportMessage(message.message);
+                            if (!report) {
+                              return (
+                                <FilteredText
+                                  style={[
+                                    styles.messageText,
+                                    isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
+                                  ]}
+                                >
+                                  {message.message}
+                                </FilteredText>
+                              );
+                            }
+                            const isAttacker = battleReportViewerIsAttacker(report, currentUser);
+                            const status =
+                              isAttacker
+                                ? (report.winner === 'user' ? 'Successful Breach' : 'Hack Failed')
+                                : (report.winner === 'enemy' ? 'Defense Successful' : 'Defense Failed');
+                            const cash =
+                              typeof report.cash === 'number' && Number.isFinite(report.cash)
+                                ? Math.max(0, Math.floor(report.cash))
+                                : 0;
+                            // Bugbot: PvP cash only when attacker won (server); winner==='user' gate is intentional — update payload + this if rules change.
+                            const showWallet = report.winner === 'user' && cash > 0;
+                            const hackLocLine =
+                              typeof report.hl === 'string' && report.hl.trim().length > 0
+                                ? report.hl.trim()
+                                : null;
+                            const fmt = (n: number) => n.toLocaleString();
+                            const line = (label: string, start: number, lost: number) =>
+                              `${label} - ${fmt(start)} > ${fmt(lost)} Lost`;
+                            const renderSide = (
+                              title: string,
+                              start: BattleReportBotCounts,
+                              lost: BattleReportBotCounts,
+                            ) => (
+                              <>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {title}
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {line('Guardians', start.guardian, lost.guardian)}
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {line('Breachers', start.breacher, lost.breacher)}
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {line('Phreaks', start.phreak, lost.phreak)}
+                                </Text>
+                              </>
+                            );
+                            return (
+                              <View style={styles.probeReportBlock}>
+                                <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
+                                  Battle Report
+                                </Text>
+                                {hackLocLine ? (
+                                  <>
+                                    <Text
+                                      style={[
+                                        styles.messageText,
+                                        styles.probeReportLine,
+                                        { color: colors.text.primary },
+                                      ]}
+                                    >
+                                      Hack Location
+                                    </Text>
+                                    <Text
+                                      style={[
+                                        styles.messageText,
+                                        styles.probeReportLine,
+                                        styles.hackLocationMono,
+                                        { color: colors.text.secondary },
+                                      ]}
+                                    >
+                                      {hackLocLine}
+                                    </Text>
+                                  </>
+                                ) : null}
+                                {renderSide(
+                                  `Attacker (${isAttacker ? 'You' : 'Opponent'}):`,
+                                  report.attackerStart,
+                                  report.attackerLost,
+                                )}
+                                {renderSide(
+                                  `Defender (${isAttacker ? 'Opponent' : 'You'}):`,
+                                  report.defenderStart,
+                                  report.defenderLost,
+                                )}
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  Result:
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {status}
+                                </Text>
+                                {showWallet ? (
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    {isAttacker
+                                      ? `Wallet stolen: $${fmt(cash)}`
+                                      : `Wallet lost: $${fmt(cash)}`}
+                                  </Text>
+                                ) : null}
                               </View>
                             );
                           })() : (
@@ -559,6 +766,13 @@ const createStyles = (colors: any) =>
     probeReportBlock: { gap: 4 },
     probeReportTitle: { fontSize: SIZING.font.body, fontWeight: '600', marginBottom: 2 },
     probeReportLine: { fontSize: SIZING.font.body, lineHeight: SIZING.font.body + 4 },
+    /** Synthetic hack location — monospace “IP-like” line */
+    hackLocationMono: {
+      fontSize: SIZING.font.body,
+      lineHeight: SIZING.font.body + 4,
+      fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
+      letterSpacing: 0.5,
+    },
     reportButton: {
       position: 'absolute',
       bottom: -3,

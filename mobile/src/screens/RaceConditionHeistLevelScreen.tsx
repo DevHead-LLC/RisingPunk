@@ -49,7 +49,7 @@ SCORING
 Score = packet value × exploit multiplier × combo. Combo builds when you steal in quick succession (2 = 1.2×, 4 = 1.5×, 6 = 2×). Failed exploit resets combo.
 
 TIER REWARDS
-Complete all 5 levels in a tier to unlock that tier's Cavalry (Guardian) stat reward.`;
+Complete all 5 levels in a tier to unlock that tier's Sprint (Guardian) stat reward.`;
 
 type RaceConditionHeistLevelScreenProps = {
   onClose: () => void;
@@ -109,7 +109,7 @@ export function RaceConditionHeistLevelScreen({ onClose, onSelectLevel }: RaceCo
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <CloseButton onPress={handleClose} />
       <Balance />
-      <Text style={[styles.title, { color: colors.primary }]}>Program Cavalry for Tiered Awards</Text>
+      <Text style={[styles.title, { color: colors.primary }]}>Program Sprint for Tiered Awards</Text>
       <TouchableOpacity
         onPress={() => setShowRules(true)}
         style={[styles.rulesButton, { borderColor: colors.primary }]}
