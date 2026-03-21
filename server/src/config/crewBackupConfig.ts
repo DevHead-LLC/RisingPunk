@@ -1,6 +1,6 @@
 /**
  * Crew backup time-reduction formula constants.
- * See taskItems/in-progress-4.md § Crew backup time-reduction formula.
+ * See taskItems/ios/turf/crew-backup-request.md (formula summary) and CrewBackupService.
  */
 
 /** Jobs with total time T ≤ this (seconds) can have 100% of time helped away. */

@@ -169,6 +169,21 @@ export interface IUser extends Document {
   };
   /** Phreak (Ranged) bonus from Binary Bank Crack tier completion; same shape as armyBonus/guardianBonus (Attack/Health/Defense cycle). */
   phreakBonus?: { strength: number; defense: number; speed: number; health: number };
+  /** Battle presets: up to 3 saved battalion configurations (one-time purchase per preset). */
+  battlePresets?: {
+    preset1?: {
+      unlockedAt: Date;
+      battalions: Record<string, { botType: string; quantity: number }>;
+    };
+    preset2?: {
+      unlockedAt: Date;
+      battalions: Record<string, { botType: string; quantity: number }>;
+    };
+    preset3?: {
+      unlockedAt: Date;
+      battalions: Record<string, { botType: string; quantity: number }>;
+    };
+  };
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
   blockedUserIds?: mongoose.Types.ObjectId[];
   /** Set by schema timestamps: true. */
@@ -593,7 +608,21 @@ const userSchema = new Schema({
     type: [Schema.Types.ObjectId],
     ref: 'User',
     default: []
-  }
+  },
+  battlePresets: {
+    preset1: {
+      unlockedAt: { type: Date, default: null },
+      battalions: { type: Schema.Types.Mixed, default: undefined },
+    },
+    preset2: {
+      unlockedAt: { type: Date, default: null },
+      battalions: { type: Schema.Types.Mixed, default: undefined },
+    },
+    preset3: {
+      unlockedAt: { type: Date, default: null },
+      battalions: { type: Schema.Types.Mixed, default: undefined },
+    },
+  },
 }, { 
   collection: 'users',  // Explicitly name the collection
   timestamps: true      // Add created/updated timestamps

@@ -111,6 +111,9 @@ export interface IBattle extends Document {
   defenderNpcSlug?: string;
   defenderNpcInstanceId?: string;
   isUserDefender?: boolean;
+  /** Map cell X/Y when battle was started from Hack Map (optional). */
+  hackMapCellX?: number;
+  hackMapCellY?: number;
   defenderDeployedTotals?: {
     guardian: number;
     breacher: number;
@@ -119,6 +122,8 @@ export interface IBattle extends Document {
   defenderDeploymentExhausted?: boolean;
   lastTickProcessed?: number;
   processedRewards?: any;
+  /** PvP hack theft amount (defender → attacker); set once at battle end. */
+  pvpMoneyTransfer?: { amount: number; processedAt: Date };
   screenWidth: number;
   screenHeight: number;
   createdAt: Date;

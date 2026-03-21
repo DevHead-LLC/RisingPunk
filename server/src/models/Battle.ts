@@ -200,6 +200,9 @@ const battleSchema = new Schema({
   defenderNpcSlug: { type: String, default: '' },
   defenderNpcInstanceId: { type: String, default: '' },
   isUserDefender: { type: Boolean, default: false },
+  /** Hack map grid cell at attack start (for Battle Report Hack Location line). */
+  hackMapCellX: { type: Number, required: false },
+  hackMapCellY: { type: Number, required: false },
   defenderDeployedTotals: {
     guardian: { type: Number, default: 0 },
     breacher: { type: Number, default: 0 },
@@ -210,6 +213,11 @@ const battleSchema = new Schema({
   processedRewards: {
     type: Schema.Types.Mixed,
     default: undefined
+  },
+  /** PvP wallet transfer (user-vs-user); set once when battle end processes money. */
+  pvpMoneyTransfer: {
+    amount: { type: Number },
+    processedAt: { type: Date }
   },
   screenWidth: { type: Number, required: true },
   screenHeight: { type: Number, required: true }
