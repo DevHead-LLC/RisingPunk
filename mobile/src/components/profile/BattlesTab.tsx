@@ -218,7 +218,9 @@ export function BattlesTab(): React.JSX.Element {
   }
 
   const presets = data.presets;
-  const presetList = ['1', '2', '3'].map(id => presets[id]);
+  const presetList = (['1', '2', '3'] as const)
+    .map((id) => presets[id])
+    .filter((p): p is PresetData => p != null);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
