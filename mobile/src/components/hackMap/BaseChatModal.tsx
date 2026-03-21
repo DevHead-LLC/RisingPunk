@@ -70,7 +70,11 @@ export interface BattleReportPayload {
   defenderStart: BattleReportBotCounts;
   attackerLost: BattleReportBotCounts;
   defenderLost: BattleReportBotCounts;
-  /** Attacker won when `user`; defender won when `enemy` (server `battle` / `BattleNotificationService`). */
+  /**
+   * Which battle **side** won (see `BattleNotificationService`: `battle.winner` → JSON).
+   * `user` = attacker NODE (`NodeOwner.USER`); `enemy` = defender NODE (`NodeOwner.ENEMY`).
+   * Same payload for both recipients — not the English word "enemy" as "your opponent"; both sides interpret using the same keys.
+   */
   winner: 'user' | 'enemy';
   /** Dollars moved from defender wallet to attacker when attacker won (0 or omitted if none). */
   cash?: number;
@@ -444,6 +448,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               );
                             }
                             const isAttacker = battleReportViewerIsAttacker(report, currentUser);
+                            // Bugbot: attacker viewer — `user` = attacker side won, `enemy` = defender side won. Defender viewer uses same `winner` (battle-axis; not narrative "enemy").
                             const status =
                               isAttacker
                                 ? (report.winner === 'user' ? 'Successful Breach' : 'Hack Failed')
