@@ -70,6 +70,7 @@ export interface BattleReportPayload {
   defenderStart: BattleReportBotCounts;
   attackerLost: BattleReportBotCounts;
   defenderLost: BattleReportBotCounts;
+  /** Attacker won when `user`; defender won when `enemy` (server `battle` / `BattleNotificationService`). */
   winner: 'user' | 'enemy';
   /** Dollars moved from defender wallet to attacker when attacker won (0 or omitted if none). */
   cash?: number;
@@ -446,11 +447,12 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                             const status =
                               isAttacker
                                 ? (report.winner === 'user' ? 'Successful Breach' : 'Hack Failed')
-                                : (report.winner === 'enemy' ? 'Defended Breach' : 'Attacker Breach');
+                                : (report.winner === 'enemy' ? 'Defense Successful' : 'Defense Failed');
                             const cash =
                               typeof report.cash === 'number' && Number.isFinite(report.cash)
                                 ? Math.max(0, Math.floor(report.cash))
                                 : 0;
+                            // Bugbot: PvP cash only when attacker won (server); winner==='user' gate is intentional — update payload + this if rules change.
                             const showWallet = report.winner === 'user' && cash > 0;
                             const hackLocLine =
                               typeof report.hl === 'string' && report.hl.trim().length > 0

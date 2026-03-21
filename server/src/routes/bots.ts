@@ -652,6 +652,7 @@ router.post('/assign-preset', auth, async (req, res) => {
           sumByType[a.botType] = (sumByType[a.botType] || 0) + a.quantity;
         }
 
+        // Bugbot: compare to total bot.bots (not “available after other battalions”) — preset replaces battalionAssignments atomically, so prior deployments are cleared in the same write. Concurrent bot.bots / assignment changes on this doc bump __v; findOneAndUpdate below retries.
         for (const t of PRESET_VALID_BOT_TYPES) {
           const owned = bot.bots[t] || 0;
           if (sumByType[t] > owned) {
