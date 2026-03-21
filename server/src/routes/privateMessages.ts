@@ -5,11 +5,17 @@ import { User } from '../models/User';
 import { PrivateMessage, ADMIN_BROADCAST_FOOTER } from '../models/PrivateMessage';
 import { filterBadWords } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
-import { PROBE_REPORT_SENDER_ID, PROBE_REPORT_SENDER_USERNAME } from '../constants/systemSenders';
+import {
+  PROBE_REPORT_SENDER_ID,
+  PROBE_REPORT_SENDER_USERNAME,
+  BATTLE_REPORT_SENDER_ID,
+  BATTLE_REPORT_SENDER_USERNAME,
+} from '../constants/systemSenders';
 
 const router = express.Router();
 
 const PROBE_REPORT_PREFIX = 'PRB|';
+const BATTLE_REPORT_PREFIX = 'BTL|';
 
 /** Return a human-readable inbox preview for probe report messages; otherwise return the raw message. */
 function conversationListLastMessagePreview(raw: string | undefined, isProbeReport: boolean): string {
@@ -23,6 +29,28 @@ function conversationListLastMessagePreview(raw: string | undefined, isProbeRepo
     // ignore
   }
   return 'Probe Report';
+}
+
+/** Return a human-readable inbox preview for battle report messages. */
+function getBattleReportPreview(raw: string | undefined, currentUserId: string): string {
+  if (typeof raw !== 'string' || !raw.startsWith(BATTLE_REPORT_PREFIX)) return raw ?? 'Battle Report';
+  try {
+    const payload = JSON.parse(raw.slice(BATTLE_REPORT_PREFIX.length)) as {
+      attackerId?: string;
+      defenderId?: string;
+      attackerHandle?: string;
+      defenderHandle?: string;
+    };
+    if (!payload) return 'Battle Report';
+    const otherHandle =
+      String(payload.attackerId) === String(currentUserId)
+        ? payload.defenderHandle
+        : payload.attackerHandle;
+    return otherHandle != null ? `Battle Report: ${otherHandle}` : 'Battle Report';
+  } catch (_) {
+    // ignore
+  }
+  return 'Battle Report';
 }
 
 const PM_RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -207,6 +235,7 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
     }
 
     const probeReportSenderIdStr = PROBE_REPORT_SENDER_ID.toString();
+    const battleReportSenderIdStr = BATTLE_REPORT_SENDER_ID.toString();
     const withUsernames = await Promise.all(
       filtered
         .map(async (row: any) => {
@@ -216,20 +245,28 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
           const isBroadcast =
             keyIsBroadcast || (row.lastIsAdminBroadcast === true && adminIdSet.has(otherUserIdFromKey));
           const isProbeReport = otherUserIdFromKey === probeReportSenderIdStr;
-          const other = isProbeReport
-            ? null
-            : await User.findById(new mongoose.Types.ObjectId(otherUserIdFromKey)).select('handle').lean();
+          const isBattleReport = otherUserIdFromKey === battleReportSenderIdStr;
+          const other =
+            isProbeReport || isBattleReport
+              ? null
+              : await User.findById(new mongoose.Types.ObjectId(otherUserIdFromKey)).select('handle').lean();
+          const otherUsername = isBroadcast
+            ? 'RisingPunk (Announcements)'
+            : isProbeReport
+              ? PROBE_REPORT_SENDER_USERNAME
+              : isBattleReport
+                ? BATTLE_REPORT_SENDER_USERNAME
+                : (other?.handle ?? 'Unknown');
+          const lastMessage = isBattleReport
+            ? getBattleReportPreview(row.lastMessage, currentUserStr)
+            : conversationListLastMessagePreview(row.lastMessage, isProbeReport);
           return {
             otherUserId: otherUserIdFromKey,
-            otherUsername: isBroadcast
-              ? 'RisingPunk (Announcements)'
-              : isProbeReport
-                ? PROBE_REPORT_SENDER_USERNAME
-                : (other?.handle ?? 'Unknown'),
-            lastMessage: conversationListLastMessagePreview(row.lastMessage, isProbeReport),
+            otherUsername,
+            lastMessage,
             lastAt: row.lastAt,
             unreadCount: row.unreadCount ?? 0,
-            isBroadcast: !!isBroadcast || isProbeReport,
+            isBroadcast: !!isBroadcast || isProbeReport || isBattleReport,
           };
         }),
     );

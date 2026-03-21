@@ -53,6 +53,7 @@ import { SIZING } from '../styles/theme';
 import { getPersistedTurfNavState, setPersistedTurfNavState, type TurfScreenName } from '../utils/turfNavStatePersistence';
 import { CrewBackupBanner } from '../components/turf/CrewBackupBanner';
 import { CrewModal } from '../components/hackMap/CrewModal';
+import { ActiveJobsModal } from '../components/turf/ActiveJobsModal';
 import { useGetCrewStatusQuery } from '../store/api/authApi';
 
 // Platform-specific imports - available on both platforms but only used on Android
@@ -190,6 +191,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [returnContext, setReturnContext] = useState<{ origin: 'hackRig' | 'map'; mapPan?: { x: number; y: number } } | null>(null);
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
+  const [pendingHackMapCell, setPendingHackMapCell] = useState<{ x: number; y: number } | null>(null);
   const [previousScreen, setPreviousScreen] = useState<TurfScreenName>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
   const [packetBreachLevelId, setPacketBreachLevelId] = useState<string | null>(null);
@@ -204,6 +206,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [crewModalInitialCategory, setCrewModalInitialCategory] = useState<'backup-requests' | null>(null);
   const [crewModalFocusBackupKey, setCrewModalFocusBackupKey] = useState(0);
+  const [showActiveJobsModal, setShowActiveJobsModal] = useState(false);
   const [showSearchUserModal, setShowSearchUserModal] = useState(false);
   const [visitingProfileUserId, setVisitingProfileUserId] = useState<string | null>(null);
   const [showVisitingProfileModal, setShowVisitingProfileModal] = useState(false);
@@ -850,6 +853,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       setPendingDefenderUserId(null);
       setPendingNpcSlug(null);
       setPendingNpcInstanceId(null);
+      setPendingHackMapCell(null);
     }
   }, [currentScreen]);
 
@@ -1095,6 +1099,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               (globalThis as any).pendingNpcSlug = undefined;
               (globalThis as any).pendingNpcInstanceId = undefined;
               (globalThis as any).pendingMapPan = undefined;
+              setPendingHackMapCell(
+                mapPan != null && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
+                  ? { x: mapPan.x, y: mapPan.y }
+                  : null
+              );
               setReturnContext({ origin: 'map', mapPan });
               navigateToScreen('battlePrep');
               return;
@@ -1105,6 +1114,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
               (globalThis as any).pendingDefenderUserId = undefined;
               (globalThis as any).pendingMapPan = undefined;
+              setPendingHackMapCell(
+                mapPan != null && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
+                  ? { x: mapPan.x, y: mapPan.y }
+                  : null
+              );
               setReturnContext({ origin: 'map', mapPan });
               navigateToScreen('battlePrep');
               return;
@@ -1135,6 +1149,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           defenderId={pendingDefenderUserId || undefined}
           defenderNpcSlug={pendingNpcSlug || undefined}
           defenderNpcInstanceId={pendingNpcInstanceId || undefined}
+          hackMapCell={pendingHackMapCell ?? undefined}
         />;
       case 'battle':
         if (!battleId) {
@@ -1751,18 +1766,33 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         />
       )}
       {renderScreen()}
-      {currentScreen === 'turf' && crewStatus?.isInCrew && (
-        <TouchableOpacity
-          style={styles.crewIconButton}
-          onPress={() => {
-            setCrewModalInitialCategory(null);
-            setShowCrewModal(true);
-          }}
-          activeOpacity={0.8}
-        >
-          <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={styles.crewIconImage} resizeMode="contain" />
-        </TouchableOpacity>
+      {currentScreen === 'turf' && (
+        <View style={styles.bottomRightIcons}>
+          <TouchableOpacity
+            style={styles.activeJobsIconButton}
+            onPress={() => setShowActiveJobsModal(true)}
+            activeOpacity={0.8}
+          >
+            <Image source={require('../assets/images/ui/activeJobs.png')} style={styles.activeJobsIconImage} resizeMode="contain" />
+          </TouchableOpacity>
+          {crewStatus?.isInCrew && (
+            <TouchableOpacity
+              style={styles.crewIconButton}
+              onPress={() => {
+                setCrewModalInitialCategory(null);
+                setShowCrewModal(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={styles.crewIconImage} resizeMode="contain" />
+            </TouchableOpacity>
+          )}
+        </View>
       )}
+      <ActiveJobsModal
+        visible={showActiveJobsModal}
+        onClose={() => setShowActiveJobsModal(false)}
+      />
       <CrewModal
         visible={showCrewModal}
         onClose={() => {
@@ -1806,10 +1836,16 @@ const styles = StyleSheet.create({
     gap: 8,
     zIndex: 10002,
   },
-  crewIconButton: {
+  bottomRightIcons: {
     position: 'absolute',
     bottom: SIZING.spacing.lg,
     right: SIZING.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 10002,
+  },
+  activeJobsIconButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -1818,7 +1854,20 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 255, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10002,
+  },
+  activeJobsIconImage: {
+    width: 33,
+    height: 33,
+  },
+  crewIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(128, 90, 213, 0.95)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 255, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   crewIconImage: {
     width: 28,

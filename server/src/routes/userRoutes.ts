@@ -19,6 +19,10 @@ import { RentalHousingIncomeService } from '../services/RentalHousingIncomeServi
 import { RentalHousingSyncService } from '../services/RentalHousingSyncService';
 import { accrueBalanceToTime } from '../utils/balanceAccrual';
 import { removeCrewBackupRequestForJob } from '../services/CrewBackupService';
+import { UserResearchFeature } from '../models/UserResearchFeature';
+import { getFeatureByIdAsync } from '../config/researchFeatures';
+
+const Bot = require('../models/Bot');
 
 interface UpdatePreferencesRequest extends Request {
   body: {
@@ -57,6 +61,104 @@ router.get('/lookup', auth, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Server error in user lookup:', error);
     res.status(500).json({ error: 'Error looking up user' });
+  }
+});
+
+/**
+ * GET /active-jobs — Returns all currently active jobs for the authenticated user.
+ * Used by TurfScreen "Active Jobs" modal to show build/upgrade/remodel/research/bot-assembly timers.
+ */
+router.get('/active-jobs', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user._id;
+    const now = new Date();
+    const jobs: Array<{ jobType: string; label: string; completesAt: string }> = [];
+
+    const user = await User.findById(userId)
+      .select('researchCenterBuild rentalHousingBuilds activeRemodel rentalHousingLevels')
+      .lean();
+    if (!user) {
+      res.json({ jobs: [] });
+      return;
+    }
+
+    // Research center build or upgrade
+    const rc = (user as any).researchCenterBuild;
+    if (rc?.startedAt && rc?.completesAt && now < new Date(rc.completesAt)) {
+      const targetLevel = rc.targetLevel ?? 3;
+      const label = targetLevel === 1 ? 'New Research Center Build' : `Research Center Upgrade`;
+      jobs.push({
+        jobType: 'researchCenterBuild',
+        label,
+        completesAt: new Date(rc.completesAt).toISOString(),
+      });
+    }
+
+    // Rental housing builds (property1–4)
+    const builds = (user as any).rentalHousingBuilds || {};
+    const levels = (user as any).rentalHousingLevels || {};
+    for (const key of ['property1', 'property2', 'property3', 'property4'] as const) {
+      const b = builds[key];
+      if (!b?.startedAt || !b?.completesAt || now >= new Date(b.completesAt)) continue;
+      const propNum = key.replace('property', '');
+      const targetLevel = b.targetLevel ?? 1;
+      const currentLevel = levels[key] ?? 0;
+      const label = targetLevel === 1 && currentLevel === 0
+        ? `New Investment Property ${propNum} Build`
+        : `Investment Property ${propNum} Upgrade`;
+      jobs.push({
+        jobType: 'rentalBuild',
+        label,
+        completesAt: new Date(b.completesAt).toISOString(),
+      });
+    }
+
+    // Active room remodel
+    const ar = (user as any).activeRemodel;
+    if (ar?.startedAt && ar?.completesAt && now < new Date(ar.completesAt)) {
+      const roomName = String(ar.room || '').charAt(0).toUpperCase() + String(ar.room || '').slice(1);
+      jobs.push({
+        jobType: 'remodel',
+        label: `Room Remodel — Property ${ar.propertyId} ${roomName}`,
+        completesAt: new Date(ar.completesAt).toISOString(),
+      });
+    }
+
+    // Active research (all UserResearchFeature docs with isResearching and completesAt in future)
+    const researchDocs = await UserResearchFeature.find({
+      userId,
+      isResearching: true,
+      researchCompletesAt: { $gt: now },
+    })
+      .select('categoryId featureId researchCompletesAt')
+      .lean();
+    for (const doc of researchDocs) {
+      if (!doc.researchCompletesAt) continue;
+      const feature = await getFeatureByIdAsync(doc.categoryId, doc.featureId);
+      const featureName = feature?.name ?? doc.featureId;
+      jobs.push({
+        jobType: 'research',
+        label: `Research: ${featureName}`,
+        completesAt: new Date(doc.researchCompletesAt).toISOString(),
+      });
+    }
+
+    // Bot assembly build
+    const bot = await Bot.findOne({ userId }).select('buildQueue').lean();
+    const bq = bot?.buildQueue;
+    if (bq?.startedAt && bq?.completesAt && now < new Date(bq.completesAt)) {
+      const typeName = (bq.type === 'guardian' ? 'Guardians' : bq.type === 'phreak' ? 'Phreaks' : 'Breachers');
+      jobs.push({
+        jobType: 'botAssembly',
+        label: `Bot Assembly — ${bq.quantity} ${typeName}`,
+        completesAt: new Date(bq.completesAt).toISOString(),
+      });
+    }
+
+    res.json({ jobs });
+  } catch (error) {
+    console.error('Error fetching active jobs:', error);
+    res.status(500).json({ error: 'Failed to fetch active jobs' });
   }
 });
 
