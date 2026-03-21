@@ -7,6 +7,7 @@ interface CrewChatModalProps {
   visible: boolean;
   onClose: () => void;
   crewId: string;
+  onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
 }
 
 export const CrewChatModal: React.FC<CrewChatModalProps> = ({
@@ -67,6 +68,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
       currentUser={currentUser}
       reportContext="chat-message"
       getReportContextData={getReportContextData}
+      onNavigateToMapCell={onNavigateToMapCell}
     />
   );
 };

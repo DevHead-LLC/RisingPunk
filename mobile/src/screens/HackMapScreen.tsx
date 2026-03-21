@@ -22,10 +22,10 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setMapGridSize, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
-import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation, useLaunchProbeMutation, useGetActiveProbesQuery, useCancelProbeMutation } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation, useLaunchProbeMutation, useGetActiveProbesQuery, useCancelProbeMutation, useSendMapChatMessageMutation } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
-import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
+import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery, useSendCrewChatMessageMutation } from '../store/api/authApi';
 import { API_URL } from '../config';
 import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { computePanBounds } from '../utils/mapPanBounds';
@@ -34,12 +34,19 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
 import { trackHackmapVisited } from '../services/analyticsService';
+import { buildMapLocationShareMessage } from '../../../shared/mapLocationShareMessage';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
 /** Max probes in flight per user (outbound or return). */
 const MAX_PROBES = 2;
+
+/**
+ * TurfScreen → HackMap from world-chat shared location: pan only after this delay so
+ * center-on-home / my-position / viewport effects can finish first (see in-progress-4 notes).
+ */
+const PENDING_CHAT_NAV_DELAY_MS = 1500;
 
 /** Target info for one probe (shared with complete API). */
 type ProbeTarget = {
@@ -416,7 +423,19 @@ const triggerViewportFetch = (
 type Props = {
   onClose: () => void;
   restorePan?: { x: number; y: number };
+  /** TurfScreen: after opening map from world chat, pan to this cell once. */
+  pendingNavigateToCell?: { x: number; y: number } | null;
+  onPendingNavigateConsumed?: () => void;
 };
+
+function getShareLabelForCell(info: CellData): string {
+  if (info.entity === 'empty') {
+    return info.terrain.toUpperCase();
+  }
+  const name = (info.name || '').trim();
+  if (name) return name;
+  return info.terrain.toUpperCase();
+}
 
 /**
  * Shared memo comparison function for Tile and PoolTile components
@@ -964,7 +983,12 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   );
 };
 
-export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
+export const HackMapScreen: React.FC<Props> = ({
+  onClose,
+  restorePan,
+  pendingNavigateToCell,
+  onPendingNavigateConsumed,
+}) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
   const mapGridSize = useAppSelector((state) => state.map.mapGridSize);
@@ -2008,7 +2032,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
 
   const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
-  
+  const [sendMapChatMessage] = useSendMapChatMessageMutation();
+  const [sendCrewChatMessage] = useSendCrewChatMessageMutation();
+
   const { data: crewDetails, isLoading: isLoadingCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId || '', {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
   });
@@ -3823,6 +3849,115 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     ]
   );
 
+  useEffect(() => {
+    if (!pendingNavigateToCell) return;
+    if (containerSize.width <= 0 || containerSize.height <= 0) return;
+    const { x, y } = pendingNavigateToCell;
+    const gridSize = mapGridSize ?? getGridSize(grid);
+    if (!grid || x < 0 || x >= gridSize || y < 0 || y >= gridSize) return;
+
+    const t = setTimeout(() => {
+      jumpToGridPosition(x, y);
+      hasCenteredOnHome.value = true;
+      onPendingNavigateConsumed?.();
+    }, PENDING_CHAT_NAV_DELAY_MS);
+
+    return () => clearTimeout(t);
+  }, [
+    pendingNavigateToCell,
+    containerSize.width,
+    containerSize.height,
+    grid,
+    mapGridSize,
+    jumpToGridPosition,
+    onPendingNavigateConsumed,
+  ]);
+
+  const handleNavigateFromChatToCell = useCallback(
+    (target: { mapName: string; x: number; y: number }) => {
+      if (target.mapName !== 'main') return;
+      jumpToGridPosition(target.x, target.y);
+      setShowWorldChatModal(false);
+    },
+    [jumpToGridPosition]
+  );
+
+  const handleCrewChatNavigateToCell = useCallback(
+    (target: { mapName: string; x: number; y: number }) => {
+      if (target.mapName !== 'main') return;
+      jumpToGridPosition(target.x, target.y);
+      setShowCrewModal(false);
+    },
+    [jumpToGridPosition]
+  );
+
+  const handleShareLocationPress = useCallback(() => {
+    if (!selectedCell) return;
+    const { x, y, info } = selectedCell;
+    const label = getShareLabelForCell(info);
+    const messageBody = buildMapLocationShareMessage('main', x, y, label);
+
+    const sendGlobal = () => {
+      sendMapChatMessage({ mapName: 'main', message: messageBody })
+        .unwrap()
+        .then(() => {
+          Alert.alert('Sent', 'Location shared to World Chat.');
+        })
+        .catch((err: any) => {
+          const msg = err?.data?.error ?? err?.message ?? 'Could not send message.';
+          Alert.alert('Share location', String(msg));
+        });
+    };
+
+    const sendCrew = () => {
+      const crewId = crewStatus?.crewId;
+      if (!crewId) {
+        Alert.alert('Share location', 'Join a crew to share there.');
+        return;
+      }
+      sendCrewChatMessage({ crewId: String(crewId), message: messageBody })
+        .unwrap()
+        .then(() => {
+          Alert.alert('Sent', 'Location shared to crew chat.');
+        })
+        .catch((err: any) => {
+          const msg = err?.data?.error ?? err?.message ?? 'Could not send message.';
+          Alert.alert('Share location', String(msg));
+        });
+    };
+
+    const canGlobal = hackRigUnlocked;
+    const canCrew = !!(crewStatus?.isInCrew && crewStatus.crewId);
+
+    if (!canGlobal && !canCrew) {
+      Alert.alert(
+        'Share location',
+        'Unlock World Chat from the Hack Rig, or join a crew to share to crew chat.'
+      );
+      return;
+    }
+
+    const buttons: {
+      text: string;
+      style?: 'cancel' | 'default' | 'destructive';
+      onPress?: () => void;
+    }[] = [{ text: 'Cancel', style: 'cancel' }];
+    if (canGlobal) {
+      buttons.push({ text: 'Global', onPress: sendGlobal });
+    }
+    if (canCrew) {
+      buttons.push({ text: 'Crew', onPress: sendCrew });
+    }
+    Alert.alert('Share location', 'Choose a chat', buttons);
+  }, [
+    selectedCell,
+    sendMapChatMessage,
+    sendCrewChatMessage,
+    crewStatus?.crewId,
+    crewStatus?.isInCrew,
+    hackRigUnlocked,
+  ]);
+
   const handleAntivirusPress = useCallback(() => {
     // Only show modal if antivirus feature is unlocked (including timer-based unlock)
     if (isActuallyUnlocked) {
@@ -3975,10 +4110,23 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         onPress={() => setSelectedCell(null)}
       >
         <TouchableOpacity
-          style={[styles.infoPanel, { backgroundColor: colors.background, borderColor: colors.matrix }]}
+          style={[styles.infoPanel, { backgroundColor: colors.background, borderColor: colors.matrix, position: 'relative' }]}
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()}
         >
+          <Pressable
+            style={styles.shareLocationCorner}
+            onPress={handleShareLocationPress}
+            accessibilityLabel="Share location to chat"
+            accessibilityRole="button"
+            hitSlop={10}
+          >
+            <Image
+              source={require('../assets/images/hackMap/shareLocation.png')}
+              style={styles.shareLocationCornerImage}
+              resizeMode="contain"
+            />
+          </Pressable>
           <ScrollView
             style={styles.infoPanelScrollView}
             contentContainerStyle={styles.infoPanelContent}
@@ -4205,7 +4353,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -4238,6 +4386,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         visible={showWorldChatModal}
         onClose={() => setShowWorldChatModal(false)}
         mapName="main"
+        onNavigateToMapCell={handleNavigateFromChatToCell}
       />
 
       <View style={styles.navigationButtonRow}>
@@ -4284,6 +4433,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         onClose={handleCrewClose}
         initialCategory={crewModalInitialCategory}
         focusInitialCategoryKey={crewModalInitialCategory === 'backup-requests' ? crewModalFocusBackupKey : undefined}
+        onNavigateToMapCell={handleCrewChatNavigateToCell}
       />
 
       <CrewOnboardingModal
@@ -4743,6 +4893,17 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+  shareLocationCorner: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    zIndex: 4,
+    padding: 4,
+  },
+  shareLocationCornerImage: {
+    width: 52,
+    height: 52,
   },
   infoPanel: {
     padding: SIZING.spacing.md,
