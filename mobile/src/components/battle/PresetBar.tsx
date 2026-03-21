@@ -279,7 +279,9 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
 
   if (!presetsData) return null;
 
-  const presetList = ['1', '2', '3'].map(id => presetsData.presets[id]);
+  const presetList = (['1', '2', '3'] as const)
+    .map((id) => presetsData.presets[id])
+    .filter((p): p is PresetData => p != null);
   const userLevel = presetsData.userLevel ?? 0;
 
   return (
