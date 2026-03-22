@@ -801,6 +801,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     (target: { mapName: string; x: number; y: number }) => {
       if (target.mapName !== 'main') return;
       setMapPendingNavigateCell({ x: target.x, y: target.y });
+      setShowWorldChatModal(false);
       navigateToScreen('map');
     },
     [navigateToScreen]

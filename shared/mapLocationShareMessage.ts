@@ -41,12 +41,20 @@ export function parseMapLocationShareMessage(message: string): MapLocationShareP
     if (
       payload?.loc !== 1 ||
       typeof payload.mapName !== 'string' ||
+      typeof payload.label !== 'string' ||
       !Number.isFinite(payload.x) ||
       !Number.isFinite(payload.y)
     ) {
       return null;
     }
-    return payload;
+    const label = payload.label.trim() || 'Location';
+    return {
+      loc: 1,
+      mapName: payload.mapName,
+      x: payload.x,
+      y: payload.y,
+      label,
+    };
   } catch {
     return null;
   }
