@@ -14,6 +14,7 @@ export const CrewChatModal: React.FC<CrewChatModalProps> = ({
   visible,
   onClose,
   crewId,
+  onNavigateToMapCell,
 }) => {
   const currentUser = useAppSelector((state) => state.auth.user);
 
