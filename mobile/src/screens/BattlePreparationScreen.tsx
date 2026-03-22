@@ -181,6 +181,11 @@ export const BattlePreparationScreen = React.memo(
     setSelectorVisible(true);
   }, [isBattalionAHighlight, advanceHighlightStep]);
 
+  /** Serialize preset applies; skip identical successful lineup. Preset uses POST /assign-preset (one request) to avoid per-slot rate limits. */
+  const presetApplyChainRef = useRef(Promise.resolve());
+  /** Cleared when assignments change outside a successful preset apply (manual assign / server resync) so re-tap re-applies. Bugbot: sig is preset-shaped only; it does not reflect manual edits. */
+  const lastSuccessfulPresetSigRef = useRef<string | null>(null);
+
   const handleBotAssignment = React.useCallback(async (data: { botType: BotType; quantity: number }) => {
     if (!selectedBattalion) {
       return;
@@ -204,6 +209,7 @@ export const BattlePreparationScreen = React.memo(
         };
         return newAssignments;
       });
+      lastSuccessfulPresetSigRef.current = null;
       setSelectorVisible(false);
     } catch (error) {
       console.error('Failed to assign bots:', error);
@@ -211,10 +217,6 @@ export const BattlePreparationScreen = React.memo(
       throw error;
     }
   }, [selectedBattalion, assignToBattalion]);
-
-  /** Serialize preset applies; skip identical successful lineup. Preset uses POST /assign-preset (one request) to avoid per-slot rate limits. */
-  const presetApplyChainRef = useRef(Promise.resolve());
-  const lastSuccessfulPresetSigRef = useRef<string | null>(null);
 
   const handleApplyPreset = React.useCallback(
     (presetId: string, presetAssignments: Record<string, BattalionAssignment>) => {
@@ -279,6 +281,7 @@ export const BattlePreparationScreen = React.memo(
                 }
               }
               setAssignments(next);
+              lastSuccessfulPresetSigRef.current = null;
             }
           } catch (refetchErr) {
             console.error('Failed to refetch bots after preset error:', refetchErr);
