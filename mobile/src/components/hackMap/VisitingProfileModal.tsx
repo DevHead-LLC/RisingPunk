@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, SafeAreaView, Image, ScrollView, Platform, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Image, ScrollView, Platform, Pressable, Dimensions } from 'react-native';
 import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useTheme } from '../../context/ThemeContext';
@@ -293,15 +293,19 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
       supportedOrientations={['landscape']}
       presentationStyle="overFullScreen"
     >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={handleClose}
-      >
+      {/* Backdrop and card are siblings: do not wrap ScrollView in TouchableOpacity or a view that
+          steals the responder on touch-down — that blocked Android scroll until multiple gestures. */}
+      <View style={styles.overlay}>
+        <Pressable
+          style={[StyleSheet.absoluteFillObject, styles.overlayBackdrop]}
+          onPress={handleClose}
+          accessibilityLabel="Dismiss profile"
+        />
         <View
-          style={[styles.modalContainer, { backgroundColor: colors.background, borderColor: colors.secondary }]}
-          onStartShouldSetResponder={() => true}
-          onMoveShouldSetResponder={() => false}
+          style={[
+            styles.modalContainer,
+            { backgroundColor: colors.background, borderColor: colors.secondary, zIndex: 1 },
+          ]}
         >
           <Pressable
             style={({ pressed }) => [
@@ -351,7 +355,7 @@ export const VisitingProfileModal: React.FC<VisitingProfileModalProps> = ({
             )}
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 };
@@ -365,10 +369,12 @@ const createStyles = (colors: any, themeMode: 'light' | 'dark') => StyleSheet.cr
     left: 0,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: SIZING.spacing.lg,
+  },
+  overlayBackdrop: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalContainer: {
     width: '60%',
