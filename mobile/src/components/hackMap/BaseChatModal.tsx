@@ -578,75 +578,22 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                             );
                           })() : (() => {
                             const locShare = parseMapLocationShareMessage(message.message);
-                            if (locShare && onNavigateToMapCell) {
+                            if (locShare) {
                               const hackLocLine = formatHackLocationDisplay(locShare.x, locShare.y);
-                              return (
-                                <Pressable
-                                  onPress={() =>
-                                    onNavigateToMapCell({
-                                      mapName: locShare.mapName,
-                                      x: locShare.x,
-                                      y: locShare.y,
-                                    })
-                                  }
-                                  accessibilityRole="button"
-                                  accessibilityLabel="Open shared location on map"
-                                >
-                                  <View style={styles.probeReportBlock}>
-                                    <Text
-                                      style={[
-                                        styles.probeReportTitle,
-                                        { color: isOwnMessage ? colors.background : colors.text.primary },
-                                      ]}
-                                    >
-                                      Shared location
-                                    </Text>
-                                    <Text
-                                      style={[
-                                        styles.messageText,
-                                        styles.probeReportLine,
-                                        { color: isOwnMessage ? colors.background : colors.text.primary },
-                                      ]}
-                                    >
-                                      {locShare.label}
-                                    </Text>
-                                    <Text
-                                      style={[
-                                        styles.messageText,
-                                        styles.probeReportLine,
-                                        styles.hackLocationMono,
-                                        {
-                                          color: isOwnMessage ? colors.background : colors.text.secondary,
-                                        },
-                                      ]}
-                                    >
-                                      {hackLocLine}
-                                    </Text>
-                                    <Text
-                                      style={[
-                                        styles.messageText,
-                                        styles.probeReportLine,
-                                        {
-                                          fontSize: SIZING.font.small,
-                                          fontStyle: 'italic',
-                                          color: isOwnMessage ? colors.background : colors.text.secondary,
-                                        },
-                                      ]}
-                                    >
-                                      Tap to open on map
-                                    </Text>
-                                  </View>
-                                </Pressable>
-                              );
-                            }
-                            if (locShare && !onNavigateToMapCell) {
-                              const hackLocLine = formatHackLocationDisplay(locShare.x, locShare.y);
-                              return (
+                              const primaryOnBubble = isOwnMessage ? colors.background : colors.text.primary;
+                              const secondaryOnBubble = isOwnMessage ? colors.background : colors.text.secondary;
+                              const card = (
                                 <View style={styles.probeReportBlock}>
-                                  <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
+                                  <Text style={[styles.probeReportTitle, { color: primaryOnBubble }]}>
                                     Shared location
                                   </Text>
-                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  <Text
+                                    style={[
+                                      styles.messageText,
+                                      styles.probeReportLine,
+                                      { color: primaryOnBubble },
+                                    ]}
+                                  >
                                     {locShare.label}
                                   </Text>
                                   <Text
@@ -654,13 +601,46 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                       styles.messageText,
                                       styles.probeReportLine,
                                       styles.hackLocationMono,
-                                      { color: colors.text.secondary },
+                                      { color: secondaryOnBubble },
                                     ]}
                                   >
                                     {hackLocLine}
                                   </Text>
+                                  {onNavigateToMapCell ? (
+                                    <Text
+                                      style={[
+                                        styles.messageText,
+                                        styles.probeReportLine,
+                                        {
+                                          fontSize: SIZING.font.small,
+                                          fontStyle: 'italic',
+                                          color: secondaryOnBubble,
+                                        },
+                                      ]}
+                                    >
+                                      Tap to open on map
+                                    </Text>
+                                  ) : null}
                                 </View>
                               );
+                              if (onNavigateToMapCell) {
+                                return (
+                                  <Pressable
+                                    onPress={() =>
+                                      onNavigateToMapCell({
+                                        mapName: locShare.mapName,
+                                        x: locShare.x,
+                                        y: locShare.y,
+                                      })
+                                    }
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Open shared location on map"
+                                  >
+                                    {card}
+                                  </Pressable>
+                                );
+                              }
+                              return card;
                             }
                             return (
                               <FilteredText
