@@ -807,6 +807,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     [navigateToScreen]
   );
 
+  const handleMapPendingNavigateConsumed = useCallback(() => {
+    setMapPendingNavigateCell(null);
+  }, []);
+
   const navigateToFloorPlan = useCallback((propertyId: number) => {
     // Capture current turf view position
     if (Platform.OS === 'android') {
@@ -1099,7 +1103,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         return <HackMapScreen
           restorePan={returnContext?.mapPan}
           pendingNavigateToCell={mapPendingNavigateCell}
-          onPendingNavigateConsumed={() => setMapPendingNavigateCell(null)}
+          onPendingNavigateConsumed={handleMapPendingNavigateConsumed}
           onClose={() => {
             const slug = (globalThis as any).pendingNpcSlug as string | undefined;
             const defenderUserId = (globalThis as any).pendingDefenderUserId as string | undefined;
@@ -1760,7 +1764,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleWorldChatNavigateToMapCell]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleWorldChatNavigateToMapCell, handleMapPendingNavigateConsumed]);
 
   // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
   if (!navRestoreAttempted) {
