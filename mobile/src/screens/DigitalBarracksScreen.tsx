@@ -21,6 +21,18 @@ import { formatNumber } from '../utils/formatUtils';
 
 type MarkLevel = 1 | 2 | 3 | 4;
 
+/** Bot display names and type labels (Sprint/Brute/Remote) for Digital Barracks. */
+const BOT_DISPLAY_NAMES: Record<BotType, string> = {
+  guardian: 'Guardian',
+  breacher: 'Breacher',
+  phreak: 'Phreak',
+};
+const BOT_TYPE_LABELS: Record<BotType, string> = {
+  guardian: 'Sprint',
+  breacher: 'Brute',
+  phreak: 'Remote',
+};
+
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
@@ -59,10 +71,6 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
     const botStats = botStatsData?.botStats?.[type];
     const allBotStats = botStatsData?.botStats;
 
-    const getBotRole = (_type: BotType): string => {
-      return botStats?.role || 'Unknown';
-    };
-
     const getTypeMatchups = (botType: BotType): { strongAgainst: string; weakAgainst: string } | null => {
       const matchups: Record<BotType, { strongAgainst: string; weakAgainst: string }> = {
         guardian: { strongAgainst: 'Breacher', weakAgainst: 'Phreak' },
@@ -77,8 +85,8 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
     return (
       <View style={styles.botCard}>
         <View style={styles.botHeader}>
-          <Text style={styles.botName}>{type.toUpperCase()}</Text>
-          <Text style={styles.botRole}>{getBotRole(type)}</Text>
+          <Text style={styles.botName}>{BOT_DISPLAY_NAMES[type]}</Text>
+          <Text style={styles.botRole}>{BOT_TYPE_LABELS[type]}</Text>
         </View>
 
         <View style={styles.botContent}>

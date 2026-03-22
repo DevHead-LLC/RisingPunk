@@ -143,6 +143,18 @@ export const botsApi = createApi({
       }),
       invalidatesTags: ['Bots'],
     }),
+    /** Replaces all battalion assignments in one server request (battle presets). Avoids rate-limit 429 from many /assign calls. */
+    assignPresetBattalions: builder.mutation<
+      { success: boolean; bots: Record<BotType, number>; battalionAssignments: Array<{ battalionId: string; botType: BotType; quantity: number; markLevel?: number }> },
+      { assignments: Array<{ battalionId: string; botType: BotType; quantity: number; markLevel?: number }> }
+    >({
+      query: (body) => ({
+        url: '/api/bots/assign-preset',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Bots'],
+    }),
     speedupBotBuild: builder.mutation<{ success: boolean; message: string; newBalance: number; bots: Record<BotType, number> }, void>({
       query: () => ({
         url: '/api/bots/speedup-build',
@@ -162,4 +174,13 @@ export const botsApi = createApi({
   }),
 });
 
-export const { useFetchBotsQuery, useFetchBuildStateQuery, useFetchBotStatsQuery, useFetchBotStatsBreakdownQuery, useStartBuildMutation, useAssignToBattalionMutation, useSpeedupBotBuildMutation } = botsApi;
+export const {
+  useFetchBotsQuery,
+  useFetchBuildStateQuery,
+  useFetchBotStatsQuery,
+  useFetchBotStatsBreakdownQuery,
+  useStartBuildMutation,
+  useAssignToBattalionMutation,
+  useAssignPresetBattalionsMutation,
+  useSpeedupBotBuildMutation,
+} = botsApi;

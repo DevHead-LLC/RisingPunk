@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated, Platform } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Dimensions, TouchableOpacity, Animated, Platform, Alert } from 'react-native';
 import { SIZING } from '../styles/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { CloseButton } from '../components/common/CloseButton';
@@ -10,7 +10,11 @@ import { BattalionAssignment } from '../components/battle/BattalionSlot';
 import { ShieldCheckModal } from '../components/battle/ShieldCheckModal';
 import { BotType } from '../types/bots';
 import { useAppSelector } from '../store/hooks';
-import { useAssignToBattalionMutation } from '../store/api/botsApi';
+import {
+  useAssignToBattalionMutation,
+  useAssignPresetBattalionsMutation,
+  useFetchBotsQuery,
+} from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
 import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
@@ -19,6 +23,7 @@ import { useBattalionSlotUnlocks } from '../hooks/useBattalionSlotUnlocks';
 import { API_URL } from '../config';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
+import { PresetBar } from '../components/battle/PresetBar';
 
 const DeployPurgeHighlightBorder = React.memo(({ colors }: { colors: any }) => {
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
@@ -68,11 +73,14 @@ type Props = {
   defenderId?: string;
   defenderNpcSlug?: string;
   defenderNpcInstanceId?: string;
+  /** Set when battle was initiated from Hack Map (target cell). */
+  hackMapCell?: { x: number; y: number };
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, defenderId, defenderNpcSlug, defenderNpcInstanceId }: Props) => {
+export const BattlePreparationScreen = React.memo(
+  ({ onClose, onBattleStart, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell }: Props) => {
   const colors = useThemeColors();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -83,7 +91,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
   const token = useAppSelector((state) => state.auth.token);
   const userId = useAppSelector((state) => state.auth.user?._id);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
+  const userBalance = useAppSelector((state) => state.balance.total ?? 0);
   const [assignToBattalion] = useAssignToBattalionMutation();
+  const [assignPresetBattalions] = useAssignPresetBattalionsMutation();
+  const { refetch: refetchBots } = useFetchBotsQuery();
   const [startBattle] = useStartBattleMutation();
   const [deactivateShield] = useDeactivateShieldMutation();
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
@@ -170,17 +181,22 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
     setSelectorVisible(true);
   }, [isBattalionAHighlight, advanceHighlightStep]);
 
+  /** Serialize preset applies; skip identical successful lineup. Preset uses POST /assign-preset (one request) to avoid per-slot rate limits. */
+  const presetApplyChainRef = useRef(Promise.resolve());
+  /** Cleared when assignments change outside a successful preset apply (manual assign / server resync) so re-tap re-applies. Bugbot: sig is preset-shaped only; it does not reflect manual edits. */
+  const lastSuccessfulPresetSigRef = useRef<string | null>(null);
+
   const handleBotAssignment = React.useCallback(async (data: { botType: BotType; quantity: number }) => {
     if (!selectedBattalion) {
       return;
     }
 
     try {
-      const result = await assignToBattalion({
+      await assignToBattalion({
         botType: data.botType,
         quantity: data.quantity,
         battalionId: selectedBattalion,
-      });
+      }).unwrap();
 
       setAssignments(prev => {
         const newAssignments = {
@@ -193,37 +209,93 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
         };
         return newAssignments;
       });
+      lastSuccessfulPresetSigRef.current = null;
       setSelectorVisible(false);
     } catch (error) {
       console.error('Failed to assign bots:', error);
       setSelectorVisible(false);
       throw error;
     }
-  }, [selectedBattalion, assignToBattalion, botCounts, assignments]);
+  }, [selectedBattalion, assignToBattalion]);
 
-  const resetBattalions = React.useCallback(async () => {
-    try {
-      const resetPromises = [
-        assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'A' }),
-        assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'B' }),
-      ];
-      if (isBattalionCUnlocked) {
-        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'C' }));
-      }
-      if (isBattalionDUnlocked) {
-        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'D' }));
-      }
-      if (isBattalionEUnlocked) {
-        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'E' }));
-      }
-      if (isBattalionFUnlocked) {
-        resetPromises.push(assignToBattalion({ botType: 'breacher', quantity: 0, battalionId: 'F' }));
-      }
-      await Promise.all(resetPromises);
-    } catch (error) {
-      console.error('Failed to reset battalions:', error);
-    }
-  }, [assignToBattalion, isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked]);
+  const handleApplyPreset = React.useCallback(
+    (presetId: string, presetAssignments: Record<string, BattalionAssignment>) => {
+      const sig = `${presetId}:${JSON.stringify(
+        ['A', 'B', 'C', 'D', 'E', 'F'].map((id) => presetAssignments[id] ?? null)
+      )}`;
+
+      const task = async () => {
+        if (lastSuccessfulPresetSigRef.current === sig) {
+          return;
+        }
+        setAssignments(presetAssignments);
+        try {
+          const assignmentList = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((battalionId) => {
+            const a = presetAssignments[battalionId];
+            if (!a || a.quantity <= 0) return [];
+            return [
+              {
+                battalionId,
+                botType: a.botType as BotType,
+                quantity: a.quantity,
+                markLevel: a.markLevel ?? 1,
+              },
+            ];
+          });
+          await assignPresetBattalions({ assignments: assignmentList }).unwrap();
+          setAssignments(presetAssignments);
+          lastSuccessfulPresetSigRef.current = sig;
+          refetchBots().catch(() => {});
+        } catch (error: unknown) {
+          console.error('Failed to apply preset:', error);
+          lastSuccessfulPresetSigRef.current = null;
+          const status =
+            error && typeof error === 'object' && 'status' in error
+              ? (error as { status?: number }).status
+              : undefined;
+          if (status === 429) {
+            Alert.alert(
+              'Slow down',
+              'Too many battalion updates at once. Wait a few seconds and try again.',
+            );
+          } else {
+            Alert.alert(
+              'Could not apply preset',
+              'Your battalion lineup may not match the server. Try again or assign manually.',
+            );
+          }
+          try {
+            const { data } = await refetchBots();
+            const list = data?.battalionAssignments as
+              | Array<{ battalionId: string; botType: BotType; quantity: number; markLevel?: number }>
+              | undefined;
+            if (list) {
+              const next: Record<string, BattalionAssignment> = {};
+              for (const a of list) {
+                if (a.battalionId && a.quantity > 0) {
+                  next[a.battalionId] = {
+                    botType: a.botType,
+                    quantity: a.quantity,
+                    markLevel: a.markLevel ?? 1,
+                  };
+                }
+              }
+              setAssignments(next);
+              lastSuccessfulPresetSigRef.current = null;
+            }
+          } catch (refetchErr) {
+            console.error('Failed to refetch bots after preset error:', refetchErr);
+          }
+        }
+      };
+
+      presetApplyChainRef.current = presetApplyChainRef.current.then(task).catch(() => {
+        /* task handles errors; keep chain usable for the next preset tap */
+      });
+      return presetApplyChainRef.current;
+    },
+    [assignPresetBattalions, refetchBots]
+  );
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
@@ -269,6 +341,10 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
   const battleStartData = React.useMemo(() => {
     const isHackRigBattle = !defenderId && !defenderNpcSlug;
+    const hasCell =
+      hackMapCell != null &&
+      Number.isFinite(hackMapCell.x) &&
+      Number.isFinite(hackMapCell.y);
     return {
       userBattalions,
       screenWidth: SCREEN_WIDTH,
@@ -277,8 +353,9 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
       defenderNpcSlug: isHackRigBattle ? undefined : defenderNpcSlug,
       unlockHackRigOnWin: isHackRigBattle,
       defenderNpcInstanceId,
+      ...(hasCell ? { hackMapCellX: hackMapCell!.x, hackMapCellY: hackMapCell!.y } : {}),
     };
-  }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId]);
+  }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell]);
 
   const { clearHighlight } = useTaskGuideHighlight();
   
@@ -501,6 +578,12 @@ export const BattlePreparationScreen = React.memo(({ onClose, onBattleStart, def
 
       {!isDeployPurgeHighlight && (
         <View>
+          <PresetBar
+            botCounts={botCounts}
+            userBalance={userBalance}
+            unlockedSlots={{ isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked }}
+            onApplyPreset={handleApplyPreset}
+          />
           <TouchableOpacity
             style={[
               styles.executeButton,
