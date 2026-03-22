@@ -3880,19 +3880,22 @@ export const HackMapScreen: React.FC<Props> = ({
   const handleNavigateFromChatToCell = useCallback(
     (target: { mapName: string; x: number; y: number }) => {
       if (target.mapName !== 'main') return;
+      // Invalidate Turf → map pending nav timer so a delayed jump cannot override this tap.
+      onPendingNavigateConsumed?.();
       jumpToGridPosition(target.x, target.y);
       setShowWorldChatModal(false);
     },
-    [jumpToGridPosition]
+    [jumpToGridPosition, onPendingNavigateConsumed]
   );
 
   const handleCrewChatNavigateToCell = useCallback(
     (target: { mapName: string; x: number; y: number }) => {
       if (target.mapName !== 'main') return;
+      onPendingNavigateConsumed?.();
       jumpToGridPosition(target.x, target.y);
       setShowCrewModal(false);
     },
-    [jumpToGridPosition]
+    [jumpToGridPosition, onPendingNavigateConsumed]
   );
 
   const handleShareLocationPress = useCallback(() => {
