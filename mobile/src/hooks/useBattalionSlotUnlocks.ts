@@ -9,6 +9,19 @@ interface FeatureWithResearch {
   researchCompletesAt?: string | Date | null;
 }
 
+/** RTK `useGetUserFeaturesQuery` returns `{ features: [...] }`, not a bare array. */
+type HackAbilityFeaturesInput =
+  | FeatureWithResearch[]
+  | { features?: FeatureWithResearch[] }
+  | undefined
+  | null;
+
+function hackAbilityFeaturesToList(data: HackAbilityFeaturesInput): FeatureWithResearch[] | undefined {
+  if (data == null) return undefined;
+  if (Array.isArray(data)) return data;
+  return data.features;
+}
+
 /**
  * Whether a research feature is effectively unlocked at `nowMs` (unlocked or research just completed).
  * Matches server-side isBattalionSlotUnlocked: requires a valid researchCompletesAt before
@@ -69,12 +82,13 @@ const BATTALION_SIZE_MAP: Record<(typeof BATTALION_SIZE_FEATURE_IDS)[number], nu
  * Single source of truth with `useBattalionMaxSize`.
  */
 export function computeBattalionMaxSizeFromFeatures(
-  hackAbilityFeatures: FeatureWithResearch[] | undefined,
+  hackAbilityFeatures: HackAbilityFeaturesInput,
   nowMs: number
 ): number {
+  const list = hackAbilityFeaturesToList(hackAbilityFeatures);
   let max = 250;
   for (const id of BATTALION_SIZE_FEATURE_IDS) {
-    const f = hackAbilityFeatures?.find((feat) => feat.id === id);
+    const f = list?.find((feat) => feat.id === id);
     if (!f) break;
     if (!isResearchFeatureEffectivelyUnlockedAt(f, nowMs)) break;
     max = BATTALION_SIZE_MAP[id] ?? max;
@@ -85,10 +99,8 @@ export function computeBattalionMaxSizeFromFeatures(
 /**
  * Monotonic clock while any battalion-size research is in progress (matches QuantitySelector / PresetBar).
  */
-export function useBattalionSizeResearchNowMs(
-  hackAbilityFeatures: FeatureWithResearch[] | undefined
-): number {
-  return useResearchCompletesAtTicker(hackAbilityFeatures, BATTALION_SIZE_FEATURE_IDS);
+export function useBattalionSizeResearchNowMs(hackAbilityFeatures: HackAbilityFeaturesInput): number {
+  return useResearchCompletesAtTicker(hackAbilityFeaturesToList(hackAbilityFeatures), BATTALION_SIZE_FEATURE_IDS);
 }
 
 const ADD_BATTALION_SLOT_FEATURE_IDS = [
@@ -98,10 +110,8 @@ const ADD_BATTALION_SLOT_FEATURE_IDS = [
   'add-battalion-f',
 ] as const;
 
-function useAddBattalionSlotResearchNowMs(
-  hackAbilityFeatures: FeatureWithResearch[] | undefined
-): number {
-  return useResearchCompletesAtTicker(hackAbilityFeatures, ADD_BATTALION_SLOT_FEATURE_IDS);
+function useAddBattalionSlotResearchNowMs(hackAbilityFeatures: HackAbilityFeaturesInput): number {
+  return useResearchCompletesAtTicker(hackAbilityFeaturesToList(hackAbilityFeatures), ADD_BATTALION_SLOT_FEATURE_IDS);
 }
 
 /**
