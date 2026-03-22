@@ -22,7 +22,7 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setMapGridSize, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
-import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation, useLaunchProbeMutation, useGetActiveProbesQuery, useCancelProbeMutation, useSendMapChatMessageMutation } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation, useLaunchProbeMutation, useGetActiveProbesQuery, useCancelProbeMutation, useSendMapChatMessageMutation, useMovePropertyMutation } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery, useSendCrewChatMessageMutation } from '../store/api/authApi';
@@ -35,6 +35,8 @@ import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
 import { trackHackmapVisited } from '../services/analyticsService';
 import { buildMapLocationShareMessage } from '../../../shared/mapLocationShareMessage';
+import { MOVE_PROPERTY_COST } from '../../../shared/movePropertyCost';
+import { getCurrentBalance } from '../store/slices/balanceSlice';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
@@ -996,6 +998,7 @@ export const HackMapScreen: React.FC<Props> = ({
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
   const currentUserId = useAppSelector((state) => state.auth.user?._id);
   const currentUserIsAdmin = useAppSelector((state) => state.auth.user?.isAdmin === true);
+  const currentBalanceDisplay = useAppSelector(getCurrentBalance);
   const token = useAppSelector((state) => state.auth.token);
   const hackRigUnlocked = useAppSelector((state) => state.auth.user?.unlockedFeatures?.hackRig === true);
   const colors = useThemeColors();
@@ -1301,6 +1304,7 @@ export const HackMapScreen: React.FC<Props> = ({
   const [completeProbeMutation] = useCompleteProbeMutation();
   const [launchProbeMutation] = useLaunchProbeMutation();
   const [cancelProbeMutation] = useCancelProbeMutation();
+  const [movePropertyMutation] = useMovePropertyMutation();
   const { data: activeProbesData } = useGetActiveProbesQuery(undefined, {
     pollingInterval: 3000,
   });
@@ -3958,6 +3962,71 @@ export const HackMapScreen: React.FC<Props> = ({
     hackRigUnlocked,
   ]);
 
+  const handleMovePropertyPress = useCallback(() => {
+    if (!selectedCell) return;
+    if (!effectiveMyPosition) {
+      Alert.alert(
+        'Move property',
+        'Could not determine your home location. Wait for the map to finish loading and try again.'
+      );
+      return;
+    }
+    const { x, y, info } = selectedCell;
+    const terr = info.terrain;
+    if (terr === 'water' || terr === 'mountain' || terr === 'road') {
+      Alert.alert('Move property', 'You cannot move to water, mountain, or road tiles.');
+      return;
+    }
+    if (info.entity !== 'empty') {
+      Alert.alert('Move property', 'Choose an empty tile.');
+      return;
+    }
+    if (effectiveMyPosition.x === x && effectiveMyPosition.y === y) {
+      Alert.alert('Move property', 'Your home is already at this tile.');
+      return;
+    }
+    if (currentBalanceDisplay < MOVE_PROPERTY_COST) {
+      Alert.alert(
+        'Move property',
+        `You need at least $${MOVE_PROPERTY_COST.toLocaleString()} to move. Current balance is too low.`
+      );
+      return;
+    }
+    const costLabel = `$${MOVE_PROPERTY_COST.toLocaleString()}`;
+    Alert.alert(
+      'Move property',
+      `Move your home to (${x}, ${y}) for ${costLabel}? Your balance will be charged immediately.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Move',
+          onPress: () => {
+            movePropertyMutation({ x, y })
+              .unwrap()
+              .then(() => {
+                dispatch(refreshUserDataSilent());
+                refetch();
+                triggerGetMyMapPosition();
+                setSelectedCell(null);
+              })
+              .catch((err: any) => {
+                const msg = err?.data?.error ?? err?.message ?? 'Could not move property.';
+                Alert.alert('Move property', String(msg));
+              });
+          },
+        },
+      ]
+    );
+  }, [
+    selectedCell,
+    effectiveMyPosition,
+    currentBalanceDisplay,
+    movePropertyMutation,
+    dispatch,
+    refetch,
+    triggerGetMyMapPosition,
+  ]);
+
   const handleAntivirusPress = useCallback(() => {
     // Only show modal if antivirus feature is unlocked (including timer-based unlock)
     if (isActuallyUnlocked) {
@@ -4149,6 +4218,42 @@ export const HackMapScreen: React.FC<Props> = ({
                 {selectedCell.info.terrain.toUpperCase()}
               </Text>
             </View>
+
+            {selectedCell.info.entity === 'empty' &&
+              effectiveMyPosition &&
+              selectedCell.info.terrain !== 'water' &&
+              selectedCell.info.terrain !== 'mountain' &&
+              selectedCell.info.terrain !== 'road' &&
+              (selectedCell.x !== effectiveMyPosition.x || selectedCell.y !== effectiveMyPosition.y) && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    {
+                      backgroundColor:
+                        currentBalanceDisplay >= MOVE_PROPERTY_COST ? colors.matrix : colors.buttonDisabled,
+                      borderColor: colors.matrix,
+                      opacity: currentBalanceDisplay >= MOVE_PROPERTY_COST ? 1 : 0.75,
+                    },
+                  ]}
+                  onPress={handleMovePropertyPress}
+                  accessibilityLabel="Move home to this tile"
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      {
+                        color:
+                          currentBalanceDisplay >= MOVE_PROPERTY_COST ? colors.background : colors.text.secondary,
+                      },
+                    ]}
+                  >
+                    Move home here (${MOVE_PROPERTY_COST.toLocaleString()})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
             
             {selectedCell.info.entity !== 'empty' && (
               <>
@@ -4353,7 +4458,7 @@ export const HackMapScreen: React.FC<Props> = ({
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
