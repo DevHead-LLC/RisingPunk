@@ -9,19 +9,6 @@ interface FeatureWithResearch {
   researchCompletesAt?: string | Date | null;
 }
 
-/** RTK `useGetUserFeaturesQuery` returns `{ features: [...] }`, not a bare array. */
-type HackAbilityFeaturesInput =
-  | FeatureWithResearch[]
-  | { features?: FeatureWithResearch[] }
-  | undefined
-  | null;
-
-function hackAbilityFeaturesToList(data: HackAbilityFeaturesInput): FeatureWithResearch[] | undefined {
-  if (data == null) return undefined;
-  if (Array.isArray(data)) return data;
-  return data.features;
-}
-
 /**
  * Whether a research feature is effectively unlocked at `nowMs` (unlocked or research just completed).
  * Matches server-side isBattalionSlotUnlocked: requires a valid researchCompletesAt before
@@ -78,17 +65,17 @@ const BATTALION_SIZE_MAP: Record<(typeof BATTALION_SIZE_FEATURE_IDS)[number], nu
 };
 
 /**
- * Pure max battalion size from hack-ability features at a given time (e.g. `Date.now()` or a ticking clock while research completes).
+ * Pure max battalion size from hack-ability **feature rows** at a given time (e.g. `Date.now()` or a ticking clock while research completes).
  * Single source of truth with `useBattalionMaxSize`.
+ * Bugbot: pass `useGetUserFeaturesQuery('hack-ability').data?.features`, not the whole `data` object (`researchFeaturesApi` getUserFeatures is `{ features: any[] }`).
  */
 export function computeBattalionMaxSizeFromFeatures(
-  hackAbilityFeatures: HackAbilityFeaturesInput,
+  features: FeatureWithResearch[] | undefined,
   nowMs: number
 ): number {
-  const list = hackAbilityFeaturesToList(hackAbilityFeatures);
   let max = 250;
   for (const id of BATTALION_SIZE_FEATURE_IDS) {
-    const f = list?.find((feat) => feat.id === id);
+    const f = features?.find((feat) => feat.id === id);
     if (!f) break;
     if (!isResearchFeatureEffectivelyUnlockedAt(f, nowMs)) break;
     max = BATTALION_SIZE_MAP[id] ?? max;
@@ -98,9 +85,10 @@ export function computeBattalionMaxSizeFromFeatures(
 
 /**
  * Monotonic clock while any battalion-size research is in progress (matches QuantitySelector / PresetBar).
+ * Bugbot: argument is `data?.features` from hack-ability `useGetUserFeaturesQuery`, not `data`.
  */
-export function useBattalionSizeResearchNowMs(hackAbilityFeatures: HackAbilityFeaturesInput): number {
-  return useResearchCompletesAtTicker(hackAbilityFeaturesToList(hackAbilityFeatures), BATTALION_SIZE_FEATURE_IDS);
+export function useBattalionSizeResearchNowMs(features: FeatureWithResearch[] | undefined): number {
+  return useResearchCompletesAtTicker(features, BATTALION_SIZE_FEATURE_IDS);
 }
 
 const ADD_BATTALION_SLOT_FEATURE_IDS = [
@@ -110,8 +98,8 @@ const ADD_BATTALION_SLOT_FEATURE_IDS = [
   'add-battalion-f',
 ] as const;
 
-function useAddBattalionSlotResearchNowMs(hackAbilityFeatures: HackAbilityFeaturesInput): number {
-  return useResearchCompletesAtTicker(hackAbilityFeaturesToList(hackAbilityFeatures), ADD_BATTALION_SLOT_FEATURE_IDS);
+function useAddBattalionSlotResearchNowMs(features: FeatureWithResearch[] | undefined): number {
+  return useResearchCompletesAtTicker(features, ADD_BATTALION_SLOT_FEATURE_IDS);
 }
 
 /**
@@ -119,12 +107,13 @@ function useAddBattalionSlotResearchNowMs(hackAbilityFeatures: HackAbilityFeatur
  * Base is 250; each successive battalion-size research doubles/raises it.
  */
 export function useBattalionMaxSize(): number {
-  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
-  const nowMs = useBattalionSizeResearchNowMs(hackAbilityFeatures);
+  const { data } = useGetUserFeaturesQuery('hack-ability');
+  const features = data?.features;
+  const nowMs = useBattalionSizeResearchNowMs(features);
 
   return useMemo(
-    () => computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, nowMs),
-    [hackAbilityFeatures, nowMs]
+    () => computeBattalionMaxSizeFromFeatures(features, nowMs),
+    [features, nowMs]
   );
 }
 
@@ -138,19 +127,20 @@ export function useBattalionSlotUnlocks(): {
   isBattalionEUnlocked: boolean;
   isBattalionFUnlocked: boolean;
 } {
-  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
-  const nowMs = useAddBattalionSlotResearchNowMs(hackAbilityFeatures);
+  const { data } = useGetUserFeaturesQuery('hack-ability');
+  const features = data?.features;
+  const nowMs = useAddBattalionSlotResearchNowMs(features);
 
   return useMemo(() => {
-    const battalionC = hackAbilityFeatures?.features?.find((f: { id?: string }) => f.id === 'add-battalion-c');
-    const battalionD = hackAbilityFeatures?.features?.find((f: { id?: string }) => f.id === 'add-battalion-d');
-    const battalionE = hackAbilityFeatures?.features?.find((f: { id?: string }) => f.id === 'add-battalion-e');
-    const battalionF = hackAbilityFeatures?.features?.find((f: { id?: string }) => f.id === 'add-battalion-f');
+    const battalionC = features?.find((f: { id?: string }) => f.id === 'add-battalion-c');
+    const battalionD = features?.find((f: { id?: string }) => f.id === 'add-battalion-d');
+    const battalionE = features?.find((f: { id?: string }) => f.id === 'add-battalion-e');
+    const battalionF = features?.find((f: { id?: string }) => f.id === 'add-battalion-f');
     return {
       isBattalionCUnlocked: isResearchFeatureEffectivelyUnlockedAt(battalionC, nowMs),
       isBattalionDUnlocked: isResearchFeatureEffectivelyUnlockedAt(battalionD, nowMs),
       isBattalionEUnlocked: isResearchFeatureEffectivelyUnlockedAt(battalionE, nowMs),
       isBattalionFUnlocked: isResearchFeatureEffectivelyUnlockedAt(battalionF, nowMs),
     };
-  }, [hackAbilityFeatures, nowMs]);
+  }, [features, nowMs]);
 }

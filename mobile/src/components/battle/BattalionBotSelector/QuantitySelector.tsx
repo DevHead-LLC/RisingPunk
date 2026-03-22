@@ -20,12 +20,13 @@ type Props = {
 export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity, disabled = false }: Props) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
-  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
-  const researchNowMs = useBattalionSizeResearchNowMs(hackAbilityFeatures);
+  const { data } = useGetUserFeaturesQuery('hack-ability');
+  const features = data?.features;
+  const researchNowMs = useBattalionSizeResearchNowMs(features);
 
   const MAX_BATTALION_SIZE = React.useMemo(
-    () => computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, researchNowMs),
-    [hackAbilityFeatures, researchNowMs]
+    () => computeBattalionMaxSizeFromFeatures(features, researchNowMs),
+    [features, researchNowMs]
   );
   const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
 
