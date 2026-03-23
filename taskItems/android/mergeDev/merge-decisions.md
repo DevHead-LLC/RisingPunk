@@ -1,21 +1,12 @@
-# Merge decisions: `origin/dev` → `android_mergeDev` (March 21, 2026)
+# Merge decisions: `origin/dev` → `android_mergeDev` (March 23, 2026)
 
 Session log for conflict resolutions. Priority: Android deploy / Play Console first, then dev behavior.
 
 ---
 
-## `.github/workflows/deploy-production.yml` / `deploy-staging.yml` (correction)
+## Deploy workflows
 
-**March 21 merge mistake:** Conflicts were resolved to `dist/server/server.js`. **That was wrong** for this repo’s EB pipeline.
-
-**Authoritative rule:** Per [merge-flow.md](merge-flow.md), Android merge **must not** change deploy workflows except to **keep `androidStaging` (HEAD)**. Correct Procfile paths are:
-
-- Production: `NODE_ENV=production node dist/server.js`
-- Staging: `NODE_ENV=staging node dist/server.js`
-
-**Never** `dist/server/server.js` in these workflow Procfile lines.
-
-**If something breaks:** Wrong entry on EB → restore the exact YAML from `androidStaging` / merge-flow; do not infer paths from `server/package.json` local `start` scripts during Android merges.
+No conflicts in `.github/workflows/deploy-production.yml` or `deploy-staging.yml` this session. **Kept HEAD per merge-flow; workflows unchanged by intent.**
 
 ---
 
@@ -23,30 +14,47 @@ Session log for conflict resolutions. Priority: Android deploy / Play Console fi
 
 | Side | Content |
 |------|---------|
-| HEAD | `"version": "3.1.0"`, `"versionCode": 102` |
-| `origin/dev` | `"version": "3.2.0"` (no `versionCode`) |
+| HEAD (`androidStaging` lineage) | `"version": "3.2.0"`, `"versionCode": 104` |
+| `origin/dev` | `"version": "3.3.0"` (no `versionCode`) |
 
-**Resolution:** `"version": "3.2.0"` + `"versionCode": 102`.
+**Resolution:** `"version": "3.3.0"` + `"versionCode": 104`.
 
-**Rationale:** Version label tracks dev. `versionCode` stays from Android branch for Gradle / Play monotonicity until the next intentional store bump.
+**Rationale:** Version label tracks dev. `versionCode` stays from the Android branch for Gradle / Play monotonicity until the next intentional store bump.
 
-**Rejected:** Dropping `versionCode`. Keeping `3.1.0` only.
+**Rejected:** Dropping `versionCode`. Keeping `3.2.0` only.
 
 **If something breaks:** Gradle missing `versionCode` → restore in `package.json`. Play upload rejected for duplicate code → bump `versionCode` in a dedicated commit.
 
 ---
 
-## `mobile/src/components/battle/BattalionBotSelector/QuantitySelector.tsx`
+## `mobile/src/screens/HackMapScreen.tsx` (active probes + move property)
 
 | Side | Content |
 |------|---------|
-| HEAD | Local `useEffect` / `currentTime` / `BATTALION_SIZE_FEATURE_IDS` loop for max size |
-| `origin/dev` | `computeBattalionMaxSizeFromFeatures(hackAbilityFeatures, researchNowMs)` |
+| HEAD | `useGetActiveProbesQuery` with `refetch: refetchActiveProbes`; no `useMovePropertyMutation` on this block |
+| `origin/dev` | `useMovePropertyMutation` + `useGetActiveProbesQuery` without `refetch` |
 
-**Resolution:** Dev’s `useMemo` + shared helpers (`useBattalionSizeResearchNowMs`, `computeBattalionMaxSizeFromFeatures`).
+**Resolution:** Both hooks: `useMovePropertyMutation()` then `useGetActiveProbesQuery` with `refetch: refetchActiveProbes` (dev’s move-property API + HEAD’s refetch used by probe completion effects).
 
-**Rationale:** Single source of truth in `useBattalionSlotUnlocks`; HEAD conflict block referenced incomplete symbols vs dev’s refactor. Matches PresetBar / research timer behavior.
+**Rationale:** Dev adds move-property; Android branch added probe refetch after complete — both behaviors are required.
 
-**Rejected:** HEAD duplicate tier logic (stale vs shared module).
+**Rejected:** Dev-only (lose refetch → stale probe UI). HEAD-only (lose move mutation → build/runtime errors where `movePropertyMutation` is used).
 
-**If something breaks:** Wrong max quantity in battle prep → compare `computeBattalionMaxSizeFromFeatures` inputs vs API `features` list.
+**If something breaks:** Move property fails → check `handleMovePropertyPress` / `movePropertyMutation`. Probes stuck after complete → check `refetchActiveProbes` call sites.
+
+---
+
+## `mobile/src/screens/HackMapScreen.tsx` (selected-cell modal `useCallback` deps)
+
+| Side | Content |
+|------|---------|
+| HEAD | Shorter dependency array (no `probes`, no share/move handlers) |
+| `origin/dev` | Full deps including `probes`, `handleShareLocationPress`, `effectiveMyPosition`, `currentBalanceDisplay`, `handleMovePropertyPress` |
+
+**Resolution:** `origin/dev` dependency array.
+
+**Rationale:** Modal renders share location + move property; those handlers and `probes` belong in the dependency list so the callback matches dev’s UI.
+
+**Rejected:** HEAD’s shorter list (risk stale closures for new buttons).
+
+**If something breaks:** Wrong labels or handlers on cell modal → verify deps match values used inside the callback.

@@ -387,6 +387,45 @@ export async function setPlayerPosition(
   return true;
 }
 
+/**
+ * Move the user's permanent house to (x, y). **MapCell-backed maps only** (`gridSize === 500`).
+ * Clears YOU markers, clears non-YOU player cells for this user (house row), then places the house (`entityName` = handle).
+ * Caller must validate the target cell before calling. Throws with code `MOVE_TARGET_UNAVAILABLE` if the final `updateOne` does not modify (race / taken tile).
+ */
+export async function moveUserHouseToCell(
+  mapDoc: any,
+  userId: mongoose.Types.ObjectId,
+  handle: string,
+  x: number,
+  y: number,
+  session: mongoose.mongo.ClientSession
+): Promise<void> {
+  if (!usesMapCells(mapDoc)) {
+    throw new Error('moveUserHouseToCell requires MapCell-backed map');
+  }
+  await clearYouMarkersForUser(mapDoc, userId, session);
+  await MapCell.updateMany(
+    { mapId: mapDoc._id, userId, occupiedBy: 'player', entityName: { $ne: 'YOU' } },
+    {
+      $set: {
+        isOccupied: false,
+        occupiedBy: 'none',
+        entityName: '',
+        npcSlug: '',
+        npcInstanceId: '',
+        userId: null,
+      },
+    },
+    { session }
+  );
+  const ok = await setPlayerPosition(mapDoc, x, y, userId, handle, session);
+  if (!ok) {
+    const err = new Error('MOVE_TARGET_UNAVAILABLE');
+    (err as any).code = 'MOVE_TARGET_UNAVAILABLE';
+    throw err;
+  }
+}
+
 /** Clear all NPC occupancy from a map. */
 export async function clearNpcsFromMap(mapDoc: any): Promise<void> {
   if (!usesMapCells(mapDoc)) return;
