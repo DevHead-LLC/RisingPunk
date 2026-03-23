@@ -45,4 +45,8 @@ MapSchema.index({ 'cells.x': 1, 'cells.y': 1 });
 // Index for efficient updates by userId (e.g. handle change, orphan cleanup)
 MapSchema.index({ 'cells.userId': 1 }, { sparse: true });
 
+// One logical map name per DB (e.g. "main" for HackMap). Prevents duplicate findOne({ name: 'main' }) rows.
+// Run server/scripts/dedupeHackMaps.ts before creating this index if duplicates already exist.
+MapSchema.index({ name: 1 }, { unique: true });
+
 export const Map = mongoose.model('Map', MapSchema); 

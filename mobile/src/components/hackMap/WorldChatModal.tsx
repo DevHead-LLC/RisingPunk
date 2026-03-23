@@ -7,12 +7,14 @@ interface WorldChatModalProps {
   visible: boolean;
   onClose: () => void;
   mapName: string;
+  onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
 }
 
 export const WorldChatModal: React.FC<WorldChatModalProps> = ({
   visible,
   onClose,
   mapName,
+  onNavigateToMapCell,
 }) => {
   const currentUser = useAppSelector((state) => state.auth.user);
 
@@ -67,6 +69,7 @@ export const WorldChatModal: React.FC<WorldChatModalProps> = ({
       currentUser={currentUser}
       reportContext="map-chat-message"
       getReportContextData={getReportContextData}
+      onNavigateToMapCell={onNavigateToMapCell}
     />
   );
 };

@@ -15,7 +15,10 @@ import {
   clearYouMarkersForUser,
   setPlayerPosition,
   updateCell,
+  moveUserHouseToCell,
 } from '../services/CellAccessorService';
+import { accrueBalanceToTime } from '../utils/balanceAccrual';
+import { MOVE_PROPERTY_COST } from '../../../shared/movePropertyCost';
 import { NPCService } from '../services/NPCService';
 import { MapChatMessage } from '../models/MapChatMessage';
 import { filterBadWords } from '../utils/contentModeration';
@@ -445,6 +448,170 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (error: any) {
     console.error('Player position update error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST move-property MUST be before /:name (same as my-position / player-position).
+router.post('/move-property', auth, async (req: Request, res: Response) => {
+  try {
+    const authUserId: any = (req as any).user?._id;
+    if (!authUserId) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+
+    const { x: rawX, y: rawY } = req.body as { x: unknown; y: unknown };
+    if (typeof rawX !== 'number' || typeof rawY !== 'number' || !Number.isInteger(rawX) || !Number.isInteger(rawY)) {
+      res.status(400).json({ error: 'Invalid coordinates' });
+      return;
+    }
+    const x = rawX;
+    const y = rawY;
+
+    const mapDoc = await MapModel.findOne({ name: 'main' });
+    if (!mapDoc) {
+      res.status(404).json({ error: 'Map not found' });
+      return;
+    }
+
+    if (!usesMapCells(mapDoc)) {
+      res.status(503).json({ error: 'Property move is not available for this map layout' });
+      return;
+    }
+
+    const target = await getCell(mapDoc, x, y);
+    if (!target) {
+      res.status(404).json({ error: 'Target cell not found' });
+      return;
+    }
+    if (!target.canBeOccupied || target.terrain === 'mountain' || target.terrain === 'water' || target.terrain === 'road') {
+      res.status(400).json({ error: 'Cell cannot be occupied' });
+      return;
+    }
+
+    const authUserIdObj = authUserId as mongoose.Types.ObjectId;
+    const house = await findHouseForUser(mapDoc, authUserIdObj);
+    if (!house) {
+      res.status(400).json({ error: 'No property on the map to move' });
+      return;
+    }
+    if (house.x === x && house.y === y) {
+      res.status(400).json({ error: 'Property is already at this location' });
+      return;
+    }
+
+    if (target.isOccupied) {
+      const isOwnYou =
+        target.occupiedBy === 'player' &&
+        target.entityName === 'YOU' &&
+        target.userId &&
+        String(target.userId) === String(authUserId);
+      if (!isOwnYou) {
+        res.status(400).json({ error: 'Cell already occupied' });
+        return;
+      }
+    }
+
+    const user = await User.findById(authUserId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    const handle = (user as any).handle || 'User';
+    const now = new Date();
+    const accrued = accrueBalanceToTime(
+      user.balance.total,
+      user.balance.ratePerSecond,
+      user.balance.lastUpdated,
+      user.balance.fractionalRemainder ?? 0,
+      now
+    );
+
+    if (accrued.total < MOVE_PROPERTY_COST) {
+      res.status(400).json({
+        error: `Insufficient funds — $${MOVE_PROPERTY_COST.toLocaleString()} required to move property.`,
+        costRequired: MOVE_PROPERTY_COST,
+        currentBalance: accrued.total,
+      });
+      return;
+    }
+
+    const newBalance = accrued.total - MOVE_PROPERTY_COST;
+    const frRead = user.balance.fractionalRemainder ?? 0;
+    const fractionalFingerprint =
+      frRead === 0
+        ? {
+            $or: [
+              { 'balance.fractionalRemainder': 0 },
+              { 'balance.fractionalRemainder': null },
+              { 'balance.fractionalRemainder': { $exists: false } },
+            ],
+          }
+        : { 'balance.fractionalRemainder': frRead };
+
+    const session = await mongoose.startSession();
+    let responseNewBalance: number;
+    try {
+      await session.withTransaction(async () => {
+        const updated = await User.findOneAndUpdate(
+          {
+            _id: authUserId,
+            $and: [
+              {
+                'balance.total': user.balance.total,
+                'balance.ratePerSecond': user.balance.ratePerSecond,
+                'balance.lastUpdated': user.balance.lastUpdated,
+              },
+              fractionalFingerprint,
+            ],
+          },
+          {
+            $set: {
+              'balance.total': newBalance,
+              'balance.fractionalRemainder': accrued.fractionalRemainder,
+              'balance.lastUpdated': accrued.lastUpdated,
+            },
+          },
+          { session, new: true }
+        );
+
+        if (!updated) {
+          const err = new Error('BALANCE_CONFLICT');
+          (err as any).code = 'BALANCE_CONFLICT';
+          throw err;
+        }
+
+        await moveUserHouseToCell(mapDoc, authUserIdObj, handle, x, y, session);
+        responseNewBalance = updated.balance.total;
+      });
+    } catch (err: any) {
+      if (err?.code === 'BALANCE_CONFLICT' || err?.message === 'BALANCE_CONFLICT') {
+        res.status(409).json({ error: 'Balance changed. Please try again.' });
+        return;
+      }
+      if (err?.code === 'MOVE_TARGET_UNAVAILABLE' || err?.message === 'MOVE_TARGET_UNAVAILABLE') {
+        res.status(409).json({ error: 'That tile is no longer available. Try again.' });
+        return;
+      }
+      if (err?.code === 11000 || err?.codeName === 'DuplicateKey') {
+        res.status(409).json({ error: 'That tile is no longer available. Try again.' });
+        return;
+      }
+      throw err;
+    } finally {
+      await session.endSession();
+    }
+
+    res.json({
+      success: true,
+      x,
+      y,
+      newBalance: responseNewBalance!,
+    });
+  } catch (error: any) {
+    console.error('Move property error:', error);
     res.status(500).json({ error: error.message });
   }
 });
