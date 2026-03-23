@@ -202,6 +202,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [binaryBankCrackInitialSession, setBinaryBankCrackInitialSession] = useState<BinaryBankCrackSessionResponse | null>(null);
   const [turfViewPosition, setTurfViewPosition] = useState<{ x: number; y: number } | null>(null);
   const [showWorldChatModal, setShowWorldChatModal] = useState(false);
+  const [mapPendingNavigateCell, setMapPendingNavigateCell] = useState<{ x: number; y: number } | null>(null);
   const [showMessagesModal, setShowMessagesModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
   const [crewModalInitialCategory, setCrewModalInitialCategory] = useState<'backup-requests' | null>(null);
@@ -796,6 +797,20 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [currentScreen, turfViewPosition, centerAndroidView, offsetX, offsetY, dispatch]);
 
+  const handleWorldChatNavigateToMapCell = useCallback(
+    (target: { mapName: string; x: number; y: number }) => {
+      if (target.mapName !== 'main') return;
+      setMapPendingNavigateCell({ x: target.x, y: target.y });
+      setShowWorldChatModal(false);
+      navigateToScreen('map');
+    },
+    [navigateToScreen]
+  );
+
+  const handleMapPendingNavigateConsumed = useCallback(() => {
+    setMapPendingNavigateCell(null);
+  }, []);
+
   const navigateToFloorPlan = useCallback((propertyId: number) => {
     // Capture current turf view position
     if (Platform.OS === 'android') {
@@ -1087,6 +1102,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       case 'map':
         return <HackMapScreen
           restorePan={returnContext?.mapPan}
+          pendingNavigateToCell={mapPendingNavigateCell}
+          onPendingNavigateConsumed={handleMapPendingNavigateConsumed}
           onClose={() => {
             const slug = (globalThis as any).pendingNpcSlug as string | undefined;
             const defenderUserId = (globalThis as any).pendingDefenderUserId as string | undefined;
@@ -1716,6 +1733,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               visible={showWorldChatModal}
               onClose={() => setShowWorldChatModal(false)}
               mapName="main"
+              onNavigateToMapCell={handleWorldChatNavigateToMapCell}
             />
             <MessagesModal
               visible={showMessagesModal}
@@ -1746,7 +1764,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleWorldChatNavigateToMapCell, handleMapPendingNavigateConsumed]);
 
   // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
   if (!navRestoreAttempted) {

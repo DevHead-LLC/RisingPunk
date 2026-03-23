@@ -22,10 +22,10 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setMapGridSize, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
-import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation, useLaunchProbeMutation, useGetActiveProbesQuery, useCancelProbeMutation } from '../store/api/mapApi';
+import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation, useLaunchProbeMutation, useGetActiveProbesQuery, useCancelProbeMutation, useSendMapChatMessageMutation, useMovePropertyMutation } from '../store/api/mapApi';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
-import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery } from '../store/api/authApi';
+import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery, useSendCrewChatMessageMutation } from '../store/api/authApi';
 import { API_URL } from '../config';
 import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { computePanBounds } from '../utils/mapPanBounds';
@@ -34,12 +34,21 @@ import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { SIZING } from '../styles/theme';
 import { trackHackmapVisited } from '../services/analyticsService';
+import { buildMapLocationShareMessage } from '../../../shared/mapLocationShareMessage';
+import { MOVE_PROPERTY_COST } from '../../../shared/movePropertyCost';
+import { getCurrentBalance } from '../store/slices/balanceSlice';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
 
 /** Max probes in flight per user (outbound or return). */
 const MAX_PROBES = 2;
+
+/**
+ * TurfScreen → HackMap from world-chat shared location: pan only after this delay so
+ * center-on-home / my-position / viewport effects can finish first (see in-progress-4 notes).
+ */
+const PENDING_CHAT_NAV_DELAY_MS = 1500;
 
 /** Target info for one probe (shared with complete API). */
 type ProbeTarget = {
@@ -416,7 +425,19 @@ const triggerViewportFetch = (
 type Props = {
   onClose: () => void;
   restorePan?: { x: number; y: number };
+  /** TurfScreen: after opening map from world chat, pan to this cell once. */
+  pendingNavigateToCell?: { x: number; y: number } | null;
+  onPendingNavigateConsumed?: () => void;
 };
+
+function getShareLabelForCell(info: CellData): string {
+  if (info.entity === 'empty') {
+    return info.terrain.toUpperCase();
+  }
+  const name = (info.name || '').trim();
+  if (name) return name;
+  return info.terrain.toUpperCase();
+}
 
 /**
  * Shared memo comparison function for Tile and PoolTile components
@@ -964,7 +985,12 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
   );
 };
 
-export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
+export const HackMapScreen: React.FC<Props> = ({
+  onClose,
+  restorePan,
+  pendingNavigateToCell,
+  onPendingNavigateConsumed,
+}) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
   const mapGridSize = useAppSelector((state) => state.map.mapGridSize);
@@ -972,6 +998,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
   const currentUserId = useAppSelector((state) => state.auth.user?._id);
   const currentUserIsAdmin = useAppSelector((state) => state.auth.user?.isAdmin === true);
+  const currentBalanceDisplay = useAppSelector(getCurrentBalance);
   const token = useAppSelector((state) => state.auth.token);
   const hackRigUnlocked = useAppSelector((state) => state.auth.user?.unlockedFeatures?.hackRig === true);
   const colors = useThemeColors();
@@ -1277,6 +1304,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   const [completeProbeMutation] = useCompleteProbeMutation();
   const [launchProbeMutation] = useLaunchProbeMutation();
   const [cancelProbeMutation] = useCancelProbeMutation();
+  const [movePropertyMutation] = useMovePropertyMutation();
   const { data: activeProbesData } = useGetActiveProbesQuery(undefined, {
     pollingInterval: 3000,
   });
@@ -2008,7 +2036,9 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
   );
 
   const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
-  
+  const [sendMapChatMessage] = useSendMapChatMessageMutation();
+  const [sendCrewChatMessage] = useSendCrewChatMessageMutation();
+
   const { data: crewDetails, isLoading: isLoadingCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId || '', {
     skip: !crewStatus?.crewId || !crewStatus?.isInCrew,
   });
@@ -3823,6 +3853,183 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
     ]
   );
 
+  useEffect(() => {
+    if (!pendingNavigateToCell) return;
+    if (containerSize.width <= 0 || containerSize.height <= 0) return;
+    const { x, y } = pendingNavigateToCell;
+    const gridSize = mapGridSize ?? getGridSize(grid);
+    if (!grid || x < 0 || x >= gridSize || y < 0 || y >= gridSize) return;
+
+    const t = setTimeout(() => {
+      jumpToGridPosition(x, y);
+      hasCenteredOnHome.value = true;
+      onPendingNavigateConsumed?.();
+    }, PENDING_CHAT_NAV_DELAY_MS);
+
+    return () => clearTimeout(t);
+  }, [
+    pendingNavigateToCell,
+    containerSize.width,
+    containerSize.height,
+    grid,
+    mapGridSize,
+    jumpToGridPosition,
+    onPendingNavigateConsumed,
+  ]);
+
+  const handleNavigateFromChatToCell = useCallback(
+    (target: { mapName: string; x: number; y: number }) => {
+      if (target.mapName !== 'main') return;
+      // Invalidate Turf → map pending nav timer so a delayed jump cannot override this tap.
+      onPendingNavigateConsumed?.();
+      jumpToGridPosition(target.x, target.y);
+      setShowWorldChatModal(false);
+    },
+    [jumpToGridPosition, onPendingNavigateConsumed]
+  );
+
+  const handleCrewChatNavigateToCell = useCallback(
+    (target: { mapName: string; x: number; y: number }) => {
+      if (target.mapName !== 'main') return;
+      onPendingNavigateConsumed?.();
+      jumpToGridPosition(target.x, target.y);
+      setShowCrewModal(false);
+    },
+    [jumpToGridPosition, onPendingNavigateConsumed]
+  );
+
+  const handleShareLocationPress = useCallback(() => {
+    if (!selectedCell) return;
+    const { x, y, info } = selectedCell;
+    const label = getShareLabelForCell(info);
+    const messageBody = buildMapLocationShareMessage('main', x, y, label);
+
+    const sendGlobal = () => {
+      sendMapChatMessage({ mapName: 'main', message: messageBody })
+        .unwrap()
+        .then(() => {
+          Alert.alert('Sent', 'Location shared to World Chat.');
+        })
+        .catch((err: any) => {
+          const msg = err?.data?.error ?? err?.message ?? 'Could not send message.';
+          Alert.alert('Share location', String(msg));
+        });
+    };
+
+    const sendCrew = () => {
+      const crewId = crewStatus?.crewId;
+      if (!crewId) {
+        Alert.alert('Share location', 'Join a crew to share there.');
+        return;
+      }
+      sendCrewChatMessage({ crewId: String(crewId), message: messageBody })
+        .unwrap()
+        .then(() => {
+          Alert.alert('Sent', 'Location shared to crew chat.');
+        })
+        .catch((err: any) => {
+          const msg = err?.data?.error ?? err?.message ?? 'Could not send message.';
+          Alert.alert('Share location', String(msg));
+        });
+    };
+
+    const canGlobal = hackRigUnlocked;
+    const canCrew = !!(crewStatus?.isInCrew && crewStatus.crewId);
+
+    if (!canGlobal && !canCrew) {
+      Alert.alert(
+        'Share location',
+        'Unlock World Chat from the Hack Rig, or join a crew to share to crew chat.'
+      );
+      return;
+    }
+
+    const buttons: {
+      text: string;
+      style?: 'cancel' | 'default' | 'destructive';
+      onPress?: () => void;
+    }[] = [{ text: 'Cancel', style: 'cancel' }];
+    if (canGlobal) {
+      buttons.push({ text: 'Global', onPress: sendGlobal });
+    }
+    if (canCrew) {
+      buttons.push({ text: 'Crew', onPress: sendCrew });
+    }
+    Alert.alert('Share location', 'Choose a chat', buttons);
+  }, [
+    selectedCell,
+    sendMapChatMessage,
+    sendCrewChatMessage,
+    crewStatus?.crewId,
+    crewStatus?.isInCrew,
+    hackRigUnlocked,
+  ]);
+
+  const handleMovePropertyPress = useCallback(() => {
+    if (!selectedCell) return;
+    if (!effectiveMyPosition) {
+      Alert.alert(
+        'Move property',
+        'Could not determine your home location. Wait for the map to finish loading and try again.'
+      );
+      return;
+    }
+    const { x, y, info } = selectedCell;
+    const terr = info.terrain;
+    if (terr === 'water' || terr === 'mountain' || terr === 'road') {
+      Alert.alert('Move property', 'You cannot move to water, mountain, or road tiles.');
+      return;
+    }
+    if (info.entity !== 'empty') {
+      Alert.alert('Move property', 'Choose an empty tile.');
+      return;
+    }
+    if (effectiveMyPosition.x === x && effectiveMyPosition.y === y) {
+      Alert.alert('Move property', 'Your home is already at this tile.');
+      return;
+    }
+    if (currentBalanceDisplay < MOVE_PROPERTY_COST) {
+      Alert.alert(
+        'Move property',
+        `You need at least $${MOVE_PROPERTY_COST.toLocaleString()} to move. Current balance is too low.`
+      );
+      return;
+    }
+    const costLabel = `$${MOVE_PROPERTY_COST.toLocaleString()}`;
+    Alert.alert(
+      'Move property',
+      `Move your home to (${x}, ${y}) for ${costLabel}? Your balance will be charged immediately.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Move',
+          onPress: () => {
+            movePropertyMutation({ x, y })
+              .unwrap()
+              .then(() => {
+                dispatch(refreshUserDataSilent());
+                refetch();
+                triggerGetMyMapPosition();
+                setSelectedCell(null);
+              })
+              .catch((err: any) => {
+                const msg = err?.data?.error ?? err?.message ?? 'Could not move property.';
+                Alert.alert('Move property', String(msg));
+              });
+          },
+        },
+      ]
+    );
+  }, [
+    selectedCell,
+    effectiveMyPosition,
+    currentBalanceDisplay,
+    movePropertyMutation,
+    dispatch,
+    refetch,
+    triggerGetMyMapPosition,
+  ]);
+
   const handleAntivirusPress = useCallback(() => {
     // Only show modal if antivirus feature is unlocked (including timer-based unlock)
     if (isActuallyUnlocked) {
@@ -3975,10 +4182,23 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         onPress={() => setSelectedCell(null)}
       >
         <TouchableOpacity
-          style={[styles.infoPanel, { backgroundColor: colors.background, borderColor: colors.matrix }]}
+          style={[styles.infoPanel, { backgroundColor: colors.background, borderColor: colors.matrix, position: 'relative' }]}
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()}
         >
+          <Pressable
+            style={styles.shareLocationCorner}
+            onPress={handleShareLocationPress}
+            accessibilityLabel="Share location to chat"
+            accessibilityRole="button"
+            hitSlop={10}
+          >
+            <Image
+              source={require('../assets/images/hackMap/shareLocation.png')}
+              style={styles.shareLocationCornerImage}
+              resizeMode="contain"
+            />
+          </Pressable>
           <ScrollView
             style={styles.infoPanelScrollView}
             contentContainerStyle={styles.infoPanelContent}
@@ -4001,6 +4221,42 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
                 {selectedCell.info.terrain.toUpperCase()}
               </Text>
             </View>
+
+            {selectedCell.info.entity === 'empty' &&
+              effectiveMyPosition &&
+              selectedCell.info.terrain !== 'water' &&
+              selectedCell.info.terrain !== 'mountain' &&
+              selectedCell.info.terrain !== 'road' &&
+              (selectedCell.x !== effectiveMyPosition.x || selectedCell.y !== effectiveMyPosition.y) && (
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    {
+                      backgroundColor:
+                        currentBalanceDisplay >= MOVE_PROPERTY_COST ? colors.matrix : colors.buttonDisabled,
+                      borderColor: colors.matrix,
+                      opacity: currentBalanceDisplay >= MOVE_PROPERTY_COST ? 1 : 0.75,
+                    },
+                  ]}
+                  onPress={handleMovePropertyPress}
+                  accessibilityLabel="Move home to this tile"
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.actionButtonText,
+                      {
+                        color:
+                          currentBalanceDisplay >= MOVE_PROPERTY_COST ? colors.background : colors.text.secondary,
+                      },
+                    ]}
+                  >
+                    Move home here (${MOVE_PROPERTY_COST.toLocaleString()})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
             
             {selectedCell.info.entity !== 'empty' && (
               <>
@@ -4205,7 +4461,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -4238,6 +4494,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         visible={showWorldChatModal}
         onClose={() => setShowWorldChatModal(false)}
         mapName="main"
+        onNavigateToMapCell={handleNavigateFromChatToCell}
       />
 
       <View style={styles.navigationButtonRow}>
@@ -4284,6 +4541,7 @@ export const HackMapScreen: React.FC<Props> = ({ onClose, restorePan }) => {
         onClose={handleCrewClose}
         initialCategory={crewModalInitialCategory}
         focusInitialCategoryKey={crewModalInitialCategory === 'backup-requests' ? crewModalFocusBackupKey : undefined}
+        onNavigateToMapCell={handleCrewChatNavigateToCell}
       />
 
       <CrewOnboardingModal
@@ -4743,6 +5001,17 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+  shareLocationCorner: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    zIndex: 4,
+    padding: 4,
+  },
+  shareLocationCornerImage: {
+    width: 52,
+    height: 52,
   },
   infoPanel: {
     padding: SIZING.spacing.md,
