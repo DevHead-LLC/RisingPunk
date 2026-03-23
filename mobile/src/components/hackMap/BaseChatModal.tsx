@@ -641,12 +641,20 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                             }
                             if (locShare && !onNavigateToMapCell) {
                               const hackLocLine = formatHackLocationDisplay(locShare.x, locShare.y);
+                              const primaryOnBubble = isOwnMessage ? colors.background : colors.text.primary;
+                              const secondaryOnBubble = isOwnMessage ? colors.background : colors.text.secondary;
                               return (
                                 <View style={styles.probeReportBlock}>
-                                  <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
+                                  <Text style={[styles.probeReportTitle, { color: primaryOnBubble }]}>
                                     Shared location
                                   </Text>
-                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  <Text
+                                    style={[
+                                      styles.messageText,
+                                      styles.probeReportLine,
+                                      { color: primaryOnBubble },
+                                    ]}
+                                  >
                                     {locShare.label}
                                   </Text>
                                   <Text
@@ -654,7 +662,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                       styles.messageText,
                                       styles.probeReportLine,
                                       styles.hackLocationMono,
-                                      { color: colors.text.secondary },
+                                      { color: secondaryOnBubble },
                                     ]}
                                   >
                                     {hackLocLine}
