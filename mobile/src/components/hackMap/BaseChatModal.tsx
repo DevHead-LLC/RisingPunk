@@ -25,6 +25,7 @@ import { FilteredText } from '../common/FilteredText';
 import { UserReportModal } from '../modals/UserReportModal';
 import { PROBE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_ID } from '../../constants/systemSenders';
 import { formatHackLocationDisplay } from '../../../../shared/hackMapLocationDisplay';
+import { parseMapLocationShareMessage } from '../../../../shared/mapLocationShareMessage';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
@@ -194,6 +195,8 @@ export interface BaseChatModalProps {
   getReportContextData: (reportedMessage: ChatMessageForModal) => Record<string, unknown>;
   /** When false, input is hidden (e.g. admin broadcast conversation). Default true. */
   canReply?: boolean;
+  /** Tap shared map location (LOC|) to pan the HackMap to that cell. */
+  onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
 }
 
 export const BaseChatModal: React.FC<BaseChatModalProps> = ({
@@ -209,6 +212,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
   reportContext,
   getReportContextData,
   canReply = true,
+  onNavigateToMapCell,
 }) => {
   const colors = useThemeColors();
   const currentUserId = currentUser?._id || (currentUser as any)?.id;
@@ -572,16 +576,83 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 ) : null}
                               </View>
                             );
-                          })() : (
-                            <FilteredText
-                              style={[
-                                styles.messageText,
-                                isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
-                              ]}
-                            >
-                              {message.message}
-                            </FilteredText>
-                          )}
+                          })() : (() => {
+                            const locShare = parseMapLocationShareMessage(message.message);
+                            if (locShare) {
+                              const hackLocLine = formatHackLocationDisplay(locShare.x, locShare.y);
+                              const primaryOnBubble = isOwnMessage ? colors.background : colors.text.primary;
+                              const secondaryOnBubble = isOwnMessage ? colors.background : colors.text.secondary;
+                              const card = (
+                                <View style={styles.probeReportBlock}>
+                                  <Text style={[styles.probeReportTitle, { color: primaryOnBubble }]}>
+                                    Shared location
+                                  </Text>
+                                  <Text
+                                    style={[
+                                      styles.messageText,
+                                      styles.probeReportLine,
+                                      { color: primaryOnBubble },
+                                    ]}
+                                  >
+                                    {locShare.label}
+                                  </Text>
+                                  <Text
+                                    style={[
+                                      styles.messageText,
+                                      styles.probeReportLine,
+                                      styles.hackLocationMono,
+                                      { color: secondaryOnBubble },
+                                    ]}
+                                  >
+                                    {hackLocLine}
+                                  </Text>
+                                  {onNavigateToMapCell ? (
+                                    <Text
+                                      style={[
+                                        styles.messageText,
+                                        styles.probeReportLine,
+                                        {
+                                          fontSize: SIZING.font.small,
+                                          fontStyle: 'italic',
+                                          color: secondaryOnBubble,
+                                        },
+                                      ]}
+                                    >
+                                      Tap to open on map
+                                    </Text>
+                                  ) : null}
+                                </View>
+                              );
+                              if (onNavigateToMapCell) {
+                                return (
+                                  <Pressable
+                                    onPress={() =>
+                                      onNavigateToMapCell({
+                                        mapName: locShare.mapName,
+                                        x: locShare.x,
+                                        y: locShare.y,
+                                      })
+                                    }
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Open shared location on map"
+                                  >
+                                    {card}
+                                  </Pressable>
+                                );
+                              }
+                              return card;
+                            }
+                            return (
+                              <FilteredText
+                                style={[
+                                  styles.messageText,
+                                  isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
+                                ]}
+                              >
+                                {message.message}
+                              </FilteredText>
+                            );
+                          })()}
                         </View>
                         {!isOwnMessage && (
                           <TouchableOpacity

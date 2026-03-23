@@ -54,7 +54,8 @@ const mapBaseQuery = async (args: any, api: any, extraOptions: any) => {
     const isMyPositionRequest = path.endsWith('/my-position');
     const isViewportRequest = args?.params && typeof args.params === 'object' && 'x1' in args.params && 'x2' in args.params;
     const isProbeRequest = path.includes('/probe/');
-    if (!isMyPositionRequest && !isViewportRequest && !isProbeRequest) {
+    const isMovePropertyRequest = path.endsWith('/move-property');
+    if (!isMyPositionRequest && !isViewportRequest && !isProbeRequest && !isMovePropertyRequest) {
       globalErrorHandler.handleDatabaseError(result.error);
     }
   } else {
@@ -87,6 +88,17 @@ export const mapApi = createApi({
     updatePlayerPosition: builder.mutation<any, { x: number; y: number }>({
       query: (body) => ({
         url: '/api/map/player-position',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['Map'],
+    }),
+    moveProperty: builder.mutation<
+      { success: boolean; x: number; y: number; newBalance: number },
+      { x: number; y: number }
+    >({
+      query: (body) => ({
+        url: '/api/map/move-property',
         method: 'POST',
         body,
       }),
@@ -194,6 +206,7 @@ export const {
   useGetMyMapPositionQuery,
   useLazyGetMyMapPositionQuery,
   useUpdatePlayerPositionMutation,
+  useMovePropertyMutation,
   useGetMapChatMessagesQuery,
   useSendMapChatMessageMutation,
   useLaunchProbeMutation,
