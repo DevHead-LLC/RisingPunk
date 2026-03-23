@@ -65,7 +65,7 @@ export class BattleController {
     defenderId: string,
     screenWidth: number,
     screenHeight: number,
-    userBattalions?: Array<{ type: string; quantity: number }>,
+    userBattalions?: Array<{ type: string; quantity: number; markLevel?: number }>,
     defenderNpcSlug?: string,
     unlockHackRigOnWin?: boolean,
     defenderNpcInstanceId?: string,

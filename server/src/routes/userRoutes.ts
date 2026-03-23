@@ -21,6 +21,7 @@ import { accrueBalanceToTime } from '../utils/balanceAccrual';
 import { removeCrewBackupRequestForJob } from '../services/CrewBackupService';
 import { UserResearchFeature } from '../models/UserResearchFeature';
 import { getFeatureByIdAsync } from '../config/researchFeatures';
+import { parseBuildQueueFamily } from '../utils/botInventoryKeys';
 
 const Bot = require('../models/Bot');
 
@@ -147,10 +148,14 @@ router.get('/active-jobs', auth, async (req: Request, res: Response) => {
     const bot = await Bot.findOne({ userId }).select('buildQueue').lean();
     const bq = bot?.buildQueue;
     if (bq?.startedAt && bq?.completesAt && now < new Date(bq.completesAt)) {
-      const typeName = (bq.type === 'guardian' ? 'Guardians' : bq.type === 'phreak' ? 'Phreaks' : 'Breachers');
+      const family = parseBuildQueueFamily(bq as { botType?: string; type?: string });
+      const typeName =
+        family === 'guardian' ? 'Guardians' : family === 'phreak' ? 'Phreaks' : family === 'breacher' ? 'Breachers' : null;
       jobs.push({
         jobType: 'botAssembly',
-        label: `Bot Assembly — ${bq.quantity} ${typeName}`,
+        label: typeName
+          ? `Bot Assembly — ${bq.quantity} ${typeName}`
+          : `Bot Assembly — ${bq.quantity} bots`,
         completesAt: new Date(bq.completesAt).toISOString(),
       });
     }
