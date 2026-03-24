@@ -160,11 +160,16 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
           continue;
         }
         const rawMl = (b as { markLevel?: unknown }).markLevel;
-        const markLevel =
-          rawMl === 2 || rawMl === '2' ? 2 : typeof rawMl === 'number' && rawMl === 2 ? 2 : 1;
-        if (markLevel !== 1 && markLevel !== 2) {
-          res.status(400).json({ success: false, error: 'markLevel must be 1 or 2.' });
-          return;
+        let markLevel: 1 | 2;
+        if (rawMl === undefined || rawMl === null) {
+          markLevel = 1;
+        } else {
+          const v = typeof rawMl === 'string' ? Number(rawMl.trim()) : rawMl;
+          if (v !== 1 && v !== 2) {
+            res.status(400).json({ success: false, error: 'markLevel must be 1 or 2.' });
+            return;
+          }
+          markLevel = v;
         }
         if (markLevel === 2) {
           const unlocked = await userHasMark2BotsUnlocked(req.user._id);

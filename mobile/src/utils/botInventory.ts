@@ -76,9 +76,6 @@ export function battleLossTitleFor(botType: BotType, mark: number): string {
   return `${M1_UNIT_DISPLAY_NAMES[botType]} Mk I`;
 }
 
-/** Highest mark implemented for battalion assign modal (extend when M3/M4 exist). */
-export const BATTALION_MODAL_MAX_MARK_LEVEL = 2 as const;
-
 /** One line for picker option: unit name + Mark I/II (add Mark III/IV when implemented). */
 export function battalionModalOptionLine(family: BotType, markLevel: 1 | 2): string {
   const unit = markLevel === 2 ? MARK2_DISPLAY_NAMES[family] : M1_UNIT_DISPLAY_NAMES[family];
@@ -110,10 +107,6 @@ export function formatBattalionAssignmentLine(botType: string, markLevel: number
 
 export function costPerBotForMark(markLevel: 1 | 2): number {
   return markLevel === 2 ? 4 : 1;
-}
-
-export function msPerBotForMark(markLevel: 1 | 2): number {
-  return markLevel === 2 ? 4000 : 1000;
 }
 
 /** Inventory key on `Bot.bots` / `GET /api/bots` for a family + mark (M1 = family key, M2 = family + `M2`). */

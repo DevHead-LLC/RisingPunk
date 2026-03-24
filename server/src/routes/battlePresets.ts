@@ -21,7 +21,9 @@ function presetKey(id: string): PresetKey {
 /**
  * Mixed/legacy documents may store battalion keys as lowercase or odd shapes; API always returns A–F keys.
  */
-function normalizeBattalionsFromRaw(raw: unknown): Record<string, { botType: string; quantity: number }> | null {
+function normalizeBattalionsFromRaw(
+  raw: unknown
+): Record<string, { botType: string; quantity: number; markLevel: 1 | 2 }> | null {
   if (raw == null) return null;
   let obj: Record<string, unknown>;
   if (raw instanceof Map) {
@@ -31,7 +33,7 @@ function normalizeBattalionsFromRaw(raw: unknown): Record<string, { botType: str
   } else {
     return null;
   }
-  const out: Record<string, { botType: string; quantity: number; markLevel: number }> = {};
+  const out: Record<string, { botType: string; quantity: number; markLevel: 1 | 2 }> = {};
   for (const id of VALID_BATTALION_IDS) {
     const v = obj[id] ?? obj[id.toLowerCase()];
     if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
