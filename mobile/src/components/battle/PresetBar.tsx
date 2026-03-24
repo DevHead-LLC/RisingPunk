@@ -56,16 +56,6 @@ function normalizeFullInventory(raw: unknown): Record<string, number> {
   return out;
 }
 
-/** Strict `Record<BotType, number>` from RTK/API or props; ignores extra keys and bad values (Bugbot). */
-function normalizeBotCountsToRecord(raw: unknown): Record<BotType, number> {
-  const inv = normalizeFullInventory(raw);
-  return {
-    breacher: inv.breacher ?? 0,
-    guardian: inv.guardian ?? 0,
-    phreak: inv.phreak ?? 0,
-  };
-}
-
 function normalizePresetBotType(raw: string): BotType | null {
   const s = raw.trim().toLowerCase();
   return BOT_TYPES.includes(s as BotType) ? (s as BotType) : null;
@@ -128,11 +118,6 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
   const { data: botsQueryData } = useFetchBotsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
-  const effectiveBotCounts = useMemo(() => {
-    const src = botsQueryData?.bots != null ? botsQueryData.bots : botCounts;
-    return normalizeBotCountsToRecord(src);
-  }, [botsQueryData?.bots, botCounts]);
-
   const effectiveFullInventory = useMemo(() => {
     const src = botsQueryData?.bots != null ? botsQueryData.bots : botCounts;
     return normalizeFullInventory(src);
@@ -320,7 +305,6 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     onApplyPreset,
     showBanner,
     refetchPresets,
-    effectiveBotCounts,
     effectiveFullInventory,
   ]);
 

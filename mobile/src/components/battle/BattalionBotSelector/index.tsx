@@ -216,7 +216,7 @@ export const BattalionBotSelector = React.memo(
 
     const dropdownBorder = (family: BotType) => {
       const selectedHere = selectedChoice?.botType === family;
-      return selectedHere ? colors.secondary : colors.themeMode === 'light' ? 'rgba(71, 23, 246, 0.4)' : 'rgba(71, 23, 246, 0.35)';
+      return selectedHere ? colors.secondary : themeMode === 'light' ? 'rgba(71, 23, 246, 0.4)' : 'rgba(71, 23, 246, 0.35)';
     };
 
     const dropdownLabelForFamily = (family: BotType): string => {

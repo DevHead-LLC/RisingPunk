@@ -68,12 +68,12 @@ export function battleGridAbbrevFor(botType: BotType, mark: number): string {
     : RPS_BATTLE_ABBREV_M1[botType];
 }
 
-/** Post-battle loss row: full RPS or Mark II unit name + Mk I / Mk II. */
+/** Post-battle loss row: Mark I unit names (Breacher / Guardian / Phreak) or Mark II display names + Mk I / Mk II. */
 export function battleLossTitleFor(botType: BotType, mark: number): string {
   if (effectiveMarkFromBattalionMark(mark) === 2) {
     return `${MARK2_DISPLAY_NAMES[botType]} Mk II`;
   }
-  return `${RPS_TYPE_LABELS[botType]} Mk I`;
+  return `${M1_UNIT_DISPLAY_NAMES[botType]} Mk I`;
 }
 
 /** Highest mark implemented for battalion assign modal (extend when M3/M4 exist). */
