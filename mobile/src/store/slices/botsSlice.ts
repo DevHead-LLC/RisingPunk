@@ -72,9 +72,11 @@ export const botsSlice = createSlice({
                 family !== 'guardian' &&
                 family !== 'phreak'
               ) {
-                throw new Error(
-                  `buildQueue missing bot family (expected botType or type): ${String(family)}`
+                // Reducers must not throw — bad API/migration payloads would crash the app.
+                console.warn(
+                  `[bots/setBuildState] Ignoring buildQueue: missing bot family (expected botType or type): ${String(family)}`
                 );
+                return null;
               }
               return {
                 ...rawBq,
