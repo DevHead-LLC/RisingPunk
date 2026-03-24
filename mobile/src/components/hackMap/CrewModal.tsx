@@ -39,6 +39,8 @@ interface CrewModalProps {
   initialCategory?: CrewCategory | null;
   /** Increment when parent wants to re-navigate to initialCategory (e.g. backup banner tapped again while modal already open). */
   focusInitialCategoryKey?: number;
+  /** From crew chat: tap shared map location (closes crew chat overlay, then parent pans map). */
+  onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
 }
 
 type CrewCategory = 
@@ -72,6 +74,7 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   onClose,
   initialCategory = null,
   focusInitialCategoryKey,
+  onNavigateToMapCell,
 }) => {
   const colors = useThemeColors();
   const [currentCategory, setCurrentCategory] = useState<CrewCategory>(null);
@@ -2041,6 +2044,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
           visible={showCrewChatModal}
           onClose={() => setShowCrewChatModal(false)}
           crewId={crewStatus.crewId}
+          onNavigateToMapCell={
+            onNavigateToMapCell
+              ? (target) => {
+                  setShowCrewChatModal(false);
+                  onNavigateToMapCell(target);
+                }
+              : undefined
+          }
         />
       )}
 
