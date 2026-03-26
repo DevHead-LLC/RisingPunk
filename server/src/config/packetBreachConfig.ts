@@ -3,6 +3,8 @@
  * Tiers 1–21 (1.1–21.5). Tier 7+: 4-node pool + Decoy; Tier 13+: 5-node pool + Decoy. See taskItems/mini-games/packet-breach-levels.md.
  */
 
+import { scaleProgrammingBonusTotals } from './programmingBonusScale';
+
 export type LevelId = string; // e.g. "1.1", "6.1"
 
 export interface LevelParams {
@@ -289,5 +291,5 @@ export function computePacketBreachArmyBonus(levelsCompleted: string[]): ArmyBon
       health += r.health;
     }
   }
-  return { strength, defense, speed, health };
+  return scaleProgrammingBonusTotals({ strength, defense, speed, health });
 }

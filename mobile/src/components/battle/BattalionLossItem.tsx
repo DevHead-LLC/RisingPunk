@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { BattalionLoss } from '../../store/api/battleApi';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { battleLossTitleFor } from '../../utils/botInventory';
+import { BotType } from '../../types/bots';
 
 interface Props {
   battalionLoss: BattalionLoss;
@@ -10,15 +12,6 @@ interface Props {
 export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
   const colors = useThemeColors();
   
-  const getBotTypeDisplay = (type: string, mark: number) => {
-    const typeNames = {
-      guardian: 'Guardian',
-      breacher: 'Breacher',
-      phreak: 'Phreak'
-    };
-    return `${typeNames[type as keyof typeof typeNames]} Mk ${mark === 1 ? 'I' : mark === 2 ? 'II' : mark === 3 ? 'III' : 'IV'}`;
-  };
-
   const borderColor = battalionLoss.owner === 'user' ? colors.secondary : colors.error;
   const isDestroyed = battalionLoss.endingQuantity === 0;
   const losses = battalionLoss.startingQuantity - battalionLoss.endingQuantity;
@@ -27,7 +20,7 @@ export const BattalionLossItem: React.FC<Props> = ({ battalionLoss }) => {
     <View style={[styles.container, { borderLeftColor: borderColor, backgroundColor: colors.accent }]} testID="battalion-loss-item">
       <View style={styles.header}>
         <Text style={[styles.botType, { color: colors.text.primary }, isDestroyed && styles.destroyedText]}>
-          {getBotTypeDisplay(battalionLoss.type, battalionLoss.mark)}
+          {battleLossTitleFor(battalionLoss.type as BotType, battalionLoss.mark)}
         </Text>
         <Text style={[styles.owner, { color: borderColor }]}>
           {battalionLoss.owner === 'user' ? 'User' : 'Enemy'}

@@ -133,8 +133,7 @@ export function ResearchFeaturesList({
   // Show all features per category (spec 18); temporarily hide some until future development
   const visibleFeatures = features.filter(feature => {
     if (feature.id === 'bot-trap') return false;
-    // probe: shown (5.4 Probe feature implemented)
-    if (feature.id === 'mark-2-bots') return false; // TODO: re-enable when planned feature 5.4 (Research Center new abilities) is done
+    // probe: shown (5.4); mark-2-bots: Hack Ability — Mark II unlock (see in-progress-3)
     if (feature.id === 'crew-strength-increase') return false; // TODO: re-enable when planned feature 5.4 (Research Center new abilities) is done
     if (feature.id === 'energy-regen-increase') return false; // TODO: re-enable when planned feature 5.4 (Research Center new abilities) is done
     if (feature.id === 'energy-max-increase') return false; // TODO: re-enable when planned feature 5.4 (Research Center new abilities) is done

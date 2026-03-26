@@ -9,6 +9,8 @@ import { balanceApi } from './balanceApi';
 export interface PresetBattalionConfig {
   botType: 'breacher' | 'guardian' | 'phreak';
   quantity: number;
+  /** Defaults to 1 when omitted (legacy presets). */
+  markLevel?: 1 | 2;
 }
 
 export interface PresetData {

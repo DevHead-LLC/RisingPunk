@@ -12,9 +12,21 @@ type Props = {
   onSelect: (type: BotType) => void;
   isHighlighted?: boolean;
   disabled?: boolean;
+  /** When set, shown instead of `type.toUpperCase()` (Battle Prep family + mark names). */
+  titleText?: string;
+  markBadge?: 'M1' | 'M2';
 };
 
-export const BotTypeCard = React.memo(({ type, count, isSelected, onSelect, isHighlighted = false, disabled = false }: Props) => {
+export const BotTypeCard = React.memo(({
+  type,
+  count,
+  isSelected,
+  onSelect,
+  isHighlighted = false,
+  disabled = false,
+  titleText,
+  markBadge,
+}: Props) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
@@ -109,8 +121,11 @@ export const BotTypeCard = React.memo(({ type, count, isSelected, onSelect, isHi
         />
       )}
       <Text style={typeTextStyle}>
-        {type.toUpperCase()}
+        {titleText ?? type.toUpperCase()}
       </Text>
+      {markBadge ? (
+        <Text style={[countTextStyle, { fontSize: 11, marginBottom: 2 }]}>{markBadge}</Text>
+      ) : null}
       <Text style={countTextStyle}>
         ({count})
       </Text>

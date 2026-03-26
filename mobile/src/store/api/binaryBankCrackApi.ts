@@ -162,6 +162,7 @@ export const binaryBankCrackApi = createApi({
       async onQueryStarted(_, { queryFulfilled, dispatch }) {
         try {
           await queryFulfilled;
+          dispatch(botsApi.endpoints.fetchBotStats.initiate(undefined, { forceRefetch: true }));
           dispatch(botsApi.endpoints.fetchBotStatsBreakdown.initiate(undefined, { forceRefetch: true }));
         } catch (_) {}
       },

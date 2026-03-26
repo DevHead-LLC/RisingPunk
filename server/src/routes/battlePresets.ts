@@ -8,6 +8,7 @@ import {
   VALID_BOT_TYPES,
 } from '../config/battlePresetsConfig';
 import { accrueBalanceToTime } from '../utils/balanceAccrual';
+import { userHasMark2BotsUnlocked } from '../utils/userHasMark2BotsUnlocked';
 
 const router = express.Router();
 
@@ -20,7 +21,9 @@ function presetKey(id: string): PresetKey {
 /**
  * Mixed/legacy documents may store battalion keys as lowercase or odd shapes; API always returns A–F keys.
  */
-function normalizeBattalionsFromRaw(raw: unknown): Record<string, { botType: string; quantity: number }> | null {
+function normalizeBattalionsFromRaw(
+  raw: unknown
+): Record<string, { botType: string; quantity: number; markLevel: 1 | 2 }> | null {
   if (raw == null) return null;
   let obj: Record<string, unknown>;
   if (raw instanceof Map) {
@@ -30,7 +33,7 @@ function normalizeBattalionsFromRaw(raw: unknown): Record<string, { botType: str
   } else {
     return null;
   }
-  const out: Record<string, { botType: string; quantity: number }> = {};
+  const out: Record<string, { botType: string; quantity: number; markLevel: 1 | 2 }> = {};
   for (const id of VALID_BATTALION_IDS) {
     const v = obj[id] ?? obj[id.toLowerCase()];
     if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
@@ -40,6 +43,8 @@ function normalizeBattalionsFromRaw(raw: unknown): Record<string, { botType: str
       continue;
     }
     const botType = rawBt;
+    const rawMl = cfg.markLevel;
+    const markLevel = rawMl === 2 || rawMl === '2' ? 2 : 1;
     const rawQty = cfg.quantity;
     let qty: number;
     if (typeof rawQty === 'number' && Number.isFinite(rawQty)) {
@@ -53,7 +58,7 @@ function normalizeBattalionsFromRaw(raw: unknown): Record<string, { botType: str
       continue;
     }
     if (qty > 0) {
-      out[id] = { botType, quantity: qty };
+      out[id] = { botType, quantity: qty, markLevel };
     }
   }
   return Object.keys(out).length > 0 ? out : null;
@@ -239,7 +244,7 @@ router.put('/:presetId', auth, async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const validatedBattalions: Record<string, { botType: string; quantity: number }> = {};
+    const validatedBattalions: Record<string, { botType: string; quantity: number; markLevel: 1 | 2 }> = {};
     for (const [battalionIdRaw, config] of Object.entries(battalions)) {
       const battalionId = String(battalionIdRaw).toUpperCase();
       if (!VALID_BATTALION_IDS.includes(battalionId as any)) {
@@ -259,7 +264,29 @@ router.put('/:presetId', auth, async (req: Request, res: Response): Promise<void
         res.status(400).json({ error: `Invalid quantity for battalion ${battalionId}. Must be a non-negative integer.` });
         return;
       }
-      validatedBattalions[battalionId] = { botType: cfg.botType, quantity: cfg.quantity };
+      const rawMl = cfg.markLevel;
+      let markLevel: 1 | 2;
+      if (rawMl === undefined || rawMl === null) {
+        markLevel = 1;
+      } else {
+        const v = typeof rawMl === 'string' ? Number(rawMl.trim()) : rawMl;
+        if (v !== 1 && v !== 2) {
+          res.status(400).json({ error: `Invalid markLevel for battalion ${battalionId}. Must be 1 or 2.` });
+          return;
+        }
+        markLevel = v;
+      }
+      const wantsM2 = markLevel === 2 && cfg.quantity > 0;
+      if (wantsM2) {
+        const unlocked = await userHasMark2BotsUnlocked(req.user._id);
+        if (!unlocked) {
+          res.status(403).json({
+            error: 'Complete Mark 2 Bots research in Hack Ability to save Mark II units in presets.',
+          });
+          return;
+        }
+      }
+      validatedBattalions[battalionId] = { botType: cfg.botType, quantity: cfg.quantity, markLevel };
     }
 
     const updateResult = await User.findOneAndUpdate(

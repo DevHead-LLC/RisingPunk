@@ -37,9 +37,14 @@ export class CombatService {
   // ============================================================================
 
   static calculateBattalionDamage(attacker: IBattalion, defender: IBattalion): number {
-    const typeMultiplier = BotStatsService.getTypeAdvantage(attacker.type, defender.type);
-    const baseDamage = attacker.stats.offense * attacker.quantity * typeMultiplier;
-    const defenseReduction = baseDamage * (defender.stats.defense / 100);
+    const atkAdv = BotStatsService.getTypeAdvantage(attacker.type, defender.type);
+    const defAdv = BotStatsService.getTypeAdvantage(defender.type, attacker.type);
+    const atkScale = atkAdv > 1 ? atkAdv : 1;
+    const defScale = defAdv > 1 ? defAdv : 1;
+    const baseDamage = attacker.stats.offense * attacker.quantity * atkScale;
+    // Defense is stored as 0–1 (e.g. 0.08 = 8%), same as Profile / stats-breakdown — do not divide by 100.
+    const effectiveDefense = defender.stats.defense * defScale;
+    const defenseReduction = baseDamage * effectiveDefense;
     const finalDamage = Math.max(1, baseDamage - defenseReduction);
     
     return finalDamage;

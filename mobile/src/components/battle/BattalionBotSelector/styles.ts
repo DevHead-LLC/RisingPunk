@@ -38,8 +38,76 @@ export const createStyles = (colors: any) => StyleSheet.create({
   botTypeContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: SIZING.spacing.md,
+    alignItems: 'flex-start',
+    gap: SIZING.spacing.sm,
     marginBottom: SIZING.spacing.md,
+  },
+  familyColumn: {
+    flex: 1,
+    alignItems: 'center',
+    gap: SIZING.spacing.xs,
+    minWidth: 0,
+  },
+  familyColumnTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: SIZING.spacing.xs,
+  },
+  familyDropdown: {
+    width: '100%',
+    minHeight: 44,
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.xs,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+  },
+  familyDropdownText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  pickerOverlayRoot: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20000,
+    elevation: 20000,
+  },
+  pickerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
+  pickerSheet: {
+    width: '72%',
+    maxWidth: 420,
+    maxHeight: '70%',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: SIZING.spacing.md,
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: SIZING.spacing.sm,
+  },
+  pickerScroll: {
+    maxHeight: 280,
+  },
+  pickerOption: {
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pickerOptionText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  pickerOptionSub: {
+    fontSize: 12,
+    marginTop: 2,
   },
   quantityContainer: {
     marginBottom: SIZING.spacing.md,
