@@ -242,7 +242,7 @@ export const BattalionBotSelector = React.memo(
         visible={isVisible}
         transparent
         animationType="fade"
-        onRequestClose={hasZeroGuardians ? handleClose : onClose}
+        onRequestClose={handleClose}
         supportedOrientations={['landscape']}
         presentationStyle="overFullScreen"
       >
