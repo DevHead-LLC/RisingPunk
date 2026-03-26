@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Platform,
   Modal,
   Pressable,
+  ActionSheetIOS,
+  Keyboard,
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -20,7 +22,17 @@ import {
   type PresetData,
 } from '../../store/api/battlePresetsApi';
 import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { useAppSelector } from '../../store/hooks';
 import { BOT_FAMILY_ORDER, MARK2_DISPLAY_NAMES } from '../../utils/botInventory';
+
+/** Dev-only: grep Metro for `[RP-BattlesFocus]` — see taskItems/problemSolvingTempFile.md */
+function battlesFocusLog(...args: unknown[]): void {
+  if (!__DEV__) return;
+  console.log('[RP-BattlesFocus]', ...args);
+}
+
+/** Quantity fields use `number-pad` on both platforms (inline `TextInput`). */
+const QUANTITY_KEYBOARD = 'number-pad' as const;
 
 const BATTALION_IDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 type BotType = 'breacher' | 'guardian' | 'phreak';
@@ -65,46 +77,67 @@ function parseChoiceKey(s: string): { botType: BotType; markLevel: 1 | 2 } | nul
   return { botType: a, markLevel: b === '2' ? 2 : 1 };
 }
 
+function battalionsFromSig(sig: string): PresetData['battalions'] {
+  try {
+    const o = JSON.parse(sig) as unknown;
+    if (o == null || typeof o !== 'object' || Array.isArray(o)) return null;
+    return o as Record<string, PresetBattalionConfig>;
+  } catch {
+    return null;
+  }
+}
+
+function buildInitialBattalions(
+  presetBattalions: PresetData['battalions'],
+  options: SlotChoice[]
+): Record<string, { choiceKey: string; quantity: string }> {
+  const result: Record<string, { choiceKey: string; quantity: string }> = {};
+  for (const id of BATTALION_IDS) {
+    const existing = presetBattalions?.[id];
+    const bt = (existing?.botType ?? 'breacher') as BotType;
+    const ml: 1 | 2 = existing?.markLevel === 2 ? 2 : 1;
+    const key = choiceKey(bt, ml);
+    const valid = options.some((c) => choiceKey(c.botType, c.markLevel) === key);
+    result[id] = {
+      choiceKey: valid ? key : choiceKey('breacher', 1),
+      quantity: existing?.quantity != null ? String(existing.quantity) : '',
+    };
+  }
+  return result;
+}
+
 interface PresetEditorProps {
   preset: PresetData;
   colors: any;
+  choiceOptions: SlotChoice[];
+  onSavePreset: (presetId: string, battalions: Record<string, PresetBattalionConfig>) => Promise<void>;
+  isSaving: boolean;
 }
 
-const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
-  const [saveBattlePreset, { isLoading: isSaving }] = useSaveBattlePresetMutation();
-  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
-  const mark2Unlocked =
-    hackAbilityFeatures?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
-    false;
+/** Must match landscape-only `UISupportedInterfaceOrientations` in Info.plist. */
+const MODAL_LANDSCAPE_ORIENTATIONS = ['landscape-left', 'landscape-right'] as const;
 
-  const choiceOptions = useMemo(() => buildAllChoices(mark2Unlocked), [mark2Unlocked]);
-
-  const initialBattalions = useCallback((): Record<string, { choiceKey: string; quantity: string }> => {
-    const result: Record<string, { choiceKey: string; quantity: string }> = {};
-    for (const id of BATTALION_IDS) {
-      const existing = preset.battalions?.[id];
-      const bt = (existing?.botType ?? 'breacher') as BotType;
-      const ml: 1 | 2 = existing?.markLevel === 2 ? 2 : 1;
-      const key = choiceKey(bt, ml);
-      const valid = choiceOptions.some((c) => choiceKey(c.botType, c.markLevel) === key);
-      result[id] = {
-        choiceKey: valid ? key : choiceKey('breacher', 1),
-        quantity: existing?.quantity != null ? String(existing.quantity) : '',
-      };
-    }
-    return result;
-  }, [preset.battalions, choiceOptions]);
+const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, isSaving }: PresetEditorProps) => {
+  const syncDiagCountRef = useRef(0);
+  const firstChangeLoggedRef = useRef<Set<string>>(new Set());
+  const layoutLoggedRef = useRef<Set<string>>(new Set());
 
   const serverBattalionsSig = useMemo(
     () => JSON.stringify(preset.battalions ?? {}),
     [preset.battalions]
   );
 
-  const [battalions, setBattalions] = useState(() => initialBattalions());
+  const [battalions, setBattalions] = useState(() =>
+    buildInitialBattalions(preset.battalions, choiceOptions)
+  );
 
   useEffect(() => {
-    setBattalions(initialBattalions());
-  }, [preset.id, serverBattalionsSig, initialBattalions]);
+    if (__DEV__ && syncDiagCountRef.current < 16) {
+      syncDiagCountRef.current += 1;
+      battlesFocusLog('sync effect', { presetId: preset.id, n: syncDiagCountRef.current, sigLen: serverBattalionsSig.length });
+    }
+    setBattalions(buildInitialBattalions(battalionsFromSig(serverBattalionsSig), choiceOptions));
+  }, [preset.id, serverBattalionsSig, choiceOptions]);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [openBotPickerForRow, setOpenBotPickerForRow] = useState<string | null>(null);
 
@@ -128,6 +161,29 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
     setSaveMessage(null);
     setOpenBotPickerForRow(null);
   }, []);
+
+  const openIosBotPicker = useCallback(
+    (rowId: string) => {
+      battlesFocusLog('ActionSheet open request', { presetId: preset.id, rowId, optionCount: choiceOptions.length });
+      const labels = choiceOptions.map((o) => o.label);
+      const cancelIndex = labels.length;
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [...labels, 'Cancel'],
+          cancelButtonIndex: cancelIndex,
+        },
+        (buttonIndex) => {
+          battlesFocusLog('ActionSheet callback', { presetId: preset.id, rowId, buttonIndex, cancelIndex });
+          if (buttonIndex === cancelIndex) return;
+          const opt = choiceOptions[buttonIndex];
+          if (opt) {
+            handleChoiceKeyChange(rowId, choiceKey(opt.botType, opt.markLevel));
+          }
+        }
+      );
+    },
+    [choiceOptions, handleChoiceKeyChange, preset.id]
+  );
 
   const handleQuantityChange = useCallback((battalionId: string, text: string) => {
     const cleaned = text.replace(/[^0-9]/g, '');
@@ -159,12 +215,12 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
     }
 
     try {
-      await saveBattlePreset({ presetId: preset.id, battalions: payload }).unwrap();
+      await onSavePreset(preset.id, payload);
       setSaveMessage('Saved.');
     } catch {
       setSaveMessage('Failed to save.');
     }
-  }, [battalions, preset.id, saveBattlePreset]);
+  }, [battalions, preset.id, onSavePreset]);
 
   return (
     <View style={[styles.presetCard, { borderColor: colors.matrix + '33' }]}>
@@ -176,17 +232,76 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
             <Text style={[styles.battalionLabel, { color: colors.text.primary }]}>{id}</Text>
             <TouchableOpacity
               style={[styles.botDropdown, { borderColor: colors.matrix + '44' }]}
-              onPress={() => setOpenBotPickerForRow(id)}
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  openIosBotPicker(id);
+                } else {
+                  setOpenBotPickerForRow(id);
+                }
+              }}
             >
               <Text style={[styles.botDropdownText, { color: colors.text.primary }]} numberOfLines={2}>
                 {labelForChoiceKey(config.choiceKey)}
               </Text>
             </TouchableOpacity>
             <TextInput
-              style={[styles.quantityInput, { color: colors.text.primary, borderColor: colors.matrix + '44' }]}
+              style={[
+                styles.quantityInput,
+                { color: colors.text.primary, borderColor: colors.matrix + '44', textAlign: 'right' },
+              ]}
               value={config.quantity}
-              onChangeText={(text) => handleQuantityChange(id, text)}
-              keyboardType="number-pad"
+              onChangeText={(text) => {
+                const rowKey = `${preset.id}:${id}`;
+                if (__DEV__ && !firstChangeLoggedRef.current.has(rowKey)) {
+                  firstChangeLoggedRef.current.add(rowKey);
+                  battlesFocusLog('TextInput first onChangeText', { presetId: preset.id, rowId: id, platform: Platform.OS });
+                }
+                handleQuantityChange(id, text);
+              }}
+              onPressIn={() => {
+                const t = Date.now();
+                battlesFocusLog('qty TextInput onPressIn', { presetId: preset.id, rowId: id, platform: Platform.OS, t });
+                setTimeout(() => {
+                  battlesFocusLog('qty TextInput setTimeout(250) after onPressIn', {
+                    presetId: preset.id,
+                    rowId: id,
+                    dt: Date.now() - t,
+                  });
+                }, 250);
+              }}
+              onLayout={(e) => {
+                const lk = `${preset.id}:${id}`;
+                if (__DEV__ && !layoutLoggedRef.current.has(lk)) {
+                  layoutLoggedRef.current.add(lk);
+                  battlesFocusLog('TextInput onLayout (once/row)', {
+                    presetId: preset.id,
+                    rowId: id,
+                    w: e.nativeEvent.layout.width,
+                    h: e.nativeEvent.layout.height,
+                  });
+                }
+              }}
+              onFocus={() => {
+                const t = Date.now();
+                battlesFocusLog('qty TextInput onFocus ENTRY', { presetId: preset.id, rowId: id, platform: Platform.OS, t });
+                queueMicrotask(() => {
+                  battlesFocusLog('qty TextInput onFocus → queueMicrotask (JS still scheduling)', {
+                    presetId: preset.id,
+                    rowId: id,
+                    dt: Date.now() - t,
+                  });
+                });
+                setTimeout(() => {
+                  battlesFocusLog('qty TextInput onFocus → setTimeout(0)', { presetId: preset.id, rowId: id, dt: Date.now() - t });
+                }, 0);
+              }}
+              onBlur={() => {
+                battlesFocusLog('qty TextInput onBlur', { presetId: preset.id, rowId: id, platform: Platform.OS, t: Date.now() });
+              }}
+              keyboardType={QUANTITY_KEYBOARD}
+              autoCorrect={false}
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="0"
               placeholderTextColor={colors.text.primary + '44'}
               maxLength={7}
@@ -194,48 +309,53 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
           </View>
         );
       })}
-      <Modal
-        visible={openBotPickerForRow != null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpenBotPickerForRow(null)}
-        supportedOrientations={['landscape-left', 'landscape-right']}
-      >
-        <View style={styles.botPickerOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpenBotPickerForRow(null)} />
-          <View
-            style={[styles.botPickerContainer, { backgroundColor: colors.surface, borderColor: colors.matrix + '44' }]}
-            onStartShouldSetResponder={() => true}
-          >
-            <Text style={[styles.botPickerTitle, { color: colors.text.primary }]}>Select bot</Text>
-            <ScrollView
-              style={styles.botPickerScroll}
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled
-              showsVerticalScrollIndicator
+      {Platform.OS === 'android' && (
+        <Modal
+          visible={openBotPickerForRow != null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOpenBotPickerForRow(null)}
+          supportedOrientations={[...MODAL_LANDSCAPE_ORIENTATIONS]}
+          onShow={() => {
+            battlesFocusLog('Android Modal onShow', { presetId: preset.id });
+          }}
+        >
+          <View style={styles.botPickerOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpenBotPickerForRow(null)} />
+            <View
+              style={[styles.botPickerContainer, { backgroundColor: colors.surface, borderColor: colors.matrix + '44' }]}
+              onStartShouldSetResponder={() => true}
             >
-              {choiceOptions.map((opt) => {
-                const key = choiceKey(opt.botType, opt.markLevel);
-                const selected =
-                  openBotPickerForRow != null && battalions[openBotPickerForRow]?.choiceKey === key;
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={[
-                      styles.botPickerOption,
-                      { borderBottomColor: colors.text.primary + '22' },
-                      selected && { backgroundColor: colors.matrix + '22' },
-                    ]}
-                    onPress={() => openBotPickerForRow && handleChoiceKeyChange(openBotPickerForRow, key)}
-                  >
-                    <Text style={[styles.botPickerOptionText, { color: colors.text.primary }]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+              <Text style={[styles.botPickerTitle, { color: colors.text.primary }]}>Select bot</Text>
+              <ScrollView
+                style={styles.botPickerScroll}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
+              >
+                {choiceOptions.map((opt) => {
+                  const key = choiceKey(opt.botType, opt.markLevel);
+                  const selected =
+                    openBotPickerForRow != null && battalions[openBotPickerForRow]?.choiceKey === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.botPickerOption,
+                        { borderBottomColor: colors.text.primary + '22' },
+                        selected && { backgroundColor: colors.matrix + '22' },
+                      ]}
+                      onPress={() => openBotPickerForRow && handleChoiceKeyChange(openBotPickerForRow, key)}
+                    >
+                      <Text style={[styles.botPickerOptionText, { color: colors.text.primary }]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
       <TouchableOpacity
         style={[styles.saveButton, { backgroundColor: colors.matrix }]}
         onPress={handleSave}
@@ -271,9 +391,52 @@ const LockedPreset = React.memo(({ preset, colors }: LockedPresetProps) => (
 
 export function BattlesTab(): React.JSX.Element {
   const colors = useThemeColors();
+  const token = useAppSelector((state) => state.auth.token);
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !token });
+  const mark2Unlocked =
+    hackAbilityFeatures?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    false;
+  const choiceOptions = useMemo(() => buildAllChoices(mark2Unlocked), [mark2Unlocked]);
+
+  const [saveBattlePreset, { isLoading: isSaving }] = useSaveBattlePresetMutation();
+  const handleSavePreset = useCallback(
+    async (presetId: string, battalions: Record<string, PresetBattalionConfig>) => {
+      battlesFocusLog('saveBattlePreset mutation (parent)', { presetId, ts: Date.now() });
+      await saveBattlePreset({ presetId, battalions }).unwrap();
+    },
+    [saveBattlePreset]
+  );
+
   const { data, isLoading } = useGetBattlePresetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
+
+  useEffect(() => {
+    if (!__DEV__) return;
+    battlesFocusLog('BattlesTab mount');
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const subShow = Keyboard.addListener(showEvt, (e) => {
+      battlesFocusLog('Keyboard event', showEvt, { height: e.endCoordinates?.height, duration: e.duration });
+    });
+    const subHide = Keyboard.addListener(hideEvt, () => {
+      battlesFocusLog('Keyboard event', hideEvt);
+    });
+    return () => {
+      battlesFocusLog('BattlesTab unmount');
+      subShow.remove();
+      subHide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!__DEV__ || !data) return;
+    battlesFocusLog('BattlesTab presets ready', {
+      mark2Unlocked,
+      choiceOptionCount: choiceOptions.length,
+      presetKeys: Object.keys(data.presets ?? {}),
+    });
+  }, [data, mark2Unlocked, choiceOptions.length]);
 
   if (isLoading || !data) {
     return (
@@ -289,7 +452,12 @@ export function BattlesTab(): React.JSX.Element {
     .filter((p): p is PresetData => p != null);
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={[styles.tabTitle, { color: colors.text.primary }]}>BATTLE PRESETS</Text>
       <Text style={[styles.tabSubtitle, { color: colors.text.primary + '88' }]}>
         Set your desired troop layout for each preset. These are goals — when applied, battalions fill with what you
@@ -297,7 +465,14 @@ export function BattlesTab(): React.JSX.Element {
       </Text>
       {presetList.map((preset) =>
         preset.unlocked ? (
-          <PresetEditor key={preset.id} preset={preset} colors={colors} />
+          <PresetEditor
+              key={preset.id}
+              preset={preset}
+              colors={colors}
+              choiceOptions={choiceOptions}
+              onSavePreset={handleSavePreset}
+              isSaving={isSaving}
+            />
         ) : (
           <LockedPreset key={preset.id} preset={preset} colors={colors} />
         )
@@ -413,8 +588,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: Platform.OS === 'android' ? 2 : 4,
-    fontSize: SIZING.font.small * 0.9,
-    textAlign: 'right',
+    justifyContent: 'center',
   },
   saveButton: {
     marginTop: SIZING.spacing.sm,

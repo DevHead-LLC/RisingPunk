@@ -24,6 +24,9 @@ import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 
 const LEVELS = [1, 2, 3, 4];
 
+/** M3/M4 columns are locked placeholders — no inventory keys yet; must not reuse Mark I counts. */
+const ZERO_BOT_COUNTS: Record<BotType, number> = { breacher: 0, guardian: 0, phreak: 0 };
+
 export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const bots = useAppSelector((state) => state.bots);
@@ -135,7 +138,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
           markColumnLevel={level}
           selectedType={bots.selectedType}
           selectedMarkLevel={bots.selectedMarkLevel}
-          botCounts={level === 2 ? bots.botCountsM2 : bots.botCounts}
+          botCounts={level === 2 ? bots.botCountsM2 : level === 1 ? bots.botCounts : ZERO_BOT_COUNTS}
           onSelectBotType={handleSelectBotType}
           highlightGuardian={isGuardianSelectionHighlight && level === 1}
           mark2ResearchUnlocked={mark2ResearchUnlocked}

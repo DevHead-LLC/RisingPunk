@@ -49,7 +49,9 @@ export const logAccountCreatedOnce = async (params: {
 }): Promise<void> => {
   const { userId, method } = params;
   if (!userId || typeof userId !== 'string') {
-    throw new Error('[Analytics] logAccountCreatedOnce: userId is required');
+    // Never throw: callers run after auth success; a bad id must not reject login/signup.
+    console.error('[Analytics] logAccountCreatedOnce: missing or invalid userId; skipping account_created');
+    return;
   }
 
   try {

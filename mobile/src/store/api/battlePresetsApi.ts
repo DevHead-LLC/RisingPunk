@@ -39,6 +39,13 @@ export interface SavePresetResponse {
 }
 
 const battlePresetsBaseQuery = async (args: any, api: any, extraOptions: any) => {
+  if (__DEV__) {
+    const rawUrl = typeof args === 'string' ? args : (args as { url?: string })?.url;
+    if (typeof rawUrl === 'string' && rawUrl.includes('battle-presets')) {
+      const method = typeof args === 'object' && args != null && 'method' in args ? String((args as { method?: string }).method) : 'GET';
+      console.log('[RP-BattlesFocus]', 'RTK battlePresets HTTP', { method, url: rawUrl, ts: Date.now() });
+    }
+  }
   const result = await fetchBaseQuery({
     baseUrl: API_URL,
     timeout: 5000,

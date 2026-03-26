@@ -244,7 +244,7 @@ router.put('/:presetId', auth, async (req: Request, res: Response): Promise<void
       return;
     }
 
-    const validatedBattalions: Record<string, { botType: string; quantity: number; markLevel: number }> = {};
+    const validatedBattalions: Record<string, { botType: string; quantity: number; markLevel: 1 | 2 }> = {};
     for (const [battalionIdRaw, config] of Object.entries(battalions)) {
       const battalionId = String(battalionIdRaw).toUpperCase();
       if (!VALID_BATTALION_IDS.includes(battalionId as any)) {
@@ -265,10 +265,16 @@ router.put('/:presetId', auth, async (req: Request, res: Response): Promise<void
         return;
       }
       const rawMl = cfg.markLevel;
-      const markLevel = rawMl === 2 || rawMl === '2' ? 2 : 1;
-      if (markLevel !== 1 && markLevel !== 2) {
-        res.status(400).json({ error: `Invalid markLevel for battalion ${battalionId}. Must be 1 or 2.` });
-        return;
+      let markLevel: 1 | 2;
+      if (rawMl === undefined || rawMl === null) {
+        markLevel = 1;
+      } else {
+        const v = typeof rawMl === 'string' ? Number(rawMl.trim()) : rawMl;
+        if (v !== 1 && v !== 2) {
+          res.status(400).json({ error: `Invalid markLevel for battalion ${battalionId}. Must be 1 or 2.` });
+          return;
+        }
+        markLevel = v;
       }
       const wantsM2 = markLevel === 2 && cfg.quantity > 0;
       if (wantsM2) {

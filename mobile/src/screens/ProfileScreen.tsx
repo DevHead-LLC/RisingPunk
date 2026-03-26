@@ -763,7 +763,17 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const isThemeToggleHighlighted = isThemeTask && highlightStep === 'theme-toggle';
   const isAvatarToggleHighlighted = isAvatarTask && highlightStep === 'avatar-toggle';
   const isTaskGuideToggleHighlighted = isHideTaskListTask && highlightStep === 'task-guide-toggle';
-  
+
+  useEffect(() => {
+    if (!__DEV__ || activeTab !== 'battles') return;
+    const taskGuideOverlayMounted = isThemeTask || isAvatarTask || isHideTaskListTask;
+    console.log('[RP-BattlesFocus]', 'ProfileScreen battles tab active', {
+      highlightTaskId,
+      highlightStep,
+      taskGuideOverlayMounted,
+    });
+  }, [activeTab, highlightTaskId, highlightStep, isThemeTask, isAvatarTask, isHideTaskListTask]);
+
   const [settingsColorIndex, setSettingsColorIndex] = useState(0);
   const [themeToggleColorIndex, setThemeToggleColorIndex] = useState(0);
   const [avatarToggleColorIndex, setAvatarToggleColorIndex] = useState(0);
