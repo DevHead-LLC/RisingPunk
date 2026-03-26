@@ -263,6 +263,8 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
         {[1, 2, 3, 4].map((mark) => {
           const isMark2Locked = mark === 2 && !mark2ResearchUnlocked;
           const isFutureMark = mark === 3 || mark === 4;
+          // Bugbot: flagged locked tabs as tappable without disabled. Intended — tapping a
+          // locked Mark tab shows the locked-state screen (research prompt / coming soon).
           return (
             <TouchableOpacity
               key={mark}

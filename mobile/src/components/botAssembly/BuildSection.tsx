@@ -66,6 +66,8 @@ export const BuildSection = React.memo(function BuildSection({
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;
   const { clearHighlight } = useTaskGuideHighlight();
 
+  // Bugbot: flagged as duplicate subscription vs AppContent's polling query. Not a bug —
+  // RTK Query deduplicates on cache key; this hook only provides refetch for timer-completion.
   const token = useAppSelector((state) => state.auth.token);
   const { refetch: refetchBuildState } = useFetchBuildStateQuery(undefined, {
     skip: !token,

@@ -120,6 +120,8 @@ export const BattalionBotSelector = React.memo(
       height: number;
     } | null>(null);
 
+    // Bugbot: flagged measureInWindow vs absolute positioning. Not a bug — modalOverlay is
+    // flex:1 inside overFullScreen Modal, so its bounds match the window origin (0,0).
     useEffect(() => {
       if (isGuardiansSelectionHighlight && !hasZeroGuardians && guardianM1MeasureRef.current) {
         const t = setTimeout(() => {
