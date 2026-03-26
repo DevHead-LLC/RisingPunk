@@ -848,6 +848,7 @@ router.post<{}, UserResponse | { error: string }, GoogleSignInRequest['body']>(
       res.status(201).json({
         token,
         user: {
+          _id: String(user._id),
           handle: user.handle,
           email: user.getDecryptedEmail(),
           level: user.level,
@@ -1181,6 +1182,7 @@ router.post<{}, UserResponse | { error: string }, AppleSignInRequest['body']>(
       res.json({
         token,
         user: {
+          _id: String(newUser._id),
           handle: newUser.handle,
           email: newUser.getDecryptedEmail(),
           level: newUser.level,
