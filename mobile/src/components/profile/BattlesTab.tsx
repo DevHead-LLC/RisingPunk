@@ -227,7 +227,7 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
             <TextInput
               style={[
                 styles.quantityInput,
-                { color: colors.text.primary, borderColor: colors.matrix + '44', textAlign: 'right' },
+                { color: colors.text.primary, borderColor: colors.matrix + '44' },
               ]}
               value={config.quantity}
               onChangeText={(text) => handleQuantityChange(id, text)}
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: Platform.OS === 'android' ? 2 : 4,
     fontSize: SIZING.font.small * 0.9,
-    justifyContent: 'center',
+    textAlign: 'right',
   },
   saveButton: {
     marginTop: SIZING.spacing.sm,
