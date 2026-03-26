@@ -12,7 +12,7 @@ import { BotService } from './BotService';
 import { NPCService } from './NPCService';
 import { Map as MapModel } from '../models/Map';
 import { User } from '../models/User';
-import { findCellByNpcInstanceId } from './CellAccessorService';
+import { findCellByNpcInstanceId, getCell } from './CellAccessorService';
 import mongoose from 'mongoose';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 import { syncAndResolveUserBotProgrammingBonuses } from '../utils/syncUserBotProgrammingBonuses';
@@ -106,16 +106,46 @@ export class BattleSetupService {
     if (!isUserDefender && defenderId === 'computer-opponent' && !npc) {
       throw new Error('Computer-opponent battle requires an NPC configuration. No NPC found or specified.');
     }
-    
+
+    /** Client should send this for map NPCs; if missing but hack map coords + slug match a cell, resolve from DB (aligns with map route npcInstanceId synthesis). */
+    let effectiveDefenderNpcInstanceId = defenderNpcInstanceId;
+    let defenderNpcInstanceIdVerifiedByCoords = false;
+    if (
+      !isUserDefender &&
+      actualDefenderNpcSlug &&
+      !effectiveDefenderNpcInstanceId &&
+      typeof hackMapCellX === 'number' &&
+      Number.isFinite(hackMapCellX) &&
+      typeof hackMapCellY === 'number' &&
+      Number.isFinite(hackMapCellY)
+    ) {
+      const mapDoc = await MapModel.findOne({ name: 'main' });
+      if (mapDoc) {
+        const cell = await getCell(mapDoc, hackMapCellX, hackMapCellY);
+        if (
+          cell &&
+          cell.occupiedBy === 'npc' &&
+          String((cell as any).npcSlug || '') === actualDefenderNpcSlug
+        ) {
+          const raw = (cell as any).npcInstanceId;
+          effectiveDefenderNpcInstanceId =
+            raw != null && String(raw).trim() !== ''
+              ? String(raw)
+              : `${actualDefenderNpcSlug}-${hackMapCellX}-${hackMapCellY}`;
+          defenderNpcInstanceIdVerifiedByCoords = true;
+        }
+      }
+    }
+
     // Validate that NPC instance exists on map if instance ID is provided (only for NPC battles)
-    if (!isUserDefender && defenderNpcInstanceId && actualDefenderNpcSlug) {
+    if (!isUserDefender && effectiveDefenderNpcInstanceId && actualDefenderNpcSlug && !defenderNpcInstanceIdVerifiedByCoords) {
       const mapDoc = await MapModel.findOne({ name: 'main' });
       if (!mapDoc) {
         throw new Error('Map not found');
       }
-      const npcCell = await findCellByNpcInstanceId(mapDoc, defenderNpcInstanceId, actualDefenderNpcSlug);
+      const npcCell = await findCellByNpcInstanceId(mapDoc, effectiveDefenderNpcInstanceId, actualDefenderNpcSlug);
       if (!npcCell) {
-        throw new Error(`NPC instance ${defenderNpcInstanceId} not found on map`);
+        throw new Error(`NPC instance ${effectiveDefenderNpcInstanceId} not found on map`);
       }
     }
     
@@ -243,7 +273,7 @@ export class BattleSetupService {
       screenHeight,
       ...(unlockHackRigOnWin ? { unlockHackRigOnWin: true } as any : {}),
       ...(actualDefenderNpcSlug ? { defenderNpcSlug: actualDefenderNpcSlug } as any : {}),
-      ...(defenderNpcInstanceId ? { defenderNpcInstanceId } as any : {}),
+      ...(effectiveDefenderNpcInstanceId ? { defenderNpcInstanceId: effectiveDefenderNpcInstanceId } as any : {}),
       ...(isUserDefender ? { 
         isUserDefender: true,
         defenderDeployedTotals: { guardian: 0, breacher: 0, phreak: 0 },

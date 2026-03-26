@@ -175,7 +175,13 @@ export const botsApi = createApi({
       invalidatesTags: ['Bots'],
     }),
     speedupBotBuild: builder.mutation<
-      { success: boolean; message: string; newBalance: number; bots: Record<string, number> },
+      {
+        success: boolean;
+        message?: string;
+        error?: string;
+        newBalance?: number;
+        bots?: Record<string, number>;
+      },
       void
     >({
       query: () => ({

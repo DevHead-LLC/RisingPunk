@@ -161,7 +161,8 @@ export const BuildSection = React.memo(function BuildSection({
       } else {
         // Handle case where API returns success: false (HTTP 200 but operation failed)
         setShowSpeedupModal(false);
-        const errorMsg = result.message || 'Failed to speed up bot build. Please try again.';
+        const errorMsg =
+          result.message || result.error || 'Failed to speed up bot build. Please try again.';
         setErrorMessage(errorMsg);
         setShowErrorModal(true);
       }

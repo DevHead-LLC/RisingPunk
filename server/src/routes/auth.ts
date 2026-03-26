@@ -61,6 +61,7 @@ interface AppleSignInRequest extends Request {
 interface UserResponse {
   token: string;
   user: {
+    _id?: string;
     handle: string;
     email: string;
     level: number;
@@ -249,6 +250,7 @@ router.post<{}, UserResponse | { error: string }, RegisterRequest['body']>(
       res.status(201).json({
         token,
         user: {
+          _id: String(user._id),
           handle: user.handle,
           email: user.getDecryptedEmail(),
           level: user.level,
