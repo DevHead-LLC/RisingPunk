@@ -326,6 +326,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const showTurfIntro = useAppSelector((state) => state.auth.showTurfIntro);
   const [currentIntroStep, setCurrentIntroStep] = useState<'home' | 'barracks' | 'research' | 'investment1' | 'wallet' | 'profile' | null>(null);
 
+  const isOnboardingOrIntroActive = showOnboarding || showTurfIntro;
+
   // Email verification state
   const { user, showEmailVerification, emailVerificationPromptedUserId } = useAppSelector((state) => state.auth);
   const hackRigUnlocked = user?.unlockedFeatures?.hackRig === true;
@@ -1690,11 +1692,15 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             )}
             <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
             <DailyHaulLocation />
-            <TaskGuide 
-              currentScreen={currentScreen} 
-              onNavigateToProfile={() => navigateToScreen('profile')}
-            />
-            <TaskGuideHighlightOverlay forProfile={true} />
+            {!isOnboardingOrIntroActive && (
+              <>
+                <TaskGuide 
+                  currentScreen={currentScreen} 
+                  onNavigateToProfile={() => navigateToScreen('profile')}
+                />
+                <TaskGuideHighlightOverlay forProfile={true} />
+              </>
+            )}
             {isVisitHackmap && (
               <TouchableOpacity
                 style={styles.turfClickHandler}
@@ -1718,17 +1724,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </View>
               </>
             )}
-            <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
-              {hackRigUnlocked && (
-                <WorldChatIconButton inline onPress={() => setShowWorldChatModal(true)} />
-              )}
-              <MessagesIconButton
-                inline
-                onPress={() => setShowMessagesModal(true)}
-                unreadCount={messagesUnreadCount}
-              />
-              <SearchUserIconButton inline onPress={() => setShowSearchUserModal(true)} />
-            </View>
+            {!isOnboardingOrIntroActive && (
+              <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
+                {hackRigUnlocked && (
+                  <WorldChatIconButton inline onPress={() => setShowWorldChatModal(true)} />
+                )}
+                <MessagesIconButton
+                  inline
+                  onPress={() => setShowMessagesModal(true)}
+                  unreadCount={messagesUnreadCount}
+                />
+                <SearchUserIconButton inline onPress={() => setShowSearchUserModal(true)} />
+              </View>
+            )}
             <WorldChatModal
               visible={showWorldChatModal}
               onClose={() => setShowWorldChatModal(false)}
@@ -1764,7 +1772,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleWorldChatNavigateToMapCell, handleMapPendingNavigateConsumed]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleWorldChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive]);
 
   // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
   if (!navRestoreAttempted) {
@@ -1773,7 +1781,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   return (
     <>
-      {currentScreen === 'turf' && (
+      {currentScreen === 'turf' && !isOnboardingOrIntroActive && (
         <CrewBackupBanner
           canShowBanner={true}
           onPressOpenCrewToBackup={() => {
@@ -1784,7 +1792,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         />
       )}
       {renderScreen()}
-      {currentScreen === 'turf' && (
+      {currentScreen === 'turf' && !isOnboardingOrIntroActive && (
         <View style={styles.bottomRightIcons}>
           <TouchableOpacity
             style={styles.activeJobsIconButton}

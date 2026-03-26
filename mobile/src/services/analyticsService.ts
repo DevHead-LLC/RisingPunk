@@ -57,6 +57,9 @@ export const logAccountCreatedOnce = async (params: {
   try {
     const already = await AsyncStorage.getItem(firebaseAccountCreatedLoggedKey(userId));
     if (already === 'true') {
+      // Bugbot: dedupe skips Firebase + markAccountExists below; still set has_account_created so
+      // trackAppReturned (canTrackAppReturned) is not blocked if AsyncStorage was partially cleared.
+      await markAccountExists();
       return;
     }
   } catch (error) {
