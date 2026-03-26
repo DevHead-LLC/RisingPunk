@@ -171,6 +171,7 @@ export const packetBreachApi = createApi({
         try {
           await queryFulfilled;
           // Bots/army stats updated by claim; refetch so UI shows new Brute bonus.
+          dispatch(botsApi.endpoints.fetchBotStats.initiate(undefined, { forceRefetch: true }));
           dispatch(
             botsApi.endpoints.fetchBotStatsBreakdown.initiate(undefined, { forceRefetch: true })
           );

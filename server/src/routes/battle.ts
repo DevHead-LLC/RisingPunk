@@ -5,13 +5,16 @@ import { Battle } from '../models/Battle';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { NPCService } from '../services/NPCService';
 import { isBattalionSlotUnlocked } from '../utils/researchFeatureUtils';
+import { userHasMark2BotsUnlocked } from '../utils/userHasMark2BotsUnlocked';
 
 interface StartBattleRequest extends Request {
   body: {
     userBattalions?: Array<{
       type: 'guardian' | 'breacher' | 'phreak';
       quantity: number;
-      nodeIndex: number;
+      nodeIndex?: number;
+      /** Defaults to 1. Requires Mark II research when 2. */
+      markLevel?: number;
     }>;
     defenderId?: string;
     defenderNpcSlug?: string;
@@ -142,12 +145,56 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
 
+      const normalizedBattalions: Array<{ type: 'breacher' | 'guardian' | 'phreak'; quantity: number; markLevel: number }> = [];
+      for (const b of userBattalions) {
+        if (!b || typeof b !== 'object') {
+          res.status(400).json({ success: false, error: 'Invalid userBattalions entry.' });
+          return;
+        }
+        const t = b.type;
+        if (t !== 'breacher' && t !== 'guardian' && t !== 'phreak') {
+          res.status(400).json({ success: false, error: 'Each battalion type must be breacher, guardian, or phreak.' });
+          return;
+        }
+        if (typeof b.quantity !== 'number' || !Number.isInteger(b.quantity) || b.quantity <= 0) {
+          continue;
+        }
+        const rawMl = (b as { markLevel?: unknown }).markLevel;
+        let markLevel: 1 | 2;
+        if (rawMl === undefined || rawMl === null) {
+          markLevel = 1;
+        } else {
+          const v = typeof rawMl === 'string' ? Number(rawMl.trim()) : rawMl;
+          if (v !== 1 && v !== 2) {
+            res.status(400).json({ success: false, error: 'markLevel must be 1 or 2.' });
+            return;
+          }
+          markLevel = v;
+        }
+        if (markLevel === 2) {
+          const unlocked = await userHasMark2BotsUnlocked(req.user._id);
+          if (!unlocked) {
+            res.status(403).json({
+              success: false,
+              error: 'Complete Mark 2 Bots research in Hack Ability to deploy Mark II units in battle.',
+            });
+            return;
+          }
+        }
+        normalizedBattalions.push({ type: t, quantity: b.quantity, markLevel });
+      }
+
+      if (normalizedBattalions.length === 0) {
+        res.status(400).json({ success: false, error: 'userBattalions must contain at least one battalion with quantity > 0' });
+        return;
+      }
+
       const battle = await battleController.startBattle(
         req.user._id,
         defenderId || 'computer',
         screenWidth,
         screenHeight,
-        userBattalions,
+        normalizedBattalions,
         defenderNpcSlug,
         unlockHackRigOnWin === true,
         defenderNpcInstanceId,

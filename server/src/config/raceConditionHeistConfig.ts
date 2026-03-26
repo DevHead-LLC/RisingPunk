@@ -3,6 +3,8 @@
  * Same tier/level structure as Packet Breach: 21 tiers, 5 levels per tier (1.1–21.5). See taskItems/mini-games/race-condition-heist.md.
  */
 
+import { scaleProgrammingBonusTotals } from './programmingBonusScale';
+
 export type LevelId = string; // e.g. "1.1", "6.1"
 
 export interface LevelParams {
@@ -527,5 +529,5 @@ export function computeRaceConditionHeistGuardianBonus(levelsCompleted: string[]
       health += r.health;
     }
   }
-  return { strength, defense, speed, health };
+  return scaleProgrammingBonusTotals({ strength, defense, speed, health });
 }

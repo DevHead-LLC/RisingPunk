@@ -144,7 +144,7 @@ export class BattalionService {
   static async createUserBattalions(
     nodes: INode[],
     userLevel: number,
-    userBattalions?: Array<{ type: string; quantity: number }>,
+    userBattalions?: Array<{ type: string; quantity: number; markLevel?: number }>,
     armyBonus?: ArmyBonus,
     guardianBonus?: ArmyBonus,
     phreakBonus?: { strength: number; defense: number; speed: number; health: number }
@@ -165,24 +165,36 @@ export class BattalionService {
         continue;
       }
       const validatedBotType = this.validateBotType(battalion.type);
-      
+      const markLevel =
+        typeof battalion.markLevel === 'number' && battalion.markLevel >= 2 ? 2 : 1;
+
       // Get stats from BotService (army bonus for breacher, guardian bonus for guardian, phreak bonus for phreak)
-      const botConfig = await BotService.getUserBotStats(validatedBotType, userLevel, armyBonus, guardianBonus, phreakBonus);
+      const botConfig = await BotService.getUserBotStats(
+        validatedBotType,
+        userLevel,
+        armyBonus,
+        guardianBonus,
+        phreakBonus,
+        markLevel as 1 | 2
+      );
       
       // Random node selection from available user nodes
       // Multiple battalions can share the same node
       const randomNodeIndex = Math.floor(Math.random() * availableUserNodes.length);
       const nodeIndex = availableUserNodes[randomNodeIndex];
       
-      battalions.push(BattalionFactory.createBattalion(
-        `user-battalion-${battalions.length}`,
-        validatedBotType,
-        battalion.quantity,
-        nodeIndex,
-        NodeOwner.USER,
-        botConfig.stats,
-        nodes
-      ));
+      battalions.push(
+        BattalionFactory.createBattalion(
+          `user-battalion-${battalions.length}`,
+          validatedBotType,
+          battalion.quantity,
+          nodeIndex,
+          NodeOwner.USER,
+          botConfig.stats,
+          nodes,
+          markLevel
+        )
+      );
     }
     
     return battalions;

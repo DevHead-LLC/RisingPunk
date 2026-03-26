@@ -1,6 +1,6 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
-import { BotType } from '../slices/botsSlice';
+import { BotType } from '../../types/bots';
 import { balanceApi } from './balanceApi';
 import { subtractFromBalance, addToBalance } from '../slices/balanceSlice';
 import { globalErrorHandler } from '../../services/GlobalErrorHandler';
@@ -60,26 +60,42 @@ export const botsApi = createApi({
   baseQuery: botsBaseQuery,
   tagTypes: ['Bots'],
   endpoints: (builder) => ({
-    fetchBots: builder.query<{ bots: Record<BotType, number>; battalionAssignments: { botType: BotType; quantity: number }[] }, void>({
+    fetchBots: builder.query<
+      { bots: Record<string, number>; battalionAssignments: { botType: BotType; quantity: number }[] },
+      void
+    >({
       query: () => '/api/bots',
       providesTags: ['Bots'],
     }),
-    fetchBuildState: builder.query<{ buildQueue: any; bots: Record<BotType, number> }, void>({
+    fetchBuildState: builder.query<{ buildQueue: any; bots: Record<string, number> }, void>({
       query: () => '/api/bots/build-state',
       providesTags: ['Bots'],
     }),
-    fetchBotStats: builder.query<{ botStats: any }, void>({
+    fetchBotStats: builder.query<{ botStats: any; botStatsM2?: Record<string, unknown> }, void>({
       query: () => '/api/bots/stats',
       providesTags: ['Bots'],
     }),
     fetchBotStatsBreakdown: builder.query<
-      { userLevel: number; breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> },
+      {
+        userLevel: number;
+        breakdown: Record<
+          string,
+          {
+            base: StatRow;
+            levelBonus: StatRow;
+            programmingBonus: StatRow;
+            researchBonus: StatRow;
+            total: StatRow;
+            mark2: { base: StatRow; levelBonus: StatRow; total: StatRow };
+          }
+        >;
+      },
       void
     >({
       query: () => '/api/bots/stats-breakdown',
       providesTags: ['Bots'],
     }),
-    startBuild: builder.mutation<any, { type: BotType; quantity: number; totalCost: number }>({
+    startBuild: builder.mutation<any, { type: BotType; quantity: number; totalCost: number; markLevel: 1 | 2 }>({
       query: (body) => ({
         url: '/api/bots/build',
         method: 'POST',
@@ -135,7 +151,10 @@ export const botsApi = createApi({
       },
       invalidatesTags: ['Bots'],
     }),
-    assignToBattalion: builder.mutation<any, { botType: BotType; quantity: number; battalionId: string }>({
+    assignToBattalion: builder.mutation<
+      any,
+      { botType: BotType; quantity: number; battalionId: string; markLevel?: 1 | 2 }
+    >({
       query: (body) => ({
         url: '/api/bots/assign',
         method: 'POST',
@@ -155,7 +174,10 @@ export const botsApi = createApi({
       }),
       invalidatesTags: ['Bots'],
     }),
-    speedupBotBuild: builder.mutation<{ success: boolean; message: string; newBalance: number; bots: Record<BotType, number> }, void>({
+    speedupBotBuild: builder.mutation<
+      { success: boolean; message: string; newBalance: number; bots: Record<string, number> },
+      void
+    >({
       query: () => ({
         url: '/api/bots/speedup-build',
         method: 'POST',
