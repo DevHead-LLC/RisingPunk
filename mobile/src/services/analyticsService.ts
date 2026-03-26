@@ -3,33 +3,27 @@
  * Centralized service for tracking custom events
  */
 
+import { Platform } from 'react-native';
 import { getAnalytics, logEvent } from '@react-native-firebase/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Get analytics instance (singleton pattern)
+// Cached analytics module instance; retries until native Firebase is ready (no permanent lockout on transient errors).
 let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
-let initializationAttempted = false;
 
 // Session guard: set when user signs up this session so we don't send app_open for "returning" on first session
 let accountCreatedThisSession = false;
 
 const getAnalyticsInstance = (): ReturnType<typeof getAnalytics> | null => {
-  // If initialization was already attempted and failed, don't retry
-  if (initializationAttempted && !analyticsInstance) {
+  if (analyticsInstance) {
+    return analyticsInstance;
+  }
+  try {
+    analyticsInstance = getAnalytics();
+    return analyticsInstance;
+  } catch (error) {
+    console.error('[Analytics] Failed to create analytics instance:', error);
     return null;
   }
-
-  if (!analyticsInstance) {
-    try {
-      analyticsInstance = getAnalytics();
-      initializationAttempted = true;
-    } catch (error) {
-      console.error('[Analytics] Failed to create analytics instance:', error);
-      initializationAttempted = true;
-      return null; // Return null instead of throwing to prevent retries
-    }
-  }
-  return analyticsInstance;
 };
 
 /** Called by AppContent to skip app_open when user just signed up this session */
@@ -38,25 +32,54 @@ export const clearAccountCreatedThisSession = (): void => {
   accountCreatedThisSession = false;
 };
 
+/** How the user obtained a registered / trackable identity (Firebase param signup_method). */
+export type AccountCreationMethod = 'email' | 'google' | 'apple' | 'guest' | 'guest_link';
+
+const firebaseAccountCreatedLoggedKey = (userId: string) =>
+  `firebase_account_created_logged_${userId}`;
+
 /**
- * Track account creation
- * Call this when a user successfully creates an account
+ * Log exactly one `account_created` per user id (persists across sessions).
+ * Call only after the server has confirmed success (HTTP 200 + persisted session).
+ * Guest link uses the same user id as the prior guest — dedupe prevents a second event.
  */
-export const trackAccountCreated = async (method: 'email' | 'google' | 'apple') => {
+export const logAccountCreatedOnce = async (params: {
+  userId: string;
+  method: AccountCreationMethod;
+}): Promise<void> => {
+  const { userId, method } = params;
+  if (!userId || typeof userId !== 'string') {
+    // Never throw: callers run after auth success; a bad id must not reject login/signup.
+    console.error('[Analytics] logAccountCreatedOnce: missing or invalid userId; skipping account_created');
+    return;
+  }
+
   try {
-    // Set prerequisite first so returning-user tracking works when storage succeeds
+    const already = await AsyncStorage.getItem(firebaseAccountCreatedLoggedKey(userId));
+    if (already === 'true') {
+      // Bugbot: dedupe skips Firebase + markAccountExists below; still set has_account_created so
+      // trackAppReturned (canTrackAppReturned) is not blocked if AsyncStorage was partially cleared.
+      await markAccountExists();
+      return;
+    }
+  } catch (error) {
+    console.error('[Analytics] Error reading account_created dedupe flag:', error);
+  }
+
+  try {
     await markAccountExists();
-    // Always set session guard so we skip app_open this session (even if storage failed)
     accountCreatedThisSession = true;
 
     const analytics = getAnalyticsInstance();
     if (!analytics) {
-      return; // Analytics not available, skip event (flag already set)
+      return;
     }
     await logEvent(analytics, 'account_created', {
       signup_method: method,
+      platform: Platform.OS,
       timestamp: new Date().toISOString(),
     });
+    await AsyncStorage.setItem(firebaseAccountCreatedLoggedKey(userId), 'true');
   } catch (error) {
     console.error('[Analytics] Error tracking account_created:', error);
   }

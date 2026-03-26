@@ -179,7 +179,9 @@ mongoose.connect(process.env.MONGODB_URI, {
     // Start activity aggregation service for privacy compliance
     const { ActivityAggregationService } = require('./src/services/ActivityAggregationService');
     ActivityAggregationService.startAggregationService();
-    
+
+    // Listen only after DB + LevelingService + BotStatsService are ready (avoids race: requests before config load).
+    startServer();
   } catch (error) {
     console.error('Failed to initialize game services:', error);
     process.exit(1);
@@ -624,7 +626,7 @@ app.get('/delete-account', deleteAccountHandler);
 app.use('/', healthRoute);
 
 
-// Listen strictly on the configured PORT from env.ts
+// Listen strictly on the configured PORT from env.ts (invoked from mongoose.connect().then after services load).
 const startServer = (port = PORT, maxAttempts = 0) => {
   try {
     const server = app.listen(port, () => {
@@ -650,6 +652,3 @@ const startServer = (port = PORT, maxAttempts = 0) => {
     process.exit(1);
   }
 };
-
-// Start the server with dynamic port selection
-startServer();

@@ -18,4 +18,12 @@ export const formatNumber = (num: number): string => {
     return '0';
   }
   return num.toLocaleString();
-}; 
+};
+
+/** Bot stat quick view: same defense % rules as Profile > Stats (API defense is 0–1). */
+export function formatBotStatValue(statKey: string, value: number): string {
+  if (statKey === 'defense') {
+    return `${(Number(value) * 100).toFixed(1)}%`;
+  }
+  return String(value);
+} 

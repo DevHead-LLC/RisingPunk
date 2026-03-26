@@ -1,3 +1,5 @@
+import { deriveMarkBaseStatsFromMark1 } from '../utils/mark2BaseStatsFromMark1';
+
 interface BotBaseStats {
   health: number;
   offense: number;
@@ -47,6 +49,22 @@ export interface EffectiveBotStats {
   range: number;
 }
 
+/** Inventory/stat keys for Mark II+ that are derived from Mark I `bot_types` bases (no separate DB row required). */
+const DERIVED_MARK_FROM_M1: Record<
+  string,
+  { family: 'breacher' | 'guardian' | 'phreak'; markLevel: number }
+> = {
+  breacherM2: { family: 'breacher', markLevel: 2 },
+  guardianM2: { family: 'guardian', markLevel: 2 },
+  phreakM2: { family: 'phreak', markLevel: 2 },
+  breacherM3: { family: 'breacher', markLevel: 3 },
+  guardianM3: { family: 'guardian', markLevel: 3 },
+  phreakM3: { family: 'phreak', markLevel: 3 },
+  breacherM4: { family: 'breacher', markLevel: 4 },
+  guardianM4: { family: 'guardian', markLevel: 4 },
+  phreakM4: { family: 'phreak', markLevel: 4 },
+};
+
 export class BotStatsService {
   private static botTypes: Map<string, BotTypeConfig> = new Map();
   private static growthConfig: GrowthConfig | null = null;
@@ -86,18 +104,28 @@ export class BotStatsService {
     }
   }
 
+  /** Mark II+ keys (`breacherM2`, …) derive from Mark I DB bases via `deriveMarkBaseStatsFromMark1`. */
+  private static getBaseStatsFromDb(botType: string): BotBaseStats {
+    const botConfig = this.botTypes.get(botType);
+    if (!botConfig) {
+      throw new Error(`Bot type '${botType}' not found`);
+    }
+    return { ...botConfig.base };
+  }
+
   /** Returns a copy so callers cannot mutate the cached config. */
   static getBaseStats(botType: string): BotBaseStats {
     if (!this.configsLoaded) {
       throw new Error('BotStatsService configs not loaded');
     }
 
-    const botConfig = this.botTypes.get(botType);
-    if (!botConfig) {
-      throw new Error(`Bot type '${botType}' not found`);
+    const derived = DERIVED_MARK_FROM_M1[botType];
+    if (derived) {
+      const m1Base = this.getBaseStatsFromDb(derived.family);
+      return deriveMarkBaseStatsFromMark1(m1Base, derived.markLevel);
     }
 
-    return { ...botConfig.base };
+    return this.getBaseStatsFromDb(botType);
   }
 
   static getGrowthConfig(): GrowthConfig {
@@ -140,12 +168,11 @@ export class BotStatsService {
     // Offense: +5% per level
     const offense = baseStats.offense * (1 + growth.offensePctPerLevel * (userLevel - 1));
 
-    // Defense: +1% every 2 levels, capped at 30%
+    // Defense: +0.5% every 2 levels; cap at growth.defenseCap and per-type cap (base + 12 pts on 0–1 scale)
     const defenseLevels = Math.floor((userLevel - 1) / growth.defenseEveryNLevels);
-    const defense = Math.min(
-      baseStats.defense + growth.defensePctPerNLevels * defenseLevels,
-      growth.defenseCap
-    );
+    const fromGrowth = baseStats.defense + growth.defensePctPerNLevels * defenseLevels;
+    const perTypeDefenseCap = baseStats.defense + 0.12;
+    const defense = Math.min(fromGrowth, perTypeDefenseCap, growth.defenseCap);
 
     // Speed: +1 every 5 levels, capped at base + 3
     const speedLevels = Math.floor((userLevel - 1) / growth.speedEveryNLevels);
@@ -166,11 +193,60 @@ export class BotStatsService {
     };
   }
 
+  /**
+   * Mark II+ (keys in `DERIVED_MARK_FROM_M1`): user level growth is computed from **Mark I** only, then added as a flat delta.
+   * Total = mark base + (effective M1 − M1 base). Programming/research bonuses stack the same way via `BotService.getUserBotStats`.
+   * Do not call `computeEffectiveBotStats(markKey, level)` for derived keys — that would scale % growth on the larger mark base.
+   */
+  static computeEffectiveBotStatsForDerivedMark(
+    familyKey: 'breacher' | 'guardian' | 'phreak',
+    markStatsKey: string,
+    userLevel: number
+  ): EffectiveBotStats {
+    const derived = DERIVED_MARK_FROM_M1[markStatsKey];
+    if (!derived || derived.family !== familyKey) {
+      throw new Error(`Invalid derived mark key or family: ${markStatsKey} / ${familyKey}`);
+    }
+
+    const baseM1 = this.getBaseStats(familyKey);
+    const effectiveM1 = this.computeEffectiveBotStats(familyKey, userLevel);
+    const baseMk = this.getBaseStats(markStatsKey);
+
+    const health = baseMk.health + (effectiveM1.health - baseM1.health);
+    const offense = baseMk.offense + (effectiveM1.offense - baseM1.offense);
+    const defense = baseMk.defense + (effectiveM1.defense - baseM1.defense);
+    const speed = baseMk.speed + (effectiveM1.speed - baseM1.speed);
+    const range = baseMk.range + (effectiveM1.range - baseM1.range);
+
+    return {
+      health: this.roundTo2Decimals(health),
+      offense: this.roundTo2Decimals(offense),
+      defense: this.roundTo2Decimals(defense),
+      speed: Math.round(speed),
+      range: Math.round(range),
+    };
+  }
+
   static getAllBotTypes(): string[] {
     return Array.from(this.botTypes.keys());
   }
 
+  /** Mark II inventory/stat keys are always supported (derived from Mark I). */
+  static hasBotTypeKey(key: string): boolean {
+    if (!this.configsLoaded) {
+      throw new Error('BotStatsService configs not loaded');
+    }
+    if (DERIVED_MARK_FROM_M1[key]) {
+      return true;
+    }
+    return this.botTypes.has(key);
+  }
+
   static getBotRole(botType: string): string {
+    const derived = DERIVED_MARK_FROM_M1[botType];
+    if (derived) {
+      return this.getBotRole(derived.family);
+    }
     const botConfig = this.botTypes.get(botType);
     return botConfig?.role || 'unknown';
   }

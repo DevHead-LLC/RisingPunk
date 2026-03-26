@@ -92,6 +92,8 @@ export interface StartBattleRequest {
   userBattalions: Array<{
     type: 'guardian' | 'breacher' | 'phreak';
     quantity: number;
+    /** Defaults to 1 server-side when omitted. */
+    markLevel?: 1 | 2;
   }>;
   screenWidth: number;
   screenHeight: number;

@@ -8,6 +8,7 @@ import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { MovementState } from '../../types/battleTypes';
 import { ANIMATION_CONFIG } from '../../config';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { battleGridAbbrevFor, effectiveMarkFromBattalionMark } from '../../utils/botInventory';
 
 interface Props {
   battalion: {
@@ -32,12 +33,6 @@ interface Props {
   size?: number;
   showHealthBar?: boolean;
 }
-
-const BOT_TYPE_LABELS: Record<string, string> = {
-  phreak: 'Ph',
-  breacher: 'Br',
-  guardian: 'Gn',
-};
 
 export const BattleBattalion = React.memo(({
   battalion,
@@ -122,9 +117,15 @@ export const BattleBattalion = React.memo(({
 
   const attackRangeRadius = React.useMemo(() => battalion.stats.range * 8, [battalion.stats.range]);
 
-  const botTypeLabel = React.useMemo(() => 
-    BOT_TYPE_LABELS[battalion.type] || ''
-  , [battalion.type]);
+  const botTypeLabel = React.useMemo(
+    () => battleGridAbbrevFor(battalion.type, battalion.mark),
+    [battalion.type, battalion.mark]
+  );
+
+  const markShortLabel = React.useMemo(() => {
+    const ml = effectiveMarkFromBattalionMark(battalion.mark);
+    return ml === 2 ? 'Mk II' : 'Mk I';
+  }, [battalion.mark]);
 
   const shouldShowAttackRange = React.useMemo(() => 
     movementState?.movementStatus === 'moving' || movementState?.movementStatus === 'arrived'
@@ -258,7 +259,7 @@ export const BattleBattalion = React.memo(({
       <View style={labelRowStyle}>
         <Text style={botTypeLabelStyle}>{botTypeLabel}</Text>
         <View style={{ width: 12 }} />
-        <Text style={markLabelStyle}>Mk I</Text>
+        <Text style={markLabelStyle}>{markShortLabel}</Text>
       </View>
     </View>
   );
