@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   Modal,
   Pressable,
   ActionSheetIOS,
-  Keyboard,
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -24,15 +23,6 @@ import {
 import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { useAppSelector } from '../../store/hooks';
 import { BOT_FAMILY_ORDER, MARK2_DISPLAY_NAMES } from '../../utils/botInventory';
-
-/** Dev-only: grep Metro for `[RP-BattlesFocus]` — see taskItems/problemSolvingTempFile.md */
-function battlesFocusLog(...args: unknown[]): void {
-  if (!__DEV__) return;
-  console.log('[RP-BattlesFocus]', ...args);
-}
-
-/** Quantity fields use `number-pad` on both platforms (inline `TextInput`). */
-const QUANTITY_KEYBOARD = 'number-pad' as const;
 
 const BATTALION_IDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 type BotType = 'breacher' | 'guardian' | 'phreak';
@@ -118,10 +108,6 @@ interface PresetEditorProps {
 const MODAL_LANDSCAPE_ORIENTATIONS = ['landscape-left', 'landscape-right'] as const;
 
 const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, isSaving }: PresetEditorProps) => {
-  const syncDiagCountRef = useRef(0);
-  const firstChangeLoggedRef = useRef<Set<string>>(new Set());
-  const layoutLoggedRef = useRef<Set<string>>(new Set());
-
   const serverBattalionsSig = useMemo(
     () => JSON.stringify(preset.battalions ?? {}),
     [preset.battalions]
@@ -132,10 +118,6 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
   );
 
   useEffect(() => {
-    if (__DEV__ && syncDiagCountRef.current < 16) {
-      syncDiagCountRef.current += 1;
-      battlesFocusLog('sync effect', { presetId: preset.id, n: syncDiagCountRef.current, sigLen: serverBattalionsSig.length });
-    }
     setBattalions(buildInitialBattalions(battalionsFromSig(serverBattalionsSig), choiceOptions));
   }, [preset.id, serverBattalionsSig, choiceOptions]);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
@@ -164,7 +146,6 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
 
   const openIosBotPicker = useCallback(
     (rowId: string) => {
-      battlesFocusLog('ActionSheet open request', { presetId: preset.id, rowId, optionCount: choiceOptions.length });
       const labels = choiceOptions.map((o) => o.label);
       const cancelIndex = labels.length;
       ActionSheetIOS.showActionSheetWithOptions(
@@ -173,7 +154,6 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
           cancelButtonIndex: cancelIndex,
         },
         (buttonIndex) => {
-          battlesFocusLog('ActionSheet callback', { presetId: preset.id, rowId, buttonIndex, cancelIndex });
           if (buttonIndex === cancelIndex) return;
           const opt = choiceOptions[buttonIndex];
           if (opt) {
@@ -182,7 +162,7 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
         }
       );
     },
-    [choiceOptions, handleChoiceKeyChange, preset.id]
+    [choiceOptions, handleChoiceKeyChange]
   );
 
   const handleQuantityChange = useCallback((battalionId: string, text: string) => {
@@ -250,55 +230,8 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
                 { color: colors.text.primary, borderColor: colors.matrix + '44', textAlign: 'right' },
               ]}
               value={config.quantity}
-              onChangeText={(text) => {
-                const rowKey = `${preset.id}:${id}`;
-                if (__DEV__ && !firstChangeLoggedRef.current.has(rowKey)) {
-                  firstChangeLoggedRef.current.add(rowKey);
-                  battlesFocusLog('TextInput first onChangeText', { presetId: preset.id, rowId: id, platform: Platform.OS });
-                }
-                handleQuantityChange(id, text);
-              }}
-              onPressIn={() => {
-                const t = Date.now();
-                battlesFocusLog('qty TextInput onPressIn', { presetId: preset.id, rowId: id, platform: Platform.OS, t });
-                setTimeout(() => {
-                  battlesFocusLog('qty TextInput setTimeout(250) after onPressIn', {
-                    presetId: preset.id,
-                    rowId: id,
-                    dt: Date.now() - t,
-                  });
-                }, 250);
-              }}
-              onLayout={(e) => {
-                const lk = `${preset.id}:${id}`;
-                if (__DEV__ && !layoutLoggedRef.current.has(lk)) {
-                  layoutLoggedRef.current.add(lk);
-                  battlesFocusLog('TextInput onLayout (once/row)', {
-                    presetId: preset.id,
-                    rowId: id,
-                    w: e.nativeEvent.layout.width,
-                    h: e.nativeEvent.layout.height,
-                  });
-                }
-              }}
-              onFocus={() => {
-                const t = Date.now();
-                battlesFocusLog('qty TextInput onFocus ENTRY', { presetId: preset.id, rowId: id, platform: Platform.OS, t });
-                queueMicrotask(() => {
-                  battlesFocusLog('qty TextInput onFocus → queueMicrotask (JS still scheduling)', {
-                    presetId: preset.id,
-                    rowId: id,
-                    dt: Date.now() - t,
-                  });
-                });
-                setTimeout(() => {
-                  battlesFocusLog('qty TextInput onFocus → setTimeout(0)', { presetId: preset.id, rowId: id, dt: Date.now() - t });
-                }, 0);
-              }}
-              onBlur={() => {
-                battlesFocusLog('qty TextInput onBlur', { presetId: preset.id, rowId: id, platform: Platform.OS, t: Date.now() });
-              }}
-              keyboardType={QUANTITY_KEYBOARD}
+              onChangeText={(text) => handleQuantityChange(id, text)}
+              keyboardType="number-pad"
               autoCorrect={false}
               autoCapitalize="none"
               spellCheck={false}
@@ -316,9 +249,6 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
           animationType="fade"
           onRequestClose={() => setOpenBotPickerForRow(null)}
           supportedOrientations={[...MODAL_LANDSCAPE_ORIENTATIONS]}
-          onShow={() => {
-            battlesFocusLog('Android Modal onShow', { presetId: preset.id });
-          }}
         >
           <View style={styles.botPickerOverlay}>
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpenBotPickerForRow(null)} />
@@ -401,7 +331,6 @@ export function BattlesTab(): React.JSX.Element {
   const [saveBattlePreset, { isLoading: isSaving }] = useSaveBattlePresetMutation();
   const handleSavePreset = useCallback(
     async (presetId: string, battalions: Record<string, PresetBattalionConfig>) => {
-      battlesFocusLog('saveBattlePreset mutation (parent)', { presetId, ts: Date.now() });
       await saveBattlePreset({ presetId, battalions }).unwrap();
     },
     [saveBattlePreset]
@@ -410,33 +339,6 @@ export function BattlesTab(): React.JSX.Element {
   const { data, isLoading } = useGetBattlePresetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
-
-  useEffect(() => {
-    if (!__DEV__) return;
-    battlesFocusLog('BattlesTab mount');
-    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const subShow = Keyboard.addListener(showEvt, (e) => {
-      battlesFocusLog('Keyboard event', showEvt, { height: e.endCoordinates?.height, duration: e.duration });
-    });
-    const subHide = Keyboard.addListener(hideEvt, () => {
-      battlesFocusLog('Keyboard event', hideEvt);
-    });
-    return () => {
-      battlesFocusLog('BattlesTab unmount');
-      subShow.remove();
-      subHide.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!__DEV__ || !data) return;
-    battlesFocusLog('BattlesTab presets ready', {
-      mark2Unlocked,
-      choiceOptionCount: choiceOptions.length,
-      presetKeys: Object.keys(data.presets ?? {}),
-    });
-  }, [data, mark2Unlocked, choiceOptions.length]);
 
   if (isLoading || !data) {
     return (
@@ -466,13 +368,13 @@ export function BattlesTab(): React.JSX.Element {
       {presetList.map((preset) =>
         preset.unlocked ? (
           <PresetEditor
-              key={preset.id}
-              preset={preset}
-              colors={colors}
-              choiceOptions={choiceOptions}
-              onSavePreset={handleSavePreset}
-              isSaving={isSaving}
-            />
+            key={preset.id}
+            preset={preset}
+            colors={colors}
+            choiceOptions={choiceOptions}
+            onSavePreset={handleSavePreset}
+            isSaving={isSaving}
+          />
         ) : (
           <LockedPreset key={preset.id} preset={preset} colors={colors} />
         )
