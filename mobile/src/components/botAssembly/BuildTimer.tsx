@@ -1,76 +1,26 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { useAppSelector } from '../../store/hooks';
 
 type BuildTimerProps = {
-  _quantity: number;
-  buildTimePerUnit: number;
+  /** 0–100 from wall-clock startedAt → completesAt (same source as the progress bar). */
   progress: number;
+  timeRemainingMs: number;
+  totalBuildQuantity: number;
 };
 
 export const BuildTimer = React.memo(function BuildTimer({
-  _quantity,
-  buildTimePerUnit,
   progress,
+  timeRemainingMs,
+  totalBuildQuantity,
 }: BuildTimerProps) {
-
-  const totalBuildQuantity = useAppSelector((state) => state.bots.totalBuildQuantity);
-  const buildStartTime = useAppSelector((state) => state.bots.buildStartTime);
-  const [currentProgress, setCurrentProgress] = useState<number>(progress);
-  const [timeLeft, setTimeLeft] = useState<number>(0);
   const colors = useThemeColors();
 
-  const botsBuilt = Math.floor((currentProgress / 100) * totalBuildQuantity);
-
-  useEffect(() => {
-    if (!buildStartTime || totalBuildQuantity === 0) {
-      setCurrentProgress(0);
-      setTimeLeft(0);
-      return;
-    }
-
-    const startTime = new Date(buildStartTime).getTime();
-    if (isNaN(startTime)) {
-      setCurrentProgress(0);
-      setTimeLeft(0);
-      return;
-    }
-
-    const updateProgress = () => {
-      const now = Date.now();
-      const totalTime = totalBuildQuantity * buildTimePerUnit;
-      const elapsed = now - startTime;
-      
-      if (elapsed >= totalTime) {
-        setCurrentProgress(100);
-        setTimeLeft(0);
-      } else {
-        const newProgress = (elapsed / totalTime) * 100;
-        
-        if (Math.abs(newProgress - progress) > 15) {
-          setCurrentProgress(progress);
-        } else {
-          setCurrentProgress(newProgress);
-        }
-        
-        setTimeLeft(totalTime - elapsed);
-      }
-    };
-
-    updateProgress();
-    const timer = setInterval(updateProgress, 1000);
-
-    return () => clearInterval(timer);
-  }, [buildStartTime, totalBuildQuantity, buildTimePerUnit]);
-
-  useEffect(() => {
-    setCurrentProgress(progress);
-  }, [progress]);
+  const botsBuilt = Math.floor((progress / 100) * totalBuildQuantity);
 
   const formattedTime = useMemo(() => {
-    const seconds = Math.floor(timeLeft / 1000);
+    const seconds = Math.floor(timeRemainingMs / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
@@ -82,7 +32,7 @@ export const BuildTimer = React.memo(function BuildTimer({
     parts.push(`${seconds % 60}s`);
 
     return `${parts.join(' ')} remaining`;
-  }, [timeLeft]);
+  }, [timeRemainingMs]);
 
   return (
     <View style={styles.container}>

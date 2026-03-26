@@ -5,6 +5,8 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 
 type BotTypeCardProps = {
   type: string;
+  /** When set (e.g. Mark II Exploit/Worm/Sniffer), shown instead of type.toUpperCase(). */
+  displayLabel?: string;
   _level: number;
   isLocked: boolean;
   isSelected: boolean;
@@ -16,6 +18,7 @@ type BotTypeCardProps = {
 
 export const BotTypeCard = React.memo(function BotTypeCard({
   type,
+  displayLabel,
   _level,
   isLocked,
   isSelected,
@@ -57,7 +60,9 @@ export const BotTypeCard = React.memo(function BotTypeCard({
 
   const cardContent = (
     <View style={styles.botCardContent}>
-      <Text style={[styles.botType, { color: colors.text.primary }]}>{type.toUpperCase()}</Text>
+      <Text style={[styles.botType, { color: colors.text.primary }]}>
+        {(displayLabel ?? type).toUpperCase()}
+      </Text>
       {!isLocked ? (
         <Text style={[styles.botCount, { color: colors.text.placeholder }]}>
           Owned: {count}

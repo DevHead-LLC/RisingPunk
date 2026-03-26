@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { BotType } from '../../types/bots';
 import { useAppSelector } from '../../store/hooks';
 
 // Utility function for formatting balance
@@ -12,13 +11,14 @@ export function formatBalance(amount: number): string {
 }
 
 type BuildStatusProps = {
-  selectedType: BotType | null;
+  /** Shown in the Type row (e.g. BRUTE vs BREACHER). */
+  typeLabel: string;
   quantity: string;
   botCost: number;
 };
 
 export const BuildStatus = React.memo(function BuildStatus({
-  selectedType,
+  typeLabel,
   quantity,
   botCost,
 }: BuildStatusProps) {
@@ -31,7 +31,7 @@ export const BuildStatus = React.memo(function BuildStatus({
       return buildQueue.totalCost;
     }
     // For new builds, calculate from inputs
-    if (selectedType && quantity) {
+    if (typeLabel && typeLabel !== 'N/A' && quantity) {
       return botCost * (parseInt(quantity) || 0);
     }
     return 0;
@@ -41,7 +41,7 @@ export const BuildStatus = React.memo(function BuildStatus({
     <View style={[styles.buildStatus, { backgroundColor: colors.accent + '10' }]}>
       <View style={styles.statusRow}>
         <Text style={[styles.statusLabel, { color: colors.text.placeholder }]}>Type:</Text>
-        <Text style={[styles.statusValue, { color: colors.text.primary }]}>{selectedType || 'N/A'}</Text>
+        <Text style={[styles.statusValue, { color: colors.text.primary }]}>{typeLabel}</Text>
       </View>
       <View style={styles.statusRow}>
         <Text style={[styles.statusLabel, { color: colors.text.placeholder }]}>Total Cost:</Text>

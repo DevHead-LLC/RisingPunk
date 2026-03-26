@@ -19,11 +19,21 @@ import type { BattalionAssignment } from './BattalionSlot';
 import type { BotType } from '../../types/bots';
 import { useBattalionMaxSize } from '../../hooks/useBattalionSlotUnlocks';
 import { useFetchBotsQuery } from '../../store/api/botsApi';
+import { inventoryKeyForFamilyAndMark, MARK2_DISPLAY_NAMES } from '../../utils/botInventory';
 
 const BOT_TYPES: readonly BotType[] = ['breacher', 'guardian', 'phreak'];
 
-/** Strict `Record<BotType, number>` from RTK/API or props; ignores extra keys and bad values (Bugbot). */
-function normalizeBotCountsToRecord(raw: unknown): Record<BotType, number> {
+const INVENTORY_KEYS = [
+  'breacher',
+  'guardian',
+  'phreak',
+  'breacherM2',
+  'guardianM2',
+  'phreakM2',
+] as const;
+
+/** M1 + M2 inventory keys from `GET /api/bots` `bots` object. */
+function normalizeFullInventory(raw: unknown): Record<string, number> {
   const n = (v: unknown): number => {
     if (typeof v === 'number' && Number.isFinite(v)) {
       return Math.max(0, Math.floor(v));
@@ -34,15 +44,16 @@ function normalizeBotCountsToRecord(raw: unknown): Record<BotType, number> {
     }
     return 0;
   };
+  const out: Record<string, number> = {};
   if (!raw || typeof raw !== 'object') {
-    return { breacher: 0, guardian: 0, phreak: 0 };
+    for (const k of INVENTORY_KEYS) out[k] = 0;
+    return out;
   }
   const o = raw as Record<string, unknown>;
-  return {
-    breacher: n(o.breacher),
-    guardian: n(o.guardian),
-    phreak: n(o.phreak),
-  };
+  for (const k of INVENTORY_KEYS) {
+    out[k] = n(o[k]);
+  }
+  return out;
 }
 
 function normalizePresetBotType(raw: string): BotType | null {
@@ -56,19 +67,22 @@ function labelForBotType(t: BotType): string {
   return 'Phreak';
 }
 
-function collectPresetBotTypes(preset: PresetData): BotType[] {
+function collectPresetSlotNeeds(preset: PresetData): Array<{ botType: BotType; markLevel: 1 | 2 }> {
   const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
-  const seen = new Set<BotType>();
-  const out: BotType[] = [];
+  const seen = new Set<string>();
+  const out: Array<{ botType: BotType; markLevel: 1 | 2 }> = [];
   if (!preset.battalions) return out;
-  const rec = preset.battalions as Record<string, { botType: string; quantity: number }>;
+  const rec = preset.battalions as Record<string, { botType: string; quantity: number; markLevel?: number }>;
   for (const slotId of fillOrder) {
     const c = rec[slotId] ?? rec[slotId.toLowerCase()];
     if (!c || c.quantity <= 0) continue;
     const bt = normalizePresetBotType(c.botType);
-    if (!bt || seen.has(bt)) continue;
-    seen.add(bt);
-    out.push(bt);
+    if (!bt) continue;
+    const markLevel: 1 | 2 = c.markLevel === 2 ? 2 : 1;
+    const sig = `${bt}:${markLevel}`;
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    out.push({ botType: bt, markLevel });
   }
   return out;
 }
@@ -76,7 +90,7 @@ function collectPresetBotTypes(preset: PresetData): BotType[] {
 function presetHasConfiguredSlots(preset: PresetData): boolean {
   const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
   if (!preset.battalions) return false;
-  const rec = preset.battalions as Record<string, { botType: string; quantity: number }>;
+  const rec = preset.battalions as Record<string, { botType: string; quantity: number; markLevel?: number }>;
   return fillOrder.some((id) => {
     const c = rec[id] ?? rec[id.toLowerCase()];
     return c != null && c.quantity > 0 && normalizePresetBotType(c.botType) != null;
@@ -104,9 +118,9 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
   const { data: botsQueryData } = useFetchBotsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
-  const effectiveBotCounts = useMemo(() => {
+  const effectiveFullInventory = useMemo(() => {
     const src = botsQueryData?.bots != null ? botsQueryData.bots : botCounts;
-    return normalizeBotCountsToRecord(src);
+    return normalizeFullInventory(src);
   }, [botsQueryData?.bots, botCounts]);
   const [unlockPreset] = useUnlockPresetMutation();
   const maxBattalionSize = useBattalionMaxSize();
@@ -135,12 +149,12 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
 
   const getSlotConfig = useCallback((battalions: PresetData['battalions'], slotId: string) => {
     if (!battalions) return undefined;
-    const rec = battalions as Record<string, { botType: string; quantity: number }>;
+    const rec = battalions as Record<string, { botType: string; quantity: number; markLevel?: number }>;
     return rec[slotId] ?? rec[slotId.toLowerCase()];
   }, []);
 
   const buildAssignmentsForPreset = useCallback(
-    (preset: PresetData, counts: Record<BotType, number>): Record<string, BattalionAssignment> | null => {
+    (preset: PresetData, inventory: Record<string, number>): Record<string, BattalionAssignment> | null => {
       const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
       const hasConfigured = fillOrder.some((id) => {
         const c = getSlotConfig(preset.battalions, id);
@@ -150,11 +164,7 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
         return null;
       }
 
-      const remaining: Record<string, number> = {
-        breacher: counts.breacher ?? 0,
-        guardian: counts.guardian ?? 0,
-        phreak: counts.phreak ?? 0,
-      };
+      const remaining: Record<string, number> = { ...inventory };
 
       const newAssignments: Record<string, BattalionAssignment> = {};
 
@@ -167,16 +177,18 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
         const bt = normalizePresetBotType(config.botType);
         if (!bt) continue;
 
-        const available = remaining[bt] ?? 0;
+        const markLevel: 1 | 2 = config.markLevel === 2 ? 2 : 1;
+        const invKey = inventoryKeyForFamilyAndMark(bt, markLevel);
+        const available = remaining[invKey] ?? 0;
         if (available <= 0) continue;
 
         const toAssign = Math.min(config.quantity, available, maxBattalionSize);
-        remaining[bt] -= toAssign;
+        remaining[invKey] = available - toAssign;
 
         newAssignments[slotId] = {
           botType: bt,
           quantity: toAssign,
-          markLevel: 1,
+          markLevel,
         };
       }
 
@@ -226,22 +238,42 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
       return;
     }
 
-    const presetFromCache = presetsData.presets[preset.id];
+    /** Always refetch before apply so Profile saves are not masked by stale RTK cache. */
+    let presetsPayload = presetsData;
+    try {
+      const result = await refetchPresets();
+      if (result.data) {
+        presetsPayload = result.data;
+      }
+    } catch {
+      /* use presetsPayload as-is */
+    }
+
+    const presetFromCache = presetsPayload?.presets?.[preset.id];
     if (!presetFromCache) {
       showBanner('Preset data not loaded.');
       return;
     }
 
-    const built = buildAssignmentsForPreset(presetFromCache, effectiveBotCounts);
+    const built = buildAssignmentsForPreset(presetFromCache, effectiveFullInventory);
     if (!built) {
       if (!presetHasConfiguredSlots(presetFromCache)) {
         showBanner('Set up this preset in Profile > Battles.');
         return;
       }
-      const needed = collectPresetBotTypes(presetFromCache);
-      const missing = needed.filter((t) => (effectiveBotCounts[t] ?? 0) <= 0);
+      const needed = collectPresetSlotNeeds(presetFromCache);
+      const missing = needed.filter(({ botType, markLevel }) => {
+        const key = inventoryKeyForFamilyAndMark(botType, markLevel);
+        return (effectiveFullInventory[key] ?? 0) <= 0;
+      });
       if (missing.length > 0) {
-        const names = missing.map(labelForBotType).join(', ');
+        const names = missing
+          .map(({ botType, markLevel }) =>
+            markLevel === 2
+              ? `${MARK2_DISPLAY_NAMES[botType]} (M2)`
+              : `${labelForBotType(botType)} (M1)`
+          )
+          .join(', ');
         showBanner(
           `This preset needs ${names}, but you have none in your army. Build them in Digital Barracks, or use a preset that matches troops you already have.`,
         );
@@ -258,7 +290,6 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     setPresetApplyBusy(true);
     try {
       await onApplyPreset(preset.id, built);
-      refetchPresets().catch(() => {});
     } catch {
       // Parent handles alert; applies are serialized in BattlePreparationScreen.
     } finally {
@@ -274,7 +305,7 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     onApplyPreset,
     showBanner,
     refetchPresets,
-    effectiveBotCounts,
+    effectiveFullInventory,
   ]);
 
   if (!presetsData) return null;

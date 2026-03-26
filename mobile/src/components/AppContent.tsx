@@ -35,7 +35,7 @@ const AppContent = memo(() => {
   const showGlobalError = useAppSelector((state) => state.ui.modals.globalError);
   const globalErrorVariant = useAppSelector((state) => state.ui.modals.globalErrorVariant);
   const { token, isLoading, showHandleSelection, showEmailVerification, showEmailVerificationBanner, showAccountSwitched, showAccountSwitchedBanner, user } = useAppSelector((state) => state.auth);
-  
+  const activeBotBuildQueue = useAppSelector((state) => state.bots.buildQueue);
   const balanceDisplayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const turfScreenRef = useRef<any>(null);
   const previousTokenRef = useRef<string | null>(null);
@@ -79,7 +79,9 @@ const AppContent = memo(() => {
 
   const { data: buildStateData, isLoading: buildStateLoading } = useFetchBuildStateQuery(undefined, {
     skip: !token,
-    pollingInterval: 10000, // Poll every 10 seconds
+    // While a build is active, poll often so Redux stays near server; idle stays at 10s.
+    // Completion also triggers an explicit refetch from BuildSection when the timer hits zero.
+    pollingInterval: activeBotBuildQueue ? 2000 : 10000,
   });
 
   // Fetch fresh user profile data to get latest preferences

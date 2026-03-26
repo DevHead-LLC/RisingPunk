@@ -91,6 +91,7 @@ export const BattlePreparationScreen = React.memo(
   const token = useAppSelector((state) => state.auth.token);
   const userId = useAppSelector((state) => state.auth.user?._id);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
+  const botCountsM2 = useAppSelector((state) => state.bots.botCountsM2);
   const userBalance = useAppSelector((state) => state.balance.total ?? 0);
   const [assignToBattalion] = useAssignToBattalionMutation();
   const [assignPresetBattalions] = useAssignPresetBattalionsMutation();
@@ -108,6 +109,11 @@ export const BattlePreparationScreen = React.memo(
   
   // Get research features data (same as other components)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+  const mark2Unlocked =
+    hackAbilityFeatures?.some(
+      (f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked
+    ) ?? false;
   
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.features?.find(f => f.id === 'antivirus');
@@ -129,27 +135,30 @@ export const BattlePreparationScreen = React.memo(
     return ['A', 'B'];
   }, []);
 
-  // Calculate available bot counts by subtracting assigned quantities
-  const availableBots = useMemo(() => {
-    
-    const available = { ...botCounts };
-    
-    // Subtract assigned quantities from available pool
+  // Available Mark I / Mark II pools after other battalion assignments (same family can differ by mark).
+  const { availableM1, availableM2 } = useMemo(() => {
+    const m1: Record<BotType, number> = { ...botCounts };
+    const m2: Record<BotType, number> = { ...botCountsM2 };
+
     Object.values(assignments).forEach((assignment) => {
       if (assignment && assignment.quantity > 0) {
-        available[assignment.botType as BotType] -= assignment.quantity;
+        const bt = assignment.botType as BotType;
+        const ml = assignment.markLevel === 2 ? 2 : 1;
+        if (ml === 2) {
+          m2[bt] -= assignment.quantity;
+        } else {
+          m1[bt] -= assignment.quantity;
+        }
       }
     });
-    
-    // Ensure quantities don't go below 0
-    Object.keys(available).forEach((botType) => {
-      if (available[botType as BotType] < 0) {
-        available[botType as BotType] = 0;
-      }
+
+    (['breacher', 'guardian', 'phreak'] as BotType[]).forEach((bt) => {
+      if (m1[bt] < 0) m1[bt] = 0;
+      if (m2[bt] < 0) m2[bt] = 0;
     });
-    
-    return available;
-  }, [botCounts, assignments]);
+
+    return { availableM1: m1, availableM2: m2 };
+  }, [botCounts, botCountsM2, assignments]);
 
   useEffect(() => {
     Animated.sequence([
@@ -186,7 +195,8 @@ export const BattlePreparationScreen = React.memo(
   /** Cleared when assignments change outside a successful preset apply (manual assign / server resync) so re-tap re-applies. Bugbot: sig is preset-shaped only; it does not reflect manual edits. */
   const lastSuccessfulPresetSigRef = useRef<string | null>(null);
 
-  const handleBotAssignment = React.useCallback(async (data: { botType: BotType; quantity: number }) => {
+  const handleBotAssignment = React.useCallback(
+    async (data: { botType: BotType; quantity: number; markLevel: 1 | 2 }) => {
     if (!selectedBattalion) {
       return;
     }
@@ -196,6 +206,7 @@ export const BattlePreparationScreen = React.memo(
         botType: data.botType,
         quantity: data.quantity,
         battalionId: selectedBattalion,
+        markLevel: data.markLevel,
       }).unwrap();
 
       setAssignments(prev => {
@@ -204,7 +215,7 @@ export const BattlePreparationScreen = React.memo(
           [selectedBattalion]: {
             botType: data.botType,
             quantity: data.quantity,
-            markLevel: 1,
+            markLevel: data.markLevel,
           },
         };
         return newAssignments;
@@ -216,7 +227,9 @@ export const BattlePreparationScreen = React.memo(
       setSelectorVisible(false);
       throw error;
     }
-  }, [selectedBattalion, assignToBattalion]);
+  },
+    [selectedBattalion, assignToBattalion]
+  );
 
   const handleApplyPreset = React.useCallback(
     (presetId: string, presetAssignments: Record<string, BattalionAssignment>) => {
@@ -299,18 +312,19 @@ export const BattlePreparationScreen = React.memo(
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
-    const battalionData: Array<{type: BotType, quantity: number}> = [];
-    
-    // Convert assignments to battalion data format
-    Object.entries(assignments).forEach(([battalionId, assignment]) => {
+    const battalionData: Array<{ type: BotType; quantity: number; markLevel: 1 | 2 }> = [];
+
+    Object.entries(assignments).forEach(([, assignment]) => {
       if (assignment && assignment.quantity > 0) {
+        const ml: 1 | 2 = assignment.markLevel === 2 ? 2 : 1;
         battalionData.push({
           type: assignment.botType as BotType,
-          quantity: assignment.quantity
+          quantity: assignment.quantity,
+          markLevel: ml,
         });
       }
     });
-    
+
     return battalionData;
   }, []);
 
@@ -496,11 +510,13 @@ export const BattlePreparationScreen = React.memo(
       </View>
 
       <View style={[styles.mainContainer, isBattalionAHighlight && { zIndex: 1000, elevation: 1000 }]}>
-        <ScrollView 
-          horizontal 
-          pagingEnabled 
+        <ScrollView
+          horizontal
+          pagingEnabled
           showsHorizontalScrollIndicator={false}
           scrollEnabled={!isBattalionAHighlight}
+          style={styles.horizontalPager}
+          contentContainerStyle={styles.horizontalPagerContent}
         >
           {/* User Forces Screen */}
           <View style={styles.screen}>
@@ -509,69 +525,86 @@ export const BattlePreparationScreen = React.memo(
               <Text style={[styles.swipeArrow, { color: colors.text.accent }]}>⟶</Text>
               <Text style={[styles.swipeText, { color: colors.text.accent }]}>ENEMY FORCES</Text>
             </Animated.View>
-            <View style={[styles.battalionsContainer, isBattalionAHighlight && { zIndex: 1001, elevation: 1001 }]}>
-              {!isBattalionEUnlocked ? (
-                renderBattalionSlots(['E', 'F'], false, true)
-              ) : (
-                <View style={styles.battalionColumn}>
-                  <BattalionSlot
-                    name="E"
-                    isEnemy={false}
-                    isLocked={false}
-                    onPress={() => handleBattalionPress('E')}
-                    assignment={assignments['E']}
-                    isHighlighted={false}
-                    disabled={isBattalionAHighlight}
-                  />
-                  <BattalionSlot
-                    name="F"
-                    isEnemy={false}
-                    isLocked={!isBattalionFUnlocked}
-                    onPress={isBattalionFUnlocked ? () => handleBattalionPress('F') : undefined}
-                    assignment={isBattalionFUnlocked ? assignments['F'] : undefined}
-                    isHighlighted={false}
-                    disabled={isBattalionAHighlight}
-                  />
-                </View>
-              )}
-              {!isBattalionCUnlocked ? (
-                renderBattalionSlots(['C', 'D'], false, true)
-              ) : (
-                <View style={styles.battalionColumn}>
-                  <BattalionSlot
-                    name="C"
-                    isEnemy={false}
-                    isLocked={false}
-                    onPress={() => handleBattalionPress('C')}
-                    assignment={assignments['C']}
-                    isHighlighted={false}
-                    disabled={isBattalionAHighlight}
-                  />
-                  <BattalionSlot
-                    name="D"
-                    isEnemy={false}
-                    isLocked={!isBattalionDUnlocked}
-                    onPress={isBattalionDUnlocked ? () => handleBattalionPress('D') : undefined}
-                    assignment={isBattalionDUnlocked ? assignments['D'] : undefined}
-                    isHighlighted={false}
-                    disabled={isBattalionAHighlight}
-                  />
-                </View>
-              )}
-              {renderBattalionSlots(availableBattalions)}
-              {renderCircleSlots(3)}
-            </View>
+            <ScrollView
+              style={styles.battalionVerticalScroll}
+              contentContainerStyle={styles.battalionVerticalScrollContent}
+              scrollEnabled={!isBattalionAHighlight}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={[styles.battalionsContainer, isBattalionAHighlight && { zIndex: 1001, elevation: 1001 }]}>
+                {!isBattalionEUnlocked ? (
+                  renderBattalionSlots(['E', 'F'], false, true)
+                ) : (
+                  <View style={styles.battalionColumn}>
+                    <BattalionSlot
+                      name="E"
+                      isEnemy={false}
+                      isLocked={false}
+                      onPress={() => handleBattalionPress('E')}
+                      assignment={assignments['E']}
+                      isHighlighted={false}
+                      disabled={isBattalionAHighlight}
+                    />
+                    <BattalionSlot
+                      name="F"
+                      isEnemy={false}
+                      isLocked={!isBattalionFUnlocked}
+                      onPress={isBattalionFUnlocked ? () => handleBattalionPress('F') : undefined}
+                      assignment={isBattalionFUnlocked ? assignments['F'] : undefined}
+                      isHighlighted={false}
+                      disabled={isBattalionAHighlight}
+                    />
+                  </View>
+                )}
+                {!isBattalionCUnlocked ? (
+                  renderBattalionSlots(['C', 'D'], false, true)
+                ) : (
+                  <View style={styles.battalionColumn}>
+                    <BattalionSlot
+                      name="C"
+                      isEnemy={false}
+                      isLocked={false}
+                      onPress={() => handleBattalionPress('C')}
+                      assignment={assignments['C']}
+                      isHighlighted={false}
+                      disabled={isBattalionAHighlight}
+                    />
+                    <BattalionSlot
+                      name="D"
+                      isEnemy={false}
+                      isLocked={!isBattalionDUnlocked}
+                      onPress={isBattalionDUnlocked ? () => handleBattalionPress('D') : undefined}
+                      assignment={isBattalionDUnlocked ? assignments['D'] : undefined}
+                      isHighlighted={false}
+                      disabled={isBattalionAHighlight}
+                    />
+                  </View>
+                )}
+                {renderBattalionSlots(availableBattalions)}
+                {renderCircleSlots(3)}
+              </View>
+            </ScrollView>
           </View>
 
           {/* Enemy Forces Screen */}
           <View style={styles.screen}>
             <Text style={[styles.subtitleEnemy, { color: colors.error }]}>[ENEMY FORCES]</Text>
-            <View style={[styles.battalionsContainer, styles.battalionsContainerEnemy]}>
-              {renderCircleSlots(3, true)}
-              {renderBattalionSlots(['A', 'B'], true)}
-              {renderBattalionSlots(['C', 'D'], true, true)}
-              {renderBattalionSlots(['E', 'F'], true, true)}
-            </View>
+            <ScrollView
+              style={styles.battalionVerticalScroll}
+              contentContainerStyle={styles.battalionVerticalScrollContent}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={[styles.battalionsContainer, styles.battalionsContainerEnemy]}>
+                {renderCircleSlots(3, true)}
+                {renderBattalionSlots(['A', 'B'], true)}
+                {renderBattalionSlots(['C', 'D'], true, true)}
+                {renderBattalionSlots(['E', 'F'], true, true)}
+              </View>
+            </ScrollView>
           </View>
         </ScrollView>
       </View>
@@ -672,7 +705,9 @@ export const BattlePreparationScreen = React.memo(
         onClose={() => setSelectorVisible(false)}
         onSubmit={handleBotAssignment}
         battalionName={selectedBattalion || ''}
-        availableBots={availableBots}
+        availableM1={availableM1}
+        availableM2={availableM2}
+        mark2Unlocked={mark2Unlocked}
       />
 
       <ShieldCheckModal
@@ -700,10 +735,32 @@ const styles = StyleSheet.create({
     flex: 1,
     width: SCREEN_WIDTH,
   },
+  /** Horizontal USER ↔ ENEMY pager; flex so each page gets a bounded height for nested vertical scroll. */
+  horizontalPager: {
+    flex: 1,
+  },
+  horizontalPagerContent: {
+    flexGrow: 1,
+    alignItems: 'stretch',
+  },
   screen: {
     width: SCREEN_WIDTH,
+    flex: 1,
+    minHeight: 0,
     alignItems: 'center',
     paddingTop: SIZING.spacing.lg,
+  },
+  /** Phase 2: only battalion slots scroll vertically; presets + deploy stay outside. */
+  battalionVerticalScroll: {
+    flex: 1,
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  battalionVerticalScrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: SIZING.spacing.md,
   },
   title: {
     fontSize: 32,
