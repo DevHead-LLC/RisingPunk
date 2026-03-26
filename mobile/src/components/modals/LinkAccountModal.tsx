@@ -56,10 +56,12 @@ export const LinkAccountModal: React.FC<LinkAccountModalProps> = ({
 
     try {
       await linkAccount({ email: trimmedEmail, accessKey }).unwrap();
-      // Non-critical analytics: same Mongo user as guest — dedupes if guest already emitted account_created.
-      // Do not throw if _id is missing (edge-case state); link already succeeded — success UI must still run.
+      // Non-critical analytics: fire-and-forget so unexpected AsyncStorage/Firebase errors cannot hit the outer catch
+      // and show "Failed to link account" after the server already succeeded.
       if (user?._id) {
-        await logAccountCreatedOnce({ userId: user._id, method: 'guest_link' });
+        void logAccountCreatedOnce({ userId: user._id, method: 'guest_link' }).catch((err) => {
+          console.error('[Analytics] logAccountCreatedOnce after guest link (non-fatal):', err);
+        });
       } else {
         console.error('[Analytics] Link account succeeded but user id missing in state; skipping account_created');
       }
