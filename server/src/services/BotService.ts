@@ -1,5 +1,5 @@
 import { BotStatsService, EffectiveBotStats } from './BotStatsService';
-import { getInventoryKey } from '../utils/botInventoryKeys';
+import { getFamilyMarkStatsKey, getInventoryKey } from '../utils/botInventoryKeys';
 
 export interface BotConfig {
   role: string;
@@ -90,16 +90,30 @@ export class BotService {
     }
   }
 
-  static async getEnemyBotStats(botType: string, userLevel: number): Promise<BotConfig> {
+  /**
+   * NPC / non-player defenders: same growth rules as users, no programming bonuses.
+   * @param markLevel 1 = Mark I `bot_types` key; 2–4 = derived `breacherM2`…`breacherM4` curves.
+   */
+  static async getEnemyBotStats(
+    botType: string,
+    userLevel: number,
+    markLevel: number = 1
+  ): Promise<BotConfig> {
     try {
-      // For enemies, we can use the same base stats but potentially apply different modifiers
-      // For now, using the same calculation as user bots
-      const effectiveStats = BotStatsService.computeEffectiveBotStats(botType, userLevel);
-      const role = BotStatsService.getBotRole(botType);
-      
+      const family = botType as 'breacher' | 'guardian' | 'phreak';
+      const m = Math.min(4, Math.max(1, Math.floor(markLevel)));
+      let effectiveStats: EffectiveBotStats;
+      if (m === 1) {
+        effectiveStats = BotStatsService.computeEffectiveBotStats(botType, userLevel);
+      } else {
+        const statsKey = getFamilyMarkStatsKey(family, m);
+        effectiveStats = BotStatsService.computeEffectiveBotStatsForDerivedMark(family, statsKey, userLevel);
+      }
+      const roleKey = m === 1 ? botType : getFamilyMarkStatsKey(family, m);
+      const role = BotStatsService.getBotRole(roleKey);
       return {
         role,
-        stats: effectiveStats
+        stats: effectiveStats,
       };
     } catch (error) {
       console.error(`❌ BotService: Failed to get enemy bot stats for ${botType} at level ${userLevel}:`, error);

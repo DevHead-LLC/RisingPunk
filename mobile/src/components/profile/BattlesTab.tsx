@@ -328,10 +328,24 @@ export function BattlesTab(): React.JSX.Element {
     false;
   const choiceOptions = useMemo(() => buildAllChoices(mark2Unlocked), [mark2Unlocked]);
 
-  const [saveBattlePreset, { isLoading: isSaving }] = useSaveBattlePresetMutation();
+  /**
+   * Bugbot: `useSaveBattlePresetMutation` exposes shared `isLoading`; passing it to every PresetEditor would disable all
+   * SAVE buttons. We track `savingPresetIds` and pass `isSaving={!!savingPresetIds[preset.id]}` per editor.
+   */
+  const [savingPresetIds, setSavingPresetIds] = useState<Record<string, boolean>>({});
+  const [saveBattlePreset] = useSaveBattlePresetMutation();
   const handleSavePreset = useCallback(
     async (presetId: string, battalions: Record<string, PresetBattalionConfig>) => {
-      await saveBattlePreset({ presetId, battalions }).unwrap();
+      setSavingPresetIds((prev) => ({ ...prev, [presetId]: true }));
+      try {
+        await saveBattlePreset({ presetId, battalions }).unwrap();
+      } finally {
+        setSavingPresetIds((prev) => {
+          const next = { ...prev };
+          delete next[presetId];
+          return next;
+        });
+      }
     },
     [saveBattlePreset]
   );
@@ -373,7 +387,7 @@ export function BattlesTab(): React.JSX.Element {
             colors={colors}
             choiceOptions={choiceOptions}
             onSavePreset={handleSavePreset}
-            isSaving={isSaving}
+            isSaving={!!savingPresetIds[preset.id]}
           />
         ) : (
           <LockedPreset key={preset.id} preset={preset} colors={colors} />
@@ -490,6 +504,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: Platform.OS === 'android' ? 2 : 4,
+    fontSize: SIZING.font.small * 0.9,
     justifyContent: 'center',
   },
   saveButton: {
