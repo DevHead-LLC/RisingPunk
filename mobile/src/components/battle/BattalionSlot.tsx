@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { COLORS, SIZING } from '../../styles/theme';
-import { toRomanNumeral } from '../../utils/formatUtils';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { formatBattalionAssignmentLine } from '../../utils/botInventory';
 
 export type BattalionAssignment = {
   botType: string;
@@ -91,7 +91,7 @@ export const BattalionSlot = React.memo(({
       ) : (
         <View style={styles.assignmentInfo}>
           <Text style={styles.assignmentText}>
-            {assignment.botType.toUpperCase()} MK {toRomanNumeral(assignment.markLevel)}
+            {formatBattalionAssignmentLine(assignment.botType, assignment.markLevel)}
           </Text>
           <Text style={styles.assignmentText}>
             {assignment.quantity} ASSIGNED

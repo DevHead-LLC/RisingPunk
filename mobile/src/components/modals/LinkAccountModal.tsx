@@ -14,8 +14,9 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { sharedModalFormStyles } from '../../styles/modalFormStyles';
 import { useLinkAccountMutation } from '../../store/api/authApi';
-import { useAppDispatch } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { refreshUserData } from '../../store/slices/authSlice';
+import { logAccountCreatedOnce } from '../../services/analyticsService';
 
 interface LinkAccountModalProps {
   isVisible: boolean;
@@ -28,6 +29,7 @@ export const LinkAccountModal: React.FC<LinkAccountModalProps> = ({
 }) => {
   const colors = useThemeColors();
   const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
   const [email, setEmail] = useState('');
   const [accessKey, setAccessKey] = useState('');
   const [verifyAccessKey, setVerifyAccessKey] = useState('');
@@ -54,6 +56,15 @@ export const LinkAccountModal: React.FC<LinkAccountModalProps> = ({
 
     try {
       await linkAccount({ email: trimmedEmail, accessKey }).unwrap();
+      // Non-critical analytics: fire-and-forget so unexpected AsyncStorage/Firebase errors cannot hit the outer catch
+      // and show "Failed to link account" after the server already succeeded.
+      if (user?._id) {
+        void logAccountCreatedOnce({ userId: user._id, method: 'guest_link' }).catch((err) => {
+          console.error('[Analytics] logAccountCreatedOnce after guest link (non-fatal):', err);
+        });
+      } else {
+        console.error('[Analytics] Link account succeeded but user id missing in state; skipping account_created');
+      }
       Alert.alert('Account Linked', 'Your email and password have been set. You can now sign in from other devices.', [
         { text: 'OK', onPress: () => {
           dispatch(refreshUserData());
@@ -67,7 +78,7 @@ export const LinkAccountModal: React.FC<LinkAccountModalProps> = ({
       const msg = error?.data?.error ?? error?.message ?? 'Failed to link account';
       Alert.alert('Error', msg);
     }
-  }, [email, accessKey, verifyAccessKey, linkAccount, dispatch, onClose]);
+  }, [email, accessKey, verifyAccessKey, linkAccount, dispatch, onClose, user?._id]);
 
   const handleClose = useCallback(() => {
     setEmail('');

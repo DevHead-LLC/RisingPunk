@@ -4,6 +4,19 @@ import auth from '../middleware/auth';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
 import { getMaxBattalionSize, isBattalionSlotUnlocked } from '../utils/researchFeatureUtils';
+import {
+  normalizeBotsObject,
+  getInventoryKey,
+  buildCostPerUnit,
+  buildMillisecondsPerUnit,
+  BOT_FAMILY_TYPES,
+  getBuildQueueFamily,
+  parseBuildQueueFamily,
+} from '../utils/botInventoryKeys';
+import { BotStatsService } from '../services/BotStatsService';
+import { syncAndResolveUserBotProgrammingBonuses } from '../utils/syncUserBotProgrammingBonuses';
+import { roundEffectiveStatsToStatRow } from '../utils/botStatDisplayRounding';
+import { userHasMark2BotsUnlocked } from '../utils/userHasMark2BotsUnlocked';
 
 const router = express.Router();
 
@@ -20,7 +33,7 @@ router.post('/test', auth, async (req, res) => {
   try {
     const bot = await Bot.findOneAndUpdate(
       { userId: req.user._id },
-      { $setOnInsert: { bots: { breacher: 0, guardian: 0, phreak: 0 } } },
+      { $setOnInsert: { bots: normalizeBotsObject({}) } },
       { upsert: true, new: true }
     );
     res.json(bot);
@@ -35,15 +48,15 @@ router.get('/', auth, async (req, res) => {
   try {
     const bot = await Bot.findOne({ userId: req.user._id });
     if (!bot) {
-      res.json({ 
-        bots: { breacher: 0, guardian: 0, phreak: 0 },
-        battalionAssignments: []
+      res.json({
+        bots: normalizeBotsObject({}),
+        battalionAssignments: [],
       });
       return;
     }
-    res.json({ 
-      bots: bot.bots,
-      battalionAssignments: bot.battalionAssignments
+    res.json({
+      bots: normalizeBotsObject(bot.bots as Record<string, unknown>),
+      battalionAssignments: bot.battalionAssignments,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -55,17 +68,37 @@ router.get('/', auth, async (req, res) => {
 router.get('/stats', auth, async (req, res) => {
   try {
     const { BotService } = require('../services/BotService');
-    const user = await User.findById(req.user._id).select('level armyBonus guardianBonus phreakBonus');
-    const userLevel = user?.level || 1;
-    const armyBonus = user?.armyBonus;
-    const guardianBonus = user?.guardianBonus;
-    const phreakBonus = user?.phreakBonus;
+    const { userLevel, armyBonusForStats, guardianBonusForStats, phreakBonusForStats } =
+      await syncAndResolveUserBotProgrammingBonuses(req.user._id);
     const botStats: Record<string, any> = {};
-    for (const botType of ['guardian', 'breacher', 'phreak']) {
-      const config = await BotService.getUserBotStats(botType, userLevel, armyBonus, guardianBonus, phreakBonus);
-      botStats[botType] = config;
+    const botStatsM2: Record<string, any> = {};
+    for (const botType of BOT_FAMILY_TYPES) {
+      const config = await BotService.getUserBotStats(
+        botType,
+        userLevel,
+        armyBonusForStats,
+        guardianBonusForStats,
+        phreakBonusForStats,
+        1
+      );
+      botStats[botType] = { ...config, stats: roundEffectiveStatsToStatRow(config.stats) };
     }
-    res.json({ botStats });
+    for (const botType of BOT_FAMILY_TYPES) {
+      const statsKey = getInventoryKey(botType, 2);
+      if (!BotStatsService.hasBotTypeKey(statsKey)) {
+        continue;
+      }
+      const config = await BotService.getUserBotStats(
+        botType,
+        userLevel,
+        armyBonusForStats,
+        guardianBonusForStats,
+        phreakBonusForStats,
+        2
+      );
+      botStatsM2[botType] = { ...config, stats: roundEffectiveStatsToStatRow(config.stats) };
+    }
+    res.json({ botStats, botStatsM2 });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -80,9 +113,6 @@ interface StatRow {
   range: number;
 }
 
-const { computePacketBreachArmyBonus } = require('../config/packetBreachConfig');
-const { computeRaceConditionHeistGuardianBonus } = require('../config/raceConditionHeistConfig');
-const { computeBinaryBankCrackPhreakBonus } = require('../config/binaryBankCrackConfig');
 // Get bot stats breakdown for profile charts (base, +level, +programming, total)
 // Total row comes from BotService.getUserBotStats (same as /stats and battles) so one source of truth.
 // Range bot type (Phreaks): programming bonus from Binary Bank Crack (Attack/Health/Defense/Speed), same pattern as PB → Infantry (breacher), RCH → Cavalry (guardian).
@@ -91,53 +121,23 @@ router.get('/stats-breakdown', auth, async (req, res) => {
     const { BotService } = require('../services/BotService');
     const BotStatsService = require('../services/BotStatsService').BotStatsService;
     await BotStatsService.loadConfigs();
-    const user = await User.findById(req.user._id).select('level packetBreach raceConditionHeist binaryBankCrack armyBonus guardianBonus phreakBonus');
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-    const userLevel = user.level || 1;
-    const packetBreachLevels: string[] = Array.isArray(user.packetBreach?.levelsCompleted) ? user.packetBreach!.levelsCompleted : [];
-    const programmingFromLevels = computePacketBreachArmyBonus(packetBreachLevels);
-    const storedArmyBonus = user.armyBonus || { strength: 0, defense: 0, speed: 0, health: 0 };
-    const armyBonusMatches =
-      storedArmyBonus.strength === programmingFromLevels.strength &&
-      storedArmyBonus.defense === programmingFromLevels.defense &&
-      storedArmyBonus.speed === programmingFromLevels.speed &&
-      storedArmyBonus.health === programmingFromLevels.health;
-    if (!armyBonusMatches) {
-      await User.updateOne({ _id: user._id }, { $set: { armyBonus: programmingFromLevels } });
-    }
-    const armyBonusForStats = armyBonusMatches ? storedArmyBonus : programmingFromLevels;
-    const rchLevels: string[] = Array.isArray(user.raceConditionHeist?.levelsCompleted) ? user.raceConditionHeist!.levelsCompleted : [];
-    const programmingGuardianFromLevels = computeRaceConditionHeistGuardianBonus(rchLevels);
-    const storedGuardianBonus = user.guardianBonus || { strength: 0, defense: 0, speed: 0, health: 0 };
-    const guardianBonusMatches =
-      storedGuardianBonus.strength === programmingGuardianFromLevels.strength &&
-      storedGuardianBonus.defense === programmingGuardianFromLevels.defense &&
-      storedGuardianBonus.speed === programmingGuardianFromLevels.speed &&
-      storedGuardianBonus.health === programmingGuardianFromLevels.health;
-    if (!guardianBonusMatches) {
-      await User.updateOne({ _id: user._id }, { $set: { guardianBonus: programmingGuardianFromLevels } });
-    }
-    const guardianBonusForStats = guardianBonusMatches ? storedGuardianBonus : programmingGuardianFromLevels;
-    const bbcLevels: string[] = Array.isArray(user.binaryBankCrack?.levelsCompleted) ? user.binaryBankCrack!.levelsCompleted : [];
-    const programmingPhreakFromLevels = computeBinaryBankCrackPhreakBonus(bbcLevels);
-    const storedPhreakBonus = user.phreakBonus ?? { strength: 0, defense: 0, speed: 0, health: 0 };
-    const phreakBonusMatches =
-      storedPhreakBonus.strength === programmingPhreakFromLevels.strength &&
-      storedPhreakBonus.defense === programmingPhreakFromLevels.defense &&
-      storedPhreakBonus.speed === programmingPhreakFromLevels.speed &&
-      storedPhreakBonus.health === programmingPhreakFromLevels.health;
-    if (!phreakBonusMatches) {
-      await User.updateOne({ _id: user._id }, { $set: { phreakBonus: programmingPhreakFromLevels } });
-    }
-    const phreakBonusForStats = phreakBonusMatches ? storedPhreakBonus : programmingPhreakFromLevels;
+    const { userLevel, armyBonusForStats, guardianBonusForStats, phreakBonusForStats } =
+      await syncAndResolveUserBotProgrammingBonuses(req.user._id);
 
     const zeroRow = (): StatRow => ({ health: 0, offense: 0, defense: 0, speed: 0, range: 0 });
-    const breakdown: Record<string, { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow }> = {};
+    const breakdown: Record<
+      string,
+      {
+        base: StatRow;
+        levelBonus: StatRow;
+        programmingBonus: StatRow;
+        researchBonus: StatRow;
+        total: StatRow;
+        mark2: { base: StatRow; levelBonus: StatRow; total: StatRow };
+      }
+    > = {};
 
-    for (const botType of ['guardian', 'breacher', 'phreak']) {
+    for (const botType of BOT_FAMILY_TYPES) {
       const base = BotStatsService.getBaseStats(botType);
       const effective = BotStatsService.computeEffectiveBotStats(botType, userLevel);
       const levelBonus: StatRow = {
@@ -150,40 +150,67 @@ router.get('/stats-breakdown', auth, async (req, res) => {
       const programmingBonus: StatRow =
         botType === 'breacher'
           ? {
-              health: programmingFromLevels.health,
-              offense: programmingFromLevels.strength,
-              defense: programmingFromLevels.defense,
-              speed: programmingFromLevels.speed,
+              health: armyBonusForStats.health,
+              offense: armyBonusForStats.strength,
+              defense: armyBonusForStats.defense,
+              speed: armyBonusForStats.speed,
               range: 0,
             }
           : botType === 'guardian'
             ? {
-                health: programmingGuardianFromLevels.health,
-                offense: programmingGuardianFromLevels.strength,
-                defense: programmingGuardianFromLevels.defense,
-                speed: programmingGuardianFromLevels.speed,
+                health: guardianBonusForStats.health,
+                offense: guardianBonusForStats.strength,
+                defense: guardianBonusForStats.defense,
+                speed: guardianBonusForStats.speed,
                 range: 0,
               }
             : botType === 'phreak'
               ? {
-                  health: (phreakBonusForStats as any).health ?? 0,
-                  offense: (phreakBonusForStats as any).strength ?? 0,
-                  defense: (phreakBonusForStats as any).defense ?? 0,
-                  speed: (phreakBonusForStats as any).speed ?? 0,
-                  range: (phreakBonusForStats as any).range ?? 0,
+                  health: phreakBonusForStats.health ?? 0,
+                  offense: phreakBonusForStats.strength ?? 0,
+                  defense: phreakBonusForStats.defense ?? 0,
+                  speed: phreakBonusForStats.speed ?? 0,
+                  range: (phreakBonusForStats as { range?: number }).range ?? 0,
                 }
               : zeroRow();
       const researchBonus = zeroRow(); // Placeholder for future research bonuses
-      const finalConfig = await BotService.getUserBotStats(botType, userLevel, armyBonusForStats, guardianBonusForStats, phreakBonusForStats);
+      const finalConfig = await BotService.getUserBotStats(
+        botType,
+        userLevel,
+        armyBonusForStats,
+        guardianBonusForStats,
+        phreakBonusForStats,
+        1
+      );
       const s = finalConfig.stats;
-      const total: StatRow = {
-        health: Math.round(s.health * 100) / 100,
-        offense: Math.round(s.offense * 100) / 100,
-        defense: Math.round(s.defense * 1000) / 1000,
-        speed: Math.round(s.speed),
-        range: Math.round(s.range * 100) / 100,
+      const total: StatRow = roundEffectiveStatsToStatRow(s);
+
+      const m2Key = getInventoryKey(botType, 2);
+      const baseM2 = BotStatsService.getBaseStats(m2Key);
+      /** Same absolute +User Level deltas as Mark I — not recomputed on the Mark II base. */
+      const levelBonusM2: StatRow = { ...levelBonus };
+      const finalM2 = await BotService.getUserBotStats(
+        botType,
+        userLevel,
+        armyBonusForStats,
+        guardianBonusForStats,
+        phreakBonusForStats,
+        2
+      );
+      const totalM2 = roundEffectiveStatsToStatRow(finalM2.stats);
+
+      breakdown[botType] = {
+        base,
+        levelBonus,
+        programmingBonus,
+        researchBonus,
+        total,
+        mark2: {
+          base: baseM2,
+          levelBonus: levelBonusM2,
+          total: totalM2,
+        },
       };
-      breakdown[botType] = { base, levelBonus, programmingBonus, researchBonus, total };
     }
 
     res.json({ userLevel, breakdown });
@@ -195,10 +222,41 @@ router.get('/stats-breakdown', auth, async (req, res) => {
 // Start bot build
 router.post('/build', auth, async (req, res) => {
   try {
-    const { type, quantity, totalCost } = req.body;
-    
-    if (!type || quantity <= 0) {
+    const { type, quantity: rawQty, totalCost: rawTotalCost, markLevel: rawMark } = req.body;
+    const markLevel = rawMark === 2 || rawMark === '2' ? 2 : 1;
+
+    const qty = Number.parseInt(String(rawQty ?? ''), 10);
+    if (!['breacher', 'guardian', 'phreak'].includes(String(type)) || !Number.isInteger(qty) || qty < 1) {
       res.status(400).json({ error: 'Invalid build parameters' });
+      return;
+    }
+
+    if (markLevel === 2) {
+      const unlocked = await userHasMark2BotsUnlocked(req.user._id);
+      if (!unlocked) {
+        res.status(403).json({
+          error: 'Complete Mark 2 Bots research in Hack Ability to build Mark II units.',
+        });
+        return;
+      }
+    }
+
+    const costPerUnit = buildCostPerUnit(markLevel);
+    const expectedTotalCost = qty * costPerUnit;
+    const declaredTotal =
+      rawTotalCost === undefined || rawTotalCost === null || rawTotalCost === ''
+        ? expectedTotalCost
+        : Number(rawTotalCost);
+    if (!Number.isFinite(declaredTotal) || declaredTotal !== expectedTotalCost) {
+      res.status(400).json({
+        error: `Total cost must be $${expectedTotalCost} for this build (${qty} × $${costPerUnit}).`,
+      });
+      return;
+    }
+
+    let bot = await Bot.findOne({ userId: req.user._id });
+    if (bot?.buildQueue) {
+      res.status(400).json({ error: 'A build is already in progress' });
       return;
     }
 
@@ -208,43 +266,39 @@ router.post('/build', auth, async (req, res) => {
       return;
     }
 
-    if (user.balance.total < totalCost) {
+    if (user.balance.total < expectedTotalCost) {
       res.status(400).json({ error: 'Insufficient balance' });
       return;
     }
 
-    // Deduct balance FIRST to ensure we have sufficient funds
-    user.balance.total -= totalCost;
+    user.balance.total -= expectedTotalCost;
     await user.save();
 
-    const buildTimePerUnit = 1000;
-    const totalBuildTime = quantity * buildTimePerUnit;
+    const msPerUnit = buildMillisecondsPerUnit(markLevel);
+    const totalBuildTime = qty * msPerUnit;
     const startedAt = new Date().toISOString();
     const completesAt = new Date(Date.now() + totalBuildTime).toISOString();
 
-    let bot = await Bot.findOne({ userId: req.user._id });
-    
     if (!bot) {
       bot = new Bot({
         userId: req.user._id,
-        bots: { breacher: 0, guardian: 0, phreak: 0 }
+        bots: normalizeBotsObject({}),
       });
     }
 
     bot.buildQueue = {
-      type,
-      quantity,
-      totalCost,
+      botType: type,
+      quantity: qty,
+      totalCost: expectedTotalCost,
       startedAt,
       completesAt,
-      botsBuilt: 0
+      botsBuilt: 0,
+      markLevel,
     };
 
-    // Save build queue AFTER successful balance deduction
     await bot.save();
 
-    res.json({ buildQueue: bot.buildQueue, bots: bot.bots });
-
+    res.json({ buildQueue: bot.buildQueue, bots: normalizeBotsObject(bot.bots as Record<string, unknown>) });
   } catch (error: any) {
     console.error('Build error:', error);
     res.status(500).json({ error: error.message });
@@ -261,11 +315,11 @@ router.post('/test-build-queue', auth, async (req, res) => {
 
     // Set up a test build queue
     bot.buildQueue = {
-      type: 'breacher',
+      botType: 'breacher',
       quantity: 5,
       startedAt: new Date(),
       completesAt: new Date(Date.now() + (5 * 1000)), // 5 seconds total
-      botsBuilt: 0
+      botsBuilt: 0,
     };
 
     await bot.save();
@@ -282,9 +336,26 @@ router.get('/build-state', auth, async (req, res) => {
     const bot = await Bot.findOne({ userId: req.user._id });
     
     if (!bot?.buildQueue) {
-      res.json({ 
+      res.json({
         buildQueue: null,
-        bots: bot?.bots || { breacher: 0, guardian: 0, phreak: 0 }
+        bots: normalizeBotsObject(bot?.bots as Record<string, unknown>),
+      });
+      return;
+    }
+
+    if (!parseBuildQueueFamily(bot.buildQueue as { botType?: string; type?: string })) {
+      console.warn('[bots/build-state] Clearing buildQueue with missing family (botType/type)', {
+        userId: String(req.user._id),
+        snapshot:
+          typeof (bot.buildQueue as { toObject?: () => object }).toObject === 'function'
+            ? (bot.buildQueue as { toObject: () => object }).toObject()
+            : bot.buildQueue,
+      });
+      bot.buildQueue = null;
+      await bot.save();
+      res.json({
+        buildQueue: null,
+        bots: normalizeBotsObject(bot.bots as Record<string, unknown>),
       });
       return;
     }
@@ -296,12 +367,16 @@ router.get('/build-state', auth, async (req, res) => {
     const elapsedTime = now.getTime() - startedAt.getTime();
     const progress = Math.min((elapsedTime / totalTime) * 100, 100);
 
+    const queueMarkLevel = (bot.buildQueue as { markLevel?: number }).markLevel ?? 1;
+    const invKey = getInventoryKey(getBuildQueueFamily(bot.buildQueue as any), queueMarkLevel);
+
     // Calculate how many bots should be built based on progress
     const expectedBotsBuilt = Math.floor((progress / 100) * bot.buildQueue.quantity);
-    
+
     // Update botsBuilt if needed and save to database
     if (expectedBotsBuilt > bot.buildQueue.botsBuilt) {
-      bot.bots[bot.buildQueue.type] += (expectedBotsBuilt - bot.buildQueue.botsBuilt);
+      const prev = (bot.bots as Record<string, number>)[invKey] ?? 0;
+      (bot.bots as Record<string, number>)[invKey] = prev + (expectedBotsBuilt - bot.buildQueue.botsBuilt);
       bot.buildQueue.botsBuilt = expectedBotsBuilt;
       await bot.save();
     }
@@ -324,13 +399,16 @@ router.get('/build-state', auth, async (req, res) => {
           }
           
           // Use values from botInTransaction (not stale bot object) to ensure correctness
-          const finalTypeInTransaction = botInTransaction.buildQueue.type;
+          const finalTypeInTransaction = getBuildQueueFamily(botInTransaction.buildQueue as any);
           const fullQuantityBuilt = botInTransaction.buildQueue.quantity;
           const remainingBotsInTransaction = botInTransaction.buildQueue.quantity - botInTransaction.buildQueue.botsBuilt;
-          
+          const txMarkLevel = (botInTransaction.buildQueue as { markLevel?: number }).markLevel ?? 1;
+          const txInvKey = getInventoryKey(finalTypeInTransaction, txMarkLevel);
+
           // Add remaining bots to inventory (if any)
           if (remainingBotsInTransaction > 0) {
-            botInTransaction.bots[finalTypeInTransaction] += remainingBotsInTransaction;
+            const botsMap = botInTransaction.bots as Record<string, number>;
+            botsMap[txInvKey] = (botsMap[txInvKey] ?? 0) + remainingBotsInTransaction;
           }
           
           // Increment user counters with FULL quantity built (not just remaining)
@@ -369,21 +447,24 @@ router.get('/build-state', auth, async (req, res) => {
       const updatedBot = await Bot.findOne({ userId: req.user._id });
       res.json({
         buildQueue: null,
-        bots: updatedBot?.bots || bot.bots
+        bots: normalizeBotsObject((updatedBot?.bots ?? bot.bots) as Record<string, unknown>),
       });
       return;
     }
 
     // Return current state with all buildQueue properties
+    const family = getBuildQueueFamily(bot.buildQueue as any);
     res.json({
       buildQueue: {
         ...bot.buildQueue.toObject(),
         progress,
-        type: bot.buildQueue.type,
-        totalCost: bot.buildQueue.totalCost,  // Explicitly include totalCost
-        botsBuilt: bot.buildQueue.botsBuilt  // Include botsBuilt
+        type: family,
+        botType: family,
+        totalCost: bot.buildQueue.totalCost, // Explicitly include totalCost
+        botsBuilt: bot.buildQueue.botsBuilt, // Include botsBuilt
+        markLevel: (bot.buildQueue as { markLevel?: number }).markLevel ?? 1,
       },
-      bots: bot.bots
+      bots: normalizeBotsObject(bot.bots as Record<string, unknown>),
     });
   } catch (error: any) {
     console.error('Build state check error:', error);
@@ -403,6 +484,18 @@ router.post('/speedup-build', auth, async (req, res) => {
     const bot = await Bot.findOne({ userId: req.user._id });
     if (!bot || !bot.buildQueue) {
       res.status(400).json({ error: 'No active build found' });
+      return;
+    }
+
+    if (!parseBuildQueueFamily(bot.buildQueue as { botType?: string; type?: string })) {
+      console.warn('[bots/speedup-build] Clearing buildQueue with missing family (botType/type)', {
+        userId: String(req.user._id),
+      });
+      bot.buildQueue = null;
+      await bot.save();
+      res.status(400).json({
+        error: 'Build data was invalid and has been cleared. Start a new build.',
+      });
       return;
     }
 
@@ -443,16 +536,18 @@ router.post('/speedup-build', auth, async (req, res) => {
 
         // Calculate remaining bots to add to inventory
         const remainingBotsToAdd = botInTransaction.buildQueue.quantity - (botInTransaction.buildQueue.botsBuilt || 0);
-        
-        // Add remaining bots to inventory
-        botInTransaction.bots[botInTransaction.buildQueue.type] += remainingBotsToAdd;
+
+        const spMarkLevel = (botInTransaction.buildQueue as { markLevel?: number }).markLevel ?? 1;
+        const spInvKey = getInventoryKey(getBuildQueueFamily(botInTransaction.buildQueue as any), spMarkLevel);
+        const spBotsMap = botInTransaction.bots as Record<string, number>;
+        spBotsMap[spInvKey] = (spBotsMap[spInvKey] ?? 0) + remainingBotsToAdd;
         
         // Increment lifetime bot build counters (capped at 1,000,000)
         // When speedup is used, we count the FULL quantity built, not just remaining
         // This ensures all bots are counted even if some were already built naturally
         const fullQuantityBuilt = botInTransaction.buildQueue.quantity;
         if (fullQuantityBuilt > 0) {
-          const botType = botInTransaction.buildQueue.type;
+          const botType = getBuildQueueFamily(botInTransaction.buildQueue as any);
           const updateField = botType === 'guardian' ? 'totalGuardiansBuilt' : 
                              botType === 'phreak' ? 'totalPhreaksBuilt' : 'totalBreachersBuilt';
           
@@ -519,7 +614,7 @@ router.post('/speedup-build', auth, async (req, res) => {
       success: true,
       message: 'Bot build completed successfully',
       newBalance: updatedUser.balance.total,
-      bots: updatedBot.bots
+      bots: normalizeBotsObject(updatedBot.bots as Record<string, unknown>),
     });
   } catch (error: any) {
     console.error('Error speeding up bot build:', error);
@@ -621,10 +716,19 @@ router.post('/assign-preset', auth, async (req, res) => {
         }
       }
 
-      const markLevel =
-        typeof (entry as any).markLevel === 'number' && Number.isInteger((entry as any).markLevel) && (entry as any).markLevel > 0
-          ? (entry as any).markLevel
-          : 1;
+      const rawMark = (entry as any).markLevel;
+      const markLevel: number =
+        typeof rawMark === 'number' && Number.isInteger(rawMark) && rawMark >= 2 ? 2 : 1;
+
+      if (markLevel >= 2) {
+        const unlocked = await userHasMark2BotsUnlocked(req.user._id);
+        if (!unlocked) {
+          res.status(403).json({
+            error: 'Complete Mark 2 Bots research in Hack Ability to assign Mark II units.',
+          });
+          return;
+        }
+      }
 
       if (quantity > 0) {
         normalized.push({ battalionId, botType, quantity, markLevel });
@@ -640,7 +744,7 @@ router.post('/assign-preset', auth, async (req, res) => {
         if (!bot) {
           const newBot = new Bot({
             userId: req.user._id,
-            bots: { breacher: 0, guardian: 0, phreak: 0 },
+            bots: normalizeBotsObject({}),
             battalionAssignments: [],
           });
           await newBot.save();
@@ -649,15 +753,18 @@ router.post('/assign-preset', auth, async (req, res) => {
           continue;
         }
 
-        const sumByType: Record<string, number> = { breacher: 0, guardian: 0, phreak: 0 };
+        const sumByInv: Record<string, number> = {};
         for (const a of normalized) {
-          sumByType[a.botType] = (sumByType[a.botType] || 0) + a.quantity;
+          const key = getInventoryKey(a.botType, a.markLevel);
+          sumByInv[key] = (sumByInv[key] || 0) + a.quantity;
         }
 
         // Bugbot: compare to total bot.bots (not “available after other battalions”) — preset replaces battalionAssignments atomically, so prior deployments are cleared in the same write. Concurrent bot.bots / assignment changes on this doc bump __v; findOneAndUpdate below retries.
-        for (const t of PRESET_VALID_BOT_TYPES) {
-          const owned = bot.bots[t] || 0;
-          if (sumByType[t] > owned) {
+        const botsMapPreset = bot.bots as Record<string, number>;
+        for (const key of Object.keys(sumByInv)) {
+          const need = sumByInv[key] || 0;
+          const owned = botsMapPreset[key] ?? 0;
+          if (need > owned) {
             res.status(400).json({ error: 'Insufficient Bots Available' });
             return;
           }
@@ -690,7 +797,7 @@ router.post('/assign-preset', auth, async (req, res) => {
 
         res.json({
           success: true,
-          bots: updatedBot.bots,
+          bots: normalizeBotsObject(updatedBot.bots as Record<string, unknown>),
           battalionAssignments: updatedBot.battalionAssignments,
         });
         return;
@@ -715,8 +822,24 @@ router.post('/assign-preset', auth, async (req, res) => {
 router.post('/assign', auth, async (req, res) => {
   try {
     const userId = req.user._id.toString();
-    const { botType, quantity, battalionId } = req.body;
-    
+    const { botType, quantity, battalionId, markLevel: rawMark } = req.body;
+    const markLevel = rawMark === 2 || rawMark === '2' ? 2 : 1;
+
+    if (!botType || !['breacher', 'guardian', 'phreak'].includes(String(botType))) {
+      res.status(400).json({ error: 'Invalid bot type' });
+      return;
+    }
+
+    if (markLevel === 2) {
+      const unlocked = await userHasMark2BotsUnlocked(req.user._id);
+      if (!unlocked) {
+        res.status(403).json({
+          error: 'Complete Mark 2 Bots research in Hack Ability to assign Mark II units.',
+        });
+        return;
+      }
+    }
+
     if (!battalionId || typeof battalionId !== 'string' || !/^[A-Z]$/.test(battalionId)) {
       res.status(400).json({ error: 'Battalion ID must be a single uppercase letter (A-Z)' });
       return;
@@ -782,8 +905,8 @@ router.post('/assign', auth, async (req, res) => {
           // Create new bot if none exists
           const newBot = new Bot({
             userId: req.user._id,
-            bots: { breacher: 0, guardian: 0, phreak: 0 },
-            battalionAssignments: []
+            bots: normalizeBotsObject({}),
+            battalionAssignments: [],
           });
           await newBot.save();
           retryCount++;
@@ -791,6 +914,7 @@ router.post('/assign', auth, async (req, res) => {
           continue; // Retry with the new bot
         }
 
+        const invKey = getInventoryKey(String(botType), markLevel);
 
         // Find existing assignment for this battalion
         const existingAssignment = bot.battalionAssignments.find(
@@ -803,49 +927,40 @@ router.post('/assign', auth, async (req, res) => {
           (assignment: { battalionId: string }) => assignment.battalionId !== battalionId
         );
 
-        // Calculate truly available (unassigned) bots for the new type
-        const totalBotsOfType = bot.bots[botType] || 0;
-        
-        // Calculate how many bots of this type are already assigned to other battalions
+        const botsMap = bot.bots as Record<string, number>;
+        const totalBotsOfType = botsMap[invKey] || 0;
+
         const otherAssignments = newAssignments.filter(
-          (assignment: any) => assignment.botType === botType
+          (assignment: any) =>
+            assignment.botType === botType && (assignment.markLevel ?? 1) === markLevel
         );
         const alreadyAssignedToOtherBattalions = otherAssignments.reduce(
-          (sum: number, assignment: any) => sum + assignment.quantity, 0
+          (sum: number, assignment: any) => sum + assignment.quantity,
+          0
         );
-        
-        // Calculate truly available bots (total - already assigned to other battalions)
+
         let trulyAvailableBots = totalBotsOfType - alreadyAssignedToOtherBattalions;
-        
-        // Handle existing assignment logic
+
         if (existingAssignment) {
-          if (existingAssignment.botType === botType) {
-            // Same bot type: add back the existing assignment quantity to available pool
+          const sameFamilyAndMark =
+            existingAssignment.botType === botType &&
+            (existingAssignment.markLevel ?? 1) === markLevel;
+          if (sameFamilyAndMark) {
             trulyAvailableBots += existingAssignment.quantity;
-          } else {
-            // Different bot type: the bots are already "returned" to their original type
-            // because we filtered out the existing assignment, so they're no longer assigned
-            // and are available in their original type's inventory
           }
         }
-        
 
-        // Verify sufficient truly available bots
         if (trulyAvailableBots < quantity) {
           res.status(400).json({ error: 'Insufficient Bots Available' });
           return;
         }
 
-        // CRITICAL: Do NOT modify total bot inventory - it should remain constant
-        // The assignment system works by tracking assignments, not by modifying inventory
-
-        // Add new assignment if quantity > 0
         if (quantity > 0) {
           newAssignments.push({
             battalionId,
             botType,
             quantity,
-            markLevel: 1
+            markLevel,
           });
         }
 
@@ -876,17 +991,21 @@ router.post('/assign', auth, async (req, res) => {
         }
 
 
-        // Calculate final available count for response
-        const finalAvailableCount = (updatedBot.bots[botType] || 0) - 
+        const ub = updatedBot.bots as Record<string, number>;
+        const finalAvailableCount =
+          (ub[invKey] || 0) -
           updatedBot.battalionAssignments
-            .filter((assignment: any) => assignment.botType === botType)
+            .filter(
+              (assignment: any) =>
+                assignment.botType === botType && (assignment.markLevel ?? 1) === markLevel
+            )
             .reduce((sum: number, assignment: any) => sum + assignment.quantity, 0);
 
-        res.json({ 
+        res.json({
           success: true,
           availableBotCount: finalAvailableCount,
-          totalBotCount: updatedBot.bots[botType],
-          previousAssignment: existingAssignment || null
+          totalBotCount: ub[invKey] || 0,
+          previousAssignment: existingAssignment || null,
         });
         return; // Success - exit retry loop
 
