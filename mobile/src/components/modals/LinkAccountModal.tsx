@@ -56,11 +56,13 @@ export const LinkAccountModal: React.FC<LinkAccountModalProps> = ({
 
     try {
       await linkAccount({ email: trimmedEmail, accessKey }).unwrap();
-      // Same Mongo user as guest — logAccountCreatedOnce dedupes if guest already emitted account_created.
-      if (!user?._id) {
-        throw new Error('Link account succeeded but user id is missing');
+      // Non-critical analytics: same Mongo user as guest — dedupes if guest already emitted account_created.
+      // Do not throw if _id is missing (edge-case state); link already succeeded — success UI must still run.
+      if (user?._id) {
+        await logAccountCreatedOnce({ userId: user._id, method: 'guest_link' });
+      } else {
+        console.error('[Analytics] Link account succeeded but user id missing in state; skipping account_created');
       }
-      await logAccountCreatedOnce({ userId: user._id, method: 'guest_link' });
       Alert.alert('Account Linked', 'Your email and password have been set. You can now sign in from other devices.', [
         { text: 'OK', onPress: () => {
           dispatch(refreshUserData());

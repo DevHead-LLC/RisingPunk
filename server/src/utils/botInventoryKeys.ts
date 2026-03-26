@@ -33,6 +33,18 @@ export function parseInventoryKeyToFamilyAndMark(
   return null;
 }
 
+/**
+ * Stat key for `BotStatsService` (Mark I family key or `breacherM2`…`breacherM4` derived keys).
+ * Used for NPC/enemy battalions at any supported mark.
+ */
+export function getFamilyMarkStatsKey(family: BotFamily, markLevel: number): string {
+  const m = Math.min(4, Math.max(1, Math.floor(markLevel)));
+  if (m === 1) {
+    return family;
+  }
+  return `${family}M${m}`;
+}
+
 export function getInventoryKey(botType: string, markLevel: number): BotInventoryKey {
   const ml = markLevel >= 2 ? 2 : 1;
   if (ml === 2) {

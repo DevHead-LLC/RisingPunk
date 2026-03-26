@@ -17,6 +17,7 @@ import mongoose from 'mongoose';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 import { syncAndResolveUserBotProgrammingBonuses } from '../utils/syncUserBotProgrammingBonuses';
 import { parseInventoryKeyToFamilyAndMark } from '../utils/botInventoryKeys';
+import { normalizeNpcBattalionMarkLevel } from '../utils/npcMarkMixConfig';
 
 export class BattleSetupService {
 
@@ -182,7 +183,8 @@ export class BattleSetupService {
       const npcLevel = npc.userLevelAssociation || 1;
       for (const battalion of npc.battalions) {
         const validatedType = BattalionService.validateEnemyBotType(battalion.type);
-        const botConfig = await BotService.getEnemyBotStats(validatedType, npcLevel);
+        const ml = normalizeNpcBattalionMarkLevel(battalion.markLevel);
+        const botConfig = await BotService.getEnemyBotStats(validatedType, npcLevel, ml);
         enemyTotal += botConfig.stats.health * battalion.quantity;
       }
     } else {
