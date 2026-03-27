@@ -344,13 +344,6 @@ router.get('/build-state', auth, async (req, res) => {
     }
 
     if (!parseBuildQueueFamily(bot.buildQueue as { botType?: string; type?: string })) {
-      console.warn('[bots/build-state] Clearing buildQueue with missing family (botType/type)', {
-        userId: String(req.user._id),
-        snapshot:
-          typeof (bot.buildQueue as { toObject?: () => object }).toObject === 'function'
-            ? (bot.buildQueue as { toObject: () => object }).toObject()
-            : bot.buildQueue,
-      });
       bot.buildQueue = null;
       await bot.save();
       res.json({
@@ -488,9 +481,6 @@ router.post('/speedup-build', auth, async (req, res) => {
     }
 
     if (!parseBuildQueueFamily(bot.buildQueue as { botType?: string; type?: string })) {
-      console.warn('[bots/speedup-build] Clearing buildQueue with missing family (botType/type)', {
-        userId: String(req.user._id),
-      });
       bot.buildQueue = null;
       await bot.save();
       res.status(400).json({
