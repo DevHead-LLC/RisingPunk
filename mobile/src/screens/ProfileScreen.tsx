@@ -908,7 +908,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   });
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !token });
   const mark2BotsResearchUnlocked =
-    hackAbilityFeatures?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    hackAbilityFeatures?.features?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
     false;
   const { data: researchCenterData, isLoading: researchCenterLoading } = useGetResearchCenterStatusQuery(undefined, {
     skip: !token,

@@ -86,7 +86,7 @@ export const botsApi = createApi({
             programmingBonus: StatRow;
             researchBonus: StatRow;
             total: StatRow;
-            mark2: { base: StatRow; levelBonus: StatRow; total: StatRow };
+            mark2?: { base: StatRow; levelBonus: StatRow; total: StatRow };
           }
         >;
       },

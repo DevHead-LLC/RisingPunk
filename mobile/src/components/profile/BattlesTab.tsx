@@ -324,7 +324,7 @@ export function BattlesTab(): React.JSX.Element {
   const token = useAppSelector((state) => state.auth.token);
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !token });
   const mark2Unlocked =
-    hackAbilityFeatures?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    hackAbilityFeatures?.features?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
     false;
   const choiceOptions = useMemo(() => buildAllChoices(mark2Unlocked), [mark2Unlocked]);
 

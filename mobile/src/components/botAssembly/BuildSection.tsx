@@ -14,7 +14,7 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { useSpeedupBotBuildMutation, useFetchBuildStateQuery } from '../../store/api/botsApi';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
-import { setBots, setBuildState } from '../../store/slices/botsSlice';
+import { setBuildState } from '../../store/slices/botsSlice';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
 type BuildSectionProps = {
   selectedType: BotType | null;
@@ -151,7 +151,6 @@ export const BuildSection = React.memo(function BuildSection({
         
         // Update bot counts and clear build state
         if (result.bots) {
-          dispatch(setBots(result.bots));
           dispatch(setBuildState({ buildQueue: null, bots: result.bots }));
         }
         

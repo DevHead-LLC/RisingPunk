@@ -111,7 +111,7 @@ export const BattlePreparationScreen = React.memo(
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
   const mark2Unlocked =
-    hackAbilityFeatures?.some(
+    hackAbilityFeatures?.features?.some(
       (f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked
     ) ?? false;
   

@@ -91,7 +91,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
   });
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !token });
   const mark2ResearchUnlocked =
-    hackAbilityFeatures?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    hackAbilityFeatures?.features?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
     false;
   const colors = useThemeColors();
   const { themeMode } = useTheme();

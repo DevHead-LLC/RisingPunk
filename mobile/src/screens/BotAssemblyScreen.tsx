@@ -34,7 +34,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const [startBuild] = useStartBuildMutation();
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
   const mark2ResearchUnlocked =
-    hackAbilityFeatures?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    hackAbilityFeatures?.features?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
     false;
   const { isSmallDevice } = useResponsiveDimensions();
   const colors = useThemeColors();
