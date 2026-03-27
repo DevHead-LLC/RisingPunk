@@ -30,7 +30,7 @@ function getUnlockTimeInPrefetch(prefetch: BonusPrefetch, categoryId: string, fe
   return doc?.isUnlocked && doc.unlockedAt ? doc.unlockedAt : null;
 }
 
-/** Cash-flow feature IDs that add to base income rate (spec 18). Bugbot: no legacy IDs in DB — only reduce-expenses is legacy (TAX_REDUCTION_FEATURES). Grandfather migration for increase-income-rate intentionally grants 01+02+025 ($0.055/sec), slightly more than old $0.05/sec. */
+/** Cash-flow feature IDs that add to base income rate (spec 18). Bugbot: no legacy IDs in DB — legacy financial/reduce-expenses is handled only in getTaxReductionBonus. Grandfather migration for increase-income-rate intentionally grants 01+02+025 ($0.055/sec), slightly more than old $0.05/sec. */
 const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-01', value: 0.01 },
   { featureId: 'increase-income-02', value: 0.02 },
@@ -52,15 +52,27 @@ const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-insurance-03', value: 0.02 }
 ];
 
-/** Tax reduction: current spec (cash-flow) and legacy (financial/reduce-expenses). Check correct category per feature. Bugbot: new starts of financial/reduce-expenses are blocked in ResearchFeatureService to prevent cheap tax-reduction bypass. */
-const TAX_REDUCTION_FEATURES: { featureId: string; value: number; categoryId: string }[] = [
-  { featureId: 'reduce-tax-expense-02', value: 0.02, categoryId: 'cash-flow' },
-  { featureId: 'reduce-expenses', value: 0.02, categoryId: 'financial' }
+/** Cash-flow tax tiers stack (spec 18). Legacy financial/reduce-expenses applies only when no cash-flow tax tier is unlocked. */
+const CASH_FLOW_TAX_REDUCTION_STACK: { featureId: string; value: number }[] = [
+  { featureId: 'reduce-tax-expense-02', value: 0.02 },
+  { featureId: 'reduce-tax-expense-03', value: 0.03 }
 ];
 
 /** Cash-flow feature IDs that reduce rent/mortgage expense. No legacy. */
 const RENT_MORTGAGE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
-  { featureId: 'reduce-rent-mortgage-05', value: 0.05 }
+  { featureId: 'reduce-rent-mortgage-05', value: 0.05 },
+  { featureId: 'reduce-rent-mortgage-10', value: 0.1 }
+];
+
+/** Cash-flow utilities expense reduction (spec 18). */
+const UTILITIES_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+  { featureId: 'reduce-utilities-05', value: 0.05 }
+];
+
+/** Cash-flow misc/entertainment expense reduction (spec 18). */
+const MISC_ENTERTAINMENT_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+  { featureId: 'reduce-misc-entertainment-10', value: 0.1 },
+  { featureId: 'reduce-misc-entertainment-15', value: 0.15 }
 ];
 
 /** Rental profit per room features (spec 18). All tiers in investments. Bugbot: no legacy IDs (e.g. rental-profit-increase) — never used in this project. */
@@ -132,7 +144,7 @@ export async function getRentMortgageReductionBonus(userId: string, prefetch?: B
 
 /**
  * Total tax expense reduction from unlocked tax features (spec 18 + legacy).
- * reduce-tax-expense-02 is cash-flow; legacy reduce-expenses is financial. Only one applies; both grant $0.02.
+ * Cash-flow tiers (reduce-tax-expense-02, -03, …) stack. Legacy financial/reduce-expenses grants $0.02 only when no cash-flow tax tier is unlocked.
  * Pass prefetch to avoid N+1 queries (Bugbot).
  */
 export async function getTaxReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
@@ -140,11 +152,37 @@ export async function getTaxReductionBonus(userId: string, prefetch?: BonusPrefe
     ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
     : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
   let total = 0;
-  for (const { featureId, value, categoryId } of TAX_REDUCTION_FEATURES) {
-    if (await check(categoryId, featureId)) {
-      total += value;
-      break; // Only one tax reduction feature (current or legacy) per user
-    }
+  for (const { featureId, value } of CASH_FLOW_TAX_REDUCTION_STACK) {
+    if (await check('cash-flow', featureId)) total += value;
+  }
+  if (total === 0 && (await check('financial', 'reduce-expenses'))) total = 0.02;
+  return total;
+}
+
+/**
+ * Total utilities expense reduction from unlocked cash-flow features (spec 18).
+ */
+export async function getUtilitiesReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+  const check = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
+  let total = 0;
+  for (const { featureId, value } of UTILITIES_REDUCTION_FEATURES) {
+    if (await check('cash-flow', featureId)) total += value;
+  }
+  return total;
+}
+
+/**
+ * Total misc/entertainment expense reduction from unlocked cash-flow features (spec 18).
+ */
+export async function getMiscEntertainmentReductionBonus(userId: string, prefetch?: BonusPrefetch): Promise<number> {
+  const check = prefetch
+    ? (cat: string, fid: string) => Promise.resolve(isUnlockedInPrefetch(prefetch, cat, fid))
+    : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
+  let total = 0;
+  for (const { featureId, value } of MISC_ENTERTAINMENT_REDUCTION_FEATURES) {
+    if (await check('cash-flow', featureId)) total += value;
   }
   return total;
 }

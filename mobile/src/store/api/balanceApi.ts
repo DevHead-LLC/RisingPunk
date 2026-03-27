@@ -54,6 +54,8 @@ export interface BalanceResponse {
   insuranceReduction?: number;
   taxReduction?: number;
   rentMortgageReduction?: number;
+  utilitiesReduction?: number;
+  miscEntertainmentReduction?: number;
 }
 
 export const balanceApi = createApi({
