@@ -418,6 +418,17 @@ export async function getResearchFeaturesAsync(categoryId: string): Promise<IRes
       merged.push(toResearchFeature(d as any));
     }
   }
+  if (categoryId === 'cash-flow') {
+    merged.sort((a, b) => {
+      const la = a.levelRequirement ?? 0;
+      const lb = b.levelRequirement ?? 0;
+      if (la !== lb) return la - lb;
+      const ca = a.unlockCost ?? 0;
+      const cb = b.unlockCost ?? 0;
+      if (ca !== cb) return ca - cb;
+      return String(a.id).localeCompare(String(b.id));
+    });
+  }
   return merged;
 }
 

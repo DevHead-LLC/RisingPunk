@@ -60,6 +60,16 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     if (typeof balanceData?.rentMortgageReduction === 'number') return balanceData.rentMortgageReduction;
     return 0;
   }, [expenseModifiers?.rentMortgageReduction, balanceData?.rentMortgageReduction]);
+  const utilitiesReductionTotal = useMemo(() => {
+    if (typeof expenseModifiers?.utilitiesReduction === 'number') return expenseModifiers.utilitiesReduction;
+    if (typeof balanceData?.utilitiesReduction === 'number') return balanceData.utilitiesReduction;
+    return 0;
+  }, [expenseModifiers?.utilitiesReduction, balanceData?.utilitiesReduction]);
+  const miscEntertainmentReductionTotal = useMemo(() => {
+    if (typeof expenseModifiers?.miscEntertainmentReduction === 'number') return expenseModifiers.miscEntertainmentReduction;
+    if (typeof balanceData?.miscEntertainmentReduction === 'number') return balanceData.miscEntertainmentReduction;
+    return 0;
+  }, [expenseModifiers?.miscEntertainmentReduction, balanceData?.miscEntertainmentReduction]);
   const { themeMode } = useTheme();
   const colors = useThemeColors();
   
@@ -107,6 +117,13 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     const hasRentMortgageInTemplate = Object.keys(baseIncomeStatement).some(
       k => /\brent\b|\bmortgage\b/.test(String(k).trim().toLowerCase())
     );
+    const hasUtilitiesInTemplate = Object.keys(baseIncomeStatement).some(k =>
+      /\butilities\b/.test(String(k).trim().toLowerCase())
+    );
+    const hasMiscEntertainmentInTemplate = Object.keys(baseIncomeStatement).some(k => {
+      const kl = String(k).trim().toLowerCase();
+      return /\bmisc\b|\bentertainment\b/.test(kl);
+    });
 
     const incomeStatementEntries = Object.entries(effectiveIncomeStatement);
     
@@ -121,6 +138,12 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     }
     if (hasRentMortgageInTemplate && rentMortgageReductionTotal > 0) {
       effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - rentMortgageReductionTotal);
+    }
+    if (hasUtilitiesInTemplate && utilitiesReductionTotal > 0) {
+      effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - utilitiesReductionTotal);
+    }
+    if (hasMiscEntertainmentInTemplate && miscEntertainmentReductionTotal > 0) {
+      effectiveIncomeRateBonus = Math.max(0, effectiveIncomeRateBonus - miscEntertainmentReductionTotal);
     }
     const baseGrossIncome = 12.00;
     const grossIncome = baseGrossIncome + effectiveIncomeRateBonus;
@@ -140,6 +163,8 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
     // Apply tax reduction to the first expense line whose label contains "tax"; apply rent/mortgage reduction to the first line matching rent|mortgage (so gross-income offset matches).
     let taxReductionApplied = false;
     let rentMortgageReductionApplied = false;
+    let utilitiesReductionApplied = false;
+    let miscEntertainmentReductionApplied = false;
     const expenseEntries = rawExpenseEntries.map(([k, v]) => {
       const num = Number(v);
       const keyLower = String(k).trim().toLowerCase();
@@ -150,6 +175,14 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       if (num < 0 && /\brent\b|\bmortgage\b/.test(keyLower) && !rentMortgageReductionApplied) {
         rentMortgageReductionApplied = true;
         return [k, num + rentMortgageReductionTotal] as [string, number];
+      }
+      if (num < 0 && /\butilities\b/.test(keyLower) && !utilitiesReductionApplied) {
+        utilitiesReductionApplied = true;
+        return [k, num + utilitiesReductionTotal] as [string, number];
+      }
+      if (num < 0 && (/\bmisc\b|\bentertainment\b/.test(keyLower)) && !miscEntertainmentReductionApplied) {
+        miscEntertainmentReductionApplied = true;
+        return [k, num + miscEntertainmentReductionTotal] as [string, number];
       }
       return [k, v] as [string, number];
     });
@@ -177,7 +210,16 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
       passiveIncome,
       netCashFlow
     };
-  }, [merged, incomeRateBonus, insuranceReductionTotal, taxReductionTotal, rentMortgageReductionTotal, rentalHousingData?.totalIncomePerSecond]);
+  }, [
+    merged,
+    incomeRateBonus,
+    insuranceReductionTotal,
+    taxReductionTotal,
+    rentMortgageReductionTotal,
+    utilitiesReductionTotal,
+    miscEntertainmentReductionTotal,
+    rentalHousingData?.totalIncomePerSecond,
+  ]);
 
   const getStyles = () => ({
     container: {
