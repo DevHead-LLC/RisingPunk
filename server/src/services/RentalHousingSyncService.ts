@@ -1,7 +1,18 @@
 import { IUser } from '../models/User';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
 import { getPropertyMaxLevel } from './RentalPropertyConfigService';
-import { getBaseIncomeRateBonus, getInsuranceReductionBonus, getTaxReductionBonus, getRentMortgageReductionBonus, getRentalProfitBonusPerRoom, getRentalProfitBonusPerRoomAsOf, getResearchFeaturesForBonusSync, type BonusPrefetch } from '../utils/researchFeatureUtils';
+import {
+  getBaseIncomeRateBonus,
+  getInsuranceReductionBonus,
+  getTaxReductionBonus,
+  getRentMortgageReductionBonus,
+  getUtilitiesReductionBonus,
+  getMiscEntertainmentReductionBonus,
+  getRentalProfitBonusPerRoom,
+  getRentalProfitBonusPerRoomAsOf,
+  getResearchFeaturesForBonusSync,
+  type BonusPrefetch,
+} from '../utils/researchFeatureUtils';
 
 export interface RentalHousingSyncResult {
   needsSync: boolean;
@@ -17,6 +28,8 @@ export interface PerformSyncResult {
   insuranceReduction: number;
   taxReduction: number;
   rentMortgageReduction: number;
+  utilitiesReduction: number;
+  miscEntertainmentReduction: number;
 }
 
 export class RentalHousingSyncService {
@@ -186,13 +199,22 @@ export class RentalHousingSyncService {
 
     // CRITICAL: Always calculate and update ratePerSecond, even if no rental properties exist
     // Base rate is $1.00 + income rate bonus + insurance + tax + rent/mortgage reduction, plus passive income
-    const [incomeBonus, insuranceBonus, taxBonus, rentMortgageBonus] = await Promise.all([
+    const [incomeBonus, insuranceBonus, taxBonus, rentMortgageBonus, utilitiesBonus, miscEntertainmentBonus] = await Promise.all([
       getBaseIncomeRateBonus(userId, bonusPrefetch),
       getInsuranceReductionBonus(userId, bonusPrefetch),
       getTaxReductionBonus(userId, bonusPrefetch),
       getRentMortgageReductionBonus(userId, bonusPrefetch),
+      getUtilitiesReductionBonus(userId, bonusPrefetch),
+      getMiscEntertainmentReductionBonus(userId, bonusPrefetch),
     ]);
-    const baseRate = 1.0 + incomeBonus + insuranceBonus + taxBonus + rentMortgageBonus;
+    const baseRate =
+      1.0 +
+      incomeBonus +
+      insuranceBonus +
+      taxBonus +
+      rentMortgageBonus +
+      utilitiesBonus +
+      miscEntertainmentBonus;
 
     if (baseRate < 0) {
       console.error('[INCOME RATE] Invalid baseRate calculated:', baseRate);
@@ -239,6 +261,8 @@ export class RentalHousingSyncService {
       insuranceReduction: insuranceBonus,
       taxReduction: taxBonus,
       rentMortgageReduction: rentMortgageBonus,
+      utilitiesReduction: utilitiesBonus,
+      miscEntertainmentReduction: miscEntertainmentBonus,
     };
   }
 }

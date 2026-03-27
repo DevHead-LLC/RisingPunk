@@ -320,6 +320,8 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
     const insuranceReduction = syncResult.insuranceReduction;
     const taxReduction = syncResult.taxReduction;
     const rentMortgageReduction = syncResult.rentMortgageReduction;
+    const utilitiesReduction = syncResult.utilitiesReduction;
+    const miscEntertainmentReduction = syncResult.miscEntertainmentReduction;
 
     // Return updated balance (ratePerSecond already includes rental housing income)
     const currentBalance = {
@@ -331,7 +333,9 @@ app.get('/api/balance', auth, async (req: Request, res: Response) => {
       lifetimeHighUpdated: lifetimeHighUpdated,
       insuranceReduction,
       taxReduction,
-      rentMortgageReduction
+      rentMortgageReduction,
+      utilitiesReduction,
+      miscEntertainmentReduction,
     };
 
     res.json(currentBalance);
