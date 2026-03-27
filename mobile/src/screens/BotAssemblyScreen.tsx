@@ -6,12 +6,13 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import { selectBotType } from '../store/slices/botsSlice';
+import { selectBotSlot } from '../store/slices/botsSlice';
 import { useStartBuildMutation } from '../store/api/botsApi';
+import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { MARK2_DISPLAY_NAMES, costPerBotForMark } from '../utils/botInventory';
+import type { BotType } from '../types/bots';
 import { SIZING } from '../styles/theme';
 import { useResponsiveDimensions } from '../hooks/useResponsiveDimensions';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -21,17 +22,21 @@ import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 
-type BotType = 'breacher' | 'guardian' | 'phreak';
-
 const LEVELS = [1, 2, 3, 4];
+
+/** M3/M4 columns are locked placeholders — no inventory keys yet; must not reuse Mark I counts. */
+const ZERO_BOT_COUNTS: Record<BotType, number> = { breacher: 0, guardian: 0, phreak: 0 };
 
 export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
   const dispatch = useAppDispatch();
   const bots = useAppSelector((state) => state.bots);
   const [quantity, setQuantity] = useState('1');
   const [startBuild] = useStartBuildMutation();
-  const BOT_COST = 1;
-  const { isSmallDevice, scaleFactor } = useResponsiveDimensions();
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability');
+  const mark2ResearchUnlocked =
+    hackAbilityFeatures?.features?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    false;
+  const { isSmallDevice } = useResponsiveDimensions();
   const colors = useThemeColors();
   const { highlightTaskId, highlightStep, clearHighlight, advanceHighlightStep } = useTaskGuideHighlight();
   
@@ -42,14 +47,26 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const isSpeedupButtonHighlight = isBuildGuardians && highlightStep === 'speedup-button';
 
   const handleBuild = useCallback(() => {
-    if (!bots.selectedType) {return;}
+    if (!bots.selectedType) {
+      return;
+    }
     const qty = parseInt(quantity, 10);
-    if (isNaN(qty) || qty <= 0) {return;}
-    startBuild({ type: bots.selectedType, quantity: qty, totalCost: qty });
+    if (isNaN(qty) || qty <= 0) {
+      return;
+    }
+    const ml: 1 | 2 = bots.selectedMarkLevel === 2 ? 2 : 1;
+    const unit = costPerBotForMark(ml);
+    const totalCost = qty * unit;
+    startBuild({
+      type: bots.selectedType,
+      quantity: qty,
+      totalCost,
+      markLevel: ml,
+    });
     if (isBuildButtonHighlight) {
       clearHighlight();
     }
-  }, [bots.selectedType, quantity, startBuild, isBuildButtonHighlight, clearHighlight]);
+  }, [bots.selectedType, bots.selectedMarkLevel, quantity, startBuild, isBuildButtonHighlight, clearHighlight]);
 
   const handleQuantityChange = useCallback((value: string) => {
     setQuantity(value);
@@ -84,28 +101,59 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
     };
   }, [isQuantityInputHighlight, quantity, advanceHighlightStep]);
   
-  const handleSelectBotType = useCallback((type: BotType) => {
-    dispatch(selectBotType(type));
-    if (isGuardianSelectionHighlight && type === 'guardian') {
-      advanceHighlightStep();
-    }
-  }, [dispatch, isGuardianSelectionHighlight, advanceHighlightStep]);
+  const handleSelectBotType = useCallback(
+    (type: BotType, markLevel: 1 | 2) => {
+      dispatch(selectBotSlot({ type, markLevel }));
+      if (isGuardianSelectionHighlight && type === 'guardian' && markLevel === 1) {
+        advanceHighlightStep();
+      }
+    },
+    [dispatch, isGuardianSelectionHighlight, advanceHighlightStep]
+  );
 
-  const userLevel = 1;
+  const effectiveType =
+    bots.buildingProgress !== null ? bots.buildQueue?.type ?? bots.selectedType : bots.selectedType;
+  const effectiveMark: 1 | 2 =
+    bots.buildingProgress !== null ? (bots.buildQueue?.markLevel === 2 ? 2 : 1) : bots.selectedMarkLevel;
 
-  const levelSections = useMemo(() => (
-    LEVELS.map((level) => (
-      <LevelSection
-        key={level}
-        level={level}
-        selectedType={bots.selectedType}
-        botCounts={bots.botCounts}
-        userLevel={userLevel}
-        onSelectBotType={handleSelectBotType}
-        highlightGuardian={isGuardianSelectionHighlight && level === 1}
-      />
-    ))
-  ), [bots.selectedType, bots.botCounts, userLevel, handleSelectBotType, isGuardianSelectionHighlight]);
+  const selectionLabel =
+    !effectiveType
+      ? 'NO BOT SELECTED'
+      : effectiveMark === 2
+        ? MARK2_DISPLAY_NAMES[effectiveType].toUpperCase()
+        : effectiveType.toUpperCase();
+
+  const statusTypeLabel =
+    !effectiveType ? 'N/A' : effectiveMark === 2
+      ? MARK2_DISPLAY_NAMES[effectiveType].toUpperCase()
+      : effectiveType.toUpperCase();
+
+  const botCost = costPerBotForMark(effectiveMark);
+
+  const levelSections = useMemo(
+    () =>
+      LEVELS.map((level) => (
+        <LevelSection
+          key={level}
+          markColumnLevel={level}
+          selectedType={bots.selectedType}
+          selectedMarkLevel={bots.selectedMarkLevel}
+          botCounts={level === 2 ? bots.botCountsM2 : level === 1 ? bots.botCounts : ZERO_BOT_COUNTS}
+          onSelectBotType={handleSelectBotType}
+          highlightGuardian={isGuardianSelectionHighlight && level === 1}
+          mark2ResearchUnlocked={mark2ResearchUnlocked}
+        />
+      )),
+    [
+      bots.selectedType,
+      bots.selectedMarkLevel,
+      bots.botCounts,
+      bots.botCountsM2,
+      handleSelectBotType,
+      isGuardianSelectionHighlight,
+      mark2ResearchUnlocked,
+    ]
+  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -127,20 +175,25 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
           >
             {levelSections}
           </ScrollView>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} disabled={isGuardianSelectionHighlight || isBuildButtonHighlight}>
+          <View style={styles.buildSectionWrap}>
             <BuildSection
-              selectedType={bots.buildingProgress !== null ? bots.buildQueue?.type || bots.selectedType : bots.selectedType}
+              selectedType={
+                bots.buildingProgress !== null ? bots.buildQueue?.type || bots.selectedType : bots.selectedType
+              }
+              selectionLabel={selectionLabel}
+              statusTypeLabel={statusTypeLabel}
+              selectedMarkLevel={effectiveMark}
               buildingProgress={bots.buildingProgress}
               quantity={quantity}
               onQuantityChange={handleQuantityChange}
               onBuild={handleBuild}
-              botCost={BOT_COST}
+              botCost={botCost}
               highlightQuantityInput={isQuantityInputHighlight}
               highlightBuildButton={isBuildButtonHighlight}
               highlightSpeedupButton={isSpeedupButtonHighlight}
               isInputDisabled={isGuardianSelectionHighlight}
             />
-          </TouchableWithoutFeedback>
+          </View>
         </View>
       </KeyboardAvoidingView>
       {isBuildGuardians && (
@@ -173,6 +226,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     flexDirection: 'row',
+  },
+  buildSectionWrap: {
+    flex: 1,
   },
   botSelection: {
     flex: 0.35,

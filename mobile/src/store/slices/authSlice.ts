@@ -9,7 +9,7 @@ import { resetAllApiCaches } from '../api/resetApiCaches';
 import { clearPersistedTurfNavState } from '../../utils/turfNavStatePersistence';
 import { authApi } from '../api/authApi';
 import { mapApi } from '../api/mapApi';
-import { trackAccountCreated, markAccountExists } from '../../services/analyticsService';
+import { logAccountCreatedOnce, markAccountExists } from '../../services/analyticsService';
 
 // Types
 export interface User {
@@ -165,13 +165,16 @@ export const registerUser = createAsyncThunk(
 
       const data = await response.json();
 
+      if (!data.user?._id) {
+        return rejectWithValue('Registration succeeded but user id was not returned');
+      }
+
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       // Do not clear guest token (guestCredentialsStorage): preserve device-linked token for "Play as Guest" resume.
 
-      // Track account creation
-      await trackAccountCreated('email');
+      await logAccountCreatedOnce({ userId: data.user._id, method: 'email' });
 
       return data;
     } catch (error) {
@@ -335,6 +338,11 @@ export const playAsGuest = createAsyncThunk(
       }
 
       const data = await response.json();
+
+      if (!data.user?._id) {
+        return rejectWithValue('Guest session missing user id');
+      }
+
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       await setGuestToken(data.token);
@@ -343,8 +351,8 @@ export const playAsGuest = createAsyncThunk(
       await fetchBotsAndBuildStateForToken(data.token, dispatch, 'Failed to fetch initial data for guest:');
 
       await markAccountExists();
-      // New guest: clear persisted turf nav so they start on turf, not previous user's screen (e.g. map locked for new account).
       await clearPersistedTurfNavState();
+      await logAccountCreatedOnce({ userId: data.user._id, method: 'guest' });
       return data;
     } catch (error) {
       console.error('[auth] Play as guest error', { apiHost: getApiHostForLogging(), error });
@@ -442,13 +450,16 @@ export const googleSignUpUser = createAsyncThunk(
 
       const data = await response.json();
 
+      if (!data.user?._id) {
+        return rejectWithValue('Google sign-up succeeded but user id was not returned');
+      }
+
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       // Do not clear guest token (guestCredentialsStorage): preserve device-linked token for "Play as Guest" resume.
 
-      // Track account creation
-      await trackAccountCreated('google');
+      await logAccountCreatedOnce({ userId: data.user._id, method: 'google' });
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);
@@ -569,13 +580,16 @@ export const appleSignUpUser = createAsyncThunk(
 
       const data = await response.json();
 
+      if (!data.user?._id) {
+        return rejectWithValue('Apple sign-up succeeded but user id was not returned');
+      }
+
       // Store in AsyncStorage
       await AsyncStorage.setItem('token', data.token);
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       // Do not clear guest token (guestCredentialsStorage): preserve device-linked token for "Play as Guest" resume.
 
-      // Track account creation
-      await trackAccountCreated('apple');
+      await logAccountCreatedOnce({ userId: data.user._id, method: 'apple' });
 
       // Clear any existing RTK Query cache to ensure fresh data for new user
       resetAllApiCaches({ dispatch } as any);

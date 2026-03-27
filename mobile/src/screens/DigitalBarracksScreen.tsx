@@ -14,10 +14,12 @@ import { SIZING } from '../styles/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { BotType } from '../types/bots';
-import { useFetchBotStatsQuery } from '../store/api/botsApi';
+import { useFetchBotStatsQuery, useFetchBotStatsBreakdownQuery } from '../store/api/botsApi';
 import { useTrackDigitalBarracksVisitMutation as useTrackDigitalBarracksVisitMutationFromUserGuide } from '../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
-import { formatNumber } from '../utils/formatUtils';
+import { formatBotStatValue, formatNumber } from '../utils/formatUtils';
+import { BOT_FAMILY_ORDER, MARK2_DISPLAY_NAMES } from '../utils/botInventory';
+import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 
 type MarkLevel = 1 | 2 | 3 | 4;
 
@@ -33,16 +35,69 @@ const BOT_TYPE_LABELS: Record<BotType, string> = {
   phreak: 'Remote',
 };
 
+/** Mark I composition bar / legend (per family). */
+const M1_COMPOSITION_COLORS: Record<BotType, string> = {
+  breacher: '#FF4B4B',
+  guardian: '#4CAF50',
+  phreak: '#2196F3',
+};
+/** Mark II: distinct palette so M1 vs M2 reads at a glance. */
+const M2_COMPOSITION_COLORS: Record<BotType, string> = {
+  breacher: '#FF9800',
+  guardian: '#26C6DA',
+  phreak: '#AB47BC',
+};
+
+/** RPS by type: Sprint > Brute > Remote > Sprint (shown as labels, not unit names). */
+const TYPE_MATCHUPS: Record<BotType, { strongAgainst: string; weakAgainst: string }> = {
+  guardian: { strongAgainst: 'Brute', weakAgainst: 'Remote' },
+  breacher: { strongAgainst: 'Remote', weakAgainst: 'Sprint' },
+  phreak: { strongAgainst: 'Sprint', weakAgainst: 'Brute' },
+};
+
+/** Short “In Real Life” blurbs: what the unit name refers to in hacker / cyberpunk culture. */
+const UNIT_IN_REAL_LIFE: Record<1 | 2, Record<BotType, string>> = {
+  1: {
+    breacher:
+      'In Real Life: “Breacher” echoes military breach-and-clear and red-team pentesters, operators who force a path through walls and firewalls to prove where defenses break.',
+    guardian:
+      'In Real Life: “Guardian” suggests perimeter defense: admins and tools that watch packets, filter traffic, and stand between your network and everyone else (classic “ICE” energy).',
+    phreak:
+      'In Real Life: “Phreak” comes from phone phreaks: 1970s hackers who played the phone system with boxes and tones; in fiction, the trickster who social-engineers the machine.',
+  },
+  2: {
+    breacher:
+      'In Real Life: “Exploit” is straight from infosec: weaponized code or a technique that abuses a bug to gain control. Every cyberpunk run hinges on a good exploit.',
+    guardian:
+      'In Real Life: “Worm” means self-copying malware that crawls net to net. Think Morris Worm lore and stories where one loose program infects the whole grid.',
+    phreak:
+      'In Real Life: “Sniffer” is a passive tap on the wire: packet capture and eavesdropping (Wireshark-era tradecraft) from the shadows of the LAN.',
+  },
+};
+
 export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const token = useAppSelector((state) => state.auth.token);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
+  const botCountsM2 = useAppSelector((state) => state.bots.botCountsM2);
   const [selectedMark, setSelectedMark] = useState<MarkLevel>(1);
-  const { data: botStatsData, isLoading: botStatsLoading } = useFetchBotStatsQuery();
+  const { data: botStatsData, isLoading: botStatsLoading } = useFetchBotStatsQuery(undefined, {
+    skip: !token,
+    refetchOnMountOrArgChange: true,
+  });
+  /** Same `total` row as Profile > Stats (Mark I); avoids stale `/stats` cache missing programming bonuses. */
+  const { data: breakdownData, isLoading: breakdownLoading } = useFetchBotStatsBreakdownQuery(undefined, {
+    skip: !token,
+    refetchOnMountOrArgChange: true,
+  });
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !token });
+  const mark2ResearchUnlocked =
+    hackAbilityFeatures?.features?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    false;
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const [trackDigitalBarracksVisit] = useTrackDigitalBarracksVisitMutationFromUserGuide();
   const { highlightTaskId, clearHighlight } = useTaskGuideHighlight();
   const hasTrackedVisit = useRef(false);
-  const token = useAppSelector((state) => state.auth.token);
 
   const styles = useMemo(() => createStyles(colors, themeMode), [colors, themeMode]);
 
@@ -61,38 +116,33 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
     }
   }, [token, highlightTaskId, trackDigitalBarracksVisit, clearHighlight]);
 
-  const BotCard = ({ type }: { type: BotType }) => {
-    const hackerLore = {
-      breacher: "IRL: Named after 'breach and clear' tactics used in early penetration testing, where security teams would methodically break through firewall layers.",
-      guardian: "IRL: Inspired by 'packet guardian' programs from the 1990s that network administrators used to monitor and filter suspicious traffic.",
-      phreak: "IRL: Based on 'phone phreakers' from the 1970s who used blue boxes to manipulate telephone systems and make free long-distance calls.",
-    };
+  const BotCard = ({ type, markLevel }: { type: BotType; markLevel: 1 | 2 }) => {
+    const displayName = markLevel === 2 ? MARK2_DISPLAY_NAMES[type] : BOT_DISPLAY_NAMES[type];
+    const inventory = markLevel === 2 ? botCountsM2 : botCounts;
+    const totalFromBreakdown = breakdownData?.breakdown?.[type]?.total;
+    const m2TotalFromBreakdown = breakdownData?.breakdown?.[type]?.mark2?.total;
+    const botStats =
+      markLevel === 2
+        ? m2TotalFromBreakdown != null
+          ? { role: '', stats: m2TotalFromBreakdown }
+          : botStatsData?.botStatsM2?.[type]
+        : totalFromBreakdown != null
+          ? { role: '', stats: totalFromBreakdown }
+          : botStatsData?.botStats?.[type];
 
-    const botStats = botStatsData?.botStats?.[type];
-    const allBotStats = botStatsData?.botStats;
-
-    const getTypeMatchups = (botType: BotType): { strongAgainst: string; weakAgainst: string } | null => {
-      const matchups: Record<BotType, { strongAgainst: string; weakAgainst: string }> = {
-        guardian: { strongAgainst: 'Breacher', weakAgainst: 'Phreak' },
-        breacher: { strongAgainst: 'Phreak', weakAgainst: 'Guardian' },
-        phreak: { strongAgainst: 'Guardian', weakAgainst: 'Breacher' },
-      };
-      return matchups[botType] || null;
-    };
-
-    const matchups = getTypeMatchups(type);
+    const matchups = TYPE_MATCHUPS[type];
 
     return (
       <View style={styles.botCard}>
         <View style={styles.botHeader}>
-          <Text style={styles.botName}>{BOT_DISPLAY_NAMES[type]}</Text>
+          <Text style={styles.botName}>{displayName}</Text>
           <Text style={styles.botRole}>{BOT_TYPE_LABELS[type]}</Text>
         </View>
 
         <View style={styles.botContent}>
           <View style={styles.countRow}>
             <Text style={styles.countLabel}>Available:</Text>
-            <Text style={styles.countValue}>{formatNumber(botCounts?.[type] || 0)}</Text>
+            <Text style={styles.countValue}>{formatNumber(inventory?.[type] ?? 0)}</Text>
             <View style={styles.deployedContainer}>
               <Text style={styles.countLabel}>Deployed: 0</Text>
             </View>
@@ -100,7 +150,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
 
           <View style={styles.infoContainer}>
             <View style={styles.loreContainer}>
-              <Text style={styles.hackerLore}>{hackerLore[type]}</Text>
+              <Text style={styles.hackerLore}>{UNIT_IN_REAL_LIFE[markLevel][type]}</Text>
               {matchups ? (
                 <>
                   <Text style={styles.strongText}>Strong vs: {matchups.strongAgainst}</Text>
@@ -121,7 +171,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
                      stat.toUpperCase()}
                   </Text>
                   <Text style={styles.statValue}>
-                    {stat === 'defense' ? `${Math.round(Number(value) * 100)}%` : String(value)}
+                    {formatBotStatValue(stat, Number(value))}
                   </Text>
                 </View>
               )) : (
@@ -135,50 +185,66 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
   };
 
   const ArmyComposition = () => {
-    if (!botCounts) {return null;}
+    if (!botCounts || !botCountsM2) {return null;}
 
-    const total = Object.values(botCounts).reduce((a, b) => a + b, 0);
+    const total =
+      BOT_FAMILY_ORDER.reduce((sum, type) => sum + (botCounts[type] ?? 0) + (botCountsM2[type] ?? 0), 0);
     if (total === 0) {return null;}
+
+    const segments = BOT_FAMILY_ORDER.flatMap((type) => [
+      {
+        key: `m1-${type}`,
+        count: botCounts[type] ?? 0,
+        color: M1_COMPOSITION_COLORS[type],
+        label: `${BOT_DISPLAY_NAMES[type]} (M I)`,
+      },
+      {
+        key: `m2-${type}`,
+        count: botCountsM2[type] ?? 0,
+        color: M2_COMPOSITION_COLORS[type],
+        label: `${MARK2_DISPLAY_NAMES[type]} (M II)`,
+      },
+    ]);
 
     return (
       <View style={styles.compositionContainer}>
         <View style={styles.barContainer}>
-          {Object.entries(botCounts).map(([type, count]) => {
-            const percentage = (count / total) * 100;
+          {segments.map((seg) => {
+            const percentage = (seg.count / total) * 100;
+            if (percentage <= 0) {return null;}
             return (
               <View
-                key={type}
+                key={seg.key}
                 style={[
                   styles.compositionBar,
                   {
                     width: `${percentage}%`,
-                    backgroundColor:
-                      type === 'breacher' ? '#FF4B4B' :
-                      type === 'guardian' ? '#4CAF50' :
-                      '#2196F3',
+                    backgroundColor: seg.color,
                   },
                 ]}
               />
             );
           })}
         </View>
-        <View style={styles.compositionLegend}>
-          {Object.entries(botCounts).map(([type, count]) => (
-            <View key={type} style={styles.legendItem}>
-              <View style={[
-                styles.legendDot,
-                {
-                  backgroundColor:
-                    type === 'breacher' ? '#FF4B4B' :
-                    type === 'guardian' ? '#4CAF50' :
-                    '#2196F3',
-                },
-              ]} />
-              <Text style={styles.legendText}>
-                {`${type.charAt(0).toUpperCase() + type.slice(1)}: ${((count / total) * 100).toFixed(1)}%`}
-              </Text>
-            </View>
-          ))}
+        <View style={[styles.compositionLegend, styles.compositionLegendWrap]}>
+          {segments
+            .filter((seg) => seg.count > 0)
+            .map((seg) => {
+              const pct = (seg.count / total) * 100;
+              return (
+                <View key={`leg-${seg.key}`} style={styles.legendItem}>
+                  <View
+                    style={[
+                      styles.legendDot,
+                      { backgroundColor: seg.color },
+                    ]}
+                  />
+                  <Text style={styles.legendText}>
+                    {`${seg.label}: ${pct.toFixed(1)}%`}
+                  </Text>
+                </View>
+              );
+            })}
         </View>
       </View>
     );
@@ -194,18 +260,25 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
       <Text style={styles.title}>Digital Barracks</Text>
 
       <View style={styles.markSelector}>
-        {[1, 2, 3, 4].map((mark) => (
-          <TouchableOpacity
-            key={mark}
-            style={[
-              styles.markButton,
-              selectedMark === mark && styles.selectedMark,
-            ]}
-            onPress={() => setSelectedMark(mark as MarkLevel)}
-          >
-            <Text style={styles.markText}>MARK {mark}</Text>
-          </TouchableOpacity>
-        ))}
+        {[1, 2, 3, 4].map((mark) => {
+          const isMark2Locked = mark === 2 && !mark2ResearchUnlocked;
+          const isFutureMark = mark === 3 || mark === 4;
+          // Bugbot: flagged locked tabs as tappable without disabled. Intended — tapping a
+          // locked Mark tab shows the locked-state screen (research prompt / coming soon).
+          return (
+            <TouchableOpacity
+              key={mark}
+              style={[
+                styles.markButton,
+                selectedMark === mark && styles.selectedMark,
+                (isMark2Locked || isFutureMark) && styles.markButtonLocked,
+              ]}
+              onPress={() => setSelectedMark(mark as MarkLevel)}
+            >
+              <Text style={styles.markText}>MARK {mark}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -213,7 +286,15 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Army Size:</Text>
             <Text style={styles.totalCount}>
-              {formatNumber(botCounts ? Object.values(botCounts).reduce((a, b) => a + b, 0) : 0)}
+              {formatNumber(
+                botCounts && botCountsM2
+                  ? BOT_FAMILY_ORDER.reduce(
+                      (sum, type) =>
+                        sum + (botCounts[type] ?? 0) + (botCountsM2[type] ?? 0),
+                      0
+                    )
+                  : 0
+              )}
             </Text>
           </View>
           <ArmyComposition />
@@ -221,14 +302,23 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
 
         <View style={styles.botsContainer}>
           {selectedMark === 1 ? (
-            botStatsLoading ? (
+            (breakdownLoading && !breakdownData?.breakdown) || (botStatsLoading && !botStatsData?.botStats) ? (
               <Text style={styles.lockedText}>Loading...</Text>
-            ) : botStatsData?.botStats ? (
-              Object.keys(botStatsData.botStats).map((type) => (
-                <BotCard key={type} type={type as BotType} />
-              ))
+            ) : botStatsData?.botStats || breakdownData?.breakdown ? (
+              BOT_FAMILY_ORDER.map((type) => <BotCard key={`m1-${type}`} type={type} markLevel={1} />)
             ) : (
               <Text style={styles.lockedText}>No bot data available</Text>
+            )
+          ) : selectedMark === 2 ? (
+            !mark2ResearchUnlocked ? (
+              <Text style={styles.lockedText}>🔒 MARK 2 UNITS LOCKED. Complete Mark II Bots research in Hack Ability.</Text>
+            ) : (breakdownLoading && !breakdownData?.breakdown) ||
+              (botStatsLoading &&
+                !botStatsData?.botStatsM2 &&
+                !breakdownData?.breakdown?.breacher?.mark2) ? (
+              <Text style={styles.lockedText}>Loading...</Text>
+            ) : (
+              BOT_FAMILY_ORDER.map((type) => <BotCard key={`m2-${type}`} type={type} markLevel={2} />)
             )
           ) : (
             <Text style={styles.lockedText}>🔒 MARK {selectedMark} UNITS LOCKED</Text>
@@ -312,6 +402,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'lig
     color: colors.text.primary,
     fontSize: SIZING.font.small,
     fontWeight: 'bold',
+  },
+  markButtonLocked: {
+    opacity: 0.55,
   },
   botsContainer: {
     padding: 20,
@@ -436,6 +529,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'lig
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: SIZING.spacing.md,
+  },
+  compositionLegendWrap: {
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
   },
   legendItem: {
     flexDirection: 'row',

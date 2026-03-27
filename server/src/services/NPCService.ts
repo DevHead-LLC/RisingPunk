@@ -2,7 +2,8 @@ import mongoose from 'mongoose';
 
 type BotTypeLiteral = 'guardian' | 'breacher' | 'phreak';
 
-export type NPCBattalionConfig = { type: BotTypeLiteral; quantity: number };
+/** `markLevel` optional for legacy NPC docs; omitted means Mark I (same as 1). */
+export type NPCBattalionConfig = { type: BotTypeLiteral; quantity: number; markLevel?: number };
 
 export type NPCDocument = {
   _id: any;
@@ -10,7 +11,14 @@ export type NPCDocument = {
   name: string;
   title?: string;
   tier: number;
+  /** Stat scaling (often 1–99). Do not use as the 1–21 mark-mix table index. */
   userLevelAssociation: number;
+  /**
+   * Which row (1–21) of the mark-mix curve this NPC uses. Optional; if omitted, `applyNpcMarkMixBattalions`
+   * derives tier from `userLevelAssociation` (1–99 → 1–21 spread). Set explicitly when a slug must follow a
+   * specific mix row regardless of ULA.
+   */
+  npcMarkMixTier?: number;
   battalions: NPCBattalionConfig[];
   battleExperienceReward: number;
   victoryReward: number;

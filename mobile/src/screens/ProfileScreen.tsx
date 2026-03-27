@@ -40,6 +40,8 @@ import DeviceInfo from 'react-native-device-info';
 import { openReviewUrl, getHasOpenedReview } from '../utils/openReviewAndClaimReward';
 import { BattlesTab } from '../components/profile/BattlesTab';
 import { useGetBattlePresetsQuery } from '../store/api/battlePresetsApi';
+import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { MARK2_DISPLAY_NAMES } from '../utils/botInventory';
 
 interface UserProfile {
   handle: string;
@@ -761,7 +763,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
   const isThemeToggleHighlighted = isThemeTask && highlightStep === 'theme-toggle';
   const isAvatarToggleHighlighted = isAvatarTask && highlightStep === 'avatar-toggle';
   const isTaskGuideToggleHighlighted = isHideTaskListTask && highlightStep === 'task-guide-toggle';
-  
+
   const [settingsColorIndex, setSettingsColorIndex] = useState(0);
   const [themeToggleColorIndex, setThemeToggleColorIndex] = useState(0);
   const [avatarToggleColorIndex, setAvatarToggleColorIndex] = useState(0);
@@ -902,7 +904,12 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   const { data: breakdownData, isLoading: breakdownLoading } = useFetchBotStatsBreakdownQuery(undefined, {
     skip: !token,
+    refetchOnMountOrArgChange: true,
   });
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !token });
+  const mark2BotsResearchUnlocked =
+    hackAbilityFeatures?.features?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    false;
   const { data: researchCenterData, isLoading: researchCenterLoading } = useGetResearchCenterStatusQuery(undefined, {
     skip: !token,
   });
@@ -996,20 +1003,36 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
 
   const renderStatsChart = (
     title: string,
-    data: { base: StatRow; levelBonus: StatRow; programmingBonus: StatRow; researchBonus: StatRow; total: StatRow } | undefined
+    data:
+      | {
+          base: StatRow;
+          levelBonus: StatRow;
+          programmingBonus: StatRow;
+          researchBonus: StatRow;
+          total: StatRow;
+          mark2?: { base: StatRow; levelBonus: StatRow; total: StatRow };
+        }
+      | undefined,
+    /** Mark I unit name for this family (Breacher / Guardian / Phreak). Mark II–IV rows stay labeled until those marks ship. */
+    markOneUnitName: string,
+    /** Mark II row: Exploit / Worm / Sniffer when `mark-2-bots` research is unlocked, else "Mark II". */
+    markTwoRowLabel: string,
+    markTwoTotalLabel: string
   ) => {
     if (!data) return null;
-    // Bugbot: Mark II/III/IV placeholder rows are intentional UI for future content; not scaffolding.
+    const mark2Base = mark2BotsResearchUnlocked && data.mark2 ? data.mark2.base : null;
+    const mark2Total = mark2BotsResearchUnlocked && data.mark2 ? data.mark2.total : null;
+    // Bugbot: Mark III/IV placeholder rows are intentional UI for future content; not scaffolding.
     const rows: { label: string; values: StatRow | null }[] = [
-      { label: 'Mark I', values: data.base },
-      { label: 'Mark II', values: null },
+      { label: markOneUnitName, values: data.base },
+      { label: markTwoRowLabel, values: mark2Base },
       { label: 'Mark III', values: null },
       { label: 'Mark IV', values: null },
       { label: '+User Level', values: data.levelBonus },
       { label: '+Programming', values: data.programmingBonus },
       { label: '+Research', values: data.researchBonus },
-      { label: 'Mark I Total', values: data.total },
-      { label: 'Mark II Total', values: null },
+      { label: `${markOneUnitName} Total`, values: data.total },
+      { label: markTwoTotalLabel, values: mark2Total },
       { label: 'Mark III Total', values: null },
       { label: 'Mark IV Total', values: null },
     ];
@@ -1213,9 +1236,27 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContentContainer}>
               {breakdown && (
                 <>
-                  {renderStatsChart('BRUTE', breakdown.breacher)}
-                  {renderStatsChart('SPRINT', breakdown.guardian)}
-                  {renderStatsChart('REMOTE', breakdown.phreak)}
+                  {renderStatsChart(
+                    'BRUTE',
+                    breakdown.breacher,
+                    'Breacher',
+                    mark2BotsResearchUnlocked ? MARK2_DISPLAY_NAMES.breacher : 'Mark II',
+                    mark2BotsResearchUnlocked ? `${MARK2_DISPLAY_NAMES.breacher} Total` : 'Mark II Total'
+                  )}
+                  {renderStatsChart(
+                    'SPRINT',
+                    breakdown.guardian,
+                    'Guardian',
+                    mark2BotsResearchUnlocked ? MARK2_DISPLAY_NAMES.guardian : 'Mark II',
+                    mark2BotsResearchUnlocked ? `${MARK2_DISPLAY_NAMES.guardian} Total` : 'Mark II Total'
+                  )}
+                  {renderStatsChart(
+                    'REMOTE',
+                    breakdown.phreak,
+                    'Phreak',
+                    mark2BotsResearchUnlocked ? MARK2_DISPLAY_NAMES.phreak : 'Mark II',
+                    mark2BotsResearchUnlocked ? `${MARK2_DISPLAY_NAMES.phreak} Total` : 'Mark II Total'
+                  )}
                 </>
               )}
               {profile?.battleStats && (

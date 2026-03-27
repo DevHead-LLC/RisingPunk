@@ -19,7 +19,9 @@ export class BattalionFactory {
     nodeIndex: number,
     owner: NodeOwner,
     stats: any,
-    nodes: INode[]
+    nodes: INode[],
+    /** 1 = Mark I, 2 = Mark II (user attackers); NPC / enemy default 1. */
+    mark: number = 1
   ): IBattalion {
     const maxHealth = stats.health * quantity;
     const node = nodes[nodeIndex];
@@ -43,7 +45,7 @@ export class BattalionFactory {
       },
       owner,
       stats,
-      mark: 1,
+      mark,
     };
   }
 

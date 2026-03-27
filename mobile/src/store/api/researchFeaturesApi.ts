@@ -5,6 +5,7 @@ import { API_URL } from '../../config';
 import { RootState } from '../index';
 import { balanceApi } from './balanceApi';
 import { userGuideApi } from './userGuideApi';
+import { botsApi } from './botsApi';
 
 export interface ResearchFeatureStatus {
   featureId: string;
@@ -128,6 +129,11 @@ export const researchFeaturesApi = createApi({
           await queryFulfilled;
           // Invalidate UserTaskProgress to update task guide when research completes
           dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+          // Hack Ability (e.g. mark-2-bots): refresh bot stat caches so Profile / Digital Barracks align immediately
+          if (arg.categoryId === 'hack-ability') {
+            dispatch(botsApi.endpoints.fetchBotStats.initiate(undefined, { forceRefetch: true }));
+            dispatch(botsApi.endpoints.fetchBotStatsBreakdown.initiate(undefined, { forceRefetch: true }));
+          }
           // ExpenseModifiers already invalidated declaratively via invalidatesTags for cash-flow
           // If rental profit research completed (spec 18), invalidate balance and rental housing income cache
           if (arg.categoryId === 'investments' && INVESTMENTS_SYNC_FEATURE_IDS.includes(arg.featureId)) {
@@ -168,7 +174,10 @@ export const researchFeaturesApi = createApi({
           // Invalidate UserTaskProgress to update task guide when research completes
           // This ensures tasks like unlock-antivirus update immediately when feature is unlocked
           dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
-          
+          if (arg.categoryId === 'hack-ability') {
+            dispatch(botsApi.endpoints.fetchBotStats.initiate(undefined, { forceRefetch: true }));
+            dispatch(botsApi.endpoints.fetchBotStatsBreakdown.initiate(undefined, { forceRefetch: true }));
+          }
           // If rental profit research was speeded up (spec 18), invalidate balance and rental housing income cache
           if (arg.categoryId === 'investments' && INVESTMENTS_SYNC_FEATURE_IDS.includes(arg.featureId)) {
             const { rentalHousingApi } = await import('./rentalHousingApi');

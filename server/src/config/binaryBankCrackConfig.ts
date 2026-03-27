@@ -5,6 +5,8 @@
  * See taskItems/mini-games/binary-bank-crack.md.
  */
 
+import { scaleProgrammingBonusTotals } from './programmingBonusScale';
+
 export type LevelId = string; // e.g. "1.1", "21.5"
 
 export interface LevelParams {
@@ -150,7 +152,7 @@ export function computeBinaryBankCrackPhreakBonus(levelsCompleted: string[]): Ph
       health += r.health;
     }
   }
-  return { strength, defense, speed, health };
+  return scaleProgrammingBonusTotals({ strength, defense, speed, health });
 }
 
 /** Max value for an N-bit register (0 to 2^N - 1). */

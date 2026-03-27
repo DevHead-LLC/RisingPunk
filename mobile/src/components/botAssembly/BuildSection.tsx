@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -11,14 +11,18 @@ import { BuildTimer } from './BuildTimer';
 import { SpeedupModal } from '../common/SpeedupModal';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { useSpeedupBotBuildMutation } from '../../store/api/botsApi';
+import { useSpeedupBotBuildMutation, useFetchBuildStateQuery } from '../../store/api/botsApi';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
-import { setBots, setBuildState } from '../../store/slices/botsSlice';
+import { setBuildState } from '../../store/slices/botsSlice';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
-
 type BuildSectionProps = {
   selectedType: BotType | null;
+  /** Header line (e.g. BRUTE, BREACHER, NO BOT SELECTED). */
+  selectionLabel: string;
+  /** Type row in the cost summary (matches selection or active build). */
+  statusTypeLabel: string;
+  selectedMarkLevel: 1 | 2;
   buildingProgress: number | null;
   quantity: string;
   onQuantityChange: (value: string) => void;
@@ -32,6 +36,9 @@ type BuildSectionProps = {
 
 export const BuildSection = React.memo(function BuildSection({
   selectedType,
+  selectionLabel,
+  statusTypeLabel,
+  selectedMarkLevel,
   buildingProgress,
   quantity,
   onQuantityChange,
@@ -58,6 +65,64 @@ export const BuildSection = React.memo(function BuildSection({
   const currentBalance = balanceData?.total ?? reduxBalance;
   const numericBalance = typeof currentBalance === 'string' ? parseFloat(currentBalance) : currentBalance;
   const { clearHighlight } = useTaskGuideHighlight();
+
+  // Bugbot: flagged as duplicate subscription vs AppContent's polling query. Not a bug —
+  // RTK Query deduplicates on cache key; this hook only provides refetch for timer-completion.
+  const token = useAppSelector((state) => state.auth.token);
+  const { refetch: refetchBuildState } = useFetchBuildStateQuery(undefined, {
+    skip: !token,
+  });
+
+  /** Re-render often while building so wall-clock progress matches the bar and timer. */
+  const [buildUiTick, setBuildUiTick] = useState(0);
+  useEffect(() => {
+    if (buildingProgress === null) {
+      return;
+    }
+    const id = setInterval(() => setBuildUiTick((n) => n + 1), 250);
+    return () => clearInterval(id);
+  }, [buildingProgress]);
+
+  const timeRemainingMs = useMemo(() => {
+    if (!buildQueue?.completesAt) {
+      return 0;
+    }
+    return Math.max(0, new Date(buildQueue.completesAt).getTime() - Date.now());
+  }, [buildQueue?.completesAt, buildUiTick]);
+
+  const smoothBuildProgress = useMemo(() => {
+    if (buildingProgress === null) {
+      return 0;
+    }
+    if (!buildQueue?.completesAt || !buildQueue?.startedAt) {
+      return buildingProgress;
+    }
+    const start = new Date(buildQueue.startedAt).getTime();
+    const end = new Date(buildQueue.completesAt).getTime();
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
+      return buildingProgress;
+    }
+    const now = Date.now();
+    if (now >= end) {
+      return 100;
+    }
+    return Math.min(100, ((now - start) / (end - start)) * 100);
+  }, [buildQueue, buildingProgress, buildUiTick]);
+
+  const completionRefetchFired = useRef(false);
+  useEffect(() => {
+    completionRefetchFired.current = false;
+  }, [buildQueue?.startedAt, buildQueue?.completesAt]);
+
+  useEffect(() => {
+    if (buildingProgress === null) {
+      return;
+    }
+    if (timeRemainingMs <= 0 && !completionRefetchFired.current) {
+      completionRefetchFired.current = true;
+      void refetchBuildState();
+    }
+  }, [timeRemainingMs, buildingProgress, refetchBuildState]);
 
   // Calculate seconds remaining for speedup
   const getSecondsRemaining = (): number => {
@@ -86,7 +151,6 @@ export const BuildSection = React.memo(function BuildSection({
         
         // Update bot counts and clear build state
         if (result.bots) {
-          dispatch(setBots(result.bots));
           dispatch(setBuildState({ buildQueue: null, bots: result.bots }));
         }
         
@@ -98,7 +162,8 @@ export const BuildSection = React.memo(function BuildSection({
       } else {
         // Handle case where API returns success: false (HTTP 200 but operation failed)
         setShowSpeedupModal(false);
-        const errorMsg = result.message || result.error || 'Failed to speed up bot build. Please try again.';
+        const errorMsg =
+          result.message || result.error || 'Failed to speed up bot build. Please try again.';
         setErrorMessage(errorMsg);
         setShowErrorModal(true);
       }
@@ -122,10 +187,8 @@ export const BuildSection = React.memo(function BuildSection({
       <Text style={[styles.buildTitle, { color: colors.secondary }]}>BUILD CONTROLS</Text>
 
       <View style={styles.selectedBotInfo}>
-        <Text style={[styles.selectedBot, { color: colors.text.primary }]}>
-          {selectedType ? selectedType.toUpperCase() : 'NO BOT SELECTED'}
-        </Text>
-        {selectedType && <BotDescription type={selectedType} />}
+        <Text style={[styles.selectedBot, { color: colors.text.primary }]}>{selectionLabel}</Text>
+        {selectedType && <BotDescription type={selectedType} markLevel={selectedMarkLevel} />}
       </View>
 
       <BuildControls
@@ -140,20 +203,16 @@ export const BuildSection = React.memo(function BuildSection({
         highlightSpeedupButton={highlightSpeedupButton}
       />
 
-      <BuildStatus
-        selectedType={selectedType}
-        quantity={quantity}
-        botCost={botCost}
-      />
+      <BuildStatus typeLabel={statusTypeLabel} quantity={quantity} botCost={botCost} />
 
       {buildingProgress !== null && (
         <>
           <BuildTimer
-            _quantity={parseInt(quantity) || 0}
-            buildTimePerUnit={1000}
-            progress={buildingProgress}
+            progress={smoothBuildProgress}
+            timeRemainingMs={timeRemainingMs}
+            totalBuildQuantity={totalBuildQuantity}
           />
-          <BuildProgressBar progress={buildingProgress} />
+          <BuildProgressBar progress={smoothBuildProgress} />
         </>
       )}
 

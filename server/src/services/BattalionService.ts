@@ -6,6 +6,7 @@
 import { IBattalion, INode, NodeOwner, BotType, BattalionTargetingResult } from '../types/battle';
 import { BotService, ArmyBonus } from './BotService';
 import { BattalionFactory } from './BattalionFactory';
+import { normalizeNpcBattalionMarkLevel } from '../utils/npcMarkMixConfig';
 import { MovementService } from './MovementService';
 import { MovementState } from '../types/battle';
 import { Battle } from '../models/Battle';
@@ -144,7 +145,7 @@ export class BattalionService {
   static async createUserBattalions(
     nodes: INode[],
     userLevel: number,
-    userBattalions?: Array<{ type: string; quantity: number }>,
+    userBattalions?: Array<{ type: string; quantity: number; markLevel?: number }>,
     armyBonus?: ArmyBonus,
     guardianBonus?: ArmyBonus,
     phreakBonus?: { strength: number; defense: number; speed: number; health: number }
@@ -165,24 +166,36 @@ export class BattalionService {
         continue;
       }
       const validatedBotType = this.validateBotType(battalion.type);
-      
+      const markLevel =
+        typeof battalion.markLevel === 'number' && battalion.markLevel >= 2 ? 2 : 1;
+
       // Get stats from BotService (army bonus for breacher, guardian bonus for guardian, phreak bonus for phreak)
-      const botConfig = await BotService.getUserBotStats(validatedBotType, userLevel, armyBonus, guardianBonus, phreakBonus);
+      const botConfig = await BotService.getUserBotStats(
+        validatedBotType,
+        userLevel,
+        armyBonus,
+        guardianBonus,
+        phreakBonus,
+        markLevel as 1 | 2
+      );
       
       // Random node selection from available user nodes
       // Multiple battalions can share the same node
       const randomNodeIndex = Math.floor(Math.random() * availableUserNodes.length);
       const nodeIndex = availableUserNodes[randomNodeIndex];
       
-      battalions.push(BattalionFactory.createBattalion(
-        `user-battalion-${battalions.length}`,
-        validatedBotType,
-        battalion.quantity,
-        nodeIndex,
-        NodeOwner.USER,
-        botConfig.stats,
-        nodes
-      ));
+      battalions.push(
+        BattalionFactory.createBattalion(
+          `user-battalion-${battalions.length}`,
+          validatedBotType,
+          battalion.quantity,
+          nodeIndex,
+          NodeOwner.USER,
+          botConfig.stats,
+          nodes,
+          markLevel
+        )
+      );
     }
     
     return battalions;
@@ -230,7 +243,7 @@ export class BattalionService {
     nodes: INode[],
     userLevel: number,
     npc: {
-      battalions: Array<{ type: string; quantity: number }>;
+      battalions: Array<{ type: string; quantity: number; markLevel?: number }>;
       statMultipliers: { health: number; speed: number; offense: number; defense: number; range: number };
     }
   ): Promise<IBattalion[]> {
@@ -240,12 +253,11 @@ export class BattalionService {
 
     for (const battalion of npc.battalions) {
       const validatedBotType = this.validateEnemyBotType(battalion.type);
+      const markLevel = normalizeNpcBattalionMarkLevel(battalion.markLevel);
 
-      // Get stats from BotService based on user level (no statMultipliers needed)
-      const botConfig = await BotService.getEnemyBotStats(validatedBotType, userLevel);
+      const botConfig = await BotService.getEnemyBotStats(validatedBotType, userLevel, markLevel);
       const base = botConfig.stats;
-      
-      // No scaling needed - stats are already at the correct level
+
       const scaledStats = {
         health: base.health,
         speed: base.speed,
@@ -257,15 +269,18 @@ export class BattalionService {
       const randomNodeIndex = Math.floor(Math.random() * availableEnemyNodes.length);
       const nodeIndex = availableEnemyNodes[randomNodeIndex];
 
-      battalions.push(BattalionFactory.createBattalion(
-        `enemy-battalion-${battalions.length}`,
-        validatedBotType,
-        battalion.quantity,
-        nodeIndex,
-        NodeOwner.ENEMY,
-        scaledStats,
-        nodes
-      ));
+      battalions.push(
+        BattalionFactory.createBattalion(
+          `enemy-battalion-${battalions.length}`,
+          validatedBotType,
+          battalion.quantity,
+          nodeIndex,
+          NodeOwner.ENEMY,
+          scaledStats,
+          nodes,
+          markLevel
+        )
+      );
     }
 
     return battalions;

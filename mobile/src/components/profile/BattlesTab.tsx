@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
+  Pressable,
+  ActionSheetIOS,
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -18,65 +20,154 @@ import {
   type PresetBattalionConfig,
   type PresetData,
 } from '../../store/api/battlePresetsApi';
+import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
+import { useAppSelector } from '../../store/hooks';
+import { BOT_FAMILY_ORDER, MARK2_DISPLAY_NAMES } from '../../utils/botInventory';
 
 const BATTALION_IDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 type BotType = 'breacher' | 'guardian' | 'phreak';
 
-/** Bots available for preset selection. Type label (Sprint/Brute/Remote) + display name. Future Mark II–IV add more entries per type. */
-const PRESET_BOT_OPTIONS: { botType: BotType; typeLabel: string; name: string }[] = [
-  { botType: 'guardian', typeLabel: 'Sprint', name: 'Guardian' },
-  { botType: 'breacher', typeLabel: 'Brute', name: 'Breacher' },
-  { botType: 'phreak', typeLabel: 'Remote', name: 'Phreak' },
-];
+const PRESET_BOT_META: Record<BotType, { typeLabel: string; m1Name: string }> = {
+  breacher: { typeLabel: 'Brute', m1Name: 'Breacher' },
+  guardian: { typeLabel: 'Sprint', m1Name: 'Guardian' },
+  phreak: { typeLabel: 'Remote', m1Name: 'Phreak' },
+};
+
+type SlotChoice = { botType: BotType; markLevel: 1 | 2; label: string };
+
+function buildAllChoices(mark2Unlocked: boolean): SlotChoice[] {
+  const rows: SlotChoice[] = [];
+  for (const botType of BOT_FAMILY_ORDER) {
+    const meta = PRESET_BOT_META[botType];
+    rows.push({
+      botType,
+      markLevel: 1,
+      label: `${meta.m1Name} (${meta.typeLabel}) · M1`,
+    });
+    if (mark2Unlocked) {
+      const m2Name = MARK2_DISPLAY_NAMES[botType];
+      rows.push({
+        botType,
+        markLevel: 2,
+        label: `${m2Name} (${meta.typeLabel}) · M2`,
+      });
+    }
+  }
+  return rows;
+}
+
+function choiceKey(botType: BotType, markLevel: 1 | 2): string {
+  return `${botType}:${markLevel}`;
+}
+
+function parseChoiceKey(s: string): { botType: BotType; markLevel: 1 | 2 } | null {
+  const [a, b] = s.split(':');
+  if (a !== 'breacher' && a !== 'guardian' && a !== 'phreak') return null;
+  if (b !== '1' && b !== '2') return null;
+  return { botType: a, markLevel: b === '2' ? 2 : 1 };
+}
+
+function battalionsFromSig(sig: string): PresetData['battalions'] {
+  try {
+    const o = JSON.parse(sig) as unknown;
+    if (o == null || typeof o !== 'object' || Array.isArray(o)) return null;
+    return o as Record<string, PresetBattalionConfig>;
+  } catch {
+    return null;
+  }
+}
+
+function buildInitialBattalions(
+  presetBattalions: PresetData['battalions'],
+  options: SlotChoice[]
+): Record<string, { choiceKey: string; quantity: string }> {
+  const result: Record<string, { choiceKey: string; quantity: string }> = {};
+  for (const id of BATTALION_IDS) {
+    const existing = presetBattalions?.[id];
+    const bt = (existing?.botType ?? 'breacher') as BotType;
+    const ml: 1 | 2 = existing?.markLevel === 2 ? 2 : 1;
+    const key = choiceKey(bt, ml);
+    const valid = options.some((c) => choiceKey(c.botType, c.markLevel) === key);
+    result[id] = {
+      choiceKey: valid ? key : choiceKey('breacher', 1),
+      quantity: existing?.quantity != null ? String(existing.quantity) : '',
+    };
+  }
+  return result;
+}
 
 interface PresetEditorProps {
   preset: PresetData;
   colors: any;
+  choiceOptions: SlotChoice[];
+  onSavePreset: (presetId: string, battalions: Record<string, PresetBattalionConfig>) => Promise<void>;
+  isSaving: boolean;
 }
 
-const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
-  const [saveBattlePreset, { isLoading: isSaving }] = useSaveBattlePresetMutation();
+/** Must match landscape-only `UISupportedInterfaceOrientations` in Info.plist. */
+const MODAL_LANDSCAPE_ORIENTATIONS = ['landscape-left', 'landscape-right'] as const;
 
-  const initialBattalions = useCallback((): Record<string, { botType: string; quantity: string }> => {
-    const result: Record<string, { botType: string; quantity: string }> = {};
-    for (const id of BATTALION_IDS) {
-      const existing = preset.battalions?.[id];
-      result[id] = {
-        botType: existing?.botType ?? 'breacher',
-        quantity: existing?.quantity != null ? String(existing.quantity) : '',
-      };
-    }
-    return result;
-  }, [preset.battalions]);
-
+const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, isSaving }: PresetEditorProps) => {
   const serverBattalionsSig = useMemo(
     () => JSON.stringify(preset.battalions ?? {}),
     [preset.battalions]
   );
 
-  const [battalions, setBattalions] = useState(() => initialBattalions());
+  const [battalions, setBattalions] = useState(() =>
+    buildInitialBattalions(preset.battalions, choiceOptions)
+  );
 
   useEffect(() => {
-    setBattalions(initialBattalions());
-  }, [preset.id, serverBattalionsSig, initialBattalions]);
+    setBattalions(buildInitialBattalions(battalionsFromSig(serverBattalionsSig), choiceOptions));
+  }, [preset.id, serverBattalionsSig, choiceOptions]);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [openBotPickerForRow, setOpenBotPickerForRow] = useState<string | null>(null);
 
-  const handleBotTypeChange = useCallback((battalionId: string, botType: string) => {
-    setBattalions(prev => ({
+  const labelForChoiceKey = useCallback(
+    (key: string): string => {
+      const parsed = parseChoiceKey(key);
+      if (!parsed) return choiceOptions[0]?.label ?? '';
+      const c = choiceOptions.find(
+        (o) => o.botType === parsed.botType && o.markLevel === parsed.markLevel
+      );
+      return c?.label ?? choiceOptions[0]?.label ?? '';
+    },
+    [choiceOptions]
+  );
+
+  const handleChoiceKeyChange = useCallback((battalionId: string, key: string) => {
+    setBattalions((prev) => ({
       ...prev,
-      [battalionId]: { ...prev[battalionId], botType },
+      [battalionId]: { ...prev[battalionId], choiceKey: key },
     }));
     setSaveMessage(null);
     setOpenBotPickerForRow(null);
   }, []);
 
-  const currentBotOption = (botType: string) =>
-    PRESET_BOT_OPTIONS.find(o => o.botType === botType) ?? PRESET_BOT_OPTIONS[0];
+  const openIosBotPicker = useCallback(
+    (rowId: string) => {
+      const labels = choiceOptions.map((o) => o.label);
+      const cancelIndex = labels.length;
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [...labels, 'Cancel'],
+          cancelButtonIndex: cancelIndex,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === cancelIndex) return;
+          const opt = choiceOptions[buttonIndex];
+          if (opt) {
+            handleChoiceKeyChange(rowId, choiceKey(opt.botType, opt.markLevel));
+          }
+        }
+      );
+    },
+    [choiceOptions, handleChoiceKeyChange]
+  );
 
   const handleQuantityChange = useCallback((battalionId: string, text: string) => {
     const cleaned = text.replace(/[^0-9]/g, '');
-    setBattalions(prev => ({
+    setBattalions((prev) => ({
       ...prev,
       [battalionId]: { ...prev[battalionId], quantity: cleaned },
     }));
@@ -88,7 +179,13 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
     for (const [id, config] of Object.entries(battalions)) {
       const qty = parseInt(config.quantity, 10);
       if (qty > 0) {
-        payload[id] = { botType: config.botType as any, quantity: qty };
+        const parsed = parseChoiceKey(config.choiceKey);
+        if (!parsed) continue;
+        payload[id] = {
+          botType: parsed.botType,
+          quantity: qty,
+          markLevel: parsed.markLevel,
+        };
       }
     }
 
@@ -98,37 +195,46 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
     }
 
     try {
-      await saveBattlePreset({ presetId: preset.id, battalions: payload }).unwrap();
+      await onSavePreset(preset.id, payload);
       setSaveMessage('Saved.');
     } catch {
       setSaveMessage('Failed to save.');
     }
-  }, [battalions, preset.id, saveBattlePreset]);
+  }, [battalions, preset.id, onSavePreset]);
 
   return (
     <View style={[styles.presetCard, { borderColor: colors.matrix + '33' }]}>
       <Text style={[styles.presetTitle, { color: colors.matrix }]}>PRESET {preset.id}</Text>
-      {BATTALION_IDS.map(id => {
+      {BATTALION_IDS.map((id) => {
         const config = battalions[id];
-        const option = currentBotOption(config.botType);
         return (
           <View key={id} style={styles.battalionRow}>
-            <Text style={[styles.battalionLabel, { color: colors.text.primary }]}>
-              {id}
-            </Text>
+            <Text style={[styles.battalionLabel, { color: colors.text.primary }]}>{id}</Text>
             <TouchableOpacity
               style={[styles.botDropdown, { borderColor: colors.matrix + '44' }]}
-              onPress={() => setOpenBotPickerForRow(id)}
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  openIosBotPicker(id);
+                } else {
+                  setOpenBotPickerForRow(id);
+                }
+              }}
             >
-              <Text style={[styles.botDropdownText, { color: colors.text.primary }]}>
-                {option.name} ({option.typeLabel})
+              <Text style={[styles.botDropdownText, { color: colors.text.primary }]} numberOfLines={2}>
+                {labelForChoiceKey(config.choiceKey)}
               </Text>
             </TouchableOpacity>
             <TextInput
-              style={[styles.quantityInput, { color: colors.text.primary, borderColor: colors.matrix + '44' }]}
+              style={[
+                styles.quantityInput,
+                { color: colors.text.primary, borderColor: colors.matrix + '44' },
+              ]}
               value={config.quantity}
               onChangeText={(text) => handleQuantityChange(id, text)}
               keyboardType="number-pad"
+              autoCorrect={false}
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder="0"
               placeholderTextColor={colors.text.primary + '44'}
               maxLength={7}
@@ -136,38 +242,50 @@ const PresetEditor = React.memo(({ preset, colors }: PresetEditorProps) => {
           </View>
         );
       })}
-      <Modal
-        visible={openBotPickerForRow != null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOpenBotPickerForRow(null)}
-        supportedOrientations={['landscape-left', 'landscape-right']}
-      >
-        <TouchableOpacity
-          style={styles.botPickerOverlay}
-          activeOpacity={1}
-          onPress={() => setOpenBotPickerForRow(null)}
+      {Platform.OS === 'android' && (
+        <Modal
+          visible={openBotPickerForRow != null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOpenBotPickerForRow(null)}
+          supportedOrientations={[...MODAL_LANDSCAPE_ORIENTATIONS]}
         >
-          <View style={[styles.botPickerContainer, { backgroundColor: colors.surface, borderColor: colors.matrix + '44' }]}>
-            <Text style={[styles.botPickerTitle, { color: colors.text.primary }]}>Select bot</Text>
-            {PRESET_BOT_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.botType}
-                style={[
-                  styles.botPickerOption,
-                  { borderBottomColor: colors.text.primary + '22' },
-                  openBotPickerForRow && battalions[openBotPickerForRow]?.botType === opt.botType && { backgroundColor: colors.matrix + '22' },
-                ]}
-                onPress={() => openBotPickerForRow && handleBotTypeChange(openBotPickerForRow, opt.botType)}
+          <View style={styles.botPickerOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpenBotPickerForRow(null)} />
+            <View
+              style={[styles.botPickerContainer, { backgroundColor: colors.surface, borderColor: colors.matrix + '44' }]}
+              onStartShouldSetResponder={() => true}
+            >
+              <Text style={[styles.botPickerTitle, { color: colors.text.primary }]}>Select bot</Text>
+              <ScrollView
+                style={styles.botPickerScroll}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
               >
-                <Text style={[styles.botPickerOptionText, { color: colors.text.primary }]}>
-                  {opt.name} ({opt.typeLabel})
-                </Text>
-              </TouchableOpacity>
-            ))}
+                {choiceOptions.map((opt) => {
+                  const key = choiceKey(opt.botType, opt.markLevel);
+                  const selected =
+                    openBotPickerForRow != null && battalions[openBotPickerForRow]?.choiceKey === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[
+                        styles.botPickerOption,
+                        { borderBottomColor: colors.text.primary + '22' },
+                        selected && { backgroundColor: colors.matrix + '22' },
+                      ]}
+                      onPress={() => openBotPickerForRow && handleChoiceKeyChange(openBotPickerForRow, key)}
+                    >
+                      <Text style={[styles.botPickerOptionText, { color: colors.text.primary }]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
-        </TouchableOpacity>
-      </Modal>
+        </Modal>
+      )}
       <TouchableOpacity
         style={[styles.saveButton, { backgroundColor: colors.matrix }]}
         onPress={handleSave}
@@ -197,14 +315,41 @@ const LockedPreset = React.memo(({ preset, colors }: LockedPresetProps) => (
     <Text style={[styles.lockedText, { color: colors.text.primary + '55' }]}>
       Level {preset.levelRequired} · ${preset.cost.toLocaleString()}
     </Text>
-    <Text style={[styles.lockedSubtext, { color: colors.text.primary + '44' }]}>
-      Unlock on Battle screen
-    </Text>
+    <Text style={[styles.lockedSubtext, { color: colors.text.primary + '44' }]}>Unlock on Battle screen</Text>
   </View>
 ));
 
 export function BattlesTab(): React.JSX.Element {
   const colors = useThemeColors();
+  const token = useAppSelector((state) => state.auth.token);
+  const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !token });
+  const mark2Unlocked =
+    hackAbilityFeatures?.features?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
+    false;
+  const choiceOptions = useMemo(() => buildAllChoices(mark2Unlocked), [mark2Unlocked]);
+
+  /**
+   * Bugbot: `useSaveBattlePresetMutation` exposes shared `isLoading`; passing it to every PresetEditor would disable all
+   * SAVE buttons. We track `savingPresetIds` and pass `isSaving={!!savingPresetIds[preset.id]}` per editor.
+   */
+  const [savingPresetIds, setSavingPresetIds] = useState<Record<string, boolean>>({});
+  const [saveBattlePreset] = useSaveBattlePresetMutation();
+  const handleSavePreset = useCallback(
+    async (presetId: string, battalions: Record<string, PresetBattalionConfig>) => {
+      setSavingPresetIds((prev) => ({ ...prev, [presetId]: true }));
+      try {
+        await saveBattlePreset({ presetId, battalions }).unwrap();
+      } finally {
+        setSavingPresetIds((prev) => {
+          const next = { ...prev };
+          delete next[presetId];
+          return next;
+        });
+      }
+    },
+    [saveBattlePreset]
+  );
+
   const { data, isLoading } = useGetBattlePresetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
   });
@@ -223,18 +368,31 @@ export function BattlesTab(): React.JSX.Element {
     .filter((p): p is PresetData => p != null);
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={[styles.tabTitle, { color: colors.text.primary }]}>BATTLE PRESETS</Text>
       <Text style={[styles.tabSubtitle, { color: colors.text.primary + '88' }]}>
-        Set your desired troop layout for each preset. These are goals — when applied, battalions fill with what you have available.
+        Set your desired troop layout for each preset. These are goals — when applied, battalions fill with what you
+        have available.
       </Text>
-      {presetList.map(preset => (
+      {presetList.map((preset) =>
         preset.unlocked ? (
-          <PresetEditor key={preset.id} preset={preset} colors={colors} />
+          <PresetEditor
+            key={preset.id}
+            preset={preset}
+            colors={colors}
+            choiceOptions={choiceOptions}
+            onSavePreset={handleSavePreset}
+            isSaving={!!savingPresetIds[preset.id]}
+          />
         ) : (
           <LockedPreset key={preset.id} preset={preset} colors={colors} />
         )
-      ))}
+      )}
     </ScrollView>
   );
 }
@@ -300,6 +458,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 8,
     justifyContent: 'center',
+    minHeight: 36,
   },
   botDropdownText: {
     fontSize: Math.max(SIZING.font.small * 0.85, 11),
@@ -315,9 +474,13 @@ const styles = StyleSheet.create({
   botPickerContainer: {
     width: '100%',
     maxWidth: 320,
+    maxHeight: '70%',
     borderWidth: 1,
     borderRadius: 8,
     overflow: 'hidden',
+  },
+  botPickerScroll: {
+    maxHeight: 320,
   },
   botPickerTitle: {
     fontSize: SIZING.font.small,

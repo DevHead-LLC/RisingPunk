@@ -12,9 +12,12 @@ import { BotService } from './BotService';
 import { NPCService } from './NPCService';
 import { Map as MapModel } from '../models/Map';
 import { User } from '../models/User';
-import { findCellByNpcInstanceId } from './CellAccessorService';
+import { findCellByNpcInstanceId, getCell } from './CellAccessorService';
 import mongoose from 'mongoose';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
+import { syncAndResolveUserBotProgrammingBonuses } from '../utils/syncUserBotProgrammingBonuses';
+import { parseInventoryKeyToFamilyAndMark } from '../utils/botInventoryKeys';
+import { normalizeNpcBattalionMarkLevel } from '../utils/npcMarkMixConfig';
 
 export class BattleSetupService {
 
@@ -23,7 +26,7 @@ export class BattleSetupService {
     defenderId: string,
     screenWidth: number,
     screenHeight: number,
-    userBattalions?: Array<{ type: string; quantity: number }>,
+    userBattalions?: Array<{ type: string; quantity: number; markLevel?: number }>,
     defenderNpcSlug?: string,
     unlockHackRigOnWin?: boolean,
     defenderNpcInstanceId?: string,
@@ -40,11 +43,11 @@ export class BattleSetupService {
     let attackerPhreakBonus: { strength: number; defense: number; speed: number; health: number } | undefined;
     if (attackerId !== 'computer-opponent') {
       try {
-        const attacker = await User.findById(attackerId);
-        userLevel = attacker?.level || 1;
-        attackerArmyBonus = attacker?.armyBonus;
-        attackerGuardianBonus = attacker?.guardianBonus;
-        attackerPhreakBonus = attacker?.phreakBonus;
+        const resolved = await syncAndResolveUserBotProgrammingBonuses(attackerId);
+        userLevel = resolved.userLevel;
+        attackerArmyBonus = resolved.armyBonusForStats;
+        attackerGuardianBonus = resolved.guardianBonusForStats;
+        attackerPhreakBonus = resolved.phreakBonusForStats;
       } catch (error) {
         console.warn('Could not fetch user level, using default level 1:', error);
       }
@@ -103,16 +106,46 @@ export class BattleSetupService {
     if (!isUserDefender && defenderId === 'computer-opponent' && !npc) {
       throw new Error('Computer-opponent battle requires an NPC configuration. No NPC found or specified.');
     }
-    
+
+    /** Client should send this for map NPCs; if missing but hack map coords + slug match a cell, resolve from DB (aligns with map route npcInstanceId synthesis). */
+    let effectiveDefenderNpcInstanceId = defenderNpcInstanceId;
+    let defenderNpcInstanceIdVerifiedByCoords = false;
+    if (
+      !isUserDefender &&
+      actualDefenderNpcSlug &&
+      !effectiveDefenderNpcInstanceId &&
+      typeof hackMapCellX === 'number' &&
+      Number.isFinite(hackMapCellX) &&
+      typeof hackMapCellY === 'number' &&
+      Number.isFinite(hackMapCellY)
+    ) {
+      const mapDoc = await MapModel.findOne({ name: 'main' });
+      if (mapDoc) {
+        const cell = await getCell(mapDoc, hackMapCellX, hackMapCellY);
+        if (
+          cell &&
+          cell.occupiedBy === 'npc' &&
+          String((cell as any).npcSlug || '') === actualDefenderNpcSlug
+        ) {
+          const raw = (cell as any).npcInstanceId;
+          effectiveDefenderNpcInstanceId =
+            raw != null && String(raw).trim() !== ''
+              ? String(raw)
+              : `${actualDefenderNpcSlug}-${hackMapCellX}-${hackMapCellY}`;
+          defenderNpcInstanceIdVerifiedByCoords = true;
+        }
+      }
+    }
+
     // Validate that NPC instance exists on map if instance ID is provided (only for NPC battles)
-    if (!isUserDefender && defenderNpcInstanceId && actualDefenderNpcSlug) {
+    if (!isUserDefender && effectiveDefenderNpcInstanceId && actualDefenderNpcSlug && !defenderNpcInstanceIdVerifiedByCoords) {
       const mapDoc = await MapModel.findOne({ name: 'main' });
       if (!mapDoc) {
         throw new Error('Map not found');
       }
-      const npcCell = await findCellByNpcInstanceId(mapDoc, defenderNpcInstanceId, actualDefenderNpcSlug);
+      const npcCell = await findCellByNpcInstanceId(mapDoc, effectiveDefenderNpcInstanceId, actualDefenderNpcSlug);
       if (!npcCell) {
-        throw new Error(`NPC instance ${defenderNpcInstanceId} not found on map`);
+        throw new Error(`NPC instance ${effectiveDefenderNpcInstanceId} not found on map`);
       }
     }
     
@@ -123,7 +156,16 @@ export class BattleSetupService {
         continue;
       }
       const botType = battalion.type as BotType;
-      const botConfig = await BotService.getUserBotStats(botType, userLevel, attackerArmyBonus, attackerGuardianBonus, attackerPhreakBonus);
+      const markLevel =
+        typeof battalion.markLevel === 'number' && battalion.markLevel >= 2 ? 2 : 1;
+      const botConfig = await BotService.getUserBotStats(
+        botType,
+        userLevel,
+        attackerArmyBonus,
+        attackerGuardianBonus,
+        attackerPhreakBonus,
+        markLevel as 1 | 2
+      );
       userTotal += botConfig.stats.health * battalion.quantity;
     }
     
@@ -137,20 +179,32 @@ export class BattleSetupService {
         throw new Error(`Defender user ${defenderId} not found. Cannot calculate enemy total.`);
       }
       
-      const defenderLevel = defender.level || 1;
+      const defenderResolved = await syncAndResolveUserBotProgrammingBonuses(defenderId);
+      const defenderLevel = defenderResolved.userLevel;
       const BotModel = mongoose.model('Bot');
       const defenderBots = await BotModel.findOne({ userId: defenderId });
       
-      // Calculate total health for all available bots in defender's inventory (defender army/guardian bonus)
-      const defenderArmyBonus = defender.armyBonus;
-      const defenderGuardianBonus = defender.guardianBonus;
-      const defenderPhreakBonus = defender.phreakBonus;
+      const defenderArmyBonus = defenderResolved.armyBonusForStats;
+      const defenderGuardianBonus = defenderResolved.guardianBonusForStats;
+      const defenderPhreakBonus = defenderResolved.phreakBonusForStats;
       if (defenderBots && defenderBots.bots) {
-        for (const [botType, quantity] of Object.entries(defenderBots.bots)) {
-          if (typeof quantity === 'number' && quantity > 0) {
-            const botConfig = await BotService.getUserBotStats(botType as BotType, defenderLevel, defenderArmyBonus, defenderGuardianBonus, defenderPhreakBonus);
-            enemyTotal += botConfig.stats.health * quantity;
+        for (const [invKey, quantity] of Object.entries(defenderBots.bots)) {
+          if (typeof quantity !== 'number' || quantity <= 0) {
+            continue;
           }
+          const parsed = parseInventoryKeyToFamilyAndMark(invKey);
+          if (!parsed) {
+            continue;
+          }
+          const botConfig = await BotService.getUserBotStats(
+            parsed.family,
+            defenderLevel,
+            defenderArmyBonus,
+            defenderGuardianBonus,
+            defenderPhreakBonus,
+            parsed.markLevel
+          );
+          enemyTotal += botConfig.stats.health * quantity;
         }
       }
       // If no bots found, enemyTotal remains 0 - defender won't be able to deploy
@@ -159,7 +213,8 @@ export class BattleSetupService {
       const npcLevel = npc.userLevelAssociation || 1;
       for (const battalion of npc.battalions) {
         const validatedType = BattalionService.validateEnemyBotType(battalion.type);
-        const botConfig = await BotService.getEnemyBotStats(validatedType, npcLevel);
+        const ml = normalizeNpcBattalionMarkLevel(battalion.markLevel);
+        const botConfig = await BotService.getEnemyBotStats(validatedType, npcLevel, ml);
         enemyTotal += botConfig.stats.health * battalion.quantity;
       }
     } else {
@@ -218,7 +273,7 @@ export class BattleSetupService {
       screenHeight,
       ...(unlockHackRigOnWin ? { unlockHackRigOnWin: true } as any : {}),
       ...(actualDefenderNpcSlug ? { defenderNpcSlug: actualDefenderNpcSlug } as any : {}),
-      ...(defenderNpcInstanceId ? { defenderNpcInstanceId } as any : {}),
+      ...(effectiveDefenderNpcInstanceId ? { defenderNpcInstanceId: effectiveDefenderNpcInstanceId } as any : {}),
       ...(isUserDefender ? { 
         isUserDefender: true,
         defenderDeployedTotals: { guardian: 0, breacher: 0, phreak: 0 },

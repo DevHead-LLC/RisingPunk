@@ -1,60 +1,75 @@
-# Merge decisions: `origin/dev` → `android_mergeDev` (March 23, 2026)
-
-Session log for conflict resolutions. Priority: Android deploy / Play Console first, then dev behavior.
+# Merge Decisions — dev → android_mergeDev (2026-03-26)
 
 ---
 
-## Deploy workflows
-
-No conflicts in `.github/workflows/deploy-production.yml` or `deploy-staging.yml` this session. **Kept HEAD per merge-flow; workflows unchanged by intent.**
-
----
-
-## `mobile/package.json`
+## 1. `mobile/package.json`
 
 | Side | Content |
 |------|---------|
-| HEAD (`androidStaging` lineage) | `"version": "3.2.0"`, `"versionCode": 104` |
-| `origin/dev` | `"version": "3.3.0"` (no `versionCode`) |
+| **HEAD (androidStaging)** | `"version": "3.3.0"`, `"versionCode": 106` |
+| **dev** | `"version": "3.4.0"` (no versionCode) |
 
-**Resolution:** `"version": "3.3.0"` + `"versionCode": 104`.
+**Resolution:** Took dev's version bump (`3.4.0`) and kept Android's `versionCode: 106`.
 
-**Rationale:** Version label tracks dev. `versionCode` stays from the Android branch for Gradle / Play monotonicity until the next intentional store bump.
+**Rationale:** `versionCode` is Android-specific (required for Google Play Console uploads — each upload must increment). Dev doesn't track it. Version string updated to match dev's latest.
 
-**Rejected:** Dropping `versionCode`. Keeping `3.2.0` only.
+**Rejected content:** HEAD's `"version": "3.3.0"` — stale version string.
 
-**If something breaks:** Gradle missing `versionCode` → restore in `package.json`. Play upload rejected for duplicate code → bump `versionCode` in a dedicated commit.
-
----
-
-## `mobile/src/screens/HackMapScreen.tsx` (active probes + move property)
-
-| Side | Content |
-|------|---------|
-| HEAD | `useGetActiveProbesQuery` with `refetch: refetchActiveProbes`; no `useMovePropertyMutation` on this block |
-| `origin/dev` | `useMovePropertyMutation` + `useGetActiveProbesQuery` without `refetch` |
-
-**Resolution:** Both hooks: `useMovePropertyMutation()` then `useGetActiveProbesQuery` with `refetch: refetchActiveProbes` (dev’s move-property API + HEAD’s refetch used by probe completion effects).
-
-**Rationale:** Dev adds move-property; Android branch added probe refetch after complete — both behaviors are required.
-
-**Rejected:** Dev-only (lose refetch → stale probe UI). HEAD-only (lose move mutation → build/runtime errors where `movePropertyMutation` is used).
-
-**If something breaks:** Move property fails → check `handleMovePropertyPress` / `movePropertyMutation`. Probes stuck after complete → check `refetchActiveProbes` call sites.
+**Failure-mode hints:** If `versionCode` is missing or lower than the last Play Console upload, the AAB/APK will be rejected on upload.
 
 ---
 
-## `mobile/src/screens/HackMapScreen.tsx` (selected-cell modal `useCallback` deps)
+## 2. `mobile/src/components/AppContent.tsx`
 
 | Side | Content |
 |------|---------|
-| HEAD | Shorter dependency array (no `probes`, no share/move handlers) |
-| `origin/dev` | Full deps including `probes`, `handleShareLocationPress`, `effectiveMyPosition`, `currentBalanceDisplay`, `handleMovePropertyPress` |
+| **HEAD (androidStaging)** | Empty line (whitespace only) |
+| **dev** | `const activeBotBuildQueue = useAppSelector((state) => state.bots.buildQueue);` |
 
-**Resolution:** `origin/dev` dependency array.
+**Resolution:** Took dev's `activeBotBuildQueue` selector.
 
-**Rationale:** Modal renders share location + move property; those handlers and `probes` belong in the dependency list so the callback matches dev’s UI.
+**Rationale:** The selector is referenced at line 88 (`pollingInterval: activeBotBuildQueue ? 2000 : 10000`) for dynamic build-state polling. Without it, the variable would be undefined and the build would fail. No Android-specific concern.
 
-**Rejected:** HEAD’s shorter list (risk stale closures for new buttons).
+**Rejected content:** HEAD's blank line — no functional content.
 
-**If something breaks:** Wrong labels or handlers on cell modal → verify deps match values used inside the callback.
+**Failure-mode hints:** If this selector is missing, TypeScript will error on the `activeBotBuildQueue` reference in `useFetchBuildStateQuery`.
+
+---
+
+## 3. `mobile/src/screens/BattlePreparationScreen.tsx`
+
+| Side | Content |
+|------|---------|
+| **HEAD (androidStaging)** | `presetApplyChainRef`, `lastSuccessfulPresetSigRef` refs + old `handleBotAssignment` signature (no `markLevel`) |
+| **dev** | Updated `handleBotAssignment` signature with `markLevel: 1 \| 2` parameter |
+
+**Resolution:** Kept both — Android's preset refs AND dev's updated function signature with `markLevel`.
+
+**Rationale:** The preset refs (`presetApplyChainRef`, `lastSuccessfulPresetSigRef`) are used by `handleApplyPreset` (lines 238-315) and are Android-branch additions for serialized preset application. Dev's `markLevel` parameter is required because the function body (line 214) passes `markLevel` to `assignToBattalion`. Both are needed for the merged code to compile and function.
+
+**Rejected content:** HEAD's old function signature without `markLevel` — the function body already references `data.markLevel`.
+
+**Failure-mode hints:** Missing preset refs → `handleApplyPreset` crashes on undefined `presetApplyChainRef`. Missing `markLevel` in signature → TypeScript error when calling `handleBotAssignment` with mark level data.
+
+---
+
+## 4. `mobile/src/store/slices/authSlice.ts`
+
+| Side | Content |
+|------|---------|
+| **HEAD (androidStaging)** | `await markAccountExists();` + `await clearPersistedTurfNavState();` |
+| **dev** | `await logAccountCreatedOnce({ userId: data.user._id, method: 'guest' });` |
+
+**Resolution:** Kept all three lines: `markAccountExists()`, `clearPersistedTurfNavState()`, then `logAccountCreatedOnce()`.
+
+**Rationale:** `markAccountExists()` is needed for "returning user" tracking. `clearPersistedTurfNavState()` is an Android/androidStaging fix ensuring new guests start on turf (not a stale previous user's screen like a locked map). `logAccountCreatedOnce()` is dev's new analytics call to track guest account creation. All three are independent and necessary.
+
+**Rejected content:** None — both sides fully included.
+
+**Failure-mode hints:** Missing `clearPersistedTurfNavState()` → new guest may land on previous user's locked map screen. Missing `logAccountCreatedOnce()` → guest account_created analytics event won't fire.
+
+---
+
+## Deploy workflow files
+
+Kept HEAD per merge-flow; workflows unchanged by intent.
