@@ -36,7 +36,7 @@ export interface SpeedupFeatureResearchResponse {
 }
 
 /** Cash-flow feature IDs (spec 18) that affect balance/expense modifiers; used to invalidate balance cache on complete/speedup. Excludes legacy financial/reduce-expenses (categoryId is always cash-flow in these mutations). */
-const CASH_FLOW_SYNC_FEATURE_IDS: readonly string[] = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'increase-income-03-ii', 'increase-income-03-iii', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-insurance-03', 'reduce-rent-mortgage-05', 'reduce-tax-expense-02'];
+const CASH_FLOW_SYNC_FEATURE_IDS: readonly string[] = ['increase-income-01', 'increase-income-02', 'increase-income-025', 'increase-income-03', 'increase-income-03-ii', 'increase-income-03-iii', 'increase-income-03-iv', 'increase-income-03-v', 'increase-income-05', 'increase-income-10-i', 'increase-income-10-ii', 'reduce-insurance-01', 'reduce-insurance-02', 'reduce-insurance-03', 'reduce-rent-mortgage-05', 'reduce-tax-expense-02'];
 
 /** Investments feature IDs that affect rental income (spec 18). */
 const INVESTMENTS_SYNC_FEATURE_IDS: readonly string[] = ['rental-profit-01', 'rental-profit-015', 'rental-profit-02-i', 'rental-profit-02-ii', 'rental-profit-02-iii'];
