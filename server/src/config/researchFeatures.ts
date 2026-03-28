@@ -418,7 +418,7 @@ export async function getResearchFeaturesAsync(categoryId: string): Promise<IRes
       merged.push(toResearchFeature(d as any));
     }
   }
-  if (categoryId === 'cash-flow') {
+  if (categoryId === 'cash-flow' || categoryId === 'hack-ability') {
     merged.sort((a, b) => {
       const la = a.levelRequirement ?? 0;
       const lb = b.levelRequirement ?? 0;

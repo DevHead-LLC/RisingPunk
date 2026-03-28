@@ -4,8 +4,9 @@
  */
 
 import { Battle, IBattleDocument } from '../models/Battle';
-import { BotType, IBattalion, NodeOwner } from '../types/battle';
+import { BotType, NodeOwner } from '../types/battle';
 import mongoose from 'mongoose';
+import { getInventoryKey } from '../utils/botInventoryKeys';
 
 export class BattleInventorySettlementService {
   
@@ -54,26 +55,24 @@ export class BattleInventorySettlementService {
       const startingBattalions = battle.startingBattalions || [];
       const endingBattalions = battle.battalions || [];
       
-      // Group by bot type and calculate survivors
-      const survivorsByType: Record<string, number> = { guardian: 0, breacher: 0, phreak: 0 };
-      
+      const survivorsByInventoryKey: Record<string, number> = {};
+
       for (const endingBattalion of endingBattalions) {
         if (endingBattalion.owner === NodeOwner.USER && !endingBattalion.isDestroyed) {
-          const botType = endingBattalion.type as keyof typeof survivorsByType;
-          if (botType && survivorsByType[botType] !== undefined) {
-            survivorsByType[botType] += endingBattalion.quantity;
-          }
+          const mark =
+            typeof endingBattalion.mark === 'number' && endingBattalion.mark >= 2 ? 2 : 1;
+          const invKey = getInventoryKey(endingBattalion.type as BotType, mark);
+          survivorsByInventoryKey[invKey] =
+            (survivorsByInventoryKey[invKey] || 0) + endingBattalion.quantity;
         }
       }
 
-      // Add survivors back to attacker's inventory
       let inventoryUpdated = false;
-      for (const [botType, survivorCount] of Object.entries(survivorsByType)) {
+      for (const [invKey, survivorCount] of Object.entries(survivorsByInventoryKey)) {
         if (survivorCount > 0) {
-          const currentCount = attackerBots.bots[botType as keyof typeof attackerBots.bots] || 0;
-          attackerBots.bots[botType as keyof typeof attackerBots.bots] = currentCount + survivorCount;
+          const currentCount = attackerBots.bots[invKey as keyof typeof attackerBots.bots] || 0;
+          attackerBots.bots[invKey as keyof typeof attackerBots.bots] = currentCount + survivorCount;
           inventoryUpdated = true;
-          
         }
       }
 
@@ -113,30 +112,26 @@ export class BattleInventorySettlementService {
         return;
       }
 
-      // Calculate survivors per type from deployed totals vs ending battalions
-      const deployedTotals = battle.defenderDeployedTotals || { guardian: 0, breacher: 0, phreak: 0 };
       const endingBattalions = battle.battalions || [];
-      
-      // Group by bot type and calculate survivors
-      const survivorsByType: Record<string, number> = { guardian: 0, breacher: 0, phreak: 0 };
-      
+
+      const survivorsByInventoryKey: Record<string, number> = {};
+
       for (const endingBattalion of endingBattalions) {
         if (endingBattalion.owner === NodeOwner.ENEMY && !endingBattalion.isDestroyed) {
-          const botType = endingBattalion.type as keyof typeof survivorsByType;
-          if (botType && survivorsByType[botType] !== undefined) {
-            survivorsByType[botType] += endingBattalion.quantity;
-          }
+          const mark =
+            typeof endingBattalion.mark === 'number' && endingBattalion.mark >= 2 ? 2 : 1;
+          const invKey = getInventoryKey(endingBattalion.type as BotType, mark);
+          survivorsByInventoryKey[invKey] =
+            (survivorsByInventoryKey[invKey] || 0) + endingBattalion.quantity;
         }
       }
 
-      // Add survivors back to defender's inventory
       let inventoryUpdated = false;
-      for (const [botType, survivorCount] of Object.entries(survivorsByType)) {
+      for (const [invKey, survivorCount] of Object.entries(survivorsByInventoryKey)) {
         if (survivorCount > 0) {
-          const currentCount = defenderBots.bots[botType as keyof typeof defenderBots.bots] || 0;
-          defenderBots.bots[botType as keyof typeof defenderBots.bots] = currentCount + survivorCount;
+          const currentCount = defenderBots.bots[invKey as keyof typeof defenderBots.bots] || 0;
+          defenderBots.bots[invKey as keyof typeof defenderBots.bots] = currentCount + survivorCount;
           inventoryUpdated = true;
-          
         }
       }
 

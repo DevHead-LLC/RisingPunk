@@ -52,12 +52,14 @@ export class BattalionFactory {
   /**
    * Create a defender battalion with proper positioning and stats
    * Used by DefenderDeploymentService for wave spawning. Optional armyBonus (e.g. Packet Breach) applied for breacher.
+   * @param markLevel Must match inventory (Mark I vs Mark II); same pipeline as attackers (`BotService.getUserBotStats`).
    */
   static async createDefenderBattalion(
     id: string,
     type: BotType,
     quantity: number,
     defenderLevel: number,
+    markLevel: 1 | 2,
     nodes: INode[],
     armyBonus?: { strength: number; defense: number; speed: number; health: number },
     guardianBonus?: { strength: number; defense: number; speed: number; health: number },
@@ -73,8 +75,14 @@ export class BattalionFactory {
     const randomIndex = Math.floor(Math.random() * enemyNodes.length);
     const spawnNode = enemyNodes[randomIndex];
 
-    // Get actual bot stats from database (army bonus for breacher, guardian bonus for guardian, phreak bonus for phreak)
-    const botConfig = await BotService.getUserBotStats(type, defenderLevel, armyBonus, guardianBonus, phreakBonus);
+    const botConfig = await BotService.getUserBotStats(
+      type,
+      defenderLevel,
+      armyBonus,
+      guardianBonus,
+      phreakBonus,
+      markLevel
+    );
     
     if (!botConfig || !botConfig.stats) {
       throw new Error(`No bot stats found for type: ${type} at level ${defenderLevel}`);
@@ -97,7 +105,8 @@ export class BattalionFactory {
       spawnNode.index,
       NodeOwner.ENEMY,
       stats,
-      nodes
+      nodes,
+      markLevel
     );
   }
 }
