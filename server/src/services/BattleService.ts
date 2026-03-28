@@ -155,20 +155,23 @@ export class BattleService {
 
   private async handlePhaseChange(battleId: string, phase: BattlePhase): Promise<void> {
     const updates: { phase: BattlePhase; countdown?: number; battleTime?: number } = { phase };
-    
+
     if (phase === BattlePhase.ACTIVE) {
       updates.countdown = 0;
       updates.battleTime = 0;
       BattalionService.startMovementUpdates(battleId);
-      
-      // For user defender battles, deploy the first wave immediately
+    }
+
+    // Persist phase (and ACTIVE countdown/battleTime) before defender first-wave deploy so deployWave
+    // cannot strand the battle in a non-ACTIVE DB state if retargeting throws after inventory writes.
+    await this.updateBattle(battleId, updates);
+
+    if (phase === BattlePhase.ACTIVE) {
       const battle = await this.getBattle(battleId);
       if (battle?.isUserDefender) {
         await DefenderDeploymentService.onTick(battleId);
       }
     }
-    
-    await this.updateBattle(battleId, updates);
   }
 
   private async handleBattleTimeUpdate(battleId: string, data: any): Promise<void> {

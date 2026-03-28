@@ -218,8 +218,9 @@ export class DefenderDeploymentService {
           'NEW_DEFENDER_DEPLOYMENT'
         );
       } catch (error) {
+        // Bugbot: inventory + battle battalions already committed above; rethrowing skips onTick
+        // completion (e.g. lastTickProcessed) and could skip phase ACTIVE if deploy ran before persist.
         console.error(`Error assigning targets to new battalions:`, error);
-        throw error;
       }
     }
   }
