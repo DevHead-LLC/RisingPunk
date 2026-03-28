@@ -1,7 +1,7 @@
 {
   "name": "mobile",
-  "version": "3.5.0",
-  "versionCode": 110,
+  "version": "3.6.0",
+  "versionCode": 111,
   "private": true,
   "scripts": {
     "android": "cd android && ./gradlew clean && cd ..",

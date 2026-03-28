@@ -206,7 +206,10 @@ const battleSchema = new Schema({
   defenderDeployedTotals: {
     guardian: { type: Number, default: 0 },
     breacher: { type: Number, default: 0 },
-    phreak: { type: Number, default: 0 }
+    phreak: { type: Number, default: 0 },
+    guardianM2: { type: Number, default: 0 },
+    breacherM2: { type: Number, default: 0 },
+    phreakM2: { type: Number, default: 0 }
   },
   defenderDeploymentExhausted: { type: Boolean, default: false },
   lastTickProcessed: { type: Number, default: 0 },
