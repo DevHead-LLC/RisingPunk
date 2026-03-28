@@ -4,7 +4,7 @@
  * State is keyed by userId so each user gets their own screen/position; switching
  * users or creating a new guest does not restore the previous user's state (fixes
  * iOS/Android bug where new guest saw HackMap/onboarding from previous account).
- * See taskItems/in-progress.md Phase 2 (14.1 Refresh app — stay on current screen and position).
+ * Context: refresh/hot reload — stay on current screen and position (see task docs under taskItems/).
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';

@@ -282,17 +282,57 @@ const BATTALION_SIZE_FEATURES: { featureId: string; add: number }[] = [
   { featureId: 'battalion-size-2000', add: 2000 },
   { featureId: 'battalion-size-4500', add: 4500 },
   { featureId: 'battalion-size-6500', add: 6500 },
+  { featureId: 'battalion-size-5000-i', add: 5000 },
+  { featureId: 'battalion-size-5000-ii', add: 5000 },
+  { featureId: 'battalion-size-7500-i', add: 7500 },
+  { featureId: 'battalion-size-7500-ii', add: 7500 },
+  { featureId: 'battalion-size-10000', add: 10000 },
 ];
+
+/** UI names for each tier (same order as BATTALION_SIZE_FEATURES). Must match `research_feature_definitions` / seedResearchFeatureDefinitionsFromImage.ts. */
+const BATTALION_SIZE_RESEARCH_DISPLAY_NAMES: string[] = [
+  'Battalion Size +250',
+  'Battalion Size +500',
+  'Battalion Size +1,000',
+  'Battalion Size +2,000',
+  'Battalion Size +4,500',
+  'Battalion Size +6,500',
+  'Battalion Size +5,000 I',
+  'Battalion Size +5,000 II',
+  'Battalion Size +7,500 I',
+  'Battalion Size +7,500 II',
+  'Battalion Size +10,000',
+];
+
+const BASE_BATTALION_SIZE = 250;
+
+/**
+ * When the user is blocked by current max battalion size, returns the next research hint (matches getMaxBattalionSize progression).
+ * Returns null at the final cap (50,000) or if maxLimit is not a valid intermediate cap.
+ */
+export function getNextBattalionSizeResearchHint(maxLimit: number): string | null {
+  if (BATTALION_SIZE_RESEARCH_DISPLAY_NAMES.length !== BATTALION_SIZE_FEATURES.length) {
+    throw new Error('BATTALION_SIZE_RESEARCH_DISPLAY_NAMES out of sync with BATTALION_SIZE_FEATURES');
+  }
+  let cum = BASE_BATTALION_SIZE;
+  for (let i = 0; i < BATTALION_SIZE_FEATURES.length; i++) {
+    if (maxLimit === cum) {
+      const nextCap = cum + BATTALION_SIZE_FEATURES[i].add;
+      const name = BATTALION_SIZE_RESEARCH_DISPLAY_NAMES[i];
+      return `Complete "${name}" research to increase to ${nextCap.toLocaleString('en-US')}.`;
+    }
+    cum += BATTALION_SIZE_FEATURES[i].add;
+  }
+  return null;
+}
 
 /** Legacy feature IDs (pre–spec-18) so we find docs before grandfather migration runs. Same category hack-ability. */
 const BATTALION_SIZE_LEGACY_IDS: Record<string, string[]> = {
   'battalion-size-250': ['battalion-size-250', 'increase-battalion-size'],
 };
 
-const BASE_BATTALION_SIZE = 250;
-
 /**
- * Max troops per battalion for a user from research (250, 500, 1000, 2000, 4000, 8500, or 15000).
+ * Max troops per battalion for a user from research (base 250 plus unlocked battalion-size tiers; cap up to 50,000 after all tiers).
  * Uses isUnlocked or "completing at or before asOfTime". Queries include legacy IDs so users with old docs are found before migration.
  * @param asOfTime If provided, research is treated unlocked when researchCompletesAt <= asOfTime.
  */
