@@ -282,6 +282,11 @@ const BATTALION_SIZE_FEATURES: { featureId: string; add: number }[] = [
   { featureId: 'battalion-size-2000', add: 2000 },
   { featureId: 'battalion-size-4500', add: 4500 },
   { featureId: 'battalion-size-6500', add: 6500 },
+  { featureId: 'battalion-size-5000-i', add: 5000 },
+  { featureId: 'battalion-size-5000-ii', add: 5000 },
+  { featureId: 'battalion-size-7500-i', add: 7500 },
+  { featureId: 'battalion-size-7500-ii', add: 7500 },
+  { featureId: 'battalion-size-10000', add: 10000 },
 ];
 
 /** Legacy feature IDs (pre–spec-18) so we find docs before grandfather migration runs. Same category hack-ability. */
@@ -292,7 +297,7 @@ const BATTALION_SIZE_LEGACY_IDS: Record<string, string[]> = {
 const BASE_BATTALION_SIZE = 250;
 
 /**
- * Max troops per battalion for a user from research (250, 500, 1000, 2000, 4000, 8500, or 15000).
+ * Max troops per battalion for a user from research (base 250 plus unlocked battalion-size tiers; cap up to 50,000 after all tiers).
  * Uses isUnlocked or "completing at or before asOfTime". Queries include legacy IDs so users with old docs are found before migration.
  * @param asOfTime If provided, research is treated unlocked when researchCompletesAt <= asOfTime.
  */
