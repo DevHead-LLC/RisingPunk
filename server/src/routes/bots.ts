@@ -3,7 +3,11 @@ const Bot = require('../models/Bot');
 import auth from '../middleware/auth';
 import { User } from '../models/User';
 import mongoose from 'mongoose';
-import { getMaxBattalionSize, isBattalionSlotUnlocked } from '../utils/researchFeatureUtils';
+import {
+  getMaxBattalionSize,
+  getNextBattalionSizeResearchHint,
+  isBattalionSlotUnlocked,
+} from '../utils/researchFeatureUtils';
 import {
   normalizeBotsObject,
   getInventoryKey,
@@ -692,7 +696,11 @@ router.post('/assign-preset', auth, async (req, res) => {
         return;
       }
       if (quantity > maxLimit) {
-        res.status(400).json({ error: `Maximum troops per battalion is ${maxLimit.toLocaleString()}.` });
+        const nextStep = getNextBattalionSizeResearchHint(maxLimit);
+        const errorMessage = nextStep
+          ? `Maximum troops per battalion is ${maxLimit.toLocaleString()}. ${nextStep}`
+          : `Maximum troops per battalion is ${maxLimit.toLocaleString()}.`;
+        res.status(400).json({ error: errorMessage });
         return;
       }
 
@@ -849,20 +857,7 @@ router.post('/assign', auth, async (req, res) => {
     const maxLimit = await getMaxBattalionSize(userId, new Date(now));
 
     if (quantity > maxLimit) {
-      const nextStep =
-        maxLimit === 250
-          ? 'Complete "Battalion Size +250" research to increase to 500.'
-          : maxLimit === 500
-            ? 'Complete "Battalion Size +500" research to increase to 1,000.'
-            : maxLimit === 1000
-              ? 'Complete "Battalion Size +1,000" research to increase to 2,000.'
-              : maxLimit === 2000
-                ? 'Complete "Battalion Size +2,000" research to increase to 4,000.'
-                : maxLimit === 4000
-                  ? 'Complete "Battalion Size +4,500" research to increase to 8,500.'
-                  : maxLimit === 8500
-                    ? 'Complete "Battalion Size +6,500" research to increase to 15,000.'
-                    : null;
+      const nextStep = getNextBattalionSizeResearchHint(maxLimit);
       const errorMessage = nextStep
         ? `Maximum troops per battalion is ${maxLimit.toLocaleString()}. ${nextStep}`
         : `Maximum troops per battalion is ${maxLimit.toLocaleString()}.`;

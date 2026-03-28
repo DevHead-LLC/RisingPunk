@@ -118,6 +118,9 @@ export interface IBattle extends Document {
     guardian: number;
     breacher: number;
     phreak: number;
+    guardianM2: number;
+    breacherM2: number;
+    phreakM2: number;
   };
   defenderDeploymentExhausted?: boolean;
   lastTickProcessed?: number;

@@ -578,7 +578,7 @@ export async function findCellByNpcInstanceId(
 }
 
 /** Clear all map cells occupied by this user (MapCell collection only). Returns count updated.
- * Used by AccountDeletionService on account delete. Bugbot: For one-off orphan cleanup (users deleted outside app), call for each userId present in MapCell but not in User collection; no standalone npm script (see taskItems/in-progress.md). */
+ * Used by AccountDeletionService on account delete. Bugbot: For one-off orphan cleanup (users deleted outside app), call for each userId present in MapCell but not in User collection; no standalone npm script (see task docs under taskItems/). */
 export async function clearUserFromMapCells(
   userId: mongoose.Types.ObjectId
 ): Promise<number> {
