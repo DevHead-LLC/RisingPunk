@@ -276,7 +276,14 @@ export class BattleSetupService {
       ...(effectiveDefenderNpcInstanceId ? { defenderNpcInstanceId: effectiveDefenderNpcInstanceId } as any : {}),
       ...(isUserDefender ? { 
         isUserDefender: true,
-        defenderDeployedTotals: { guardian: 0, breacher: 0, phreak: 0 },
+        defenderDeployedTotals: {
+          guardian: 0,
+          breacher: 0,
+          phreak: 0,
+          guardianM2: 0,
+          breacherM2: 0,
+          phreakM2: 0,
+        },
         defenderDeploymentExhausted: false,
         lastTickProcessed: 0
       } as any : {}),
