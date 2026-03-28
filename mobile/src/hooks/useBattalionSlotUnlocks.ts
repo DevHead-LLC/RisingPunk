@@ -53,6 +53,11 @@ export const BATTALION_SIZE_FEATURE_IDS = [
   'battalion-size-2000',
   'battalion-size-4500',
   'battalion-size-6500',
+  'battalion-size-5000-i',
+  'battalion-size-5000-ii',
+  'battalion-size-7500-i',
+  'battalion-size-7500-ii',
+  'battalion-size-10000',
 ] as const;
 
 const BATTALION_SIZE_MAP: Record<(typeof BATTALION_SIZE_FEATURE_IDS)[number], number> = {
@@ -62,6 +67,11 @@ const BATTALION_SIZE_MAP: Record<(typeof BATTALION_SIZE_FEATURE_IDS)[number], nu
   'battalion-size-2000': 4000,
   'battalion-size-4500': 8500,
   'battalion-size-6500': 15000,
+  'battalion-size-5000-i': 20000,
+  'battalion-size-5000-ii': 25000,
+  'battalion-size-7500-i': 32500,
+  'battalion-size-7500-ii': 40000,
+  'battalion-size-10000': 50000,
 };
 
 /**
