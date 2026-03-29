@@ -1,7 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, Alert, unstable_batchedUpdates, Modal, AppState } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction, useAnimatedRef, getRelativeCoords } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { CollapsibleToolbar } from '../components/hackMap/CollapsibleToolbar';
@@ -3655,7 +3655,8 @@ export const HackMapScreen: React.FC<Props> = ({
   const PRESS_DEBOUNCE_MS = 300;
   const DOUBLE_PRESS_THRESHOLD_MS = 500;
   const abortControllerRef = useRef<AbortController | null>(null);
-  const mapViewRef = useRef<Animated.View>(null);
+  /** Animated ref so tap worklet can use Reanimated `measure` / `getRelativeCoords` (includes transform; Android `measureInWindow` often does not — tap grid was shifted after pan). */
+  const mapViewRef = useAnimatedRef<Animated.View>();
   const mapViewWindowRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const isMountedRef = useRef<boolean>(true);
 
@@ -3769,19 +3770,12 @@ export const HackMapScreen: React.FC<Props> = ({
   // Store handler in ref for stable reference
   handleCellPressRef.current = handleCellPress;
 
-  // Tap-at-view coords: use absolute tap position + map view's window position so we get correct cell (e.x/e.y are unreliable when the view has transform). See tile-tap-reliability.md.
-  // Measure map in window at tap time so we don't rely on stale onLayout; Reanimated transform can move the view without firing onLayout.
-  // Tap off-probe (on map/cell) cancels follow mode so the map stops following the probe.
-  const handleTapAtViewCoords = useCallback((absoluteX: number, absoluteY: number) => {
-    const viewRef = mapViewRef.current;
-    if (!viewRef) return;
-    viewRef.measureInWindow((wx, wy) => {
+  // Tap → grid: need view-local coords that match the transformed map. Reanimated `getRelativeCoords` uses native
+  // `measure` (pageX/pageY) which includes translate; RN `measureInWindow` on Android often omits transform → taps
+  // skew by pan (e.g. must tap left of a tile or hit wrong cell). Fallback if measure returns null (flattened view).
+  const handleTapMapLocal = useCallback(
+    (viewX: number, viewY: number) => {
       if (!isMountedRef.current) return;
-      mapViewWindowRef.current = { x: wx, y: wy };
-      // (wx, wy) is the view's rendered top-left (after translate); so view-local tap = (absolute - window).
-      // Grid content starts at (MARGIN_SIZE, MARGIN_SIZE) in view; do NOT subtract pan offset — it's already in (wx, wy).
-      const viewX = absoluteX - wx;
-      const viewY = absoluteY - wy;
       const contentX = viewX - MARGIN_SIZE;
       const contentY = viewY - MARGIN_SIZE;
       const col = Math.floor(contentX / CELL_SIZE);
@@ -3792,15 +3786,30 @@ export const HackMapScreen: React.FC<Props> = ({
       const cell = rowData[col] as CellData;
       if (!cell) return;
       if (!isMountedRef.current) return;
-      // Tapping on the map (off the probe) cancels follow so the map stops following the probe.
       if (followProbeIdRef.current) {
         handleProbeFollowModalClose();
       }
       const handler = handleCellPressRef.current;
       if (!handler) return;
       handler(col, row, cell);
-    });
-  }, [grid, handleProbeFollowModalClose]);
+    },
+    [grid, handleProbeFollowModalClose]
+  );
+
+  const handleTapAtWindowCoords = useCallback(
+    (absoluteX: number, absoluteY: number) => {
+      const viewRef = mapViewRef.current;
+      if (!viewRef) return;
+      viewRef.measureInWindow((wx, wy) => {
+        if (!isMountedRef.current) return;
+        mapViewWindowRef.current = { x: wx, y: wy };
+        const viewX = absoluteX - wx;
+        const viewY = absoluteY - wy;
+        handleTapMapLocal(viewX, viewY);
+      });
+    },
+    [handleTapMapLocal]
+  );
 
   const tapGesture = useMemo(
     () =>
@@ -3809,9 +3818,14 @@ export const HackMapScreen: React.FC<Props> = ({
         .maxDuration(400)
         .onEnd((e) => {
           'worklet';
-          runOnJS(handleTapAtViewCoords)(e.absoluteX, e.absoluteY);
+          const rel = getRelativeCoords(mapViewRef, e.absoluteX, e.absoluteY);
+          if (rel !== null) {
+            runOnJS(handleTapMapLocal)(rel.x, rel.y);
+          } else {
+            runOnJS(handleTapAtWindowCoords)(e.absoluteX, e.absoluteY);
+          }
         }),
-    [handleTapAtViewCoords]
+    [handleTapMapLocal, handleTapAtWindowCoords]
   );
 
   const combinedMapGesture = useMemo(
@@ -4654,6 +4668,7 @@ export const HackMapScreen: React.FC<Props> = ({
           <GestureDetector gesture={combinedMapGesture}>
           <Animated.View
             ref={mapViewRef}
+            collapsable={false}
             style={[
               styles.marginWrapper,
               { width: totalSize + (MARGIN_SIZE * 2), height: totalSize + (MARGIN_SIZE * 2) },
