@@ -110,8 +110,9 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'reduce-misc-entertainment-15': require('../../assets/images/researchCenter/miscEntExpenseReduction.png'),
   'probe': require('../../assets/images/researchCenter/probeResearch.png'),
   'mark-2-bots': require('../../assets/images/researchCenter/botUpgradeEvolution.png'),
-  'crew-strength-increase': require('../../assets/images/researchCenter/crewStrengthBonus.png'),
 };
+
+const CREW_BONUS_CARD_IMAGE = require('../../assets/images/researchCenter/crewBonus.png');
 
 export function FeatureCard({
   feature,
@@ -126,7 +127,10 @@ export function FeatureCard({
   const colors = useThemeColors();
   const isActuallyUnlocked = feature.isUnlocked || (feature.isResearching && timerRemaining === 0);
   
-  const imageSource = backgroundImage || BACKGROUND_IMAGE_MAP[feature.id];
+  const imageSource =
+    backgroundImage ||
+    BACKGROUND_IMAGE_MAP[feature.id] ||
+    (feature.id.startsWith('crew-army-') ? CREW_BONUS_CARD_IMAGE : undefined);
   const hasBackgroundImage = !!imageSource;
 
   const formatTimeRemaining = (milliseconds: number) => {

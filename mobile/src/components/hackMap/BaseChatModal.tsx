@@ -24,7 +24,10 @@ import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
 import { UserReportModal } from '../modals/UserReportModal';
 import { PROBE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_ID } from '../../constants/systemSenders';
-import { formatHackLocationDisplay } from '../../../../shared/hackMapLocationDisplay';
+import {
+  formatHackLocationDisplay,
+  parseHackLocationDisplayCoords,
+} from '../../../../shared/hackMapLocationDisplay';
 import { parseMapLocationShareMessage } from '../../../../shared/mapLocationShareMessage';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
@@ -102,6 +105,10 @@ export interface BattleReportPayload {
   cash?: number;
   /** Synthetic IP-style hack location (server `hl`); not real map data. */
   hl?: string;
+  /** When present with `x`/`y`, tap-to-navigate on map (same as shared location in chat). */
+  mapName?: string;
+  x?: number;
+  y?: number;
 }
 
 function parseBattleReportMessage(message: string): BattleReportPayload | null {
@@ -116,12 +123,23 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
     const attackerLost = normalizeBattleReportBotCounts(payload.attackerLost);
     const defenderLost = normalizeBattleReportBotCounts(payload.defenderLost);
     if (!attackerStart || !defenderStart || !attackerLost || !defenderLost) return null;
+    const mapName =
+      typeof payload.mapName === 'string' && payload.mapName.trim().length > 0
+        ? payload.mapName.trim()
+        : undefined;
+    const x =
+      typeof payload.x === 'number' && Number.isFinite(payload.x) ? payload.x : undefined;
+    const y =
+      typeof payload.y === 'number' && Number.isFinite(payload.y) ? payload.y : undefined;
     return {
       ...payload,
       attackerStart,
       defenderStart,
       attackerLost,
       defenderLost,
+      mapName,
+      x: x !== undefined && Number.isFinite(x) ? x : undefined,
+      y: y !== undefined && Number.isFinite(y) ? y : undefined,
     };
   } catch (_) {
     // ignore
@@ -358,6 +376,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
               scrollEnabled
+              keyboardShouldPersistTaps="handled"
               onScrollEndDrag={updateAtBottomFromScrollEvent}
               onMomentumScrollEnd={updateAtBottomFromScrollEvent}
               onContentSizeChange={() => {
@@ -500,6 +519,23 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               typeof report.hl === 'string' && report.hl.trim().length > 0
                                 ? report.hl.trim()
                                 : null;
+                            const battleMapName =
+                              typeof report.mapName === 'string' && report.mapName.trim().length > 0
+                                ? report.mapName.trim()
+                                : 'main';
+                            const battleCoords =
+                              typeof report.x === 'number' &&
+                              Number.isFinite(report.x) &&
+                              typeof report.y === 'number' &&
+                              Number.isFinite(report.y)
+                                ? { x: report.x, y: report.y }
+                                : hackLocLine
+                                  ? parseHackLocationDisplayCoords(hackLocLine)
+                                  : null;
+                            const canOpenBattleOnMap =
+                              Boolean(onNavigateToMapCell) &&
+                              battleCoords !== null &&
+                              battleMapName === 'main';
                             const fmt = (n: number) => n.toLocaleString();
                             const line = (label: string, start: number, lost: number) =>
                               `${label} - ${fmt(start)} > ${fmt(lost)} Lost`;
@@ -523,41 +559,80 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 </Text>
                               </>
                             );
+                            const hackLocationBlock = hackLocLine ? (
+                              <>
+                                <Text
+                                  style={[
+                                    styles.messageText,
+                                    styles.probeReportLine,
+                                    { color: colors.text.primary },
+                                  ]}
+                                >
+                                  Hack Location
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.messageText,
+                                    styles.probeReportLine,
+                                    styles.hackLocationMono,
+                                    {
+                                      color: canOpenBattleOnMap
+                                        ? (colors.primary ?? colors.text.secondary)
+                                        : colors.text.secondary,
+                                      textDecorationLine: canOpenBattleOnMap ? 'underline' : 'none',
+                                    },
+                                  ]}
+                                >
+                                  {hackLocLine}
+                                </Text>
+                                {canOpenBattleOnMap ? (
+                                  <Text
+                                    style={[
+                                      styles.messageText,
+                                      styles.probeReportLine,
+                                      {
+                                        fontSize: SIZING.font.small,
+                                        fontStyle: 'italic',
+                                        color: colors.text.secondary,
+                                      },
+                                    ]}
+                                  >
+                                    Tap to open on map
+                                  </Text>
+                                ) : null}
+                              </>
+                            ) : null;
                             return (
                               <View style={styles.probeReportBlock}>
                                 <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
                                   Battle Report
                                 </Text>
-                                {hackLocLine ? (
-                                  <>
-                                    <Text
-                                      style={[
-                                        styles.messageText,
-                                        styles.probeReportLine,
-                                        { color: colors.text.primary },
-                                      ]}
+                                {hackLocationBlock ? (
+                                  canOpenBattleOnMap && battleCoords ? (
+                                    <Pressable
+                                      onPress={() =>
+                                        onNavigateToMapCell?.({
+                                          mapName: battleMapName,
+                                          x: battleCoords.x,
+                                          y: battleCoords.y,
+                                        })
+                                      }
+                                      accessibilityRole="button"
+                                      accessibilityLabel="Open battle location on map"
                                     >
-                                      Hack Location
-                                    </Text>
-                                    <Text
-                                      style={[
-                                        styles.messageText,
-                                        styles.probeReportLine,
-                                        styles.hackLocationMono,
-                                        { color: colors.text.secondary },
-                                      ]}
-                                    >
-                                      {hackLocLine}
-                                    </Text>
-                                  </>
+                                      {hackLocationBlock}
+                                    </Pressable>
+                                  ) : (
+                                    hackLocationBlock
+                                  )
                                 ) : null}
                                 {renderSide(
-                                  `Attacker (${isAttacker ? 'You' : 'Opponent'}):`,
+                                  `Attacker: ${report.attackerHandle}${isAttacker ? ' (You)' : ''}`,
                                   report.attackerStart,
                                   report.attackerLost,
                                 )}
                                 {renderSide(
-                                  `Defender (${isAttacker ? 'Opponent' : 'You'}):`,
+                                  `Defender: ${report.defenderHandle}${!isAttacker ? ' (You)' : ''}`,
                                   report.defenderStart,
                                   report.defenderLost,
                                 )}

@@ -29,6 +29,8 @@ interface MessagesModalProps {
   /** When set, open directly to conversation with this user (e.g. from profile "Message" button). */
   openToUserId?: string | null;
   openToUsername?: string | null;
+  /** Same as World Chat: tap Battle Report / shared location to open Hack Map on that cell (from Turf). */
+  onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
 }
 
 export const MessagesModal: React.FC<MessagesModalProps> = ({
@@ -36,6 +38,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   onClose,
   openToUserId,
   openToUsername,
+  onNavigateToMapCell,
 }) => {
   const colors = useThemeColors();
   const currentUser = useAppSelector((state) => state.auth.user);
@@ -229,6 +232,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
           reportContext="private-message"
           getReportContextData={getReportContextData}
           canReply={canReply}
+          onNavigateToMapCell={onNavigateToMapCell}
         />
       )}
     </>

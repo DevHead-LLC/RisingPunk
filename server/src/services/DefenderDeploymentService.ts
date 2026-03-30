@@ -10,6 +10,7 @@ import { AttackService } from './AttackService';
 import mongoose from 'mongoose';
 import { parseInventoryKeyToFamilyAndMark, BotInventoryKey } from '../utils/botInventoryKeys';
 import { syncAndResolveUserBotProgrammingBonuses } from '../utils/syncUserBotProgrammingBonuses';
+import { getCrewArmyBonusTotalsForUser, mergeCrewArmyIntoArmyBonus } from '../utils/researchFeatureUtils';
 
 // Safety constants for defender deployment
 const MAX_DEFENDER_PER_BATTALION = 250000;
@@ -118,10 +119,11 @@ export class DefenderDeploymentService {
     }
 
     const resolved = await syncAndResolveUserBotProgrammingBonuses(battle.defenderId);
+    const defenderCrew = await getCrewArmyBonusTotalsForUser(battle.defenderId);
     const defenderLevel = resolved.userLevel;
-    const defenderArmyBonus = resolved.armyBonusForStats;
-    const defenderGuardianBonus = resolved.guardianBonusForStats;
-    const defenderPhreakBonus = resolved.phreakBonusForStats;
+    const defenderArmyBonus = mergeCrewArmyIntoArmyBonus(resolved.armyBonusForStats, defenderCrew);
+    const defenderGuardianBonus = mergeCrewArmyIntoArmyBonus(resolved.guardianBonusForStats, defenderCrew);
+    const defenderPhreakBonus = mergeCrewArmyIntoArmyBonus(resolved.phreakBonusForStats, defenderCrew);
 
     // Check if we have any bots left to deploy
     const totalAvailable = Object.values(defenderBots.bots).reduce((sum: number, count: any) => sum + (count || 0), 0);
