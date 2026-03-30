@@ -10,6 +10,7 @@ import './scriptEnv';
 import mongoose from 'mongoose';
 import { getDatabaseName } from './scriptEnv';
 import { ResearchFeatureDefinition } from '../src/models/ResearchFeatureDefinition';
+import { getCrewArmyBonusSeedRows } from '../src/config/crewArmyBonusResearch';
 
 type FeatureRow = {
   categoryId: string;
@@ -595,18 +596,7 @@ const FEATURES: FeatureRow[] = [
     researchCenterLevelRequirement: 4,
     effect: { type: 'unlock', value: 'mark-2-bots', target: 'battle-bots' },
   },
-  {
-    categoryId: 'hack-crew',
-    id: 'crew-strength-increase',
-    name: 'Crew Strength Bonus +0.5',
-    description: 'Increase the strength and effectiveness of your crew in battles.',
-    unlockCost: 1500000,
-    levelRequirement: 18,
-    researchTimeHours: 12,
-    requiredFeatureRefs: [{ categoryId: 'hack-crew', featureId: 'crew-system-unlock' }],
-    researchCenterLevelRequirement: 4,
-    effect: { type: 'improvement', value: 0.5, target: 'crew-strength' },
-  },
+  ...getCrewArmyBonusSeedRows(),
 ];
 
 async function run(): Promise<void> {
@@ -628,6 +618,11 @@ async function run(): Promise<void> {
     );
     upserted++;
     console.log(`  ${row.categoryId}/${row.id}`);
+  }
+
+  const removed = await ResearchFeatureDefinition.deleteOne({ categoryId: 'hack-crew', id: 'crew-strength-increase' });
+  if (removed.deletedCount) {
+    console.log('  Removed obsolete hack-crew/crew-strength-increase');
   }
 
   console.log('\nDone. Upserted', upserted, 'research feature definitions.');
