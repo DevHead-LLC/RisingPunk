@@ -1,4 +1,8 @@
+import mongoose from 'mongoose';
 import { UserResearchFeature } from '../models/UserResearchFeature';
+import { CrewStatus } from '../models/CrewStatus';
+import { CREW_ARMY_BONUS_CHAIN, CREW_ARMY_BONUS_FEATURE_IDS } from '../config/crewArmyBonusResearch';
+import type { ArmyBonus } from '../services/BotService';
 
 /** Prefetched research feature rows for bonus sync (cash-flow, financial, investments). One batch query replaces N findOne (Bugbot). */
 export type BonusPrefetch = { categoryId: string; featureId: string; isUnlocked: boolean; unlockedAt: Date | null }[];
@@ -422,4 +426,44 @@ export async function getResearchFeatureUnlockTime(
     console.error(`[RESEARCH] Error getting research unlock time (${categoryId}/${featureId}):`, error);
     return null;
   }
+}
+
+/** Stacked Crew Bonus (Hack Crew) ATK/DEF/HP — active only while user is in a crew. */
+export async function getCrewArmyBonusTotalsForUser(
+  userId: mongoose.Types.ObjectId | string
+): Promise<{ atk: number; def: number; hp: number }> {
+  const crewStatus = await CrewStatus.findOne({ userId }).select('isInCrew').lean();
+  if (!crewStatus?.isInCrew) {
+    return { atk: 0, def: 0, hp: 0 };
+  }
+  const docs = await UserResearchFeature.find({
+    userId,
+    categoryId: 'hack-crew',
+    featureId: { $in: CREW_ARMY_BONUS_FEATURE_IDS },
+    isUnlocked: true,
+  })
+    .select('featureId')
+    .lean();
+  const unlocked = new Set(docs.map((d) => d.featureId));
+  let atk = 0;
+  let def = 0;
+  let hp = 0;
+  for (const row of CREW_ARMY_BONUS_CHAIN) {
+    if (unlocked.has(row.featureId)) {
+      atk += row.atk;
+      def += row.def;
+      hp += row.hp;
+    }
+  }
+  return { atk, def, hp };
+}
+
+/** Apply crew army bonuses on top of Packet Breach / RCH / BBC programming bonuses (same shape for all three bot families). */
+export function mergeCrewArmyIntoArmyBonus(programming: ArmyBonus, crew: { atk: number; def: number; hp: number }): ArmyBonus {
+  return {
+    strength: programming.strength + crew.atk,
+    defense: programming.defense + crew.def,
+    health: programming.health + crew.hp,
+    speed: programming.speed,
+  };
 }

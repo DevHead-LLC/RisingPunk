@@ -799,11 +799,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [currentScreen, turfViewPosition, centerAndroidView, offsetX, offsetY, dispatch]);
 
-  const handleWorldChatNavigateToMapCell = useCallback(
+  /** World Chat + Messages (e.g. Battle Report): pan map after TurfScreen delay (see HackMapScreen PENDING_CHAT_NAV_DELAY_MS). */
+  const handleChatNavigateToMapCell = useCallback(
     (target: { mapName: string; x: number; y: number }) => {
       if (target.mapName !== 'main') return;
       setMapPendingNavigateCell({ x: target.x, y: target.y });
       setShowWorldChatModal(false);
+      setShowMessagesModal(false);
       navigateToScreen('map');
     },
     [navigateToScreen]
@@ -1741,13 +1743,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               visible={showWorldChatModal}
               onClose={() => setShowWorldChatModal(false)}
               mapName="main"
-              onNavigateToMapCell={handleWorldChatNavigateToMapCell}
+              onNavigateToMapCell={handleChatNavigateToMapCell}
             />
             <MessagesModal
               visible={showMessagesModal}
               onClose={handleCloseMessagesModal}
               openToUserId={messagesOpenToUser?.userId ?? null}
               openToUsername={messagesOpenToUser?.username ?? null}
+              onNavigateToMapCell={handleChatNavigateToMapCell}
             />
             <SearchUserModal
               visible={showSearchUserModal}
@@ -1772,7 +1775,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleWorldChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive]);
+  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive]);
 
   // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
   if (!navRestoreAttempted) {

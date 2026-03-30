@@ -16,6 +16,7 @@ import { findCellByNpcInstanceId, getCell } from './CellAccessorService';
 import mongoose from 'mongoose';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 import { syncAndResolveUserBotProgrammingBonuses } from '../utils/syncUserBotProgrammingBonuses';
+import { getCrewArmyBonusTotalsForUser, mergeCrewArmyIntoArmyBonus } from '../utils/researchFeatureUtils';
 import { parseInventoryKeyToFamilyAndMark } from '../utils/botInventoryKeys';
 import { normalizeNpcBattalionMarkLevel } from '../utils/npcMarkMixConfig';
 
@@ -44,10 +45,11 @@ export class BattleSetupService {
     if (attackerId !== 'computer-opponent') {
       try {
         const resolved = await syncAndResolveUserBotProgrammingBonuses(attackerId);
+        const crew = await getCrewArmyBonusTotalsForUser(attackerId);
         userLevel = resolved.userLevel;
-        attackerArmyBonus = resolved.armyBonusForStats;
-        attackerGuardianBonus = resolved.guardianBonusForStats;
-        attackerPhreakBonus = resolved.phreakBonusForStats;
+        attackerArmyBonus = mergeCrewArmyIntoArmyBonus(resolved.armyBonusForStats, crew);
+        attackerGuardianBonus = mergeCrewArmyIntoArmyBonus(resolved.guardianBonusForStats, crew);
+        attackerPhreakBonus = mergeCrewArmyIntoArmyBonus(resolved.phreakBonusForStats, crew);
       } catch (error) {
         console.warn('Could not fetch user level, using default level 1:', error);
       }
@@ -180,13 +182,14 @@ export class BattleSetupService {
       }
       
       const defenderResolved = await syncAndResolveUserBotProgrammingBonuses(defenderId);
+      const defenderCrew = await getCrewArmyBonusTotalsForUser(defenderId);
       const defenderLevel = defenderResolved.userLevel;
       const BotModel = mongoose.model('Bot');
       const defenderBots = await BotModel.findOne({ userId: defenderId });
       
-      const defenderArmyBonus = defenderResolved.armyBonusForStats;
-      const defenderGuardianBonus = defenderResolved.guardianBonusForStats;
-      const defenderPhreakBonus = defenderResolved.phreakBonusForStats;
+      const defenderArmyBonus = mergeCrewArmyIntoArmyBonus(defenderResolved.armyBonusForStats, defenderCrew);
+      const defenderGuardianBonus = mergeCrewArmyIntoArmyBonus(defenderResolved.guardianBonusForStats, defenderCrew);
+      const defenderPhreakBonus = mergeCrewArmyIntoArmyBonus(defenderResolved.phreakBonusForStats, defenderCrew);
       if (defenderBots && defenderBots.bots) {
         for (const [invKey, quantity] of Object.entries(defenderBots.bots)) {
           if (typeof quantity !== 'number' || quantity <= 0) {
