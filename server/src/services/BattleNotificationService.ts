@@ -99,6 +99,10 @@ export async function sendBattleNotifications(
     } catch (e) {
       console.error('BattleNotificationService: formatHackLocationDisplay failed', e);
     }
+    /** Same shape as map location shares — client pans HackMap to this cell (main map). */
+    (payload as any).mapName = 'main';
+    (payload as any).x = Math.floor(bx);
+    (payload as any).y = Math.floor(by);
   }
   let messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
   if (messageBody.length > MAX_MESSAGE_LENGTH) {
