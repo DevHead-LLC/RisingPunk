@@ -18,3 +18,18 @@ export function formatHackLocationDisplay(mapCellX: number, mapCellY: number): s
   };
   return `${seg(mapCellX)}.${seg(mapCellY)}.123.987`;
 }
+
+/**
+ * Inverse of {@link formatHackLocationDisplay} for tap-to-nav when only `hl` is present (e.g. older Battle Report payloads).
+ * Returns **display segments** (mod 1000), not necessarily full grid coords if either axis ≥ 1000.
+ */
+export function parseHackLocationDisplayCoords(hl: string): { x: number; y: number } | null {
+  const trimmed = hl.trim();
+  const parts = trimmed.split('.');
+  if (parts.length !== 4) return null;
+  if (parts[2] !== '123' || parts[3] !== '987') return null;
+  const x = parseInt(parts[0], 10);
+  const y = parseInt(parts[1], 10);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x, y };
+}

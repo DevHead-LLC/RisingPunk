@@ -3981,6 +3981,17 @@ export const HackMapScreen: React.FC<Props> = ({
     [jumpToGridPosition, onPendingNavigateConsumed]
   );
 
+  /** Messages modal (same map): pan immediately; unlike Turf → map there is no pending delay. */
+  const handleMessagesNavigateToMapCell = useCallback(
+    (target: { mapName: string; x: number; y: number }) => {
+      if (target.mapName !== 'main') return;
+      onPendingNavigateConsumed?.();
+      jumpToGridPosition(target.x, target.y);
+      setShowMessagesModal(false);
+    },
+    [jumpToGridPosition, onPendingNavigateConsumed]
+  );
+
   const handleShareLocationPress = useCallback(() => {
     if (!selectedCell) return;
     const { x, y, info } = selectedCell;
@@ -4648,6 +4659,7 @@ export const HackMapScreen: React.FC<Props> = ({
         onClose={handleCloseMessagesModal}
         openToUserId={messagesOpenToUser?.userId ?? null}
         openToUsername={messagesOpenToUser?.username ?? null}
+        onNavigateToMapCell={handleMessagesNavigateToMapCell}
       />
 
       {visitCrewId && (

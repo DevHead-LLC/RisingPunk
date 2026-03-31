@@ -7,6 +7,8 @@ import {
   getMaxBattalionSize,
   getNextBattalionSizeResearchHint,
   isBattalionSlotUnlocked,
+  getCrewArmyBonusTotalsForUser,
+  mergeCrewArmyIntoArmyBonus,
 } from '../utils/researchFeatureUtils';
 import {
   normalizeBotsObject,
@@ -74,15 +76,19 @@ router.get('/stats', auth, async (req, res) => {
     const { BotService } = require('../services/BotService');
     const { userLevel, armyBonusForStats, guardianBonusForStats, phreakBonusForStats } =
       await syncAndResolveUserBotProgrammingBonuses(req.user._id);
+    const crewArmy = await getCrewArmyBonusTotalsForUser(req.user._id);
+    const armyMerged = mergeCrewArmyIntoArmyBonus(armyBonusForStats, crewArmy);
+    const guardianMerged = mergeCrewArmyIntoArmyBonus(guardianBonusForStats, crewArmy);
+    const phreakMerged = mergeCrewArmyIntoArmyBonus(phreakBonusForStats, crewArmy);
     const botStats: Record<string, any> = {};
     const botStatsM2: Record<string, any> = {};
     for (const botType of BOT_FAMILY_TYPES) {
       const config = await BotService.getUserBotStats(
         botType,
         userLevel,
-        armyBonusForStats,
-        guardianBonusForStats,
-        phreakBonusForStats,
+        armyMerged,
+        guardianMerged,
+        phreakMerged,
         1
       );
       botStats[botType] = { ...config, stats: roundEffectiveStatsToStatRow(config.stats) };
@@ -95,9 +101,9 @@ router.get('/stats', auth, async (req, res) => {
       const config = await BotService.getUserBotStats(
         botType,
         userLevel,
-        armyBonusForStats,
-        guardianBonusForStats,
-        phreakBonusForStats,
+        armyMerged,
+        guardianMerged,
+        phreakMerged,
         2
       );
       botStatsM2[botType] = { ...config, stats: roundEffectiveStatsToStatRow(config.stats) };
@@ -127,6 +133,10 @@ router.get('/stats-breakdown', auth, async (req, res) => {
     await BotStatsService.loadConfigs();
     const { userLevel, armyBonusForStats, guardianBonusForStats, phreakBonusForStats } =
       await syncAndResolveUserBotProgrammingBonuses(req.user._id);
+    const crewArmy = await getCrewArmyBonusTotalsForUser(req.user._id);
+    const armyMerged = mergeCrewArmyIntoArmyBonus(armyBonusForStats, crewArmy);
+    const guardianMerged = mergeCrewArmyIntoArmyBonus(guardianBonusForStats, crewArmy);
+    const phreakMerged = mergeCrewArmyIntoArmyBonus(phreakBonusForStats, crewArmy);
 
     const zeroRow = (): StatRow => ({ health: 0, offense: 0, defense: 0, speed: 0, range: 0 });
     const breakdown: Record<
@@ -177,13 +187,19 @@ router.get('/stats-breakdown', auth, async (req, res) => {
                   range: (phreakBonusForStats as { range?: number }).range ?? 0,
                 }
               : zeroRow();
-      const researchBonus = zeroRow(); // Placeholder for future research bonuses
+      const researchBonus: StatRow = {
+        health: crewArmy.hp,
+        offense: crewArmy.atk,
+        defense: crewArmy.def,
+        speed: 0,
+        range: 0,
+      };
       const finalConfig = await BotService.getUserBotStats(
         botType,
         userLevel,
-        armyBonusForStats,
-        guardianBonusForStats,
-        phreakBonusForStats,
+        armyMerged,
+        guardianMerged,
+        phreakMerged,
         1
       );
       const s = finalConfig.stats;
@@ -196,9 +212,9 @@ router.get('/stats-breakdown', auth, async (req, res) => {
       const finalM2 = await BotService.getUserBotStats(
         botType,
         userLevel,
-        armyBonusForStats,
-        guardianBonusForStats,
-        phreakBonusForStats,
+        armyMerged,
+        guardianMerged,
+        phreakMerged,
         2
       );
       const totalM2 = roundEffectiveStatsToStatRow(finalM2.stats);
