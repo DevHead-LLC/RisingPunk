@@ -57,6 +57,10 @@ const PM_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const PM_RATE_LIMIT_MAX = 10;
 const pmRateLimit = new Map<string, { count: number; windowStartMs: number }>();
 
+/** Max conversation rows returned per user for the inbox list (FIFO eviction of older threads is separate). */
+const CONVERSATION_LIST_LIMIT = 10;
+const THREAD_MESSAGE_LIMIT = 20;
+
 function evictExpiredPmRateLimit(nowMs: number): void {
   for (const [key, val] of pmRateLimit.entries()) {
     if (nowMs - val.windowStartMs >= PM_RATE_LIMIT_WINDOW_MS) {
@@ -104,13 +108,41 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
       .map((id: unknown) => new mongoose.Types.ObjectId(String(id)))
       .filter((id) => !adminIdSet.has(id.toString()));
 
+    // Send-all rows group as `…:broadcast`. If we $limit before filtering out only **our** outbound broadcast
+    // threads, the "top 10" can all be `recipientId:broadcast` (each send-all) and the post-filter removed every
+    // row — empty inbox for the sending admin despite DB rows.
+    // Hide **only** threads where this user was the sender of the latest message in a `:broadcast` group (our
+    // send-all "per-recipient" rows). Do **not** hide `adminOther:broadcast` when we are another admin receiving
+    // that admin's announcement (lastSenderId is the other admin, not us).
+    const hideMyOutboundBroadcastThreads = [
+      {
+        $match: {
+          $expr: {
+            $or: [
+              {
+                $not: {
+                  $regexMatch: {
+                    input: { $toString: '$_id' },
+                    regex: ':broadcast$',
+                  },
+                },
+              },
+              {
+                $ne: [{ $toString: { $ifNull: ['$lastSenderId', ''] } }, userIdStr],
+              },
+            ],
+          },
+        },
+      },
+    ];
+
     const pipeline: any[] = [
       { $match: { $or: [{ senderId: userIdObj }, { recipientId: userIdObj }] } },
       { $addFields: {
         otherId: { $cond: [{ $eq: ['$senderId', userIdObj] }, '$recipientId', '$senderId'] },
         groupKey: {
           $cond: [
-            // Admin sent broadcast to otherId → separate :broadcast thread (excluded from admin inbox)
+            // Admin sent broadcast to otherId → separate :broadcast thread (listed for recipients; hidden from admin inbox via $match above)
             {
               $and: [
                 { $eq: ['$senderId', userIdObj] },
@@ -151,8 +183,9 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
           0,
         ] } },
       } },
+      ...hideMyOutboundBroadcastThreads,
       { $sort: { lastAt: -1 } },
-      { $limit: 10 },
+      { $limit: CONVERSATION_LIST_LIMIT },
     ];
     let aggregated = await PrivateMessage.aggregate(pipeline);
 
@@ -193,7 +226,7 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
           if (isUnread) g.unreadCount += 1;
         }
       }
-      return Array.from(groupMap.entries())
+      const rows = Array.from(groupMap.entries())
         .map(([_id, g]) => ({
           _id,
           lastMessage: g.lastMessage,
@@ -202,8 +235,14 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
           lastIsAdminBroadcast: g.lastIsAdminBroadcast,
           unreadCount: g.unreadCount,
         }))
-        .sort((a, b) => new Date((b as any).lastAt).getTime() - new Date((a as any).lastAt).getTime())
-        .slice(0, 10);
+        .filter((row) => {
+          const id = String(row._id);
+          if (!id.endsWith(':broadcast')) return true;
+          const last = row.lastSenderId != null ? String(row.lastSenderId) : '';
+          return last !== userIdStr;
+        })
+        .sort((a, b) => new Date((b as any).lastAt).getTime() - new Date((a as any).lastAt).getTime());
+      return rows.slice(0, CONVERSATION_LIST_LIMIT);
     }
 
     if (aggregated.length === 0) {
@@ -211,14 +250,15 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
     }
 
     const currentUserStr = userIdStr;
-    const isCurrentUserAdmin = adminIdSet.has(currentUserStr);
 
     let filtered = aggregated.filter((row: any) => {
       const key = getConversationKeyString(row);
       const isBroadcast = key.endsWith(':broadcast');
-      const otherUserIdFromKey = isBroadcast ? key.slice(0, -':broadcast'.length) : key;
       if (!key || !VALID_CONVERSATION_KEY.test(key)) return false;
-      if (isCurrentUserAdmin && isBroadcast) return false;
+      if (isBroadcast) {
+        const lastSender = row.lastSenderId != null ? String(row.lastSenderId) : '';
+        if (lastSender === currentUserStr) return false;
+      }
       return true;
     });
 
@@ -229,7 +269,10 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
         const key = getConversationKeyString(row);
         const isBroadcast = key.endsWith(':broadcast');
         if (!key || !VALID_CONVERSATION_KEY.test(key)) return false;
-        if (isCurrentUserAdmin && isBroadcast) return false;
+        if (isBroadcast) {
+          const lastSender = row.lastSenderId != null ? String(row.lastSenderId) : '';
+          if (lastSender === currentUserStr) return false;
+        }
         return true;
       });
     }
@@ -310,7 +353,6 @@ router.get('/conversations/:otherUserId/messages', auth, async (req: Request, re
       : (userId as mongoose.Types.ObjectId);
     const otherUserIdObj = new mongoose.Types.ObjectId(otherUserId);
 
-    const THREAD_MESSAGE_LIMIT = 20;
     const query = broadcastOnly
       ? {
           senderId: otherUserIdObj,
