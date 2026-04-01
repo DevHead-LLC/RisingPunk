@@ -49,6 +49,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   const { data: conversationsData, isLoading: isLoadingConversations, error: conversationsError } = useGetConversationsQuery(undefined, {
     skip: !visible,
     pollingInterval: visible ? 2000 : 0,
+    refetchOnMountOrArgChange: true,
   });
   const conversations = conversationsData?.conversations ?? [];
 
