@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -16,6 +17,7 @@ import {
   useGetThreadQuery,
   useSendMessageMutation,
   useMarkConversationReadMutation,
+  useDeleteConversationMutation,
   type PMConversation,
   type PMMessage,
 } from '../../store/api/privateMessagesApi';
@@ -68,7 +70,39 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
     },
   );
   const [markRead] = useMarkConversationReadMutation();
+  const [deleteConversation] = useDeleteConversationMutation();
   const [sendMessage, { isLoading: isSending }] = useSendMessageMutation();
+
+  const broadcastOnlyForDelete = useCallback((c: PMConversation) => {
+    return (
+      c.isBroadcast === true &&
+      c.otherUserId !== PROBE_REPORT_SENDER_ID &&
+      c.otherUserId !== BATTLE_REPORT_SENDER_ID
+    );
+  }, []);
+
+  const promptDeleteConversation = useCallback(
+    (c: PMConversation) => {
+      Alert.alert(
+        'Remove conversation',
+        'Remove this from your inbox. Messages stay for the other person until they remove it too (then the thread is deleted from the server).',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => {
+              void deleteConversation({
+                otherUserId: c.otherUserId,
+                broadcastOnly: broadcastOnlyForDelete(c),
+              }).unwrap();
+            },
+          },
+        ]
+      );
+    },
+    [deleteConversation, broadcastOnlyForDelete]
+  );
 
   const messages: ChatMessageForModal[] = (threadData?.messages ?? []).map((msg: PMMessage) => ({
     id: msg.id,
@@ -194,6 +228,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
                   <Pressable
                     style={styles.row}
                     onPress={() => openConversation(item)}
+                    onLongPress={() => promptDeleteConversation(item)}
                     accessibilityRole="button"
                     accessibilityLabel={`Conversation with ${item.otherUsername}`}
                   >

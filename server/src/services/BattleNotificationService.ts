@@ -5,6 +5,7 @@
 
 import { IBattleDocument } from '../models/Battle';
 import { PrivateMessage } from '../models/PrivateMessage';
+import { applyRetentionAfterInsert } from './PrivateMessageRetentionService';
 import { User } from '../models/User';
 import { BATTLE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_USERNAME } from '../constants/systemSenders';
 import { NodeOwner, IBattalion } from '../types/battle';
@@ -134,6 +135,18 @@ export async function sendBattleNotifications(
         isFromAdmin: false,
       },
     ]);
+    try {
+      await applyRetentionAfterInsert({
+        senderId: BATTLE_REPORT_SENDER_ID,
+        recipientId: battle.attackerId,
+      });
+      await applyRetentionAfterInsert({
+        senderId: BATTLE_REPORT_SENDER_ID,
+        recipientId: battle.defenderId,
+      });
+    } catch (re: any) {
+      console.error('BattleNotificationService: PM retention failed', re?.message ?? re);
+    }
   } catch (e) {
     console.error('BattleNotificationService: failed to save battle notifications', e);
   }
