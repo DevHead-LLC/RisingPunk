@@ -72,6 +72,11 @@ export function useAttackMarchTransitionBanners(token: string | null): {
     const ids = new Set(marches.map((m) => m.marchId));
     for (const id of [...prevStatesRef.current.keys()]) {
       if (!ids.has(id)) {
+        const prev = prevStatesRef.current.get(id);
+        // Bugbot: GET /mine omits terminal states (`done`, `cancelled`); returning→done drops the row — no in-list transition to observe.
+        if (!message && prev === 'returning') {
+          message = 'Your expedition has returned home.';
+        }
         prevStatesRef.current.delete(id);
       }
     }

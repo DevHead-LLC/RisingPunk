@@ -1235,13 +1235,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 setOpenMessagesAfterReplayClose(false);
                 setBattleScreenMode('live');
                 setBattleId(null);
-                navigateToScreen('turf');
+                navigateToScreen(previousScreen);
                 setShowMessagesModal(true);
                 return;
               }
               setBattleScreenMode('live');
               setBattleId(null);
-              navigateToScreen('turf');
+              navigateToScreen(previousScreen);
               return;
             }
 
