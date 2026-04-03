@@ -49,13 +49,14 @@ export const BattleBattalion = React.memo(({
   const [currentTime, setCurrentTime] = React.useState(Date.now());
   const [clientStartTime, setClientStartTime] = React.useState<number | null>(null);
   
+  // Bugbot: no 60fps tick in replay — smoothPosition uses replayMovementVirtualNowMs only.
   React.useEffect(() => {
+    if (replayMovementVirtualNowMs !== undefined) return;
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
     }, ANIMATION_CONFIG.FPS_60_INTERVAL_MS);
-    
     return () => clearInterval(interval);
-  }, []);
+  }, [replayMovementVirtualNowMs]);
   
   React.useEffect(() => {
     if (replayMovementVirtualNowMs !== undefined) return;

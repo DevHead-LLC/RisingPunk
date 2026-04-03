@@ -94,7 +94,9 @@ export const BattlePreparationScreen = React.memo(
   const [assignments, setAssignments] = useState<Record<string, BattalionAssignment>>({});
   const [shieldCheckModalVisible, setShieldCheckModalVisible] = useState(false);
   const [isStartingBattle, setIsStartingBattle] = useState(false);
-  /** Prevents double Deploy before first await (refetch); ref is synchronous unlike isStartingBattle. */
+  /** Mirrors {@link isStartingBattle} synchronously for deploy guards (Bugbot: avoid stale useCallback closure vs async setState). */
+  const isStartingBattleRef = useRef(false);
+  /** Held only for the actual startBattle / launchAttackMarch phase — not during shield-only prep (Bugbot: shield return must not block continue). */
   const deployInFlightRef = useRef(false);
   const token = useAppSelector((state) => state.auth.token);
   const userId = useAppSelector((state) => state.auth.user?._id);
@@ -398,10 +400,10 @@ export const BattlePreparationScreen = React.memo(
   const executeDeploy = React.useCallback(
     async (afterShieldDeactivation: boolean) => {
       if (afterShieldDeactivation) {
+        isStartingBattleRef.current = false;
         setIsStartingBattle(false);
       }
-      // Bugbot: shield continue calls executeDeploy(true) only; do not block on stale isStartingBattle from an earlier attempt.
-      if (isStartingBattle && !afterShieldDeactivation) {
+      if (isStartingBattleRef.current && !afterShieldDeactivation) {
         return;
       }
 
@@ -418,29 +420,34 @@ export const BattlePreparationScreen = React.memo(
         clearHighlight();
       }
 
+      // Shield continue: no refetch here (latency); blocking uses RTK cache / 15s poll (Bugbot).
+      let marchMetaForBlock = attackMarchMeta;
+      if (!afterShieldDeactivation) {
+        const marchesRefetch = await refetchMyMarches();
+        marchMetaForBlock =
+          marchesRefetch.data !== undefined ? marchesRefetch.data : attackMarchMeta;
+      }
+      if ((marchMetaForBlock?.marches?.length ?? 0) > 0) {
+        Alert.alert(
+          'Expedition in progress',
+          'Finish or cancel your current hack march (or wait until it completes) before deploying again.'
+        );
+        return;
+      }
+
+      const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
+      const isDefendingUser = !!defenderId && !defenderNpcSlug;
+      if (!afterShieldDeactivation && isShieldActive && isDefendingUser) {
+        setShieldCheckModalVisible(true);
+        return;
+      }
+
       if (deployInFlightRef.current) return;
       deployInFlightRef.current = true;
       try {
-        const marchesRefetch = await refetchMyMarches();
-        const marchMetaForBlock =
-          marchesRefetch.data !== undefined ? marchesRefetch.data : attackMarchMeta;
-        if ((marchMetaForBlock?.marches?.length ?? 0) > 0) {
-          Alert.alert(
-            'Expedition in progress',
-            'Finish or cancel your current hack march (or wait until it completes) before deploying again.'
-          );
-          return;
-        }
-
-        const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
-        const isDefendingUser = !!defenderId && !defenderNpcSlug;
-        if (!afterShieldDeactivation && isShieldActive && isDefendingUser) {
-          setShieldCheckModalVisible(true);
-          return;
-        }
-
         setIsStartingBattle(true);
-        // Bugbot: every exit from this try (return, throw, or fall-through) runs finally below — isStartingBattle is always cleared.
+        isStartingBattleRef.current = true;
+        // Bugbot: every exit from inner try runs inner finally — isStartingBattle + ref cleared.
         try {
           if (wantsMarchLaunch && hackMapCell) {
             if (
@@ -495,6 +502,7 @@ export const BattlePreparationScreen = React.memo(
           Alert.alert('Deploy failed', msg);
           // Stay on prep (same as !res.success / map position guard); do not navigate with a missing battle id.
         } finally {
+          isStartingBattleRef.current = false;
           setIsStartingBattle(false);
         }
       } finally {
@@ -512,7 +520,6 @@ export const BattlePreparationScreen = React.memo(
       hackMapCell,
       isActuallyUnlocked,
       isDeployPurgeHighlight,
-      isStartingBattle,
       launchAttackMarch,
       myMapPos,
       onBattleStart,

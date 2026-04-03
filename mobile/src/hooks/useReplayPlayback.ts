@@ -53,24 +53,31 @@ export function useReplayPlayback(
 
   const rawFrame = snapshots[index] as BattleReplaySnapshotFrame | undefined;
 
-  const frameTRef = useRef(0);
-  frameTRef.current = rawFrame?.t ?? 0;
-
+  /** Wall clock at the moment we anchor to this snapshot (Bugbot: avoid initial replayVirtualNowMs=0 before first effect — battalion elapsed used 0 − startTime → flash). */
   const wallAtFrameRef = useRef(Date.now());
-  const [replayVirtualNowMs, setReplayVirtualNowMs] = useState(0);
-
-  useEffect(() => {
-    if (!battleId || !data || snapshots.length === 0 || suspendPlayback) {
-      return;
-    }
+  const replayWallSigRef = useRef('');
+  const playbackActive = Boolean(
+    battleId && data && snapshots.length > 0 && !suspendPlayback
+  );
+  const wallSig = `${battleId ?? ''}:${index}:${suspendPlayback}`;
+  if (playbackActive && rawFrame && wallSig !== replayWallSigRef.current) {
+    replayWallSigRef.current = wallSig;
     wallAtFrameRef.current = Date.now();
-    const tick = () => {
-      setReplayVirtualNowMs(frameTRef.current + (Date.now() - wallAtFrameRef.current));
-    };
-    tick();
-    const id = setInterval(tick, ANIMATION_CONFIG.FPS_60_INTERVAL_MS);
+  }
+
+  const [replayPump, setReplayPump] = useState(0);
+  useEffect(() => {
+    if (!playbackActive) return;
+    const id = setInterval(() => {
+      setReplayPump((n) => n + 1);
+    }, ANIMATION_CONFIG.FPS_60_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [battleId, data, snapshots.length, suspendPlayback, index]);
+  }, [playbackActive]);
+
+  const replayVirtualNowMs = useMemo(() => {
+    if (!playbackActive || !rawFrame) return 0;
+    return rawFrame.t + (Date.now() - wallAtFrameRef.current);
+  }, [playbackActive, rawFrame, rawFrame?.t, index, replayPump, wallSig]);
 
   const battleState = useMemo((): BattleState | null => {
     if (!rawFrame) return null;
