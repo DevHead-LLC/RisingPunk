@@ -48,22 +48,24 @@ export const BattleBattalion = React.memo(({
   const animatedPosition = React.useRef(new Animated.ValueXY(position)).current;
   const [currentTime, setCurrentTime] = React.useState(Date.now());
   const [clientStartTime, setClientStartTime] = React.useState<number | null>(null);
-  
+  /** Stable for effect deps — virtual `now` updates ~60fps in replay; undefined-vs-number is enough to gate live timers. */
+  const hasReplayVirtualClock = replayMovementVirtualNowMs !== undefined;
+
   // Bugbot: no 60fps tick in replay — smoothPosition uses replayMovementVirtualNowMs only.
   React.useEffect(() => {
-    if (replayMovementVirtualNowMs !== undefined) return;
+    if (hasReplayVirtualClock) return;
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
     }, ANIMATION_CONFIG.FPS_60_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [replayMovementVirtualNowMs]);
-  
+  }, [hasReplayVirtualClock]);
+
   React.useEffect(() => {
-    if (replayMovementVirtualNowMs !== undefined) return;
+    if (hasReplayVirtualClock) return;
     if (movementState?.movementStatus === 'moving') {
       setClientStartTime(Date.now());
     }
-  }, [movementState?.startTime, movementState?.movementStatus, replayMovementVirtualNowMs]);
+  }, [movementState?.startTime, movementState?.movementStatus, hasReplayVirtualClock]);
   
   const smoothPosition = React.useMemo(() => {
     if (!movementState) return position;
