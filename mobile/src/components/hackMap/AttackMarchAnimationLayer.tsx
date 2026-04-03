@@ -64,8 +64,10 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
 }) => {
   const marchesRef = useRef(marches);
   const nowRef = useRef(Date.now());
-  const [, setFrame] = useState(0);
+  /** Bumps version to re-render; throttled below so we do not reconcile at 60fps (Bugbot). */
+  const [, setPaintGeneration] = useState(0);
   const rafRef = useRef<number | null>(null);
+  const lastPaintWallMsRef = useRef(0);
 
   useEffect(() => {
     marchesRef.current = marches;
@@ -85,11 +87,17 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
         stopLoop();
         return;
       }
-      nowRef.current = Date.now();
-      setFrame((n) => n + 1);
+      const now = Date.now();
+      nowRef.current = now;
+      const lastPaint = lastPaintWallMsRef.current;
+      if (lastPaint === 0 || now - lastPaint >= 32) {
+        lastPaintWallMsRef.current = now;
+        setPaintGeneration((n) => n + 1);
+      }
       rafRef.current = requestAnimationFrame(tick);
     };
     stopLoop();
+    lastPaintWallMsRef.current = 0;
     rafRef.current = requestAnimationFrame(tick);
   }, [stopLoop]);
 

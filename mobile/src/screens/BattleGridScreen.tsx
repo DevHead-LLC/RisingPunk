@@ -161,6 +161,18 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
     );
   }
 
+  // Bugbot: doc + frames can be ready before viewportBattleState (first frame / memo tick); avoid mounting children with overrideState null.
+  if (isReplay && replay.replayDoc && replay.totalFrames > 0 && viewportBattleState == null) {
+    return (
+      <SafeAreaView style={themeStyles.container} testID="battle-grid-screen">
+        <View style={themeStyles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={themeStyles.loadingText}>Loading replay…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const overrideState = isReplay ? viewportBattleState : undefined;
 
   return (

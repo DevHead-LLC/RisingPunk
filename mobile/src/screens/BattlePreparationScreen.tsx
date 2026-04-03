@@ -397,7 +397,11 @@ export const BattlePreparationScreen = React.memo(
 
   const executeDeploy = React.useCallback(
     async (afterShieldDeactivation: boolean) => {
-      if (isStartingBattle) {
+      if (afterShieldDeactivation) {
+        setIsStartingBattle(false);
+      }
+      // Bugbot: shield continue calls executeDeploy(true) only; do not block on stale isStartingBattle from an earlier attempt.
+      if (isStartingBattle && !afterShieldDeactivation) {
         return;
       }
 
