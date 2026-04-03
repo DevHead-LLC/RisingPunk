@@ -412,7 +412,10 @@ export const BattlePreparationScreen = React.memo(
         clearHighlight();
       }
 
-      if (hasBlockingMarch) {
+      const marchesRefetch = await refetchMyMarches();
+      const marchMetaForBlock =
+        marchesRefetch.data !== undefined ? marchesRefetch.data : attackMarchMeta;
+      if ((marchMetaForBlock?.marches?.length ?? 0) > 0) {
         Alert.alert(
           'Expedition in progress',
           'Finish or cancel your current hack march (or wait until it completes) before deploying again.'
@@ -428,6 +431,7 @@ export const BattlePreparationScreen = React.memo(
       }
 
       setIsStartingBattle(true);
+      // Bugbot: every exit from this try (return, throw, or fall-through) runs finally below — isStartingBattle is always cleared.
       try {
         if (wantsMarchLaunch && hackMapCell) {
           if (
@@ -478,23 +482,22 @@ export const BattlePreparationScreen = React.memo(
           data && typeof data === 'object' && data !== null && 'error' in data
             ? String((data as { error?: unknown }).error ?? '')
             : '';
-        if (body.length > 0) {
-          Alert.alert('Deploy failed', body);
-        }
-        onBattleStart();
+        const msg = body.length > 0 ? body : 'Deploy failed. Please try again.';
+        Alert.alert('Deploy failed', msg);
+        // Stay on prep (same as !res.success / map position guard); do not navigate with a missing battle id.
       } finally {
         setIsStartingBattle(false);
       }
     },
     [
       assignments,
+      attackMarchMeta,
       battleStartData,
       clearHighlight,
       defenderId,
       defenderNpcInstanceId,
       defenderNpcSlug,
       hackMapCell,
-      hasBlockingMarch,
       isActuallyUnlocked,
       isDeployPurgeHighlight,
       isStartingBattle,
