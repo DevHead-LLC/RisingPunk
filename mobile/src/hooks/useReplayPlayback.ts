@@ -8,10 +8,19 @@ import {
 
 const EMPTY_REPLAY_SNAPSHOTS: BattleReplaySnapshotFrame[] = [];
 
+export type UseReplayPlaybackOptions = {
+  /** When true, replay document still loads but the frame index does not advance (e.g. portrait guard hides playback). */
+  suspendPlayback?: boolean;
+};
+
 /**
  * Loads replay document and advances one frame every {@link REPLAY_SNAPSHOT_INTERVAL_MS} (R4 v1).
  */
-export function useReplayPlayback(battleId: string | null) {
+export function useReplayPlayback(
+  battleId: string | null,
+  options?: UseReplayPlaybackOptions
+) {
+  const suspendPlayback = options?.suspendPlayback === true;
   const { data, isLoading, error, isError } = useGetBattleReplayQuery(battleId ?? '', {
     skip: !battleId,
   });
@@ -31,7 +40,7 @@ export function useReplayPlayback(battleId: string | null) {
   snapshotsRef.current = snapshots;
 
   useEffect(() => {
-    if (!data || snapshots.length === 0) return;
+    if (!data || snapshots.length === 0 || suspendPlayback) return;
     const t = setInterval(() => {
       setIndex((i) => {
         const len = snapshotsRef.current.length;
@@ -39,7 +48,7 @@ export function useReplayPlayback(battleId: string | null) {
       });
     }, REPLAY_SNAPSHOT_INTERVAL_MS);
     return () => clearInterval(t);
-  }, [data, snapshots.length]);
+  }, [data, snapshots.length, suspendPlayback]);
 
   const rawFrame = snapshots[index] as BattleReplaySnapshotFrame | undefined;
 

@@ -88,10 +88,3 @@ export const battleApi = createApi({
 });
 
 export const { useStartBattleMutation, useGetBattleStateQuery, useGetBattleReplayQuery } = battleApi;
-
-/** R4: typed fetch for stored replay (GET /api/battle/:id/replay). */
-export function useReplayData(battleId: string | null | undefined, opts?: { skip?: boolean }) {
-  return useGetBattleReplayQuery(battleId as string, {
-    skip: !battleId || opts?.skip === true,
-  });
-}

@@ -38,7 +38,9 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
   const isReplay = mode === 'replay';
   const { width: vw, height: vh } = useWindowDimensions();
 
-  const replay = useReplayPlayback(isReplay ? battleId : null);
+  const replay = useReplayPlayback(isReplay ? battleId : null, {
+    suspendPlayback: isReplay && vw < vh,
+  });
 
   const viewportBattleState = useMemo(() => {
     if (!isReplay || !replay.replayDoc || !replay.battleState) return null;
