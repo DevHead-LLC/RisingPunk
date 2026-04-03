@@ -113,7 +113,9 @@ export const BattlePreparationScreen = React.memo(
     pollingInterval: 15000,
   });
   const asyncMarchesEnabled = attackMarchMeta?.asyncMarchesEnabled === true;
-  const hasBlockingMarch = (attackMarchMeta?.marches?.length ?? 0) > 0;
+  /** Orphan march rows when async is off must not block legacy live deploy (Bugbot / ENABLE_ASYNC_BATTLES). */
+  const hasBlockingMarch =
+    asyncMarchesEnabled && (attackMarchMeta?.marches?.length ?? 0) > 0;
   const [deactivateShield] = useDeactivateShieldMutation();
   const isHackRigBattleFlow = !defenderId && !defenderNpcSlug;
   const wantsMarchLaunch =
@@ -427,7 +429,10 @@ export const BattlePreparationScreen = React.memo(
         marchMetaForBlock =
           marchesRefetch.data !== undefined ? marchesRefetch.data : attackMarchMeta;
       }
-      if ((marchMetaForBlock?.marches?.length ?? 0) > 0) {
+      if (
+        marchMetaForBlock?.asyncMarchesEnabled === true &&
+        (marchMetaForBlock?.marches?.length ?? 0) > 0
+      ) {
         Alert.alert(
           'Expedition in progress',
           'Finish or cancel your current hack march (or wait until it completes) before deploying again.'
@@ -742,9 +747,8 @@ export const BattlePreparationScreen = React.memo(
           </TouchableOpacity>
           {hasBlockingMarch ? (
             <Text style={[styles.marchBlockHint, { color: colors.text.secondary }]}>
-              {asyncMarchesEnabled
-                ? 'You already have a hack expedition in progress. Committed bots stay out of Digital Barracks and full home defense until return completes or you cancel while outbound.'
-                : 'You already have a hack expedition in progress. Finish it, wait for return, or cancel while outbound.'}
+              You already have a hack expedition in progress. Committed bots stay out of Digital Barracks and full
+              home defense until return completes or you cancel while outbound.
             </Text>
           ) : null}
         </View>
