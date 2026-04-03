@@ -45,10 +45,20 @@ const battleController = new BattleController();
 /** Per-user sliding window for large GET /replay payloads. */
 const REPLAY_GET_WINDOW_MS = 60_000;
 const REPLAY_GET_MAX_PER_WINDOW = 20;
+// Evict expired entries on each check so the Map stays bounded (Bugbot: keys for users who never fetch again are never revisited otherwise).
 const replayGetRateByUser = new Map<string, { count: number; windowStartMs: number }>();
+
+function evictExpiredReplayGetRateEntries(now: number): void {
+  for (const [key, val] of replayGetRateByUser.entries()) {
+    if (now - val.windowStartMs > REPLAY_GET_WINDOW_MS) {
+      replayGetRateByUser.delete(key);
+    }
+  }
+}
 
 function takeReplayGetRateSlot(userId: string): boolean {
   const now = Date.now();
+  evictExpiredReplayGetRateEntries(now);
   const entry = replayGetRateByUser.get(userId);
   if (!entry || now - entry.windowStartMs > REPLAY_GET_WINDOW_MS) {
     replayGetRateByUser.set(userId, { count: 1, windowStartMs: now });

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGetBattleReplayQuery } from '../store/api/battleApi';
 import {
   REPLAY_SNAPSHOT_INTERVAL_MS,
   type BattleReplaySnapshotFrame,
   type BattleState,
 } from '../../../shared/battleReplay';
+
+const EMPTY_REPLAY_SNAPSHOTS: BattleReplaySnapshotFrame[] = [];
 
 /**
  * Loads replay document and advances one frame every {@link REPLAY_SNAPSHOT_INTERVAL_MS} (R4 v1).
@@ -20,12 +22,21 @@ export function useReplayPlayback(battleId: string | null) {
     setIndex(0);
   }, [battleId, data?.battleId]);
 
-  const snapshots = data?.snapshots ?? [];
+  const snapshots = useMemo(
+    () => data?.snapshots ?? EMPTY_REPLAY_SNAPSHOTS,
+    [data?.snapshots],
+  );
+
+  const snapshotsRef = useRef(snapshots);
+  snapshotsRef.current = snapshots;
 
   useEffect(() => {
     if (!data || snapshots.length === 0) return;
     const t = setInterval(() => {
-      setIndex((i) => (i >= snapshots.length - 1 ? i : i + 1));
+      setIndex((i) => {
+        const len = snapshotsRef.current.length;
+        return len === 0 || i >= len - 1 ? i : i + 1;
+      });
     }, REPLAY_SNAPSHOT_INTERVAL_MS);
     return () => clearInterval(t);
   }, [data, snapshots.length]);
