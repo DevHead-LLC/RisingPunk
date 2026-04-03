@@ -469,11 +469,11 @@ export const BattlePreparationScreen = React.memo(
         } else {
           const result = await startBattle(battleStartData).unwrap();
           onBattleStart(result.battleId, { mode: 'live' });
-        }
-        if (userId) {
-          trackFirstBattle(userId).catch((error) => {
-            console.error('[Analytics] Error tracking first_battle:', error);
-          });
+          if (userId) {
+            trackFirstBattle(userId).catch((error) => {
+              console.error('[Analytics] Error tracking first_battle:', error);
+            });
+          }
         }
       } catch (error: unknown) {
         console.error('Deploy failed:', error);
