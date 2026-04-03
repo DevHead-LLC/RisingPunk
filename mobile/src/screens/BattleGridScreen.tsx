@@ -186,7 +186,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
         <View
           style={[
             themeStyles.networkContainer,
-            { width: vw, height: vh },
+            isReplay ? { width: vw, height: vh } : null,
           ]}
         >
           <BattleNetworkGrid
