@@ -45,6 +45,8 @@ const battleController = new BattleController();
 /** Per-user sliding window for large GET /replay payloads. */
 const REPLAY_GET_WINDOW_MS = 60_000;
 const REPLAY_GET_MAX_PER_WINDOW = 20;
+/** Max distinct user keys after expired eviction — bounds per-request scan cost (Bugbot: many concurrent users within window). */
+const REPLAY_GET_RATE_MAP_MAX_ENTRIES = 4096;
 // Evict expired entries on each check so the Map stays bounded (Bugbot: keys for users who never fetch again are never revisited otherwise).
 const replayGetRateByUser = new Map<string, { count: number; windowStartMs: number }>();
 
@@ -56,9 +58,21 @@ function evictExpiredReplayGetRateEntries(now: number): void {
   }
 }
 
+function trimReplayGetRateMapToMaxEntries(): void {
+  const excess = replayGetRateByUser.size - REPLAY_GET_RATE_MAP_MAX_ENTRIES;
+  if (excess <= 0) return;
+  const entries = [...replayGetRateByUser.entries()].sort(
+    (a, b) => a[1].windowStartMs - b[1].windowStartMs
+  );
+  for (let i = 0; i < excess; i++) {
+    replayGetRateByUser.delete(entries[i][0]);
+  }
+}
+
 function takeReplayGetRateSlot(userId: string): boolean {
   const now = Date.now();
   evictExpiredReplayGetRateEntries(now);
+  trimReplayGetRateMapToMaxEntries();
   const entry = replayGetRateByUser.get(userId);
   if (!entry || now - entry.windowStartMs > REPLAY_GET_WINDOW_MS) {
     replayGetRateByUser.set(userId, { count: 1, windowStartMs: now });

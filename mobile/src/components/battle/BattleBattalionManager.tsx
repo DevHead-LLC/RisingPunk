@@ -17,6 +17,8 @@ interface Props {
   battalionSize?: number;
   showHealthBars?: boolean;
   overrideBattleState?: BattleState | null;
+  /** When set (replay), battalion movement progress uses virtual ms (frame `t` + wall delta), not `Date.now()` client anchors. */
+  replayMovementVirtualNowMs?: number;
 }
 
 export const BattleBattalionManager = React.memo(({
@@ -24,6 +26,7 @@ export const BattleBattalionManager = React.memo(({
   battalionSize = 40,
   showHealthBars = true,
   overrideBattleState,
+  replayMovementVirtualNowMs,
 }: Props) => {
   const [pollingInterval, setPollingInterval] = useState<number>(ANIMATION_CONFIG.DEFAULT_POLLING_MS);
   
@@ -81,12 +84,21 @@ export const BattleBattalionManager = React.memo(({
                 movementState={movementState}
                 size={battalionSize}
                 showHealthBar={showHealthBars}
+                replayMovementVirtualNowMs={replayMovementVirtualNowMs}
               />
             );
           })}
       </View>
     );
-  }, [battleState, battalionSize, showHealthBars, filteredBattalions, nodePositions, movementStateMap]);
+  }, [
+    battleState,
+    battalionSize,
+    showHealthBars,
+    filteredBattalions,
+    nodePositions,
+    movementStateMap,
+    replayMovementVirtualNowMs,
+  ]);
 
   return (
     <BattleLoadingError

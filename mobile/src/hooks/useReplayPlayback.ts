@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGetBattleReplayQuery } from '../store/api/battleApi';
+import { ANIMATION_CONFIG } from '../config';
 import {
   REPLAY_SNAPSHOT_INTERVAL_MS,
   type BattleReplaySnapshotFrame,
@@ -52,6 +53,25 @@ export function useReplayPlayback(
 
   const rawFrame = snapshots[index] as BattleReplaySnapshotFrame | undefined;
 
+  const frameTRef = useRef(0);
+  frameTRef.current = rawFrame?.t ?? 0;
+
+  const wallAtFrameRef = useRef(Date.now());
+  const [replayVirtualNowMs, setReplayVirtualNowMs] = useState(0);
+
+  useEffect(() => {
+    if (!battleId || !data || snapshots.length === 0 || suspendPlayback) {
+      return;
+    }
+    wallAtFrameRef.current = Date.now();
+    const tick = () => {
+      setReplayVirtualNowMs(frameTRef.current + (Date.now() - wallAtFrameRef.current));
+    };
+    tick();
+    const id = setInterval(tick, ANIMATION_CONFIG.FPS_60_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [battleId, data, snapshots.length, suspendPlayback, index]);
+
   const battleState = useMemo((): BattleState | null => {
     if (!rawFrame) return null;
     const { t: _t, ...rest } = rawFrame;
@@ -62,6 +82,8 @@ export function useReplayPlayback(
     replayDoc: data,
     frameIndex: index,
     battleState,
+    /** Virtual battle ms (aligned with snapshot `t` + movementState.startTime from headless recording). */
+    replayVirtualNowMs,
     isLoading,
     error,
     isError,

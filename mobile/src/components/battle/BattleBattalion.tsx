@@ -32,6 +32,8 @@ interface Props {
   movementState?: MovementState;
   size?: number;
   showHealthBar?: boolean;
+  /** Replay: virtual battle ms (snapshot `t` + wall delta) for movement interpolation vs `startTime`. */
+  replayMovementVirtualNowMs?: number;
 }
 
 export const BattleBattalion = React.memo(({
@@ -40,6 +42,7 @@ export const BattleBattalion = React.memo(({
   movementState,
   size = 30,
   showHealthBar = true,
+  replayMovementVirtualNowMs,
 }: Props) => {
   const colors = useThemeColors();
   const animatedPosition = React.useRef(new Animated.ValueXY(position)).current;
@@ -55,10 +58,11 @@ export const BattleBattalion = React.memo(({
   }, []);
   
   React.useEffect(() => {
+    if (replayMovementVirtualNowMs !== undefined) return;
     if (movementState?.movementStatus === 'moving') {
       setClientStartTime(Date.now());
     }
-  }, [movementState?.startTime, movementState?.movementStatus]);
+  }, [movementState?.startTime, movementState?.movementStatus, replayMovementVirtualNowMs]);
   
   const smoothPosition = React.useMemo(() => {
     if (!movementState) return position;
@@ -67,11 +71,23 @@ export const BattleBattalion = React.memo(({
       return movementState.targetPosition;
     }
 
-    if (movementState.movementStatus !== 'moving' || !clientStartTime) {
+    if (movementState.movementStatus !== 'moving') {
       return position;
     }
-    
-    const elapsed = currentTime - clientStartTime;
+
+    let elapsed: number;
+    if (
+      replayMovementVirtualNowMs !== undefined &&
+      Number.isFinite(movementState.startTime) &&
+      Number.isFinite(replayMovementVirtualNowMs)
+    ) {
+      elapsed = Math.max(0, replayMovementVirtualNowMs - movementState.startTime);
+    } else if (clientStartTime != null) {
+      elapsed = currentTime - clientStartTime;
+    } else {
+      return position;
+    }
+
     const progress = Math.min(elapsed / movementState.estimatedDuration, 1.0);
     
     let adjustedProgress = progress;
@@ -86,7 +102,7 @@ export const BattleBattalion = React.memo(({
       (movementState.targetPosition.y - movementState.startPosition.y) * adjustedProgress;
     
     return { x: smoothX, y: smoothY };
-  }, [movementState, position, currentTime, clientStartTime]);
+  }, [movementState, position, currentTime, clientStartTime, replayMovementVirtualNowMs]);
   
   React.useEffect(() => {
     Animated.timing(animatedPosition, {
