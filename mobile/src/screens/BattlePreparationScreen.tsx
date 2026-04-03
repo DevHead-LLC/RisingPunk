@@ -574,6 +574,7 @@ export const BattlePreparationScreen = React.memo(
 
   const deploymentReady = validateDeployment(assignments).isValid;
   const deployDisabled = !deploymentReady || isStartingBattle || hasBlockingMarch;
+  const deployBusyLabel = wantsMarchLaunch ? 'DISPATCHING...' : 'STARTING...';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -725,7 +726,7 @@ export const BattlePreparationScreen = React.memo(
                 color: colors.neutral,
               }
             ]}>
-              {isStartingBattle ? 'STARTING...' : 'DEPLOY PURGE'}
+              {isStartingBattle ? deployBusyLabel : 'DEPLOY PURGE'}
             </Text>
           </TouchableOpacity>
           {hasBlockingMarch ? (
@@ -783,7 +784,7 @@ export const BattlePreparationScreen = React.memo(
                   color: colors.neutral,
                 }
               ]}>
-                {isStartingBattle ? 'STARTING...' : 'DEPLOY PURGE'}
+                {isStartingBattle ? deployBusyLabel : 'DEPLOY PURGE'}
               </Text>
             </TouchableOpacity>
           </View>
