@@ -17,6 +17,8 @@ import { Error } from 'mongoose';
 import mapRoutes from './src/routes/map';
 import userRoutes from './src/routes/userRoutes';
 import battleRoutes from './src/routes/battle';
+import './src/models/BattleReplay';
+import './src/models/AttackMarch';
 import healthRoute from './src/routes/health';
 import researchRoutes from './src/routes/research';
 import documentsRoutes from './src/routes/documents';
@@ -28,6 +30,7 @@ import crewRoutes from './src/routes/crew';
 import reportsRoutes from './src/routes/reports';
 import privateMessagesRoutes from './src/routes/privateMessages';
 import probeRoutes from './src/routes/probe';
+import attackRoutes from './src/routes/attack';
 import leaderboardRoutes from './src/routes/leaderboardRoutes';
 import userGuideRoutes from './src/routes/userGuideRoutes';
 import marketingRoutes from './src/routes/marketing';
@@ -137,6 +140,30 @@ mongoose.connect(process.env.MONGODB_URI, {
     await NPCRespawnService.runRespawnCatchUp();
   } catch (respawnErr: unknown) {
     console.warn('NPC respawn catch-up failed (non-fatal):', respawnErr);
+  }
+
+  try {
+    const {
+      rescheduleAllOutboundMarches,
+      rescheduleAllReturningMarches,
+      rescheduleArrivedMarchBattleStarts,
+    } = require('./src/services/MarchArrivalSchedulerService');
+    await rescheduleAllOutboundMarches();
+    await rescheduleAllReturningMarches();
+    await rescheduleArrivedMarchBattleStarts();
+  } catch (marchErr: unknown) {
+    console.warn('Attack march arrival reschedule failed (non-fatal):', marchErr);
+  }
+
+  try {
+    const {
+      runStaleResolvingMarchRecoveryOnce,
+      startStaleResolvingMarchWatchdog,
+    } = require('./src/services/MarchStaleResolvingWatchdogService');
+    await runStaleResolvingMarchRecoveryOnce();
+    startStaleResolvingMarchWatchdog();
+  } catch (staleErr: unknown) {
+    console.warn('Stale resolving march watchdog failed to start (non-fatal):', staleErr);
   }
 
   // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
@@ -609,6 +636,7 @@ app.use('/api/crew', crewRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/private-messages', privateMessagesRoutes);
 app.use('/api/probe', probeRoutes);
+app.use('/api/attack', attackRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/daily-haul', dailyHaulRoutes);
 app.use('/api/packet-breach', packetBreachRoutes);

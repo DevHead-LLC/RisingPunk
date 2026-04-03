@@ -32,7 +32,8 @@ export class BattleSetupService {
     unlockHackRigOnWin?: boolean,
     defenderNpcInstanceId?: string,
     hackMapCellX?: number,
-    hackMapCellY?: number
+    hackMapCellY?: number,
+    marchMeta?: { marchSourcedAttack: boolean; sourceMarchId: string }
   ): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
@@ -295,6 +296,12 @@ export class BattleSetupService {
       typeof hackMapCellY === 'number' &&
       Number.isFinite(hackMapCellY)
         ? { hackMapCellX, hackMapCellY }
+        : {}),
+      ...(marchMeta?.marchSourcedAttack === true && marchMeta.sourceMarchId
+        ? {
+            marchSourcedAttack: true,
+            sourceMarchId: marchMeta.sourceMarchId,
+          }
         : {}),
     });
 

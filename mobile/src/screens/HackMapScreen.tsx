@@ -22,7 +22,21 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { useGetConversationsQuery, useBlockUserMutation } from '../store/api/privateMessagesApi';
 import { refreshUserDataSilent } from '../store/slices/authSlice';
 import { setGrid, setMapGridSize, setLoading, clearPlayerCellsByUserIds } from '../store/slices/mapSlice';
-import { useFetchMapQuery, useFetchMapViewportQuery, useGetMyMapPositionQuery, useLazyGetMyMapPositionQuery, useCompleteProbeMutation, useLaunchProbeMutation, useGetActiveProbesQuery, useCancelProbeMutation, useSendMapChatMessageMutation, useMovePropertyMutation } from '../store/api/mapApi';
+import {
+  mapApi,
+  useFetchMapQuery,
+  useFetchMapViewportQuery,
+  useGetMyMapPositionQuery,
+  useLazyGetMyMapPositionQuery,
+  useCompleteProbeMutation,
+  useLaunchProbeMutation,
+  useGetActiveProbesQuery,
+  useCancelProbeMutation,
+  useSendMapChatMessageMutation,
+  useMovePropertyMutation,
+} from '../store/api/mapApi';
+import { useGetActiveAttackMarchesQuery, useCancelOutboundAttackMarchMutation } from '../store/api/attackApi';
+import { AttackMarchAnimationLayer } from '../components/hackMap/AttackMarchAnimationLayer';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery, useSendCrewChatMessageMutation } from '../store/api/authApi';
@@ -428,6 +442,8 @@ type Props = {
   /** TurfScreen: after opening map from world chat, pan to this cell once. */
   pendingNavigateToCell?: { x: number; y: number } | null;
   onPendingNavigateConsumed?: () => void;
+  /** TurfScreen: Battle Report `BTL|` → replay mode on {@link BattleGridScreen} (same as turf Messages). */
+  onWatchBattle?: (battleId: string) => void;
 };
 
 function getShareLabelForCell(info: CellData): string {
@@ -990,6 +1006,7 @@ export const HackMapScreen: React.FC<Props> = ({
   restorePan,
   pendingNavigateToCell,
   onPendingNavigateConsumed,
+  onWatchBattle,
 }) => {
   const dispatch = useAppDispatch();
   const grid = useAppSelector((state) => state.map.grid);
@@ -1294,6 +1311,9 @@ export const HackMapScreen: React.FC<Props> = ({
   const [probes, setProbes] = useState<ProbeEntry[]>([]);
   /** Which probe (id) is shown in the follow modal and centered when in follow mode. */
   const [followProbeId, setFollowProbeId] = useState<string | null>(null);
+  /** Owner hack expedition modal (tap **outbound** or **returning** march on map). */
+  const [marchOwnerModalId, setMarchOwnerModalId] = useState<string | null>(null);
+  const [marchModalTimeTick, setMarchModalTimeTick] = useState(0);
   const [showProbeFollowModal, setShowProbeFollowModal] = useState(false);
   /** Live remainingSec/phase for the followed probe (updated by ProbeAnimationLayer each tick when modal open). */
   const [followProbeDisplay, setFollowProbeDisplay] = useState<{ remainingSec: number; phase: 'outbound' | 'returning' } | null>(null);
@@ -1308,6 +1328,55 @@ export const HackMapScreen: React.FC<Props> = ({
   const { data: activeProbesData } = useGetActiveProbesQuery(undefined, {
     pollingInterval: 3000,
   });
+  const { data: activeAttackMarchesData } = useGetActiveAttackMarchesQuery(undefined, {
+    skip: !token,
+    pollingInterval: 3000,
+  });
+  const [cancelOutboundAttackMarch, { isLoading: isCancellingOutboundMarch }] =
+    useCancelOutboundAttackMarchMutation();
+  /** Prior `/api/attack/active` snapshot — detect resolving→returning / NPC march removal → invalidate Map (ghost NPC fix). */
+  const prevActiveAttackMarchesForMapInvRef = useRef<
+    Array<{ marchId: string; state: string; defenderNpcInstanceId?: string }>
+  >([]);
+  useEffect(() => {
+    const next = activeAttackMarchesData?.marches ?? [];
+    const prev = prevActiveAttackMarchesForMapInvRef.current;
+
+    if (prev.length > 0) {
+      const nextById = new Map(next.map((m) => [m.marchId, m]));
+      let shouldInvalidate = false;
+
+      for (const p of prev) {
+        if (p.state !== 'resolving') continue;
+        const n = nextById.get(p.marchId);
+        if (!n || n.state === 'returning') {
+          shouldInvalidate = true;
+          break;
+        }
+      }
+
+      if (!shouldInvalidate) {
+        for (const p of prev) {
+          if (nextById.has(p.marchId)) continue;
+          const inst = p.defenderNpcInstanceId;
+          const npcTarget = typeof inst === 'string' && inst.trim() !== '';
+          if (
+            npcTarget &&
+            (p.state === 'outbound' || p.state === 'arrived' || p.state === 'queued')
+          ) {
+            shouldInvalidate = true;
+            break;
+          }
+        }
+      }
+
+      if (shouldInvalidate) {
+        dispatch(mapApi.util.invalidateTags(['Map']));
+      }
+    }
+
+    prevActiveAttackMarchesForMapInvRef.current = next;
+  }, [activeAttackMarchesData?.marches, dispatch]);
   /** Probe ids for which /complete failed; exclude from display so we don't re-init and retry in a loop until server TTL. */
   const [failedProbeIds, setFailedProbeIds] = useState<Set<string>>(() => new Set());
   /** Probe ids we removed from local state because return finished; server may still have them for one poll cycle. Exclude from displayProbes so ghost doesn't render or count toward MAX_PROBES. */
@@ -1391,6 +1460,51 @@ export const HackMapScreen: React.FC<Props> = ({
     setShowMessagesModal(false);
     setMessagesOpenToUser(null);
   }, []);
+
+  const handleWatchBattleFromMessages = useCallback(
+    (replayBattleId: string) => {
+      const id = String(replayBattleId ?? '').trim();
+      if (!id) return;
+      setShowMessagesModal(false);
+      setMessagesOpenToUser(null);
+      onWatchBattle?.(id);
+    },
+    [onWatchBattle]
+  );
+
+  useEffect(() => {
+    if (!marchOwnerModalId) return;
+    const id = setInterval(() => setMarchModalTimeTick((n) => n + 1), 500);
+    return () => clearInterval(id);
+  }, [marchOwnerModalId]);
+
+  useEffect(() => {
+    if (!marchOwnerModalId) return;
+    const list = activeAttackMarchesData?.marches ?? [];
+    if (!list.some((m) => m.marchId === marchOwnerModalId)) {
+      setMarchOwnerModalId(null);
+    }
+  }, [activeAttackMarchesData?.marches, marchOwnerModalId]);
+
+  const handleOwnerMarchPress = useCallback((marchId: string) => {
+    setMarchOwnerModalId(marchId);
+  }, []);
+
+  const handleMarchOwnerModalClose = useCallback(() => {
+    setMarchOwnerModalId(null);
+  }, []);
+
+  const handleCancelOutboundMarch = useCallback(async () => {
+    if (!marchOwnerModalId) return;
+    try {
+      await cancelOutboundAttackMarch({ marchId: marchOwnerModalId }).unwrap();
+      setMarchOwnerModalId(null);
+    } catch (e: unknown) {
+      const body = (e as { data?: { error?: string } })?.data?.error;
+      Alert.alert('Cancel failed', body != null ? String(body) : 'Unknown error');
+    }
+  }, [marchOwnerModalId, cancelOutboundAttackMarch]);
+
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -4580,6 +4694,7 @@ export const HackMapScreen: React.FC<Props> = ({
         openToUserId={messagesOpenToUser?.userId ?? null}
         openToUsername={messagesOpenToUser?.username ?? null}
         onNavigateToMapCell={handleMessagesNavigateToMapCell}
+        onWatchBattle={onWatchBattle ? handleWatchBattleFromMessages : undefined}
       />
 
       {visitCrewId && (
@@ -4663,6 +4778,13 @@ export const HackMapScreen: React.FC<Props> = ({
           </Animated.View>
         </GestureDetector>
         </View>
+        <AttackMarchAnimationLayer
+          marches={activeAttackMarchesData?.marches ?? []}
+          colors={colors}
+          animatedMapStyle={animatedMapStyle}
+          currentUserId={currentUserId}
+          onOwnerMarchPress={handleOwnerMarchPress}
+        />
         <ProbeAnimationLayer
           probes={displayProbes}
           setProbes={setProbes}
@@ -4735,6 +4857,129 @@ export const HackMapScreen: React.FC<Props> = ({
           </Modal>
         );
       })()}
+
+      {marchOwnerModalId != null &&
+        (() => {
+          void marchModalTimeTick;
+          const followedMarch = (activeAttackMarchesData?.marches ?? []).find(
+            (m) => m.marchId === marchOwnerModalId
+          );
+          if (!followedMarch || String(followedMarch.attackerId) !== String(currentUserId ?? '')) {
+            return null;
+          }
+          const phase = followedMarch.state;
+          const departMs = Date.parse(followedMarch.departAt);
+          const arriveMs = Date.parse(followedMarch.arriveAt);
+          const retEndMs =
+            followedMarch.returnArriveAt != null ? Date.parse(String(followedMarch.returnArriveAt)) : NaN;
+          const outboundRemainingSec =
+            phase === 'outbound' && Number.isFinite(departMs) && Number.isFinite(arriveMs)
+              ? Math.max(0, (arriveMs - Date.now()) / 1000)
+              : null;
+          const returnRemainingSec =
+            phase === 'returning' && Number.isFinite(retEndMs)
+              ? Math.max(0, (retEndMs - Date.now()) / 1000)
+              : null;
+          const showCancel = phase === 'outbound';
+          const title =
+            phase === 'returning'
+              ? 'Returning home'
+              : phase === 'outbound'
+                ? 'Hack expedition en route'
+                : 'Hack expedition';
+          return (
+            <Modal
+              visible
+              transparent
+              animationType="fade"
+              onRequestClose={handleMarchOwnerModalClose}
+              supportedOrientations={['landscape-left', 'landscape-right']}
+            >
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.35)' },
+                ]}
+                pointerEvents="box-none"
+              >
+                <Pressable
+                  style={{ flex: 1, width: '100%', justifyContent: 'center', alignItems: 'center' }}
+                  onPress={handleMarchOwnerModalClose}
+                >
+                  <Pressable
+                    style={{
+                      padding: 12,
+                      borderRadius: 8,
+                      maxWidth: 260,
+                      backgroundColor: colors.surface ? `${colors.surface}E6` : 'rgba(28,28,30,0.92)',
+                    }}
+                    onPress={(e) => e.stopPropagation()}
+                  >
+                    <Text style={[styles.npcLevelModalText, { color: colors.text.primary, fontSize: 14 }]}>
+                      {title}
+                    </Text>
+                    {phase === 'outbound' ? (
+                      outboundRemainingSec != null ? (
+                        <Text style={[styles.npcLevelModalText, { color: colors.secondary, marginTop: 6, fontSize: 13 }]}>
+                          Time to target: {Math.ceil(outboundRemainingSec)}s
+                        </Text>
+                      ) : (
+                        <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, marginTop: 6, fontSize: 12 }]}>
+                          Cancel returns your bots while still outbound.
+                        </Text>
+                      )
+                    ) : phase === 'returning' ? (
+                      <>
+                        {returnRemainingSec != null ? (
+                          <Text style={[styles.npcLevelModalText, { color: colors.secondary, marginTop: 6, fontSize: 13 }]}>
+                            Time to home: {Math.ceil(returnRemainingSec)}s
+                          </Text>
+                        ) : (
+                          <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, marginTop: 6, fontSize: 12 }]}>
+                            Marching back to your turf.
+                          </Text>
+                        )}
+                        <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, marginTop: 8, fontSize: 11 }]}>
+                          Committed bots stay out of Digital Barracks and full home defense until this return
+                          finishes. You cannot start another hack expedition until then.
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, marginTop: 6, fontSize: 12 }]}>
+                        Expedition status updated — close to continue.
+                      </Text>
+                    )}
+                    {showCancel ? (
+                      <TouchableOpacity
+                        style={[
+                          styles.actionButton,
+                          {
+                            marginTop: 8,
+                            paddingVertical: 6,
+                            backgroundColor: colors.error ?? '#c00',
+                            opacity: isCancellingOutboundMarch ? 0.6 : 1,
+                          },
+                        ]}
+                        onPress={handleCancelOutboundMarch}
+                        disabled={isCancellingOutboundMarch}
+                      >
+                        <Text style={[styles.actionButtonText, { color: colors.background, fontSize: 13 }]}>
+                          {isCancellingOutboundMarch ? 'Cancelling…' : 'Cancel expedition'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                    <TouchableOpacity
+                      style={[styles.closeButton, { marginTop: 8, paddingVertical: 6 }]}
+                      onPress={handleMarchOwnerModalClose}
+                    >
+                      <Text style={[styles.closeButtonText, { color: colors.secondary, fontSize: 13 }]}>Close</Text>
+                    </TouchableOpacity>
+                  </Pressable>
+                </Pressable>
+              </View>
+            </Modal>
+          );
+        })()}
     </View>
   );
 };

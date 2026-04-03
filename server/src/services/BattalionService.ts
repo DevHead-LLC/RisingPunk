@@ -11,6 +11,7 @@ import { MovementService } from './MovementService';
 import { MovementState } from '../types/battle';
 import { Battle } from '../models/Battle';
 import { TargetingService } from './TargetingService';
+import { getHeadlessWorkingBattle } from './HeadlessBattleRunner';
 
 export class BattalionService {
   private static targetingResults: Map<string, BattalionTargetingResult[]> = new Map();
@@ -71,6 +72,10 @@ export class BattalionService {
   }
 
   static async getBattle(battleId: string): Promise<any> {
+    const w = getHeadlessWorkingBattle(battleId);
+    if (w) {
+      return w;
+    }
     return Battle.findOne({ battleId });
   }
 
@@ -84,13 +89,19 @@ export class BattalionService {
     MovementService.stopMovementUpdates(battleId);
   }
 
-  static async updateBattleMovement(battleId: string): Promise<void> {
+  static async updateBattleMovement(battleId: string, headlessMicroStepMs?: number): Promise<void> {
     const battle = await this.getBattle(battleId);
     const targetingResults = this.getTargetingResults(battleId);
-    
+
     if (!battle) return;
 
-    // Use centralized movement state coordination
+    if (headlessMicroStepMs !== undefined) {
+      await MovementService.updateBattleMovement(battleId, battle, targetingResults, headlessMicroStepMs);
+      const { AttackService } = require('./AttackService');
+      await AttackService.processActiveAttacks(battle);
+      return;
+    }
+
     await MovementService.coordinateMovementState(battleId, battle, targetingResults);
   }
 

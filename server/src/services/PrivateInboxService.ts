@@ -16,6 +16,10 @@ import {
   threadMessagesFilter,
 } from '../utils/privateThreadCanonicalKey';
 import { MAX_PM_THREADS } from '../constants/privateMessageCaps';
+import {
+  extractBattleIdFromBtlPayload,
+  tryDeleteBattleReplayIfUnreferenced,
+} from './BattleReplayLifecycleService';
 
 const SYSTEM_PM_SENDER_IDS = new Set([
   PROBE_REPORT_SENDER_ID.toString(),
@@ -60,7 +64,16 @@ async function upsertInboxEntry(
 
 async function purgePrivateMessagesForThread(canonicalThreadKey: string): Promise<void> {
   const filter = threadMessagesFilter(canonicalThreadKey);
+  const msgs = await PrivateMessage.find(filter as any).select('message').lean();
+  const battleIds = new Set<string>();
+  for (const m of msgs) {
+    const bid = extractBattleIdFromBtlPayload((m as { message?: string }).message);
+    if (bid) battleIds.add(bid);
+  }
   await PrivateMessage.deleteMany(filter as any);
+  for (const bid of battleIds) {
+    await tryDeleteBattleReplayIfUnreferenced(bid);
+  }
 }
 
 /**

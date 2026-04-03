@@ -16,6 +16,11 @@ import {
   useFetchBotsQuery,
 } from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
+import {
+  useGetMyAttackMarchesQuery,
+  useLaunchAttackMarchMutation,
+} from '../store/api/attackApi';
+import { useGetMyMapPositionQuery } from '../store/api/mapApi';
 import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
@@ -69,7 +74,8 @@ const DeployPurgeHighlightBorder = React.memo(({ colors }: { colors: any }) => {
 
 type Props = {
   onClose: () => void;
-  onBattleStart: (battleId?: string) => void;
+  /** `mode: 'march'` when async map deploy created a march (navigate to map, no live battle yet). */
+  onBattleStart: (id?: string, options?: { mode?: 'live' | 'march' }) => void;
   defenderId?: string;
   defenderNpcSlug?: string;
   defenderNpcInstanceId?: string;
@@ -95,9 +101,26 @@ export const BattlePreparationScreen = React.memo(
   const userBalance = useAppSelector((state) => state.balance.total ?? 0);
   const [assignToBattalion] = useAssignToBattalionMutation();
   const [assignPresetBattalions] = useAssignPresetBattalionsMutation();
-  const { refetch: refetchBots } = useFetchBotsQuery();
+  const { refetch: refetchBots } = useFetchBotsQuery(undefined, { skip: !token });
   const [startBattle] = useStartBattleMutation();
+  const [launchAttackMarch] = useLaunchAttackMarchMutation();
+  const { data: attackMarchMeta, refetch: refetchMyMarches } = useGetMyAttackMarchesQuery(undefined, {
+    skip: !token,
+    pollingInterval: 15000,
+  });
+  const asyncMarchesEnabled = attackMarchMeta?.asyncMarchesEnabled === true;
+  const hasBlockingMarch = (attackMarchMeta?.marches?.length ?? 0) > 0;
   const [deactivateShield] = useDeactivateShieldMutation();
+  const isHackRigBattleFlow = !defenderId && !defenderNpcSlug;
+  const wantsMarchLaunch =
+    asyncMarchesEnabled &&
+    !isHackRigBattleFlow &&
+    hackMapCell != null &&
+    Number.isFinite(hackMapCell.x) &&
+    Number.isFinite(hackMapCell.y);
+  const { data: myMapPos } = useGetMyMapPositionQuery(undefined, {
+    skip: !token || !wantsMarchLaunch,
+  });
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
     pollingInterval: 1000,
   });
@@ -369,91 +392,139 @@ export const BattlePreparationScreen = React.memo(
   }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell]);
 
   const { clearHighlight } = useTaskGuideHighlight();
-  
-  // Handle battle start - check for shield warning first
-  const handleBattleStart = React.useCallback(async () => {
-    // Prevent double-clicks
-    if (isStartingBattle) {
-      return;
-    }
 
-    const validation = validateDeployment(assignments);
-    
-    // Always validate that at least one assignment exists (prevent empty battles)
-    // Even during guided task, we need valid assignments to start a battle
-    if (!validation.isValid) {
-      console.error('Deployment validation failed:', validation.message);
+  const executeDeploy = React.useCallback(
+    async (afterShieldDeactivation: boolean) => {
+      if (isStartingBattle) {
+        return;
+      }
+
+      const validation = validateDeployment(assignments);
+      if (!validation.isValid) {
+        console.error('Deployment validation failed:', validation.message);
+        if (isDeployPurgeHighlight) {
+          clearHighlight();
+        }
+        return;
+      }
+
       if (isDeployPurgeHighlight) {
-        // During guided task, clear highlight but still prevent battle start
         clearHighlight();
       }
-      return;
-    }
 
-    if (isDeployPurgeHighlight) {
-      clearHighlight();
-    }
-
-    const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
-    const isDefendingUser = !!defenderId && !defenderNpcSlug;
-    
-    // If attacking user has shield activated AND defending entity is another user, show modal
-    if (isShieldActive && isDefendingUser) {
-      setShieldCheckModalVisible(true);
-      return;
-    }
-
-    setIsStartingBattle(true);
-
-    try {
-      // Otherwise proceed directly with battle start
-      const result = await startBattle(battleStartData).unwrap();
-      
-      // Update UI immediately (don't block on analytics)
-      onBattleStart(result.battleId);
-      
-      // Track first battle (fire-and-forget, don't block UI updates)
-      if (userId) {
-        trackFirstBattle(userId).catch((error) => {
-          console.error('[Analytics] Error tracking first_battle:', error);
-        });
+      if (hasBlockingMarch) {
+        Alert.alert(
+          'Expedition in progress',
+          'Finish or cancel your current hack march (or wait until it completes) before deploying again.'
+        );
+        return;
       }
-    } catch (error) {
-      console.error('Failed to start battle:', error);
-      onBattleStart();
-    } finally {
-      setIsStartingBattle(false);
-    }
-  }, [assignments, isActuallyUnlocked, shieldData?.isActive, defenderId, defenderNpcSlug, battleStartData, startBattle, onBattleStart, validateDeployment, isStartingBattle, isDeployPurgeHighlight, clearHighlight, userId]);
 
-  // Handle continue from shield modal - deactivate shield and proceed to battle
+      const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
+      const isDefendingUser = !!defenderId && !defenderNpcSlug;
+      if (!afterShieldDeactivation && isShieldActive && isDefendingUser) {
+        setShieldCheckModalVisible(true);
+        return;
+      }
+
+      setIsStartingBattle(true);
+      try {
+        if (wantsMarchLaunch && hackMapCell) {
+          if (
+            myMapPos == null ||
+            !Number.isFinite(myMapPos.x) ||
+            !Number.isFinite(myMapPos.y)
+          ) {
+            Alert.alert(
+              'Home position unavailable',
+              'Open the Hack Map so your property location can load, then try Deploy again.'
+            );
+            return;
+          }
+          const res = await launchAttackMarch({
+            userBattalions: battleStartData.userBattalions,
+            screenWidth: battleStartData.screenWidth,
+            screenHeight: battleStartData.screenHeight,
+            originX: Math.floor(myMapPos.x),
+            originY: Math.floor(myMapPos.y),
+            hackMapCellX: hackMapCell.x,
+            hackMapCellY: hackMapCell.y,
+            defenderId: battleStartData.defenderId,
+            defenderNpcSlug: battleStartData.defenderNpcSlug,
+            defenderNpcInstanceId,
+          }).unwrap();
+          if (!res.success || res.data == null) {
+            const msg =
+              typeof res.error === 'string' && res.error.length > 0 ? res.error : 'Could not start march';
+            Alert.alert('Deploy failed', msg);
+            return;
+          }
+          await refetchBots();
+          void refetchMyMarches();
+          onBattleStart(res.data.marchId, { mode: 'march' });
+        } else {
+          const result = await startBattle(battleStartData).unwrap();
+          onBattleStart(result.battleId, { mode: 'live' });
+        }
+        if (userId) {
+          trackFirstBattle(userId).catch((error) => {
+            console.error('[Analytics] Error tracking first_battle:', error);
+          });
+        }
+      } catch (error: unknown) {
+        console.error('Deploy failed:', error);
+        const data = error && typeof error === 'object' && 'data' in error ? (error as { data?: unknown }).data : undefined;
+        const body =
+          data && typeof data === 'object' && data !== null && 'error' in data
+            ? String((data as { error?: unknown }).error ?? '')
+            : '';
+        if (body.length > 0) {
+          Alert.alert('Deploy failed', body);
+        }
+        onBattleStart();
+      } finally {
+        setIsStartingBattle(false);
+      }
+    },
+    [
+      assignments,
+      battleStartData,
+      clearHighlight,
+      defenderId,
+      defenderNpcInstanceId,
+      defenderNpcSlug,
+      hackMapCell,
+      hasBlockingMarch,
+      isActuallyUnlocked,
+      isDeployPurgeHighlight,
+      isStartingBattle,
+      launchAttackMarch,
+      myMapPos,
+      onBattleStart,
+      refetchBots,
+      refetchMyMarches,
+      shieldData?.isActive,
+      startBattle,
+      userId,
+      validateDeployment,
+      wantsMarchLaunch,
+    ]
+  );
+
+  const handleBattleStart = React.useCallback(() => {
+    void executeDeploy(false);
+  }, [executeDeploy]);
+
   const handleShieldModalContinue = React.useCallback(async () => {
     setShieldCheckModalVisible(false);
-    setIsStartingBattle(true);
-    
     try {
-      // First deactivate the shield
       await deactivateShield().unwrap();
-      
-      // Then start the battle
-      const result = await startBattle(battleStartData).unwrap();
-      
-      // Update UI immediately (don't block on analytics)
-      onBattleStart(result.battleId);
-      
-      // Track first battle (fire-and-forget, don't block UI updates)
-      if (userId) {
-        trackFirstBattle(userId).catch((error) => {
-          console.error('[Analytics] Error tracking first_battle:', error);
-        });
-      }
     } catch (error) {
-      console.error('Failed to deactivate shield or start battle:', error);
-      onBattleStart();
-    } finally {
-      setIsStartingBattle(false);
+      console.error('Failed to deactivate shield:', error);
+      return;
     }
-  }, [battleStartData, startBattle, onBattleStart, deactivateShield, userId]);
+    await executeDeploy(true);
+  }, [deactivateShield, executeDeploy]);
 
   // Reset assignments when component mounts - start fresh each battle prep session
   useEffect(() => {
@@ -489,6 +560,9 @@ export const BattlePreparationScreen = React.memo(
       ))}
     </View>
   ), []);
+
+  const deploymentReady = validateDeployment(assignments).isValid;
+  const deployDisabled = !deploymentReady || isStartingBattle || hasBlockingMarch;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -622,27 +696,34 @@ export const BattlePreparationScreen = React.memo(
                 borderColor: colors.secondary,
                 borderWidth: 1,
               },
-              (!validateDeployment(assignments).isValid || isStartingBattle) && {
+              deployDisabled && {
                 opacity: 0.5,
                 backgroundColor: colors.neutral + '1A',
                 borderColor: colors.neutral
               }
             ]}
             onPress={handleBattleStart}
-            disabled={!validateDeployment(assignments).isValid || isStartingBattle}
+            disabled={deployDisabled}
           >
             <Text style={[
               styles.executeText,
               { 
                 color: colors.secondary,
               },
-              (!validateDeployment(assignments).isValid || isStartingBattle) && {
+              deployDisabled && {
                 color: colors.neutral,
               }
             ]}>
               {isStartingBattle ? 'STARTING...' : 'DEPLOY PURGE'}
             </Text>
           </TouchableOpacity>
+          {hasBlockingMarch ? (
+            <Text style={[styles.marchBlockHint, { color: colors.text.secondary }]}>
+              {asyncMarchesEnabled
+                ? 'You already have a hack expedition in progress. Committed bots stay out of Digital Barracks and full home defense until return completes or you cancel while outbound.'
+                : 'You already have a hack expedition in progress. Finish it, wait for return, or cancel while outbound.'}
+            </Text>
+          ) : null}
         </View>
       )}
       {isFreeHackRig && isDeployPurgeHighlight && (
@@ -669,25 +750,25 @@ export const BattlePreparationScreen = React.memo(
                   borderColor: undefined,
                   borderWidth: 3,
                 },
-                (!validateDeployment(assignments).isValid || isStartingBattle) && {
+                deployDisabled && {
                   opacity: 0.5,
                   backgroundColor: colors.neutral + '1A',
                   borderColor: colors.neutral
                 }
               ]}
               onPress={handleBattleStart}
-              disabled={!validateDeployment(assignments).isValid || isStartingBattle}
+              disabled={deployDisabled}
               activeOpacity={0.7}
             >
-              {(!validateDeployment(assignments).isValid || isStartingBattle) ? null : (
+              {!deployDisabled ? (
                 <DeployPurgeHighlightBorder colors={colors} />
-              )}
+              ) : null}
               <Text style={[
                 styles.executeText,
                 { 
                   color: colors.secondary,
                 },
-                (!validateDeployment(assignments).isValid || isStartingBattle) && {
+                deployDisabled && {
                   color: colors.neutral,
                 }
               ]}>
@@ -816,6 +897,12 @@ const styles = StyleSheet.create({
   executeText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  marchBlockHint: {
+    marginHorizontal: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.sm,
+    fontSize: 12,
+    textAlign: 'center',
   },
   swipeIndicator: {
     alignSelf: 'flex-end',

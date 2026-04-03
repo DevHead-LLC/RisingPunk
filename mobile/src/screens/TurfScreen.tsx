@@ -33,6 +33,7 @@ import {ErrorBoundary} from '../components/common/ErrorBoundary';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
 import {fetchInitialData, setOnboardingCompleted, setShowOnboarding, setShowEmailVerification, setEmailVerificationPrompted, refreshUserDataSilent} from '../store/slices/authSlice';
 import {mapApi} from '../store/api/mapApi';
+import {attackApi} from '../store/api/attackApi';
 import {useGetRentalHousingStatusQuery, useCompleteRentalHousingMutation, useCompleteOnboardingMutation, authApi} from '../store/api/authApi';
 import {OnboardingSlides} from '../components/onboarding';
 import {TurfIntro} from '../components/turf-intro';
@@ -182,6 +183,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [currentScreen, setCurrentScreen] = useState<TurfScreenName>('turf');
   const [navRestoreAttempted, setNavRestoreAttempted] = useState(false);
   const [battleId, setBattleId] = useState<string | null>(null);
+  const [battleScreenMode, setBattleScreenMode] = useState<'live' | 'replay'>('live');
+  const [openMessagesAfterReplayClose, setOpenMessagesAfterReplayClose] = useState(false);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const isAutoPanningRef = useRef(false);
   const currentPanOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -229,6 +232,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   // Restore persisted nav state on mount (Phase 2: refresh — stay on current screen and position).
   // State is per-user so a new guest does not see the previous account's screen (e.g. HackMap/onboarding).
   const userId = useAppSelector((state) => state.auth.user?._id);
+  const dispatch = useAppDispatch();
   const restorePendingForUserIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!userId) {
@@ -269,20 +273,33 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     };
   }, [navRestoreAttempted, userId, currentScreen, turfViewPosition]);
 
-  // Phase 4: When app returns from background and we're on battle screen, refetch battle state so UI shows current progress
+  const token = useAppSelector((state) => state.auth.token);
+
+  // Foreground refresh: live battle state; async march feeds; map tiles when returning on Hack Map.
   const appStateRef = useRef(AppState.currentState);
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       const wasBackgroundOrInactive = appStateRef.current.match(/inactive|background/);
       appStateRef.current = nextState;
-      if (wasBackgroundOrInactive && nextState === 'active' && currentScreen === 'battle' && battleId) {
+      if (!wasBackgroundOrInactive || nextState !== 'active') {
+        return;
+      }
+      if (
+        currentScreen === 'battle' &&
+        battleId &&
+        battleScreenMode === 'live'
+      ) {
         dispatch(battleApi.util.invalidateTags(['Battle']));
+      }
+      if (token) {
+        dispatch(attackApi.util.invalidateTags(['AttackMarch']));
+      }
+      if (token && currentScreen === 'map') {
+        dispatch(mapApi.util.invalidateTags(['Map']));
       }
     });
     return () => sub?.remove();
-  }, [dispatch, currentScreen, battleId]);
-
-  const token = useAppSelector((state) => state.auth.token);
+  }, [dispatch, currentScreen, battleId, battleScreenMode, token]);
   const { data: conversationsData } = useGetConversationsQuery(undefined, {
     skip: !token,
     pollingInterval: token ? 10000 : 0, // 10s for badge; MessagesModal polls at 2s when open
@@ -291,7 +308,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const currentScrollPositionRef = useRef<{ x: number; y: number } | null>(null);
   const scrollWrapperRef = useRef<View>(null);
   const scrollWrapperOffsetY = useRef<number>(0);
-  const dispatch = useAppDispatch();
 
   // Android-specific gesture state - always call hooks unconditionally
   const offsetX: any = useSharedValue(0);
@@ -799,6 +815,39 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [currentScreen, turfViewPosition, centerAndroidView, offsetX, offsetY, dispatch]);
 
+  const handleWatchBattleFromMessages = useCallback(
+    (replayBattleId: string) => {
+      if (!replayBattleId) return;
+      setShowMessagesModal(false);
+      setMessagesOpenToUser(null);
+      setBattleScreenMode('replay');
+      setOpenMessagesAfterReplayClose(true);
+      setBattleId(replayBattleId);
+      navigateToScreen('battle');
+    },
+    [navigateToScreen]
+  );
+
+  /** Map-hack async: march launch returns to map (no live battle yet). Live path unchanged. */
+  const handleBattlePrepDeployComplete = useCallback(
+    (id?: string, options?: { mode?: 'live' | 'march' }) => {
+      if (options?.mode === 'march') {
+        setPendingDefenderUserId(null);
+        setPendingNpcSlug(null);
+        setPendingNpcInstanceId(null);
+        setPendingHackMapCell(null);
+        setOpenMessagesAfterReplayClose(false);
+        navigateToScreen('map');
+        return;
+      }
+      setBattleScreenMode('live');
+      setOpenMessagesAfterReplayClose(false);
+      setBattleId(id ?? null);
+      navigateToScreen('battle');
+    },
+    [navigateToScreen]
+  );
+
   /** World Chat + Messages (e.g. Battle Report): pan map after TurfScreen delay (see HackMapScreen PENDING_CHAT_NAV_DELAY_MS). */
   const handleChatNavigateToMapCell = useCallback(
     (target: { mapName: string; x: number; y: number }) => {
@@ -1108,6 +1157,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           restorePan={returnContext?.mapPan}
           pendingNavigateToCell={mapPendingNavigateCell}
           onPendingNavigateConsumed={handleMapPendingNavigateConsumed}
+          onWatchBattle={handleWatchBattleFromMessages}
           onClose={() => {
             const slug = (globalThis as any).pendingNpcSlug as string | undefined;
             const defenderUserId = (globalThis as any).pendingDefenderUserId as string | undefined;
@@ -1163,10 +1213,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       case 'battlePrep':
         return <BattlePreparationScreen
           onClose={() => navigateToScreen(previousScreen)}
-          onBattleStart={(newBattleId) => {
-            setBattleId(newBattleId || null);
-            navigateToScreen('battle');
-          }}
+          onBattleStart={handleBattlePrepDeployComplete}
           defenderId={pendingDefenderUserId || undefined}
           defenderNpcSlug={pendingNpcSlug || undefined}
           defenderNpcInstanceId={pendingNpcInstanceId || undefined}
@@ -1176,22 +1223,35 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         if (!battleId) {
           return <BattlePreparationScreen
             onClose={() => navigateToScreen(previousScreen)}
-            onBattleStart={(newBattleId) => {
-              setBattleId(newBattleId || null);
-              navigateToScreen('battle');
-            }}
+            onBattleStart={handleBattlePrepDeployComplete}
           />;
         }
         return <BattleGridScreen
           battleId={battleId}
+          mode={battleScreenMode}
           _onClose={() => {
+            if (battleScreenMode === 'replay') {
+              if (openMessagesAfterReplayClose) {
+                setOpenMessagesAfterReplayClose(false);
+                setBattleScreenMode('live');
+                setBattleId(null);
+                navigateToScreen('turf');
+                setShowMessagesModal(true);
+                return;
+              }
+              setBattleScreenMode('live');
+              setBattleId(null);
+              navigateToScreen('turf');
+              return;
+            }
+
             // Invalidate map cache to ensure fresh data after battle end
             // This prevents the "ghost NPC" issue where defeated NPCs still appear on the map
             dispatch(mapApi.util.invalidateTags(['Map']));
-            
+
             // Invalidate user profile cache to ensure fresh experience/level data
             dispatch(authApi.util.invalidateTags(['User']));
-            
+
             // Return to origin without resetting app
             if (returnContext?.origin === 'map') {
               navigateToScreen('map');
@@ -1199,6 +1259,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               navigateToScreen('hackRig');
             }
             setBattleId(null);
+            setBattleScreenMode('live');
           }}
         />;
       case 'investmentProperty':
@@ -1751,6 +1812,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               openToUserId={messagesOpenToUser?.userId ?? null}
               openToUsername={messagesOpenToUser?.username ?? null}
               onNavigateToMapCell={handleChatNavigateToMapCell}
+              onWatchBattle={handleWatchBattleFromMessages}
             />
             <SearchUserModal
               visible={showSearchUserModal}
@@ -1775,7 +1837,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive]);
+  }, [currentScreen, navigateToScreen, battleId, battleScreenMode, openMessagesAfterReplayClose, handleWatchBattleFromMessages, handleBattleEnd, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive, dispatch, returnContext]);
 
   // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
   if (!navRestoreAttempted) {

@@ -10,17 +10,20 @@ import { createNodePositionMap } from '../../utils/battleUtils';
 import { ANIMATION_CONFIG } from '../../config';
 import { BattleLoadingError } from './BattleLoadingError';
 import { useBattleState } from '../../hooks/useBattleState';
+import type { BattleState } from '../../../../shared/battleReplay';
 
 interface Props {
   battleId: string;
   battalionSize?: number;
   showHealthBars?: boolean;
+  overrideBattleState?: BattleState | null;
 }
 
 export const BattleBattalionManager = React.memo(({
   battleId,
   battalionSize = 40,
   showHealthBars = true,
+  overrideBattleState,
 }: Props) => {
   const [pollingInterval, setPollingInterval] = useState<number>(ANIMATION_CONFIG.DEFAULT_POLLING_MS);
   
@@ -31,6 +34,7 @@ export const BattleBattalionManager = React.memo(({
   } = useBattleState({
     battleId,
     pollingInterval,
+    overrideState: overrideBattleState,
   });
 
   const calculatedPollingInterval = React.useMemo(() => 

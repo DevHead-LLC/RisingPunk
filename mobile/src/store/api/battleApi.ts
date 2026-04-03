@@ -1,92 +1,17 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { API_URL } from '../../config';
-import { NetworkConnection, LineProperties, MovementState } from '../../types/battleTypes';
+import type {
+  BattleEndData,
+  BattleLosses,
+  BattalionLoss,
+  BattleReplayDocument,
+  BattleState,
+} from '../../../../shared/battleReplay';
 import type { RootState } from '../index';
 import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
 
-export interface BattalionLoss {
-  battalionId: string;
-  type: 'guardian' | 'breacher' | 'phreak';
-  mark: number;
-  startingQuantity: number;
-  endingQuantity: number;
-  startingPoints: number;
-  endingPoints: number;
-  losses: number;
-  owner: 'user' | 'enemy';
-}
-
-export interface BattleLosses {
-  userLosses: number;
-  enemyLosses: number;
-  winner: 'user' | 'enemy';
-  userStartingPoints: number;
-  userEndingPoints: number;
-  enemyStartingPoints: number;
-  enemyEndingPoints: number;
-  battalionLosses: BattalionLoss[];
-  victoryMessage: string;
-  endCondition: 'timer' | 'elimination';
-  battleDuration: number;
-}
-
-export interface BattleEndData {
-  battleId: string;
-  winner: 'user' | 'enemy';
-  losses: BattleLosses;
-  endTime: Date;
-  phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat' | 'complete';
-  experienceGained?: number;
-  hackerRewards?: number;
-  levelUp?: {
-    levelsGained: number;
-    newLevel: number;
-  };
-  lifetimeHighUpdated?: boolean;
-  isUserDefender?: boolean;
-  isPvPBattle?: boolean;
-}
-
-export interface BattleState {
-  battleId: string;
-  phase: 'setup' | 'countdown' | 'battle' | 'victory' | 'defeat' | 'complete';
-  timeRemaining: number;
-  winner?: 'user' | 'enemy';
-  battalions: Array<{
-    id: string;
-    type: 'guardian' | 'breacher' | 'phreak';
-    quantity: number;
-    currentHealth: number;
-    maxHealth: number;
-    position: { x: number; y: number };
-    isUser: boolean;
-    mark: number;
-    stats: {
-      health: number;
-      speed: number;
-      range: number;
-      offense: number;
-      defense: number;
-    };
-    movementState?: MovementState;
-  }>;
-  nodes: Array<{
-    index: number;
-    owner: 'user' | 'enemy' | 'neutral';
-    tugOfWarProgress: number;
-    maxCaptureThreshold: number;
-    position: { x: number; y: number };
-  }>;
-  networkConnections: NetworkConnection[];
-  lineProperties: LineProperties[];
-  movementStates?: MovementState[];
-  victoryCondition?: {
-    winner: 'user' | 'enemy';
-    reason: 'elimination' | 'timeout' | 'tie';
-  };
-  battleEndData?: BattleEndData;
-}
+export type { BattleEndData, BattleLosses, BattalionLoss, BattleReplayDocument, BattleState };
 
 export interface StartBattleRequest {
   userBattalions: Array<{
@@ -129,7 +54,7 @@ const battleBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const battleApi = createApi({
   reducerPath: 'battleApi',
   baseQuery: battleBaseQuery,
-  tagTypes: ['Battle'],
+  tagTypes: ['Battle', 'BattleReplay'],
   endpoints: (builder) => ({
     startBattle: builder.mutation<{ battleId: string }, StartBattleRequest>({
       query: (body) => ({
@@ -145,7 +70,28 @@ export const battleApi = createApi({
       transformResponse: (response: { success: boolean; data: BattleState }) => response.data,
       providesTags: ['Battle'],
     }),
+    getBattleReplay: builder.query<BattleReplayDocument, string>({
+      query: (battleId) => `/api/battle/${encodeURIComponent(battleId)}/replay`,
+      transformResponse: (response: {
+        success?: boolean;
+        data?: BattleReplayDocument;
+        error?: string;
+      }) => {
+        if (!response?.success || response.data == null) {
+          throw new Error(response?.error || 'Failed to load battle replay');
+        }
+        return response.data;
+      },
+      providesTags: (_result, _err, battleId) => [{ type: 'BattleReplay', id: battleId }],
+    }),
   }),
 });
 
-export const { useStartBattleMutation, useGetBattleStateQuery } = battleApi;
+export const { useStartBattleMutation, useGetBattleStateQuery, useGetBattleReplayQuery } = battleApi;
+
+/** R4: typed fetch for stored replay (GET /api/battle/:id/replay). */
+export function useReplayData(battleId: string | null | undefined, opts?: { skip?: boolean }) {
+  return useGetBattleReplayQuery(battleId as string, {
+    skip: !battleId || opts?.skip === true,
+  });
+}
