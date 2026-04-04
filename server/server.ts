@@ -172,10 +172,18 @@ mongoose.connect(process.env.MONGODB_URI, {
       runStaleResolvingMarchRecoveryOnce,
       startStaleResolvingMarchWatchdog,
     } = require('./src/services/MarchStaleResolvingWatchdogService');
-    await runStaleResolvingMarchRecoveryOnce();
-    startStaleResolvingMarchWatchdog();
-  } catch (staleErr: unknown) {
-    console.warn('Stale resolving march watchdog failed to start (non-fatal):', staleErr);
+    try {
+      await runStaleResolvingMarchRecoveryOnce();
+    } catch (recoveryErr: unknown) {
+      console.warn('Stale resolving march one-shot recovery failed (non-fatal):', recoveryErr);
+    }
+    try {
+      startStaleResolvingMarchWatchdog();
+    } catch (watchdogErr: unknown) {
+      console.warn('Stale resolving march watchdog failed to start (non-fatal):', watchdogErr);
+    }
+  } catch (staleModuleErr: unknown) {
+    console.warn('Stale resolving march watchdog module load failed (non-fatal):', staleModuleErr);
   }
 
   // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
