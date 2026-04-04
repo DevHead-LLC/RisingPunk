@@ -148,11 +148,23 @@ mongoose.connect(process.env.MONGODB_URI, {
       rescheduleAllReturningMarches,
       rescheduleArrivedMarchBattleStarts,
     } = require('./src/services/MarchArrivalSchedulerService');
-    await rescheduleAllOutboundMarches();
-    await rescheduleAllReturningMarches();
-    await rescheduleArrivedMarchBattleStarts();
-  } catch (marchErr: unknown) {
-    console.warn('Attack march arrival reschedule failed (non-fatal):', marchErr);
+    try {
+      await rescheduleAllOutboundMarches();
+    } catch (outboundErr: unknown) {
+      console.warn('Attack march outbound reschedule failed (non-fatal):', outboundErr);
+    }
+    try {
+      await rescheduleAllReturningMarches();
+    } catch (returningErr: unknown) {
+      console.warn('Attack march returning reschedule failed (non-fatal):', returningErr);
+    }
+    try {
+      await rescheduleArrivedMarchBattleStarts();
+    } catch (arrivedErr: unknown) {
+      console.warn('Attack march arrived battle-start reschedule failed (non-fatal):', arrivedErr);
+    }
+  } catch (marchModuleErr: unknown) {
+    console.warn('Attack march scheduler load failed (non-fatal):', marchModuleErr);
   }
 
   try {
