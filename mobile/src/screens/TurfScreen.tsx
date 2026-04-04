@@ -1275,14 +1275,14 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             // Invalidate user profile cache to ensure fresh experience/level data
             dispatch(authApi.util.invalidateTags(['User']));
 
-            // Return to origin without resetting app
+            // Return to origin without resetting app (Bugbot: clear battle state before navigate — same order as replay close).
+            setBattleId(null);
+            setBattleScreenMode('live');
             if (returnContext?.origin === 'map') {
               navigateToScreen('map');
             } else {
               navigateToScreen('hackRig');
             }
-            setBattleId(null);
-            setBattleScreenMode('live');
           }}
         />;
       case 'investmentProperty':

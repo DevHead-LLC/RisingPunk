@@ -119,10 +119,11 @@ export const BattlePreparationScreen = React.memo(
   const hasBlockingMarch =
     asyncMarchesEnabled && (attackMarchMeta?.marches?.length ?? 0) > 0;
   const [deactivateShield] = useDeactivateShieldMutation();
-  const isHackRigBattleFlow = !defenderId && !defenderNpcSlug;
+  /** Single source for hack-rig vs map/NPC target (Bugbot: do not duplicate in `battleStartData` useMemo). */
+  const isHackRigBattle = !defenderId && !defenderNpcSlug;
   const wantsMarchLaunch =
     asyncMarchesEnabled &&
-    !isHackRigBattleFlow &&
+    !isHackRigBattle &&
     hackMapCell != null &&
     Number.isFinite(hackMapCell.x) &&
     Number.isFinite(hackMapCell.y);
@@ -382,7 +383,6 @@ export const BattlePreparationScreen = React.memo(
   }, []);
 
   const battleStartData = React.useMemo(() => {
-    const isHackRigBattle = !defenderId && !defenderNpcSlug;
     const hasCell =
       hackMapCell != null &&
       Number.isFinite(hackMapCell.x) &&
