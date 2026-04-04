@@ -26,6 +26,7 @@ import { packetBreachApi } from './api/packetBreachApi';
 import { raceConditionHeistApi } from './api/raceConditionHeistApi';
 import { binaryBankCrackApi } from './api/binaryBankCrackApi';
 import { battlePresetsApi } from './api/battlePresetsApi';
+import { attackApi } from './api/attackApi';
 
 export const store = configureStore({
   reducer: {
@@ -55,6 +56,7 @@ export const store = configureStore({
     [raceConditionHeistApi.reducerPath]: raceConditionHeistApi.reducer,
     [binaryBankCrackApi.reducerPath]: binaryBankCrackApi.reducer,
     [battlePresetsApi.reducerPath]: battlePresetsApi.reducer,
+    [attackApi.reducerPath]: attackApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -80,7 +82,8 @@ export const store = configureStore({
     .concat(packetBreachApi.middleware)
     .concat(raceConditionHeistApi.middleware)
     .concat(binaryBankCrackApi.middleware)
-    .concat(battlePresetsApi.middleware),
+    .concat(battlePresetsApi.middleware)
+    .concat(attackApi.middleware),
   devTools: __DEV__,
 });
 

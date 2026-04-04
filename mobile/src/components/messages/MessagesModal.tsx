@@ -8,6 +8,7 @@ import {
   FlatList,
   ActivityIndicator,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -16,6 +17,7 @@ import {
   useGetThreadQuery,
   useSendMessageMutation,
   useMarkConversationReadMutation,
+  useDeleteConversationMutation,
   type PMConversation,
   type PMMessage,
 } from '../../store/api/privateMessagesApi';
@@ -31,6 +33,8 @@ interface MessagesModalProps {
   openToUsername?: string | null;
   /** Same as World Chat: tap Battle Report / shared location to open Hack Map on that cell (from Turf). */
   onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
+  /** Battle Report `battleId` present: open replay viewer (R4). */
+  onWatchBattle?: (battleId: string) => void;
 }
 
 export const MessagesModal: React.FC<MessagesModalProps> = ({
@@ -39,6 +43,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   openToUserId,
   openToUsername,
   onNavigateToMapCell,
+  onWatchBattle,
 }) => {
   const colors = useThemeColors();
   const currentUser = useAppSelector((state) => state.auth.user);
@@ -68,7 +73,55 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
     },
   );
   const [markRead] = useMarkConversationReadMutation();
+  const [deleteConversation] = useDeleteConversationMutation();
   const [sendMessage, { isLoading: isSending }] = useSendMessageMutation();
+
+  const broadcastOnlyForDelete = useCallback((c: PMConversation) => {
+    return (
+      c.isBroadcast === true &&
+      c.otherUserId !== PROBE_REPORT_SENDER_ID &&
+      c.otherUserId !== BATTLE_REPORT_SENDER_ID
+    );
+  }, []);
+
+  const promptDeleteConversation = useCallback(
+    (c: PMConversation) => {
+      Alert.alert(
+        'Remove conversation',
+        'Remove this from your inbox. Messages stay for the other person until they remove it too (then the thread is deleted from the server).',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => {
+              deleteConversation({
+                otherUserId: c.otherUserId,
+                broadcastOnly: broadcastOnlyForDelete(c),
+              })
+                .unwrap()
+                .catch((err: unknown) => {
+                  console.warn('Delete conversation failed:', err);
+                  let detail = 'Could not remove conversation. Try again.';
+                  if (typeof err === 'object' && err !== null) {
+                    const r = err as Record<string, unknown>;
+                    const data = r.data;
+                    if (typeof data === 'string') detail = data;
+                    else if (data && typeof data === 'object' && typeof (data as { message?: unknown }).message === 'string') {
+                      detail = (data as { message: string }).message;
+                    } else if (typeof r.message === 'string' && r.message) {
+                      detail = r.message;
+                    }
+                  }
+                  Alert.alert('Remove failed', detail);
+                });
+            },
+          },
+        ]
+      );
+    },
+    [deleteConversation, broadcastOnlyForDelete]
+  );
 
   const messages: ChatMessageForModal[] = (threadData?.messages ?? []).map((msg: PMMessage) => ({
     id: msg.id,
@@ -194,6 +247,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
                   <Pressable
                     style={styles.row}
                     onPress={() => openConversation(item)}
+                    onLongPress={() => promptDeleteConversation(item)}
                     accessibilityRole="button"
                     accessibilityLabel={`Conversation with ${item.otherUsername}`}
                   >
@@ -234,6 +288,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
           getReportContextData={getReportContextData}
           canReply={canReply}
           onNavigateToMapCell={onNavigateToMapCell}
+          onWatchBattle={onWatchBattle}
         />
       )}
     </>

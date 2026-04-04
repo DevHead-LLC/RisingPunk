@@ -2,10 +2,14 @@ import { Router, Request, Response } from 'express';
 import { BattleController } from '../controllers/BattleController';
 import auth from '../middleware/auth';
 import { Battle } from '../models/Battle';
+import { BattleReplay } from '../models/BattleReplay';
+import {
+  buildAdminIdSet,
+  canUserAccessBattleReplay,
+} from '../services/BattleReplayLifecycleService';
 import { UserTaskProgress } from '../models/UserTaskProgress';
 import { NPCService } from '../services/NPCService';
-import { isBattalionSlotUnlocked } from '../utils/researchFeatureUtils';
-import { userHasMark2BotsUnlocked } from '../utils/userHasMark2BotsUnlocked';
+import { normalizeUserBattalionsForBattleStart } from '../utils/normalizeUserBattalionsForBattleStart';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -38,6 +42,47 @@ interface BattleResponse {
 const router: Router = Router();
 const battleController = new BattleController();
 
+/** Per-user sliding window for large GET /replay payloads. */
+const REPLAY_GET_WINDOW_MS = 60_000;
+const REPLAY_GET_MAX_PER_WINDOW = 20;
+/** Max distinct user keys after expired eviction — bounds per-request scan cost (Bugbot: many concurrent users within window). */
+const REPLAY_GET_RATE_MAP_MAX_ENTRIES = 4096;
+// Evict expired entries on each check so the Map stays bounded (Bugbot: keys for users who never fetch again are never revisited otherwise).
+const replayGetRateByUser = new Map<string, { count: number; windowStartMs: number }>();
+
+function evictExpiredReplayGetRateEntries(now: number): void {
+  for (const [key, val] of replayGetRateByUser.entries()) {
+    if (now - val.windowStartMs > REPLAY_GET_WINDOW_MS) {
+      replayGetRateByUser.delete(key);
+    }
+  }
+}
+
+function trimReplayGetRateMapToMaxEntries(): void {
+  const excess = replayGetRateByUser.size - REPLAY_GET_RATE_MAP_MAX_ENTRIES;
+  if (excess <= 0) return;
+  const entries = [...replayGetRateByUser.entries()].sort(
+    (a, b) => a[1].windowStartMs - b[1].windowStartMs
+  );
+  for (let i = 0; i < excess; i++) {
+    replayGetRateByUser.delete(entries[i][0]);
+  }
+}
+
+function takeReplayGetRateSlot(userId: string): boolean {
+  const now = Date.now();
+  evictExpiredReplayGetRateEntries(now);
+  trimReplayGetRateMapToMaxEntries();
+  const entry = replayGetRateByUser.get(userId);
+  if (!entry || now - entry.windowStartMs > REPLAY_GET_WINDOW_MS) {
+    replayGetRateByUser.set(userId, { count: 1, windowStartMs: now });
+    return true;
+  }
+  if (entry.count >= REPLAY_GET_MAX_PER_WINDOW) return false;
+  entry.count += 1;
+  return true;
+}
+
 router.post<{}, BattleResponse, StartBattleRequest['body']>(
   '/start',
   auth,
@@ -60,67 +105,6 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
       
-      if (!userBattalions || userBattalions.length === 0) {
-        res.status(400).json({ success: false, error: 'userBattalions is required and must contain at least one battalion' });
-        return;
-      }
-      
-      const hasValidBattalion = userBattalions.some(battalion => battalion.quantity && battalion.quantity > 0);
-      if (!hasValidBattalion) {
-        res.status(400).json({ success: false, error: 'userBattalions must contain at least one battalion with quantity > 0' });
-        return;
-      }
-      
-      const MAX_USER_BATTALIONS = 6;
-      if (userBattalions.length > MAX_USER_BATTALIONS) {
-        res.status(400).json({ success: false, error: `Maximum ${MAX_USER_BATTALIONS} battalions allowed` });
-        return;
-      }
-
-      if (userBattalions.length > 2) {
-        const unlockedC = await isBattalionSlotUnlocked(String(req.user._id), 'C');
-        if (!unlockedC) {
-          res.status(403).json({
-            success: false,
-            error: 'Battalion C is locked. Complete the "Add Battalion C" research feature to unlock it.'
-          });
-          return;
-        }
-      }
-
-      if (userBattalions.length > 3) {
-        const unlockedD = await isBattalionSlotUnlocked(String(req.user._id), 'D');
-        if (!unlockedD) {
-          res.status(403).json({
-            success: false,
-            error: 'Battalion D is locked. Complete the "Add Battalion D" research feature to unlock it.'
-          });
-          return;
-        }
-      }
-
-      if (userBattalions.length > 4) {
-        const unlockedE = await isBattalionSlotUnlocked(String(req.user._id), 'E');
-        if (!unlockedE) {
-          res.status(403).json({
-            success: false,
-            error: 'Battalion E is locked. Complete the "Add Battalion E" research feature to unlock it.'
-          });
-          return;
-        }
-      }
-
-      if (userBattalions.length > 5) {
-        const unlockedF = await isBattalionSlotUnlocked(String(req.user._id), 'F');
-        if (!unlockedF) {
-          res.status(403).json({
-            success: false,
-            error: 'Battalion F is locked. Complete the "Add Battalion F" research feature to unlock it.'
-          });
-          return;
-        }
-      }
-
       let resolvedHackCellX: number | undefined;
       let resolvedHackCellY: number | undefined;
       const hasX = hackMapCellX !== undefined && hackMapCellX !== null;
@@ -145,49 +129,16 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         return;
       }
 
-      const normalizedBattalions: Array<{ type: 'breacher' | 'guardian' | 'phreak'; quantity: number; markLevel: number }> = [];
-      for (const b of userBattalions) {
-        if (!b || typeof b !== 'object') {
-          res.status(400).json({ success: false, error: 'Invalid userBattalions entry.' });
-          return;
-        }
-        const t = b.type;
-        if (t !== 'breacher' && t !== 'guardian' && t !== 'phreak') {
-          res.status(400).json({ success: false, error: 'Each battalion type must be breacher, guardian, or phreak.' });
-          return;
-        }
-        if (typeof b.quantity !== 'number' || !Number.isInteger(b.quantity) || b.quantity <= 0) {
-          continue;
-        }
-        const rawMl = (b as { markLevel?: unknown }).markLevel;
-        let markLevel: 1 | 2;
-        if (rawMl === undefined || rawMl === null) {
-          markLevel = 1;
-        } else {
-          const v = typeof rawMl === 'string' ? Number(rawMl.trim()) : rawMl;
-          if (v !== 1 && v !== 2) {
-            res.status(400).json({ success: false, error: 'markLevel must be 1 or 2.' });
-            return;
-          }
-          markLevel = v;
-        }
-        if (markLevel === 2) {
-          const unlocked = await userHasMark2BotsUnlocked(req.user._id);
-          if (!unlocked) {
-            res.status(403).json({
-              success: false,
-              error: 'Complete Mark 2 Bots research in Hack Ability to deploy Mark II units in battle.',
-            });
-            return;
-          }
-        }
-        normalizedBattalions.push({ type: t, quantity: b.quantity, markLevel });
-      }
-
-      if (normalizedBattalions.length === 0) {
-        res.status(400).json({ success: false, error: 'userBattalions must contain at least one battalion with quantity > 0' });
+      const battalionNorm = await normalizeUserBattalionsForBattleStart(String(req.user._id), userBattalions);
+      if (!battalionNorm.ok) {
+        res.status(battalionNorm.status).json({ success: false, error: battalionNorm.error });
         return;
       }
+      const normalizedBattalions = battalionNorm.normalized.map((b) => ({
+        type: b.type,
+        quantity: b.quantity,
+        markLevel: b.markLevel,
+      }));
 
       const battle = await battleController.startBattle(
         req.user._id,
@@ -338,6 +289,45 @@ router.get<{ id: string }, BattleResponse>(
       res.status(500).json({ 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to get battle state' 
+      });
+    }
+  }
+);
+
+router.get<{ id: string }, BattleResponse>(
+  '/:id/replay',
+  auth,
+  async (req, res): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const userId = String(req.user._id);
+
+      if (!takeReplayGetRateSlot(userId)) {
+        res.status(429).json({
+          success: false,
+          error: 'Too many replay downloads. Try again in a minute.',
+        });
+        return;
+      }
+
+      const replay = await BattleReplay.findOne({ battleId: id }).select('-__v').lean();
+      if (!replay) {
+        res.status(404).json({ success: false, error: 'Replay not found' });
+        return;
+      }
+
+      const adminSet = buildAdminIdSet();
+      if (!canUserAccessBattleReplay(userId, replay, adminSet)) {
+        res.status(403).json({ success: false, error: 'Not authorized to view this replay' });
+        return;
+      }
+
+      res.json({ success: true, data: replay });
+    } catch (error) {
+      console.error('Get battle replay error:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get battle replay',
       });
     }
   }

@@ -24,6 +24,7 @@ import { MapChatMessage } from '../models/MapChatMessage';
 import { filterBadWords } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 import { dedupCellsByCoord } from '../utils/mapCellUtils';
+import { safeApplyPvPDefenderRelocateInstantArrival } from '../services/MarchArrivalSchedulerService';
 
 const router: Router = express.Router();
 const mapService = new MapService();
@@ -344,6 +345,12 @@ router.get('/my-position', auth, async (req: Request, res: Response) => {
     const handle = (user as any).handle || 'User';
     const placed = await placeUserHouse(mapDoc, authUserId, handle);
     if (placed) {
+      await safeApplyPvPDefenderRelocateInstantArrival(
+        String(authUserId),
+        placed.x,
+        placed.y,
+        'after GET my-position placeUserHouse'
+      );
       res.json({ x: placed.x, y: placed.y });
       return;
     }
@@ -351,6 +358,12 @@ router.get('/my-position', auth, async (req: Request, res: Response) => {
     const freshMapDoc = await MapModel.findOne({ name: 'main' });
     house = freshMapDoc ? await findHouseForUser(freshMapDoc, authUserId) : null;
     if (house) {
+      await safeApplyPvPDefenderRelocateInstantArrival(
+        String(authUserId),
+        house.x,
+        house.y,
+        'after GET my-position concurrent house placement'
+      );
       res.json({ x: house.x, y: house.y });
       return;
     }
@@ -444,6 +457,8 @@ router.post('/player-position', auth, async (req: Request, res: Response) => {
       (mapDoc as any).markModified('cells');
       await (mapDoc as any).save();
     }
+
+    await safeApplyPvPDefenderRelocateInstantArrival(String(authUserId), x, y, 'after POST player-position');
 
     res.json({ success: true });
   } catch (error: any) {
@@ -603,6 +618,8 @@ router.post('/move-property', auth, async (req: Request, res: Response) => {
     } finally {
       await session.endSession();
     }
+
+    await safeApplyPvPDefenderRelocateInstantArrival(String(authUserId), x, y, 'after POST move-property');
 
     res.json({
       success: true,

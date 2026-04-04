@@ -130,6 +130,16 @@ export const privateMessagesApi = createApi({
       }),
       invalidatesTags: ['PrivateMessageConversations'],
     }),
+    deleteConversation: builder.mutation<
+      { success: boolean },
+      { otherUserId: string; broadcastOnly?: boolean }
+    >({
+      query: ({ otherUserId, broadcastOnly }) => ({
+        url: `/api/private-messages/conversations/${encodeURIComponent(otherUserId)}${broadcastOnly ? '?broadcastOnly=true' : ''}`,
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['PrivateMessageConversations'],
+    }),
   }),
 });
 
@@ -138,6 +148,7 @@ export const {
   useGetThreadQuery,
   useSendMessageMutation,
   useMarkConversationReadMutation,
+  useDeleteConversationMutation,
   useBlockUserMutation,
   useUnblockUserMutation,
   useSendAdminMessageToAllMutation,
