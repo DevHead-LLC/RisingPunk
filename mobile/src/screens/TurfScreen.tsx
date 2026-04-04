@@ -219,6 +219,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [messagesOpenToUser, setMessagesOpenToUser] = useState<{ userId: string; username: string } | null>(null);
   const visitingProfileCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
+  /** Synced each render — read in handlers for the visible top-level screen at tap time. */
+  const currentScreenRef = useRef<TurfScreenName>(currentScreen);
+  currentScreenRef.current = currentScreen;
+  /** Set when Messages → Watch battle; replay close uses this instead of `previousScreen` (global “back” target). */
+  const messagesReplayRestoreScreenRef = useRef<TurfScreenName | null>(null);
 
   useEffect(() => {
     return () => {
@@ -823,6 +828,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const handleWatchBattleFromMessages = useCallback(
     (replayBattleId: string) => {
       if (!replayBattleId) return;
+      messagesReplayRestoreScreenRef.current = currentScreenRef.current;
       setShowMessagesModal(false);
       setMessagesOpenToUser(null);
       setBattleScreenMode('replay');
@@ -842,11 +848,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         setPendingNpcInstanceId(null);
         setPendingHackMapCell(null);
         setOpenMessagesAfterReplayClose(false);
+        messagesReplayRestoreScreenRef.current = null;
         navigateToScreen('map');
         return;
       }
       setBattleScreenMode('live');
       setOpenMessagesAfterReplayClose(false);
+      messagesReplayRestoreScreenRef.current = null;
       setBattleId(id ?? null);
       navigateToScreen('battle');
     },
@@ -1241,15 +1249,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 setOpenMessagesAfterReplayClose(false);
                 setBattleScreenMode('live');
                 setBattleId(null);
-                navigateToScreen(previousScreen);
+                const restoreScreen =
+                  messagesReplayRestoreScreenRef.current ?? previousScreen;
+                messagesReplayRestoreScreenRef.current = null;
+                navigateToScreen(restoreScreen);
                 // Bugbot: Turf MessagesModal only mounts on `turf`; map uses HackMapScreen's modal — bump token there.
-                if (previousScreen === 'map') {
+                if (restoreScreen === 'map') {
                   setMapOpenMessagesAfterReplayToken((n) => n + 1);
                 } else {
                   setShowMessagesModal(true);
                 }
                 return;
               }
+              messagesReplayRestoreScreenRef.current = null;
               setBattleScreenMode('live');
               setBattleId(null);
               navigateToScreen(previousScreen);

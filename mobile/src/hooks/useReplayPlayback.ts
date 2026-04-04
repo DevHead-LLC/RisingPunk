@@ -102,11 +102,59 @@ export function useReplayPlayback(
       ? rawFrame.t + (Date.now() - wallAtFrameRef.current)
       : undefined;
 
-  const battleState = useMemo((): BattleState | null => {
-    if (!rawFrame) return null;
-    const { t: _t, ...rest } = rawFrame;
-    return rest;
-  }, [rawFrame]);
+  // Bugbot: `battleState` must not track `rawFrame` reference — RTK refetch replaces `snapshots` with a new array
+  // and new per-frame object identities even when payload is unchanged, which would recompute viewport state every
+  // refetch and every pump-driven render. Only re-stringify when slot (battle + snapshots ref + index) changes.
+  const battleStateStableRef = useRef<{
+    battleId: string | null;
+    snapshots: BattleReplaySnapshotFrame[] | typeof EMPTY_REPLAY_SNAPSHOTS;
+    index: number;
+    serialized: string;
+    state: BattleState | null;
+  }>({
+    battleId: null,
+    snapshots: EMPTY_REPLAY_SNAPSHOTS,
+    index: -1,
+    serialized: '',
+    state: null,
+  });
+
+  let battleState: BattleState | null = null;
+  if (!rawFrame) {
+    battleState = null;
+    battleStateStableRef.current = {
+      battleId,
+      snapshots,
+      index,
+      serialized: '',
+      state: null,
+    };
+  } else {
+    const c = battleStateStableRef.current;
+    const sameSlot =
+      (battleId ?? null) === (c.battleId ?? null) &&
+      c.snapshots === snapshots &&
+      c.index === index;
+    if (sameSlot) {
+      battleState = c.state;
+    } else {
+      const { t: _t, ...rest } = rawFrame;
+      const serialized = JSON.stringify(rest);
+      const reuseByContent =
+        (battleId ?? null) === (c.battleId ?? null) &&
+        c.state != null &&
+        c.index === index &&
+        serialized === c.serialized;
+      battleState = reuseByContent ? c.state : (rest as BattleState);
+      battleStateStableRef.current = {
+        battleId,
+        snapshots,
+        index,
+        serialized,
+        state: battleState,
+      };
+    }
+  }
 
   return {
     replayDoc: data,
