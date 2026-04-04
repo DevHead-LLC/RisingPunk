@@ -30,6 +30,11 @@ export function outboundProgressTForAttackMarch(m: AttackMarchListItem, nowMs: n
   return Math.min(1, Math.max(0, (nowMs - depart) / outboundDurMs));
 }
 
+/**
+ * Map tile-index coordinates to hack-map **content** pixels (same basis as `HackMapScreen` `MARGIN + (i+0.5)*CELL`).
+ * `x`/`y` may be **fractional** (e.g. `originX + (targetX - originX) * t`): the map is uniform, so this affine map
+ * equals lerping pixel centers — same as the outbound overlay. Bugbot: not “integer indices only.”
+ */
 export function marchTileCenter(x: number, y: number): { cx: number; cy: number } {
   return {
     cx: ATTACK_MARCH_MARGIN_SIZE + (x + 0.5) * ATTACK_MARCH_CELL_SIZE,
@@ -101,6 +106,8 @@ export function computeMarchFrame(m: AttackMarchListItem, now: number): Computed
       typeof rsy === 'number' &&
       Number.isFinite(rsx) &&
       Number.isFinite(rsy);
+    // Bugbot: returnLegStart* are fractional tile indices from cancel; marchTileCenter applies the same affine
+    // as outbound lerp (see JSDoc on marchTileCenter) — no snap/jump vs pre-cancel icon position.
     const { cx: rx, cy: ry } = useCancelStart ? marchTileCenter(rsx, rsy) : { cx: tx, cy: ty };
     return {
       marchId,

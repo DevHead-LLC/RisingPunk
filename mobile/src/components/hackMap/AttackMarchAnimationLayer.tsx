@@ -175,8 +175,8 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
               pointerEvents="none"
               style={{
                 position: 'absolute',
-                // Bugbot: RN rotates around the view center — anchor at segment midpoint so the dashed line
-                // matches (sx,sy)→(ex,ey); translateX(-L/2)+rotate+translateX(L/2) at top-left (sx,sy) is wrong.
+                // Bugbot: L×1 box at (midX-L/2, midY-0.5) centers on segment midpoint; RN default rotate
+                // pivots at view center — correct for (sx,sy)→(ex,ey). Rejected: corner-anchored translateX(±L/2).
                 left: midX - length / 2,
                 top: midY - 0.5,
                 width: length,
