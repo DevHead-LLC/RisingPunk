@@ -26,8 +26,8 @@ export function computeReplayLetterbox(
 
 /**
  * Remaps movement geometry into the letterboxed viewport.
- * Bugbot: `startTime` / `estimatedDuration` stay on the **virtual** battle timeline (same clock as replay frame `t`);
- * {@link BattleBattalion} uses `replayVirtualNowMs` for moving progress — do not rewrite `startTime` with `Date.now()` here (would go stale on the next ms).
+ * Bugbot: do not rewrite `startTime` here (would desync vs frame `t`). Live-recorded wire uses Unix `startTime`;
+ * {@link BattleBattalion} subtracts `recordingEpochMs` when interpolating with `replayVirtualNowMs`.
  */
 function mapMovementState(
   ms: BattleWireMovementState,

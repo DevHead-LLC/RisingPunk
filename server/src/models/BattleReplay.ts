@@ -17,6 +17,7 @@ export interface IBattleReplayDocument extends Document {
   defenderId: string;
   isNpc: boolean;
   winner: 'user' | 'enemy';
+  recordingEpochMs?: number;
 }
 
 const battleReplaySchema = new Schema<IBattleReplayDocument>(
@@ -33,6 +34,7 @@ const battleReplaySchema = new Schema<IBattleReplayDocument>(
     defenderId: { type: String, required: true },
     isNpc: { type: Boolean, required: true },
     winner: { type: String, enum: ['user', 'enemy'], required: true },
+    recordingEpochMs: { type: Number, required: false },
   },
   { collection: 'battle_replays' }
 );

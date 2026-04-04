@@ -172,7 +172,8 @@ router.post('/launch', auth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
- * POST /api/attack/:marchId/cancel — outbound only; restores bots + battalion assignments; clears arrival timer.
+ * POST /api/attack/:marchId/cancel — body `{ clientNowMs, outboundProgressT }` (same progress 0–1 as map
+ * outbound overlay). Outbound only; march → `returning`; restores bots when return completes.
  * Gated by `ENABLE_ASYNC_BATTLES=true`.
  */
 router.post('/:marchId/cancel', auth, async (req: Request, res: Response): Promise<void> => {
@@ -185,7 +186,23 @@ router.post('/:marchId/cancel', auth, async (req: Request, res: Response): Promi
   }
 
   try {
-    await cancelOutboundAttackMarch(String(req.user._id), req.params.marchId);
+    const { clientNowMs, outboundProgressT } = req.body ?? {};
+    if (typeof clientNowMs !== 'number' || !Number.isFinite(clientNowMs)) {
+      res.status(400).json({
+        success: false,
+        error: 'clientNowMs is required and must be a finite number (use device Date.now() when cancelling).',
+      });
+      return;
+    }
+    if (typeof outboundProgressT !== 'number' || !Number.isFinite(outboundProgressT)) {
+      res.status(400).json({
+        success: false,
+        error:
+          'outboundProgressT is required and must be a finite number (0–1 progress along outbound leg, same as map).',
+      });
+      return;
+    }
+    await cancelOutboundAttackMarch(String(req.user._id), req.params.marchId, clientNowMs, outboundProgressT);
     res.json({ success: true });
   } catch (e: unknown) {
     if (e instanceof AttackMarchCancelError) {

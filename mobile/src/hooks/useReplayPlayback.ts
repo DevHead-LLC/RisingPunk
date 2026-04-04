@@ -14,8 +14,14 @@ export type UseReplayPlaybackOptions = {
   suspendPlayback?: boolean;
 };
 
+/** Wall wait between frames when snapshot `t` does not advance (defensive). */
+const REPLAY_FRAME_FALLBACK_MS = REPLAY_SNAPSHOT_INTERVAL_MS;
+const REPLAY_FRAME_STEP_MIN_MS = 16;
+const REPLAY_FRAME_STEP_MAX_MS = 120_000;
+
 /**
- * Loads replay document and advances one frame every {@link REPLAY_SNAPSHOT_INTERVAL_MS} (R4 v1).
+ * Loads replay document and advances frames by snapshot **`t`** deltas (countdown ≈ **1s** / step; ACTIVE often **~250ms**).
+ * Fixed **250ms** per step was wrong for countdown (Bugbot: 3‑2‑1 flashed in **~750ms** wall time).
  */
 export function useReplayPlayback(
   battleId: string | null,
@@ -41,15 +47,29 @@ export function useReplayPlayback(
   snapshotsRef.current = snapshots;
 
   useEffect(() => {
-    if (!data || snapshots.length === 0 || suspendPlayback) return;
-    const t = setInterval(() => {
+    if (!data || suspendPlayback) return;
+    const list = snapshotsRef.current;
+    if (list.length === 0 || index >= list.length - 1) return;
+
+    const cur = list[index] as BattleReplaySnapshotFrame | undefined;
+    const nxt = list[index + 1] as BattleReplaySnapshotFrame | undefined;
+    if (!cur || !nxt) return;
+
+    const rawDt = nxt.t - cur.t;
+    const delayMs =
+      Number.isFinite(rawDt) && rawDt > 0
+        ? Math.min(Math.max(rawDt, REPLAY_FRAME_STEP_MIN_MS), REPLAY_FRAME_STEP_MAX_MS)
+        : REPLAY_FRAME_FALLBACK_MS;
+
+    const id = setTimeout(() => {
       setIndex((i) => {
         const len = snapshotsRef.current.length;
-        return len === 0 || i >= len - 1 ? i : i + 1;
+        if (len === 0 || i >= len - 1) return i;
+        return i + 1;
       });
-    }, REPLAY_SNAPSHOT_INTERVAL_MS);
-    return () => clearInterval(t);
-  }, [data, snapshots.length, suspendPlayback]);
+    }, delayMs);
+    return () => clearTimeout(id);
+  }, [battleId, data, index, suspendPlayback, snapshots.length]);
 
   const rawFrame = snapshots[index] as BattleReplaySnapshotFrame | undefined;
 
@@ -65,7 +85,7 @@ export function useReplayPlayback(
     wallAtFrameRef.current = Date.now();
   }
 
-  const [replayPump, setReplayPump] = useState(0);
+  const [, setReplayPump] = useState(0);
   useEffect(() => {
     if (!playbackActive) return;
     const id = setInterval(() => {
@@ -74,10 +94,13 @@ export function useReplayPlayback(
     return () => clearInterval(id);
   }, [playbackActive]);
 
-  const replayVirtualNowMs = useMemo(() => {
-    if (!playbackActive || !rawFrame) return 0;
-    return rawFrame.t + (Date.now() - wallAtFrameRef.current);
-  }, [playbackActive, rawFrame, rawFrame?.t, index, replayPump, wallSig]);
+  // Bugbot: do not memoize virtual now — any parent re-render without a replayPump tick would reuse a stale
+  // cached ms and freeze/jump interpolation until the next pump; Date.now() must reflect wall time every render.
+  // Bugbot: inactive → undefined (not 0) so BattleBattalion `!== undefined` does not treat 0 as replay clock.
+  const replayVirtualNowMs: number | undefined =
+    playbackActive && rawFrame
+      ? rawFrame.t + (Date.now() - wallAtFrameRef.current)
+      : undefined;
 
   const battleState = useMemo((): BattleState | null => {
     if (!rawFrame) return null;
@@ -89,7 +112,7 @@ export function useReplayPlayback(
     replayDoc: data,
     frameIndex: index,
     battleState,
-    /** Virtual battle ms (aligned with snapshot `t` + movementState.startTime from headless recording). */
+    /** Virtual battle ms while playing; `undefined` when replay is not active (no sentinel `0`). */
     replayVirtualNowMs,
     isLoading,
     error,

@@ -1,5 +1,9 @@
+import mongoose from 'mongoose';
 import { ENABLE_ASYNC_BATTLES } from '../config/env';
 import { AttackMarch } from '../models/AttackMarch';
+import type { AttackMarchArmySnapshot } from '../types/attackMarch';
+import { consumedRowsMatchArmySnapshot } from './AttackMarchLaunchService';
+import { restoreCommittedMarchArmyToUserBots } from './AttackMarchSystemRefundService';
 import {
   defenderQueueKeyFromMarchDoc,
   reconcileDefenderQueue,
@@ -162,16 +166,91 @@ export function clearReturnMarchTimer(marchId: string): void {
 export async function processReturnMarchComplete(marchId: string): Promise<void> {
   clearReturnMarchTimer(marchId);
   try {
-    const updated = await AttackMarch.findOneAndUpdate(
-      { marchId, state: 'returning' },
-      { $set: { state: 'done' } },
-      { new: true, lean: true }
-    );
-    if (!updated) {
+    type PrevRow = {
+      attackerId: string;
+      defenderId: string;
+      defenderNpcInstanceId?: string;
+      defenderQueueKey?: string;
+      returningAfterCancel?: boolean;
+      consumedBattalionAssignments: unknown;
+      armySnapshot: unknown;
+    };
+
+    let prevOut: PrevRow | null = null;
+    const maxAttempts = 4;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const session = await mongoose.startSession();
+      try {
+        let settled: PrevRow | null = null;
+        await session.withTransaction(async () => {
+          const cur = (await AttackMarch.findOne({ marchId, state: 'returning' }).session(session).lean()) as
+            | (PrevRow & { _id: unknown })
+            | null;
+
+          if (!cur) {
+            return;
+          }
+          settled = cur;
+
+          if (cur.returningAfterCancel === true) {
+            const consumed = cur.consumedBattalionAssignments as Array<{
+              battalionId: string;
+              botType: string;
+              quantity: number;
+              markLevel?: number;
+            }>;
+            if (!Array.isArray(consumed) || consumed.length === 0) {
+              throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
+            }
+            const armySnap = cur.armySnapshot as AttackMarchArmySnapshot;
+            if (!armySnap?.battalions || !Array.isArray(armySnap.battalions)) {
+              throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
+            }
+            if (!consumedRowsMatchArmySnapshot(consumed, armySnap)) {
+              throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
+            }
+            await restoreCommittedMarchArmyToUserBots({
+              attackerId: String(cur.attackerId),
+              armySnap,
+              consumed,
+              session,
+            });
+          }
+
+          const r = await AttackMarch.updateOne(
+            { _id: cur._id, state: 'returning' },
+            {
+              $set: { state: 'done' },
+              $unset: { returningAfterCancel: '', returnLegStartX: '', returnLegStartY: '' },
+            },
+            { session }
+          );
+          if (r.modifiedCount === 0) {
+            throw new Error('MARCH_RETURN_STATE_RACE');
+          }
+        });
+
+        prevOut = settled;
+        break;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg === 'BOT_VERSION_CONFLICT') {
+          continue;
+        }
+        console.error('[MarchReturn] processReturnMarchComplete transaction error:', marchId, e);
+        return;
+      } finally {
+        session.endSession();
+      }
+    }
+
+    if (!prevOut) {
       return;
     }
+
     const qk = defenderQueueKeyFromMarchDoc(
-      updated as { defenderQueueKey?: string; defenderId: string; defenderNpcInstanceId?: string }
+      prevOut as { defenderQueueKey?: string; defenderId: string; defenderNpcInstanceId?: string }
     );
     await runDefenderQueueSerialized(qk, async () => {
       await reconcileDefenderQueue(qk);

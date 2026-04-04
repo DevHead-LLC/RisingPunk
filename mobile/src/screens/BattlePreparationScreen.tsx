@@ -98,6 +98,8 @@ export const BattlePreparationScreen = React.memo(
   const isStartingBattleRef = useRef(false);
   /** Held only for the actual startBattle / launchAttackMarch phase — not during shield-only prep (Bugbot: shield return must not block continue). */
   const deployInFlightRef = useRef(false);
+  /** Re-entry guard for {@link executeDeploy}(true): top of that path clears {@link isStartingBattleRef}, so the usual double-tap guard does not apply until {@link deployInFlightRef} (Bugbot). */
+  const shieldContinueDeployRef = useRef(false);
   const token = useAppSelector((state) => state.auth.token);
   const userId = useAppSelector((state) => state.auth.user?._id);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
@@ -402,116 +404,131 @@ export const BattlePreparationScreen = React.memo(
   const executeDeploy = React.useCallback(
     async (afterShieldDeactivation: boolean) => {
       if (afterShieldDeactivation) {
-        isStartingBattleRef.current = false;
-        setIsStartingBattle(false);
+        if (shieldContinueDeployRef.current) return;
+        shieldContinueDeployRef.current = true;
       }
-      if (isStartingBattleRef.current && !afterShieldDeactivation) {
-        return;
-      }
-
-      const validation = validateDeployment(assignments);
-      if (!validation.isValid) {
-        console.error('Deployment validation failed:', validation.message);
-        if (isDeployPurgeHighlight) {
-          clearHighlight();
-        }
-        return;
-      }
-
-      if (isDeployPurgeHighlight) {
-        clearHighlight();
-      }
-
-      // Shield continue: no refetch here (latency); blocking uses RTK cache / 15s poll (Bugbot).
-      let marchMetaForBlock = attackMarchMeta;
-      if (!afterShieldDeactivation) {
-        const marchesRefetch = await refetchMyMarches();
-        marchMetaForBlock =
-          marchesRefetch.data !== undefined ? marchesRefetch.data : attackMarchMeta;
-      }
-      if (
-        marchMetaForBlock?.asyncMarchesEnabled === true &&
-        (marchMetaForBlock?.marches?.length ?? 0) > 0
-      ) {
-        Alert.alert(
-          'Expedition in progress',
-          'Finish or cancel your current hack march (or wait until it completes) before deploying again.'
-        );
-        return;
-      }
-
-      const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
-      const isDefendingUser = !!defenderId && !defenderNpcSlug;
-      if (!afterShieldDeactivation && isShieldActive && isDefendingUser) {
-        setShieldCheckModalVisible(true);
-        return;
-      }
-
-      if (deployInFlightRef.current) return;
-      deployInFlightRef.current = true;
       try {
-        setIsStartingBattle(true);
-        isStartingBattleRef.current = true;
-        // Bugbot: every exit from inner try runs inner finally — isStartingBattle + ref cleared.
-        try {
-          if (wantsMarchLaunch && hackMapCell) {
-            if (
-              myMapPos == null ||
-              !Number.isFinite(myMapPos.x) ||
-              !Number.isFinite(myMapPos.y)
-            ) {
-              Alert.alert(
-                'Home position unavailable',
-                'Open the Hack Map so your property location can load, then try Deploy again.'
-              );
-              return;
-            }
-            const res = await launchAttackMarch({
-              userBattalions: battleStartData.userBattalions,
-              screenWidth: battleStartData.screenWidth,
-              screenHeight: battleStartData.screenHeight,
-              originX: Math.floor(myMapPos.x),
-              originY: Math.floor(myMapPos.y),
-              hackMapCellX: hackMapCell.x,
-              hackMapCellY: hackMapCell.y,
-              defenderId: battleStartData.defenderId,
-              defenderNpcSlug: battleStartData.defenderNpcSlug,
-              defenderNpcInstanceId,
-            }).unwrap();
-            if (!res.success || res.data == null) {
-              const msg =
-                typeof res.error === 'string' && res.error.length > 0 ? res.error : 'Could not start march';
-              Alert.alert('Deploy failed', msg);
-              return;
-            }
-            await refetchBots();
-            void refetchMyMarches();
-            onBattleStart(res.data.marchId, { mode: 'march' });
-          } else {
-            const result = await startBattle(battleStartData).unwrap();
-            onBattleStart(result.battleId, { mode: 'live' });
-            if (userId) {
-              trackFirstBattle(userId).catch((error) => {
-                console.error('[Analytics] Error tracking first_battle:', error);
-              });
-            }
-          }
-        } catch (error: unknown) {
-          console.error('Deploy failed:', error);
-          const data = error && typeof error === 'object' && 'data' in error ? (error as { data?: unknown }).data : undefined;
-          const body =
-            data && typeof data === 'object' && data !== null && 'error' in data
-              ? String((data as { error?: unknown }).error ?? '')
-              : '';
-          const msg = body.length > 0 ? body : 'Deploy failed. Please try again.';
-          Alert.alert('Deploy failed', msg);
-          // Stay on prep (same as !res.success / map position guard); do not navigate with a missing battle id.
-        } finally {
+        if (afterShieldDeactivation) {
           isStartingBattleRef.current = false;
           setIsStartingBattle(false);
         }
+        if (isStartingBattleRef.current && !afterShieldDeactivation) {
+          return;
+        }
+
+        const validation = validateDeployment(assignments);
+        if (!validation.isValid) {
+          console.error('Deployment validation failed:', validation.message);
+          if (isDeployPurgeHighlight) {
+            clearHighlight();
+          }
+          return;
+        }
+
+        if (isDeployPurgeHighlight) {
+          clearHighlight();
+        }
+
+        // Shield continue: no refetch here (latency); blocking uses RTK cache / 15s poll (Bugbot).
+        let marchMetaForBlock = attackMarchMeta;
+        if (!afterShieldDeactivation) {
+          const marchesRefetch = await refetchMyMarches();
+          marchMetaForBlock =
+            marchesRefetch.data !== undefined ? marchesRefetch.data : attackMarchMeta;
+        }
+        if (
+          marchMetaForBlock?.asyncMarchesEnabled === true &&
+          (marchMetaForBlock?.marches?.length ?? 0) > 0
+        ) {
+          Alert.alert(
+            'Expedition in progress',
+            'Finish or cancel your current hack march (or wait until it completes) before deploying again.'
+          );
+          return;
+        }
+
+        const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
+        const isDefendingUser = !!defenderId && !defenderNpcSlug;
+        if (!afterShieldDeactivation && isShieldActive && isDefendingUser) {
+          setShieldCheckModalVisible(true);
+          return;
+        }
+
+        if (deployInFlightRef.current) return;
+        deployInFlightRef.current = true;
+        try {
+          setIsStartingBattle(true);
+          isStartingBattleRef.current = true;
+          // Bugbot: every exit from inner try runs inner finally — isStartingBattle + ref cleared.
+          try {
+            if (wantsMarchLaunch && hackMapCell) {
+              if (
+                myMapPos == null ||
+                !Number.isFinite(myMapPos.x) ||
+                !Number.isFinite(myMapPos.y)
+              ) {
+                Alert.alert(
+                  'Home position unavailable',
+                  'Open the Hack Map so your property location can load, then try Deploy again.'
+                );
+                return;
+              }
+              const res = await launchAttackMarch({
+                userBattalions: battleStartData.userBattalions,
+                screenWidth: battleStartData.screenWidth,
+                screenHeight: battleStartData.screenHeight,
+                originX: Math.floor(myMapPos.x),
+                originY: Math.floor(myMapPos.y),
+                hackMapCellX: hackMapCell.x,
+                hackMapCellY: hackMapCell.y,
+                defenderId: battleStartData.defenderId,
+                defenderNpcSlug: battleStartData.defenderNpcSlug,
+                defenderNpcInstanceId,
+              }).unwrap();
+              if (!res.success || res.data == null) {
+                const msg =
+                  typeof res.error === 'string' && res.error.length > 0 ? res.error : 'Could not start march';
+                Alert.alert('Deploy failed', msg);
+                return;
+              }
+              await refetchBots();
+              void refetchMyMarches();
+              onBattleStart(res.data.marchId, { mode: 'march' });
+              if (userId) {
+                trackFirstBattle(userId).catch((error) => {
+                  console.error('[Analytics] Error tracking first_battle:', error);
+                });
+              }
+            } else {
+              const result = await startBattle(battleStartData).unwrap();
+              onBattleStart(result.battleId, { mode: 'live' });
+              if (userId) {
+                trackFirstBattle(userId).catch((error) => {
+                  console.error('[Analytics] Error tracking first_battle:', error);
+                });
+              }
+            }
+          } catch (error: unknown) {
+            console.error('Deploy failed:', error);
+            const data = error && typeof error === 'object' && 'data' in error ? (error as { data?: unknown }).data : undefined;
+            const body =
+              data && typeof data === 'object' && data !== null && 'error' in data
+                ? String((data as { error?: unknown }).error ?? '')
+                : '';
+            const msg = body.length > 0 ? body : 'Deploy failed. Please try again.';
+            Alert.alert('Deploy failed', msg);
+            // Stay on prep (same as !res.success / map position guard); do not navigate with a missing battle id.
+          } finally {
+            isStartingBattleRef.current = false;
+            setIsStartingBattle(false);
+          }
+        } finally {
+          deployInFlightRef.current = false;
+        }
       } finally {
-        deployInFlightRef.current = false;
+        if (afterShieldDeactivation) {
+          shieldContinueDeployRef.current = false;
+        }
       }
     },
     [
@@ -748,7 +765,7 @@ export const BattlePreparationScreen = React.memo(
           {hasBlockingMarch ? (
             <Text style={[styles.marchBlockHint, { color: colors.text.secondary }]}>
               You already have a hack expedition in progress. Committed bots stay out of Digital Barracks and full
-              home defense until return completes or you cancel while outbound.
+              home defense until your army returns home (including a cancel recall leg on the Hack Map).
             </Text>
           ) : null}
         </View>

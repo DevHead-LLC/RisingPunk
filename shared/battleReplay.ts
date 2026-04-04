@@ -211,6 +211,12 @@ export interface BattleReplayDocument {
   defenderId: string;
   isNpc: boolean;
   winner: BattleReplayWinner;
+  /**
+   * Wall `Date.now()` baseline aligned with frame `t` (`t ≈ captureWall - recordingEpochMs`).
+   * Legacy replays may store Unix `movementState.startTime` on frames; clients subtract this when above the wall-clock threshold.
+   * New recordings normalize per-frame `startTime` to virtual ms at capture time so it matches `t` without client epoch math.
+   */
+  recordingEpochMs?: number;
 }
 
 /** Mobile `battleApi` / UI aliases (same shapes as `BattleWire*` types). */

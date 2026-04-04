@@ -341,7 +341,7 @@ export class MovementService {
             screenDimensions.height,
             'initial',
             undefined,
-            undefined,
+            battle,
             'INITIAL_TARGETING'
           );
           

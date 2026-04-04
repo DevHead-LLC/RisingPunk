@@ -62,6 +62,7 @@ export function useAttackMarchTransitionBanners(token: string | null): {
     };
 
     consider((prev, next) => prev === 'resolving' && next === 'returning', 'Battle complete — your expedition is returning home.');
+    consider((prev, next) => prev === 'outbound' && next === 'returning', 'Expedition recalled — marching home.');
     consider((prev, next) => prev === 'outbound' && next === 'arrived', 'Your expedition has arrived at its target.');
     consider((prev, next) => next === 'queued' && prev !== 'queued', 'Your expedition is queued behind another battle.');
 

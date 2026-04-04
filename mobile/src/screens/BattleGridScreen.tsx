@@ -217,6 +217,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
             showHealthBars={true}
             overrideBattleState={overrideState}
             replayMovementVirtualNowMs={isReplay ? replay.replayVirtualNowMs : undefined}
+            replayMovementEpochMs={isReplay ? replay.replayDoc?.recordingEpochMs : undefined}
           />
         </View>
       </View>

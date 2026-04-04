@@ -7,7 +7,7 @@ import { SIZING } from '../../styles/theme';
 
 /**
  * When async marches are on and the user has a non-terminal expedition, explains that
- * committed bots are unavailable in barracks / assembly until return or outbound cancel.
+ * committed bots are unavailable in barracks / assembly until the army returns home (battle end or cancel recall).
  */
 export function HackExpeditionCommitmentBanner(): React.ReactElement | null {
   const token = useAppSelector((state) => state.auth.token);
@@ -49,7 +49,8 @@ export function HackExpeditionCommitmentBanner(): React.ReactElement | null {
     <View style={styles.wrap} accessibilityRole="alert">
       <Text style={styles.text}>
         Hack expedition in progress. Committed bots are not available for assignment or builds
-        until your army returns home or you cancel while still outbound on the Hack Map.
+        until your army returns home. Cancelling outbound on the Hack Map recalls your army—it still marches home
+        before bots unlock.
       </Text>
     </View>
   );

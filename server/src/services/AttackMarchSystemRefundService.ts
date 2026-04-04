@@ -1,9 +1,12 @@
 /**
  * System / shared refund path: restore `Bot.bots` + `battalionAssignments` from march snapshot,
- * set march `cancelled`. Used by user outbound cancel and NPC knockout sweep.
+ * set march `cancelled`. Used by NPC knockout sweep, stale resolving recovery, and the atomic
+ * branch inside `systemRefundAttackMarchInState`. User outbound cancel uses a return leg first;
+ * inventory is restored when that leg completes via `restoreCommittedMarchArmyToUserBots`.
  */
 
 import mongoose from 'mongoose';
+import type { ClientSession } from 'mongoose';
 import { AttackMarch } from '../models/AttackMarch';
 import type { AttackMarchArmySnapshot } from '../types/attackMarch';
 import {
@@ -54,6 +57,51 @@ export function mergeConsumedAssignmentsInto(
   return merged.sort((a, b) => String(a.battalionId).localeCompare(String(b.battalionId)));
 }
 
+/**
+ * Restore launch-time bot deductions + assignment rows (must run inside an open transaction).
+ * Throws `BOT_VERSION_CONFLICT` for caller retry, `BOT_DOC_MISSING` if no Bot row.
+ */
+export async function restoreCommittedMarchArmyToUserBots(args: {
+  attackerId: string;
+  armySnap: AttackMarchArmySnapshot;
+  consumed: BattalionAssignmentRow[];
+  session: ClientSession;
+}): Promise<void> {
+  const { attackerId, armySnap, consumed, session } = args;
+  const aid = String(attackerId);
+  const sumByInv = sumRequiredByInventoryKeyFromArmySnapshot(armySnap);
+
+  const bot = await Bot.findOne({ userId: aid }).session(session);
+  if (!bot) {
+    throw new Error('BOT_DOC_MISSING');
+  }
+
+  const merged = mergeConsumedAssignmentsInto((bot.battalionAssignments || []) as BattalionAssignmentRow[], consumed);
+
+  const $inc: Record<string, number> = { __v: 1 };
+  for (const [key, qty] of Object.entries(sumByInv)) {
+    if (qty > 0) {
+      $inc[`bots.${key}`] = qty;
+    }
+  }
+
+  const updated = await Bot.findOneAndUpdate(
+    {
+      userId: aid,
+      $or: [{ __v: bot.__v }, { __v: { $exists: false } }],
+    },
+    {
+      $inc,
+      battalionAssignments: merged,
+    },
+    { new: true, session }
+  );
+
+  if (!updated) {
+    throw new Error('BOT_VERSION_CONFLICT');
+  }
+}
+
 export type SystemRefundResult =
   | { refunded: true; previousState: RefundableMarchState }
   | { refunded: false; reason: 'not_found' | 'state_mismatch' | 'integrity' | 'bot_missing' | 'conflict' };
@@ -91,7 +139,6 @@ export async function systemRefundAttackMarchInState(
     return { refunded: false, reason: 'integrity' };
   }
 
-  const sumByInv = sumRequiredByInventoryKeyFromArmySnapshot(armySnap);
   const maxAttempts = 4;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -109,38 +156,12 @@ export async function systemRefundAttackMarchInState(
         }
         refundedState = expectedState;
 
-        const bot = await Bot.findOne({ userId: aid }).session(session);
-        if (!bot) {
-          throw new Error('BOT_DOC_MISSING');
-        }
-
-        const merged = mergeConsumedAssignmentsInto(
-          (bot.battalionAssignments || []) as BattalionAssignmentRow[],
-          consumed
-        );
-
-        const $inc: Record<string, number> = { __v: 1 };
-        for (const [key, qty] of Object.entries(sumByInv)) {
-          if (qty > 0) {
-            $inc[`bots.${key}`] = qty;
-          }
-        }
-
-        const updated = await Bot.findOneAndUpdate(
-          {
-            userId: aid,
-            $or: [{ __v: bot.__v }, { __v: { $exists: false } }],
-          },
-          {
-            $inc,
-            battalionAssignments: merged,
-          },
-          { new: true, session }
-        );
-
-        if (!updated) {
-          throw new Error('BOT_VERSION_CONFLICT');
-        }
+        await restoreCommittedMarchArmyToUserBots({
+          attackerId: aid,
+          armySnap,
+          consumed,
+          session,
+        });
       });
 
       if (refundedState) {

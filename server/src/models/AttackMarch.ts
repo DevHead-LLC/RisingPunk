@@ -40,6 +40,11 @@ export interface IAttackMarchDocument extends Document {
   arriveAt: Date;
   resolvedAt?: Date;
   returnArriveAt?: Date;
+  /** When set, return-leg animation starts here (hack map cell coords) instead of the original target tile. */
+  returnLegStartX?: number;
+  returnLegStartY?: number;
+  /** True only for user-cancelled outbound marches; inventory refunds when return leg completes. */
+  returningAfterCancel?: boolean;
   battleId?: string;
   hackMapCellX: number;
   hackMapCellY: number;
@@ -73,6 +78,9 @@ const attackMarchSchema = new Schema<IAttackMarchDocument>(
     arriveAt: { type: Date, required: true },
     resolvedAt: { type: Date, required: false },
     returnArriveAt: { type: Date, required: false },
+    returnLegStartX: { type: Number, required: false },
+    returnLegStartY: { type: Number, required: false },
+    returningAfterCancel: { type: Boolean, required: false },
     battleId: { type: String, required: false },
     hackMapCellX: { type: Number, required: true },
     hackMapCellY: { type: Number, required: true },

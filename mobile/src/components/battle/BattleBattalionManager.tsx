@@ -19,6 +19,8 @@ interface Props {
   overrideBattleState?: BattleState | null;
   /** When set (replay), battalion movement progress uses virtual ms (frame `t` + wall delta), not `Date.now()` client anchors. */
   replayMovementVirtualNowMs?: number;
+  /** Aligns live-recorded `movementState.startTime` (Unix) with virtual frame `t`. */
+  replayMovementEpochMs?: number;
 }
 
 export const BattleBattalionManager = React.memo(({
@@ -27,6 +29,7 @@ export const BattleBattalionManager = React.memo(({
   showHealthBars = true,
   overrideBattleState,
   replayMovementVirtualNowMs,
+  replayMovementEpochMs,
 }: Props) => {
   const [pollingInterval, setPollingInterval] = useState<number>(ANIMATION_CONFIG.DEFAULT_POLLING_MS);
   
@@ -85,6 +88,7 @@ export const BattleBattalionManager = React.memo(({
                 size={battalionSize}
                 showHealthBar={showHealthBars}
                 replayMovementVirtualNowMs={replayMovementVirtualNowMs}
+                replayMovementEpochMs={replayMovementEpochMs}
               />
             );
           })}
@@ -98,6 +102,7 @@ export const BattleBattalionManager = React.memo(({
     nodePositions,
     movementStateMap,
     replayMovementVirtualNowMs,
+    replayMovementEpochMs,
   ]);
 
   return (

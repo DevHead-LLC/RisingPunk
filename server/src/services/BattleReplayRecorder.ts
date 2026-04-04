@@ -10,7 +10,12 @@ import {
   REPLAY_SNAPSHOT_INTERVAL_MS,
   type BattleReplayDocument,
   type BattleReplaySnapshotFrame,
+  type BattleState,
+  type BattleWireMovementState,
 } from '../../../shared/battleReplay';
+
+/** Same idea as client `REPLAY_WALL_CLOCK_START_TIME_THRESHOLD_MS`: Unix wall ms vs virtual battle ms. */
+const REPLAY_WALL_CLOCK_MOVEMENT_START_THRESHOLD_MS = 1_000_000_000_000;
 
 type Session = {
   battleId: string;
@@ -122,6 +127,42 @@ export class BattleReplayRecorder {
     this.enqueueCapture(battleId);
   }
 
+  /**
+   * Live battle state uses Unix `Date.now()` for movement `startTime`; replay frame `t` is virtual
+   * (`Date.now() - epochMs` or synthetic). Rewrite wall-clock movement times to virtual so clients can use
+   * `elapsed = replayNowMs - startTime` without epoch juggling (and avoid instant completion when baselines drift).
+   */
+  private normalizeWireMovementTimesToReplayTimeline(wire: BattleState, epochMs: number): BattleState {
+    const toVirtual = (st: number): number => {
+      if (!Number.isFinite(st)) {
+        throw new Error('BattleReplayRecorder: movement startTime must be finite');
+      }
+      if (st < REPLAY_WALL_CLOCK_MOVEMENT_START_THRESHOLD_MS) {
+        return st;
+      }
+      if (!Number.isFinite(epochMs) || epochMs <= 0) {
+        throw new Error(
+          'BattleReplayRecorder: wall-clock movement startTime requires positive finite epochMs'
+        );
+      }
+      return st - epochMs;
+    };
+
+    const normOne = (m: BattleWireMovementState): BattleWireMovementState => ({
+      ...m,
+      startTime: toVirtual(m.startTime),
+    });
+
+    return {
+      ...wire,
+      movementStates: wire.movementStates?.map((m) => normOne(m)),
+      battalions: wire.battalions.map((b) => ({
+        ...b,
+        movementState: b.movementState ? normOne(b.movementState) : undefined,
+      })),
+    };
+  }
+
   private enqueueCapture(battleId: string): void {
     const session = this.sessions.get(battleId);
     if (!session || session.syntheticReplayMode) return;
@@ -148,7 +189,10 @@ export class BattleReplayRecorder {
       return;
     }
 
-    const wire = mapBattleStateResponseToWire(res);
+    const wire = this.normalizeWireMovementTimesToReplayTimeline(
+      mapBattleStateResponseToWire(res),
+      session.epochMs
+    );
     const t = Math.max(0, Date.now() - session.epochMs);
     session.snapshots.push({ ...wire, t });
   }
@@ -246,7 +290,10 @@ export class BattleReplayRecorder {
       return;
     }
 
-    const wire = mapBattleStateResponseToWire(res);
+    const wire = this.normalizeWireMovementTimesToReplayTimeline(
+      mapBattleStateResponseToWire(res),
+      session.epochMs
+    );
     const lastT = session.snapshots.length > 0 ? session.snapshots[session.snapshots.length - 1].t : -1;
     const t = Math.max(virtualT, lastT + 1);
     session.snapshots.push({ ...wire, t });
@@ -298,6 +345,7 @@ export class BattleReplayRecorder {
         defenderId: String(completedBattle.defenderId),
         isNpc: Boolean(completedBattle.defenderNpcSlug),
         winner,
+        recordingEpochMs: session.epochMs,
       };
 
       await BattleReplay.replaceOne({ battleId }, doc, { upsert: true });

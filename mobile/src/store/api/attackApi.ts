@@ -22,6 +22,9 @@ export type AttackMarchListItem = {
   hackMapCellX: number;
   hackMapCellY: number;
   returnArriveAt?: string;
+  /** Set when user cancels outbound; return animation starts from this hack-map cell toward home. */
+  returnLegStartX?: number;
+  returnLegStartY?: number;
   /** Set when battle resolution completes and return leg starts (ISO). */
   resolvedAt?: string;
   totalTravelSeconds?: number;
@@ -112,10 +115,14 @@ export const attackApi = createApi({
       }),
       invalidatesTags: ['AttackMarch', 'Bots'],
     }),
-    cancelOutboundAttackMarch: builder.mutation<CancelAttackMarchResponse, { marchId: string }>({
-      query: ({ marchId }) => ({
+    cancelOutboundAttackMarch: builder.mutation<
+      CancelAttackMarchResponse,
+      { marchId: string; clientNowMs: number; outboundProgressT: number }
+    >({
+      query: ({ marchId, clientNowMs, outboundProgressT }) => ({
         url: `/api/attack/${encodeURIComponent(marchId)}/cancel`,
         method: 'POST',
+        body: { clientNowMs, outboundProgressT },
       }),
       invalidatesTags: ['AttackMarch', 'Bots'],
     }),

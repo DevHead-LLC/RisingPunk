@@ -21,7 +21,7 @@ export const MAP_VISIBLE_ATTACK_MARCH_STATES: AttackMarchState[] = [
   'returning',
 ];
 
-/** Rows removed from `Bot.battalionAssignments` at launch; restored on outbound cancel. */
+/** Rows removed from `Bot.battalionAssignments` at launch; restored when a refunding path completes (immediate `cancelled` via system refund, or end of cancel-return leg). */
 export interface ConsumedBattalionAssignmentRow {
   battalionId: string;
   botType: string;

@@ -6,10 +6,28 @@ import type { AttackMarchListItem } from '../../store/api/attackApi';
 export const ATTACK_MARCH_CELL_SIZE = 75;
 export const ATTACK_MARCH_MARGIN_SIZE = 80;
 
-export function parseMarchTimeMs(iso: string | undefined): number | null {
-  if (iso == null || typeof iso !== 'string') return null;
-  const t = Date.parse(iso);
-  return Number.isFinite(t) ? t : null;
+/** Normalize API timestamps (ISO string, unix ms, or Date) so cancel + animation use the same instant. */
+export function parseMarchTimeMs(v: unknown): number | null {
+  if (v == null) return null;
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? t : null;
+  }
+  if (v instanceof Date && Number.isFinite(v.getTime())) return v.getTime();
+  return null;
+}
+
+/**
+ * Same progress scalar as {@link computeMarchFrame} outbound (0 = home tile, 1 = target tile).
+ * Use when cancelling so return duration and start tile match the icon.
+ */
+export function outboundProgressTForAttackMarch(m: AttackMarchListItem, nowMs: number): number | null {
+  const depart = parseMarchTimeMs(m.departAt);
+  const arrive = parseMarchTimeMs(m.arriveAt);
+  if (depart == null || arrive == null) return null;
+  const outboundDurMs = Math.max(1, arrive - depart);
+  return Math.min(1, Math.max(0, (nowMs - depart) / outboundDurMs));
 }
 
 export function marchTileCenter(x: number, y: number): { cx: number; cy: number } {
@@ -76,11 +94,19 @@ export function computeMarchFrame(m: AttackMarchListItem, now: number): Computed
     }
     const durMs = retEndMs - resMs;
     const t = Math.min(1, Math.max(0, (now - resMs) / durMs));
+    const rsx = m.returnLegStartX;
+    const rsy = m.returnLegStartY;
+    const useCancelStart =
+      typeof rsx === 'number' &&
+      typeof rsy === 'number' &&
+      Number.isFinite(rsx) &&
+      Number.isFinite(rsy);
+    const { cx: rx, cy: ry } = useCancelStart ? marchTileCenter(rsx, rsy) : { cx: tx, cy: ty };
     return {
       marchId,
-      px: tx + (ox - tx) * t,
-      py: ty + (oy - ty) * t,
-      seg: { sx: tx, sy: ty, ex: ox, ey: oy },
+      px: rx + (ox - rx) * t,
+      py: ry + (oy - ry) * t,
+      seg: { sx: rx, sy: ry, ex: ox, ey: oy },
       lineOpacity: 0.8,
       iconOpacity: 1,
     };

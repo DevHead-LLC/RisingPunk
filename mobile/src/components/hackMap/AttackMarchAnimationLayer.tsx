@@ -1,6 +1,9 @@
 /**
  * Global attack-march overlay on HackMap: interpolates position from server timestamps
  * (probe-style dashed leg + icon). Geometry must stay aligned with HackMapScreen.
+ *
+ * Mount as a **sibling above** `GestureDetector` with the same `animatedMapStyle` as the map `Animated.View`
+ * so icon taps are not consumed by `Gesture.Tap` → tile handler (parity with `ProbeAnimationLayer`).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Image, StyleSheet, AppState, Pressable } from 'react-native';
@@ -49,7 +52,8 @@ const MarchIconTapTarget: React.FC<{
 export type AttackMarchAnimationLayerProps = {
   marches: AttackMarchListItem[];
   colors: ThemeColors;
-  animatedMapStyle: Record<string, unknown>;
+  /** Same Reanimated style as the map surface — required when the layer is a sibling outside `GestureDetector`. */
+  animatedMapStyle?: Record<string, unknown>;
   currentUserId?: string | null;
   /** Owner’s **outbound** or **returning** march (modal: cancel vs “returning home”). */
   onOwnerMarchPress?: (marchId: string) => void;
@@ -128,7 +132,11 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
 
   return (
     <ReanimatedView
-      style={[StyleSheet.absoluteFill, animatedMapStyle as any, { zIndex: 9, elevation: 9 }]}
+      style={[
+        StyleSheet.absoluteFill,
+        ...(animatedMapStyle != null ? [animatedMapStyle as any] : []),
+        { zIndex: 9, elevation: 9 },
+      ]}
       pointerEvents="box-none"
     >
       {marches.map((m) => {
@@ -139,6 +147,8 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
         const dy = seg.ey - seg.sy;
         const length = Math.sqrt(dx * dx + dy * dy) || 1;
         const angle = Math.atan2(dy, dx);
+        const midX = (seg.sx + seg.ex) / 2;
+        const midY = (seg.sy + seg.ey) / 2;
         const left = px - MARCH_ICON_SIZE / 2;
         const top = py - MARCH_ICON_SIZE / 2;
         const isOwnerTappable =
@@ -165,8 +175,10 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
               pointerEvents="none"
               style={{
                 position: 'absolute',
-                left: seg.sx,
-                top: seg.sy,
+                // Bugbot: RN rotates around the view center — anchor at segment midpoint so the dashed line
+                // matches (sx,sy)→(ex,ey); translateX(-L/2)+rotate+translateX(L/2) at top-left (sx,sy) is wrong.
+                left: midX - length / 2,
+                top: midY - 0.5,
                 width: length,
                 height: 1,
                 borderWidth: 1,
@@ -174,7 +186,7 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
                 borderColor: matrixColor,
                 borderRadius: 0.5,
                 opacity: lineOpacity,
-                transform: [{ translateX: -length / 2 }, { rotate: `${angle}rad` }, { translateX: length / 2 }],
+                transform: [{ rotate: `${angle}rad` }],
               }}
             />
             {isOwnerTappable ? (

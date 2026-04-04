@@ -37,6 +37,7 @@ import {
 } from '../store/api/mapApi';
 import { useGetActiveAttackMarchesQuery, useCancelOutboundAttackMarchMutation } from '../store/api/attackApi';
 import { AttackMarchAnimationLayer } from '../components/hackMap/AttackMarchAnimationLayer';
+import { outboundProgressTForAttackMarch } from '../components/hackMap/attackMarchMapFrame';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery, useSendCrewChatMessageMutation } from '../store/api/authApi';
@@ -1496,14 +1497,26 @@ export const HackMapScreen: React.FC<Props> = ({
 
   const handleCancelOutboundMarch = useCallback(async () => {
     if (!marchOwnerModalId) return;
+    const list = activeAttackMarchesData?.marches ?? [];
+    const march = list.find((m) => m.marchId === marchOwnerModalId);
+    const nowMs = Date.now();
+    const outboundProgressT = march != null ? outboundProgressTForAttackMarch(march, nowMs) : null;
+    if (march == null || outboundProgressT == null) {
+      Alert.alert('Cancel failed', 'Could not read march timing from the map. Try again in a moment.');
+      return;
+    }
     try {
-      await cancelOutboundAttackMarch({ marchId: marchOwnerModalId }).unwrap();
+      await cancelOutboundAttackMarch({
+        marchId: marchOwnerModalId,
+        clientNowMs: nowMs,
+        outboundProgressT,
+      }).unwrap();
       setMarchOwnerModalId(null);
     } catch (e: unknown) {
       const body = (e as { data?: { error?: string } })?.data?.error;
       Alert.alert('Cancel failed', body != null ? String(body) : 'Unknown error');
     }
-  }, [marchOwnerModalId, cancelOutboundAttackMarch]);
+  }, [marchOwnerModalId, cancelOutboundAttackMarch, activeAttackMarchesData?.marches]);
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -4778,10 +4791,15 @@ export const HackMapScreen: React.FC<Props> = ({
           </Animated.View>
         </GestureDetector>
         </View>
+        {/*
+          Attack march overlay sits above the gesture map (sibling, not inside GestureDetector) so tapping
+          the icon does not also trigger Gesture.Tap → handleTapAtViewCoords → tile modal — same pattern as
+          ProbeAnimationLayer (Bugbot / probe tap-through fix).
+        */}
         <AttackMarchAnimationLayer
           marches={activeAttackMarchesData?.marches ?? []}
           colors={colors}
-          animatedMapStyle={animatedMapStyle}
+          animatedMapStyle={animatedMapStyle as any}
           currentUserId={currentUserId}
           onOwnerMarchPress={handleOwnerMarchPress}
         />
@@ -4925,7 +4943,8 @@ export const HackMapScreen: React.FC<Props> = ({
                         </Text>
                       ) : (
                         <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, marginTop: 6, fontSize: 12 }]}>
-                          Cancel returns your bots while still outbound.
+                          Cancel orders your army to march home from its current position at the same pace
+                          as the outbound leg. Bots return to barracks when the army arrives.
                         </Text>
                       )
                     ) : phase === 'returning' ? (
