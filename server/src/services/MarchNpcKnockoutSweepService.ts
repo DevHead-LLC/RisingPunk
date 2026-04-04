@@ -36,7 +36,6 @@ export async function sweepQueuedMarchesAfterNpcInstanceDefeated(
     .lean();
 
   const queueKey = `npc:${id}`;
-  let refundedCount = 0;
 
   for (const m of marches) {
     if (!m.marchId || !isRefundableState(m.state)) {
@@ -49,16 +48,9 @@ export async function sweepQueuedMarchesAfterNpcInstanceDefeated(
       }
       continue;
     }
-    refundedCount += 1;
     if (result.previousState === 'outbound') {
       clearMarchArrivalTimer(m.marchId);
     }
-  }
-
-  if (refundedCount > 0) {
-    console.log(
-      `[MarchNpcKnockout] Refunded ${refundedCount} march(es) for npc instance ${id}`
-    );
   }
 
   try {
