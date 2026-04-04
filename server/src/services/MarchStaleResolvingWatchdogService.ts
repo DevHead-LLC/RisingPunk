@@ -38,9 +38,6 @@ async function backfillResolvingSinceOnLegacyRows(): Promise<void> {
     await AttackMarch.updateOne({ marchId: m.marchId }, { $set: { resolvingSince: since } });
   }
   legacyResolvingSinceBackfillDone = true;
-  if (legacy.length > 0) {
-    console.log(`[MarchStaleResolving] Backfilled resolvingSince on ${legacy.length} legacy march(es)`);
-  }
 }
 
 export async function runStaleResolvingMarchRecoveryOnce(): Promise<void> {

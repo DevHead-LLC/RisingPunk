@@ -38,7 +38,6 @@ export async function processMarchArrival(marchId: string): Promise<void> {
       } catch (e) {
         console.error('[MarchArrival] defender queue reconcile skipped:', marchId, e);
       }
-      console.log(`[MarchArrival] ${marchId} → arrived (queue reconciled)`);
     }
   } catch (e) {
     console.error('[MarchArrival] processMarchArrival failed:', marchId, e);
@@ -150,9 +149,6 @@ export async function rescheduleAllOutboundMarches(): Promise<void> {
       scheduleMarchArrival(m.marchId, new Date(m.arriveAt));
     }
   }
-  if (marches.length > 0) {
-    console.log(`[MarchArrival] Rescheduled ${marches.length} outbound march(es)`);
-  }
 }
 
 export function clearReturnMarchTimer(marchId: string): void {
@@ -257,7 +253,6 @@ export async function processReturnMarchComplete(marchId: string): Promise<void>
       const { tryStartNextMarchResolutionForQueueKey } = await import('./MarchResolutionService');
       await tryStartNextMarchResolutionForQueueKey(qk);
     });
-    console.log(`[MarchReturn] ${marchId} → done`);
   } catch (e) {
     console.error('[MarchReturn] processReturnMarchComplete failed:', marchId, e);
   }
@@ -288,9 +283,6 @@ export async function rescheduleAllReturningMarches(): Promise<void> {
       scheduleReturnMarchComplete(m.marchId, new Date(m.returnArriveAt));
     }
   }
-  if (marches.length > 0) {
-    console.log(`[MarchReturn] Rescheduled ${marches.length} returning march(es)`);
-  }
 }
 
 /**
@@ -301,17 +293,12 @@ export async function rescheduleArrivedMarchBattleStarts(): Promise<void> {
     state: 'arrived',
     defenderQueueKey: { $exists: true, $nin: [null, ''] },
   });
-  let n = 0;
   for (const qk of keys) {
     const key = String(qk ?? '').trim();
     if (!key) continue;
-    n += 1;
     void runDefenderQueueSerialized(key, async () => {
       const { tryStartNextMarchResolutionForQueueKey } = await import('./MarchResolutionService');
       await tryStartNextMarchResolutionForQueueKey(key);
     });
-  }
-  if (n > 0) {
-    console.log(`[MarchResolution] Boot catch-up queued for ${n} defender queue key(s) with arrived marches`);
   }
 }
