@@ -95,10 +95,26 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
             text: 'Remove',
             style: 'destructive',
             onPress: () => {
-              void deleteConversation({
+              deleteConversation({
                 otherUserId: c.otherUserId,
                 broadcastOnly: broadcastOnlyForDelete(c),
-              }).unwrap();
+              })
+                .unwrap()
+                .catch((err: unknown) => {
+                  console.warn('Delete conversation failed:', err);
+                  let detail = 'Could not remove conversation. Try again.';
+                  if (typeof err === 'object' && err !== null) {
+                    const r = err as Record<string, unknown>;
+                    const data = r.data;
+                    if (typeof data === 'string') detail = data;
+                    else if (data && typeof data === 'object' && typeof (data as { message?: unknown }).message === 'string') {
+                      detail = (data as { message: string }).message;
+                    } else if (typeof r.message === 'string' && r.message) {
+                      detail = r.message;
+                    }
+                  }
+                  Alert.alert('Remove failed', detail);
+                });
             },
           },
         ]
