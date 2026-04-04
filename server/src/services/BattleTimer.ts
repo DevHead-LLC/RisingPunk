@@ -1,5 +1,8 @@
 import { EventEmitter } from 'events';
 import { BattlePhase } from '../types/battle';
+import { BattalionService } from './BattalionService';
+import { MovementService } from './MovementService';
+import { setHeadlessBattleVirtualTimelineMs } from './HeadlessBattleRunner';
 
 const TIMER_CONFIG = {
   COUNTDOWN_DURATION: 3,
@@ -297,5 +300,118 @@ export class BattleTimerService extends EventEmitter {
       clearInterval(timer.battleInterval);
       timer.battleInterval = undefined;
     }
+  }
+
+  private async emitSequential(event: string, data: any): Promise<void> {
+    const fns = this.listeners(event);
+    for (const fn of fns) {
+      await Promise.resolve((fn as (d: any) => unknown)(data));
+    }
+  }
+
+  /**
+   * March headless: replace wall-clock intervals with sequential ticks so the battle finishes immediately.
+   * Clears any pending `setInterval` from `startTimer` first; assumes listeners are registered (e.g. `BattleService.createBattle`).
+   */
+  public async runSyntheticTicksToCompletion(battleId: string): Promise<void> {
+    const timer = this.timers.get(battleId);
+    if (!timer || !timer.isActive) {
+      console.warn('[BattleTimer] runSyntheticTicksToCompletion: no active timer for', battleId);
+      return;
+    }
+
+    this.clearTimerIntervals(timer);
+
+    const { BattleReplayRecorder } = await import('./BattleReplayRecorder');
+    const replayRecorder = BattleReplayRecorder.getInstance();
+    await replayRecorder.beginSyntheticReplayCapture(battleId);
+    await replayRecorder.syntheticExactFrame(battleId, 0);
+    setHeadlessBattleVirtualTimelineMs(battleId, 0);
+
+    const COUNTDOWN_STEP_MS = 1000;
+    const MOVEMENT_STEPS_PER_BATTLE_SECOND = 10;
+    const HEADLESS_MOVEMENT_STEP_MS = 100;
+
+    for (let i = 0; i < TIMER_CONFIG.COUNTDOWN_DURATION; i++) {
+      timer.countdown--;
+      await this.emitSequential('countdownUpdate', {
+        battleId,
+        countdown: timer.countdown,
+        phase: timer.phase,
+      });
+      await replayRecorder.syntheticExactFrame(battleId, (i + 1) * COUNTDOWN_STEP_MS);
+      setHeadlessBattleVirtualTimelineMs(battleId, (i + 1) * COUNTDOWN_STEP_MS);
+    }
+
+    timer.phase = BattlePhase.ACTIVE;
+    timer.countdown = 0;
+    await this.emitSequential('phaseChange', {
+      battleId,
+      phase: BattlePhase.ACTIVE,
+      countdown: 0,
+    });
+
+    BattalionService.stopMovementUpdates(battleId);
+    MovementService.resetHeadlessMovementProgress(battleId);
+
+    let virtualMs = TIMER_CONFIG.COUNTDOWN_DURATION * COUNTDOWN_STEP_MS;
+
+    for (let sec = 1; sec <= TIMER_CONFIG.BATTLE_DURATION; sec++) {
+      if (!this.timers.get(battleId)) {
+        return;
+      }
+
+      for (let m = 0; m < MOVEMENT_STEPS_PER_BATTLE_SECOND; m++) {
+        virtualMs += HEADLESS_MOVEMENT_STEP_MS;
+        setHeadlessBattleVirtualTimelineMs(battleId, virtualMs);
+        await BattalionService.updateBattleMovement(battleId, HEADLESS_MOVEMENT_STEP_MS);
+        await replayRecorder.syntheticAdvanceBucketsTo(battleId, virtualMs);
+      }
+
+      timer.battleTime = sec;
+      const timeRemaining = TIMER_CONFIG.BATTLE_DURATION - sec;
+      await this.emitSequential('battleTimeUpdate', {
+        battleId,
+        battleTime: timer.battleTime,
+        timeRemaining,
+        phase: timer.phase,
+      });
+
+      if (!this.timers.get(battleId)) {
+        return;
+      }
+
+      if (!DISABLE_ELIMINATION_CHECK && this.eliminationCallbacks.has(battleId)) {
+        const callback = this.eliminationCallbacks.get(battleId);
+        if (callback) {
+          try {
+            const shouldEnd = await callback(battleId);
+            if (shouldEnd) {
+              await replayRecorder.syntheticAdvanceBucketsTo(battleId, virtualMs);
+              await this.endBattle(battleId);
+              return;
+            }
+          } catch (error) {
+            console.error(`[BattleTimer] synthetic elimination check failed for ${battleId}:`, error);
+          }
+        }
+      }
+    }
+
+    if (!this.timers.get(battleId)) {
+      return;
+    }
+
+    this.clearTimerIntervals(timer);
+    timer.phase = BattlePhase.COMPLETE;
+    timer.isActive = false;
+    this.timers.delete(battleId);
+    this.unregisterEliminationCallback(battleId);
+
+    await this.emitSequential('battleEnd', {
+      battleId,
+      battleTime: timer.battleTime,
+      phase: BattlePhase.COMPLETE,
+    });
   }
 } 

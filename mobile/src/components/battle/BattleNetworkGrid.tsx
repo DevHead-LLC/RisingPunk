@@ -9,6 +9,7 @@ import { NodeHealthBar } from './NodeHealthBar';
 import { BattleLoadingError } from './BattleLoadingError';
 import { useBattleState } from '../../hooks/useBattleState';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import type { BattleState } from '../../../../shared/battleReplay';
 
 export interface NetworkConnection {
   from: number;
@@ -36,6 +37,7 @@ interface Props {
   lineColor?: string;
   lineWidth?: number;
   showNodeLabels?: boolean;
+  overrideBattleState?: BattleState | null;
 }
 
 export const BattleNetworkGrid = React.memo(({
@@ -44,6 +46,7 @@ export const BattleNetworkGrid = React.memo(({
   lineColor,
   lineWidth = 2,
   showNodeLabels = true,
+  overrideBattleState,
 }: Props) => {
   const colors = useThemeColors();
   const {
@@ -53,6 +56,7 @@ export const BattleNetworkGrid = React.memo(({
   } = useBattleState({
     battleId,
     pollingInterval: 1000,
+    overrideState: overrideBattleState,
   });
 
   useEffect(() => {

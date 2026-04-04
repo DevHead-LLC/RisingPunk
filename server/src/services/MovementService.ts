@@ -6,10 +6,15 @@ import { MovementCalculationService } from './MovementCalculationService';
 import { ScreenDimensionService } from './ScreenDimensionService';
 import { PathfindingService } from './PathfindingService';
 import { BattalionPositionService } from './BattalionPositionService';
+import { isHeadlessWorkingBattleActive, movementClockStartMs } from './HeadlessBattleRunner';
+
+type HeadlessSegmentRow = { anchorStartTime: number; progressMs: number };
 
 export class MovementService {
   private static movementStates: Map<string, Map<string, MovementState>> = new Map();
   private static movementIntervals: Map<string, NodeJS.Timeout> = new Map();
+  /** Per-battle per-battalion virtual elapsed for headless timer (resets when `movementState.startTime` changes). */
+  private static headlessSegmentProgress: Map<string, Map<string, HeadlessSegmentRow>> = new Map();
   
   // Cache for frequently used services
   private static serviceCache: Map<string, any> = new Map();
@@ -104,14 +109,15 @@ export class MovementService {
     networkPath: number[],
     estimatedDuration: number,
     finalTarget: number,
-    isInterruptible: boolean = false
+    isInterruptible: boolean = false,
+    clockBattleId?: string
   ): MovementState {
     return {
       battalionId,
       startPosition,
       targetPosition,
       movementStatus: 'moving',
-      startTime: Date.now(),
+      startTime: movementClockStartMs(clockBattleId),
       estimatedDuration,
       networkPath,
       attackRangePosition: { x: targetPosition.x, y: targetPosition.y },
@@ -133,7 +139,8 @@ export class MovementService {
     estimatedDuration: number,
     finalTarget: number,
     isInterruptible: boolean = false,
-    additionalProps?: Partial<MovementState>
+    additionalProps?: Partial<MovementState>,
+    clockBattleId?: string
   ): MovementState {
     const baseState = this.createBaseMovementState(
       battalion.id,
@@ -143,7 +150,8 @@ export class MovementService {
       networkPath,
       estimatedDuration,
       finalTarget,
-      isInterruptible
+      isInterruptible,
+      clockBattleId
     );
     
     return { ...baseState, ...additionalProps };
@@ -189,26 +197,64 @@ export class MovementService {
       clearInterval(interval);
       this.movementIntervals.delete(battleId);
     }
-    
+
+    this.headlessSegmentProgress.delete(battleId);
+
     // Clear cached data for this battle
     this.clearNodePositionCache(battleId);
     this.clearBattalionIndexCache(battleId);
   }
 
-  static async updateBattleMovement(battleId: string, battle: any, targetingResults: any[]): Promise<void> {
+  static resetHeadlessMovementProgress(battleId: string): void {
+    this.headlessSegmentProgress.delete(battleId);
+  }
+
+  static async updateBattleMovement(
+    battleId: string,
+    battle: any,
+    targetingResults: any[],
+    headlessMicroStepMs?: number
+  ): Promise<void> {
     if (!battle) return;
 
     if (!this.movementStates.has(battleId)) {
       this.movementStates.set(battleId, new Map());
     }
-    
+
     const battleMovementStates = this.movementStates.get(battleId)!;
+    const headlessMap =
+      headlessMicroStepMs !== undefined && Number.isFinite(headlessMicroStepMs) && headlessMicroStepMs > 0
+        ? (() => {
+            let m = this.headlessSegmentProgress.get(battleId);
+            if (!m) {
+              m = new Map();
+              this.headlessSegmentProgress.set(battleId, m);
+            }
+            return m;
+          })()
+        : undefined;
+
     let activeMovements = 0;
     let positionUpdated = false;
-    
+
     for (const [battalionId, movementState] of battleMovementStates) {
       if (movementState.movementStatus === 'moving') {
-        const updatedMovementState = this.updateMovementProgress(movementState, battleId, battle);
+        let progressOpts: { movementElapsedMs: number } | undefined;
+        if (headlessMap) {
+          let row = headlessMap.get(battalionId);
+          if (!row || row.anchorStartTime !== movementState.startTime) {
+            row = { anchorStartTime: movementState.startTime, progressMs: 0 };
+          }
+          row.progressMs += headlessMicroStepMs!;
+          headlessMap.set(battalionId, row);
+          progressOpts = { movementElapsedMs: row.progressMs };
+        }
+        const updatedMovementState = this.updateMovementProgress(
+          movementState,
+          battleId,
+          battle,
+          progressOpts
+        );
         battleMovementStates.set(battalionId, updatedMovementState);
         
         if (updatedMovementState.movementStatus === 'moving' && updatedMovementState.wasPositionUpdated) {
@@ -295,7 +341,7 @@ export class MovementService {
             screenDimensions.height,
             'initial',
             undefined,
-            undefined,
+            battle,
             'INITIAL_TARGETING'
           );
           
@@ -307,7 +353,7 @@ export class MovementService {
       }
     }
     
-    if (positionUpdated) {
+    if (positionUpdated && !isHeadlessWorkingBattleActive(battleId)) {
       await battle.save();
     }
   }
@@ -332,10 +378,20 @@ export class MovementService {
     
     let movementState: MovementState | undefined;
     
+    const clockBattleId = battle?.battleId != null ? String(battle.battleId) : undefined;
+
     if (movementType === 'initial') {
-      movementState = this.initiateInitialMovement(battalion, targetNode, nodePositions, startPosition);
+      movementState = this.initiateInitialMovement(battalion, targetNode, nodePositions, startPosition, clockBattleId);
     } else if (movementType === 'retargeting') {
-      movementState = this.initiateRetargetingMovement(battalion, targetNode, fullPath!, nodePositions, startPosition, battle);
+      movementState = this.initiateRetargetingMovement(
+        battalion,
+        targetNode,
+        fullPath!,
+        nodePositions,
+        startPosition,
+        battle,
+        clockBattleId
+      );
     }
     
     if (movementState) {
@@ -346,7 +402,13 @@ export class MovementService {
     return movementState;
   }
 
-  private static initiateInitialMovement(battalion: IBattalion, targetNode: number, nodePositions: any[], startPosition: any): MovementState | undefined {
+  private static initiateInitialMovement(
+    battalion: IBattalion,
+    targetNode: number,
+    nodePositions: any[],
+    startPosition: any,
+    clockBattleId?: string
+  ): MovementState | undefined {
     const networkPath = PathfindingService.findNetworkPath(battalion.position.nodeIndex, targetNode);
     if (!networkPath || networkPath.length === 0) {
       return undefined;
@@ -372,11 +434,20 @@ export class MovementService {
       networkPath,
       duration,
       targetNode,
-      false
+      false,
+      clockBattleId
     );
   }
 
-  private static initiateRetargetingMovement(battalion: IBattalion, targetNode: number, fullPath: number[], nodePositions: any[], startPosition: any, battle?: any): MovementState | undefined {
+  private static initiateRetargetingMovement(
+    battalion: IBattalion,
+    targetNode: number,
+    fullPath: number[],
+    nodePositions: any[],
+    startPosition: any,
+    battle?: any,
+    clockBattleId?: string
+  ): MovementState | undefined {
     if (!fullPath || fullPath.length === 0) {
       return undefined;
     }
@@ -429,7 +500,7 @@ export class MovementService {
         startPosition: startPosition,
         targetPosition: BattalionPositionService.createTargetPositionFromAttackRange(attackRangePosition, targetNode),
         movementStatus: 'moving',
-        startTime: Date.now(),
+        startTime: movementClockStartMs(clockBattleId),
         estimatedDuration: duration,
         networkPath: fullPath,
         attackRangePosition: { x: attackRangePosition.x, y: attackRangePosition.y },
@@ -476,7 +547,7 @@ export class MovementService {
       startPosition: startPosition,
       targetPosition: targetPosition,
       movementStatus: 'moving',
-      startTime: Date.now(),
+      startTime: movementClockStartMs(clockBattleId),
       estimatedDuration: duration,
       networkPath: [battalion.position.nodeIndex, nextNodeIndex],
       attackRangePosition: { x: targetPosition.x, y: targetPosition.y },
@@ -489,18 +560,29 @@ export class MovementService {
     };
   }
 
-  static updateMovementProgress(movementState: MovementState, battleId: string, battle?: any): MovementState {
+  static updateMovementProgress(
+    movementState: MovementState,
+    battleId: string,
+    battle?: any,
+    opts?: { movementElapsedMs?: number }
+  ): MovementState {
     if (movementState.movementStatus !== 'moving') {
       return movementState;
     }
 
-    const elapsedTime = Date.now() - movementState.startTime;
+    const elapsedTime =
+      opts?.movementElapsedMs !== undefined
+        ? opts.movementElapsedMs
+        : Date.now() - movementState.startTime;
     const completionThreshold = movementState.estimatedDuration + 50;
     const isComplete = elapsedTime >= completionThreshold;
     
     if (!isComplete) {
       const { MovementCalculationService } = this.getCachedService('MovementCalculationService');
-      const currentPosition = MovementCalculationService.calculateCurrentMovementPosition(movementState);
+      const currentPosition = MovementCalculationService.calculateCurrentMovementPositionFromElapsed(
+        movementState,
+        elapsedTime
+      );
       
       const battalion = this.findBattalionById(battle?.battalions || [], movementState.battalionId);
       if (battalion) {
@@ -523,7 +605,7 @@ export class MovementService {
           
           movementState.currentPathIndex = nextPathIndex;
           movementState.movementStatus = 'moving';
-          movementState.startTime = Date.now();
+          movementState.startTime = movementClockStartMs(battleId);
           movementState.startPosition = movementState.targetPosition;
           
           if (isLastStep) {
@@ -561,7 +643,7 @@ export class MovementService {
           } else {
             const duration = MovementCalculationService.calculateMovementDuration(battalionForSpeed);
             movementState.estimatedDuration = duration;
-            movementState.startTime = Date.now();
+            movementState.startTime = movementClockStartMs(battleId);
             
             return {
               ...movementState,

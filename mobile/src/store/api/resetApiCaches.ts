@@ -18,4 +18,5 @@ export const resetAllApiCaches = (api: any) => {
   api.dispatch({ type: 'raceConditionHeistApi/resetApiState' });
   api.dispatch({ type: 'binaryBankCrackApi/resetApiState' });
   api.dispatch({ type: 'battlePresetsApi/resetApiState' });
+  api.dispatch({ type: 'attackApi/resetApiState' });
 };

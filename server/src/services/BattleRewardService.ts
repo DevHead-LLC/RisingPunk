@@ -6,6 +6,7 @@
 import { User, IUser } from '../models/User';
 import { IBattleDocument } from '../models/Battle';
 import { NodeOwner, BotType } from '../types/battle';
+import { getInventoryKey, type BotInventoryKey } from '../utils/botInventoryKeys';
 
 export interface BattleRewardResult {
   success: boolean;
@@ -60,15 +61,39 @@ export class BattleRewardService {
         }
       });
 
-      // Update bot counts (reduce by losses) - always do this regardless of who won
+      const marchSourced = (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true;
       const Bot = require('../models/Bot');
-      const botDoc = await Bot.findOne({ userId });
-      if (botDoc) {
-        botDoc.bots.guardian = Math.max(0, botDoc.bots.guardian - botLosses.guardian);
-        botDoc.bots.breacher = Math.max(0, botDoc.bots.breacher - botLosses.breacher);
-        botDoc.bots.phreak = Math.max(0, botDoc.bots.phreak - botLosses.phreak);
-        
-        await botDoc.save();
+
+      if (marchSourced) {
+        const survivorIncrements: Partial<Record<BotInventoryKey, number>> = {};
+        for (const b of userEndingBattalions) {
+          if (b.quantity <= 0) continue;
+          const invKey = getInventoryKey(String(b.type), b.mark);
+          survivorIncrements[invKey] = (survivorIncrements[invKey] || 0) + b.quantity;
+        }
+        const $inc: Record<string, number> = {};
+        for (const [k, v] of Object.entries(survivorIncrements)) {
+          if (v > 0) {
+            $inc[`bots.${k}`] = v;
+          }
+        }
+        if (Object.keys($inc).length > 0) {
+          const upd = await Bot.findOneAndUpdate({ userId }, { $inc }, { new: true });
+          if (!upd) {
+            return {
+              success: false,
+              error: 'Bot document missing for march battle settlement',
+            };
+          }
+        }
+      } else {
+        const botDoc = await Bot.findOne({ userId });
+        if (botDoc) {
+          botDoc.bots.guardian = Math.max(0, botDoc.bots.guardian - botLosses.guardian);
+          botDoc.bots.breacher = Math.max(0, botDoc.bots.breacher - botLosses.breacher);
+          botDoc.bots.phreak = Math.max(0, botDoc.bots.phreak - botLosses.phreak);
+          await botDoc.save();
+        }
       }
 
       // Only give experience and money rewards if user won
