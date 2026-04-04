@@ -9,6 +9,11 @@ import { RetargetingService } from './RetargetingService';
 import { BattalionService } from './BattalionService';
 import { Battle } from '../models/Battle';
 import { MovementService } from './MovementService';
+import {
+  battleEngineNowMs,
+  getHeadlessWorkingBattle,
+  isHeadlessWorkingBattleActive,
+} from './HeadlessBattleRunner';
 
 interface AttackState {
   battleId: string;
@@ -77,7 +82,7 @@ export class AttackService {
       battleId,
       battalionId: battalion.id,
       targetNodeIndex: targetType === 'node' ? target as number : -1,
-      lastAttackTime: Date.now(),
+      lastAttackTime: battleEngineNowMs(battleId),
       attackInterval,
       isAttacking: true,
       targetType,
@@ -204,7 +209,7 @@ export class AttackService {
       battleId,
       capturedNodeIndex,
       affectedBattalionIds,
-      timestamp: Date.now(),
+      timestamp: battleEngineNowMs(battleId),
       triggerType: 'node_capture',
       priority: RETARGETING_PRIORITIES.NODE_CAPTURE
     };
@@ -232,7 +237,7 @@ export class AttackService {
       const task: RetargetingTask = {
         battleId,
         affectedBattalionIds: affectedBattalions,
-        timestamp: Date.now(),
+        timestamp: battleEngineNowMs(battleId),
         triggerType: 'battalion_destruction',
         destroyedBattalionId,
         priority: RETARGETING_PRIORITIES.BATTALION_DESTRUCTION
@@ -253,7 +258,7 @@ export class AttackService {
       triggerType: 'interrupted_recovery',
       affectedBattalionIds: [battalionId],
       capturedNodeIndex: -1,
-      timestamp: Date.now(),
+      timestamp: battleEngineNowMs(battleId),
       priority: RETARGETING_PRIORITIES.INTERRUPTED_RECOVERY
     });
     
@@ -266,7 +271,7 @@ export class AttackService {
     const task: RetargetingTask = {
       battleId: battleId,
       affectedBattalionIds: [battalionId],
-      timestamp: Date.now(),
+      timestamp: battleEngineNowMs(battleId),
       triggerType: 'missing_target',
       priority: RETARGETING_PRIORITIES.MISSING_TARGET
     };
@@ -286,7 +291,9 @@ export class AttackService {
     while (this.retargetingQueue.length > 0) {
       const task = this.retargetingQueue.shift()!;
       
-      const battle = await Battle.findOne({ battleId: task.battleId });
+      const battle =
+        getHeadlessWorkingBattle(task.battleId) ??
+        (await Battle.findOne({ battleId: task.battleId }));
       if (!battle) {
         continue;
       }
@@ -316,7 +323,9 @@ export class AttackService {
         console.error(`❌ RETARGETING ERROR: Failed to process ${task.triggerType}:`, error);
       }
       
-      await new Promise(resolve => setTimeout(resolve, 50));
+      if (!isHeadlessWorkingBattleActive(task.battleId)) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
     }
     
     this.isProcessingQueue = false;
@@ -373,7 +382,9 @@ export class AttackService {
           }
         }
         
-        await battle.save();
+        if (!isHeadlessWorkingBattleActive(battle.battleId)) {
+          await battle.save();
+        }
       }
     }
     
@@ -469,8 +480,9 @@ export class AttackService {
     }
 
     const battleId = battle.battleId;
+    const now = battleEngineNowMs(battleId);
     for (const [battalionId, attackState] of this.getActiveAttacksForBattle(battleId)) {
-      if (Date.now() - attackState.lastAttackTime >= attackState.attackInterval) {
+      if (now - attackState.lastAttackTime >= attackState.attackInterval) {
         const battalion = battle.battalions.find((b: IBattalion) => b.id === battalionId);
         
         if (!battalion) {
@@ -488,10 +500,12 @@ export class AttackService {
           
           if (defender && !defender.isDestroyed) {
             const destroyed = this.processUnifiedAttack(battalion, defender, 'battalion');
-            attackState.lastAttackTime = Date.now();
+            attackState.lastAttackTime = now;
             
             if (destroyed) {
-              await battle.save();
+              if (!isHeadlessWorkingBattleActive(battle.battleId)) {
+                await battle.save();
+              }
               this.queueBattalionDestructionRetargeting(battle.battleId, defender.id);
             }
           } else {
@@ -508,7 +522,7 @@ export class AttackService {
           
           if (node && CombatService.canTargetNode(node)) {
             const captured = this.processUnifiedAttack(battalion, node, 'node');
-            attackState.lastAttackTime = Date.now();
+            attackState.lastAttackTime = now;
             
             if (captured) {
               const affectedAttackers = this.getBattalionsAttackingSpecificNode(battleId, node.index);
@@ -520,7 +534,9 @@ export class AttackService {
           }
         }
         
-        await battle.save();
+        if (!isHeadlessWorkingBattleActive(battle.battleId)) {
+          await battle.save();
+        }
       }
     }
   }

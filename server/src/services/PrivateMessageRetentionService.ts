@@ -7,6 +7,10 @@ import mongoose from 'mongoose';
 import { PrivateMessage } from '../models/PrivateMessage';
 import { MAX_PM_MESSAGES_PER_THREAD, MAX_PM_THREADS } from '../constants/privateMessageCaps';
 import { upsertInboxFromNewMessage } from './PrivateInboxService';
+import {
+  extractBattleIdFromBtlPayload,
+  tryDeleteBattleReplayIfUnreferenced,
+} from './BattleReplayLifecycleService';
 
 export { MAX_PM_MESSAGES_PER_THREAD, MAX_PM_THREADS } from '../constants/privateMessageCaps';
 
@@ -39,10 +43,18 @@ export async function trimThreadToMaxMessages(doc: LeanPm): Promise<void> {
   const excess = await PrivateMessage.find(filter as any)
     .sort({ createdAt: -1 })
     .skip(MAX_PM_MESSAGES_PER_THREAD)
-    .select('_id')
+    .select('_id message')
     .lean();
   if (excess.length === 0) return;
+  const battleIds = new Set<string>();
+  for (const row of excess) {
+    const bid = extractBattleIdFromBtlPayload((row as { message?: string }).message);
+    if (bid) battleIds.add(bid);
+  }
   await PrivateMessage.deleteMany({ _id: { $in: excess.map((x) => x._id) } });
+  for (const bid of battleIds) {
+    await tryDeleteBattleReplayIfUnreferenced(bid);
+  }
 }
 
 /** After any PM insert: trim to 20 messages (shared thread storage); update per-user inbox rows. */

@@ -33,6 +33,8 @@ interface MessagesModalProps {
   openToUsername?: string | null;
   /** Same as World Chat: tap Battle Report / shared location to open Hack Map on that cell (from Turf). */
   onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
+  /** Battle Report `battleId` present: open replay viewer (R4). */
+  onWatchBattle?: (battleId: string) => void;
 }
 
 export const MessagesModal: React.FC<MessagesModalProps> = ({
@@ -41,6 +43,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   openToUserId,
   openToUsername,
   onNavigateToMapCell,
+  onWatchBattle,
 }) => {
   const colors = useThemeColors();
   const currentUser = useAppSelector((state) => state.auth.user);
@@ -269,6 +272,7 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
           getReportContextData={getReportContextData}
           canReply={canReply}
           onNavigateToMapCell={onNavigateToMapCell}
+          onWatchBattle={onWatchBattle}
         />
       )}
     </>
