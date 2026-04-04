@@ -10,17 +10,26 @@ import { createNodePositionMap } from '../../utils/battleUtils';
 import { ANIMATION_CONFIG } from '../../config';
 import { BattleLoadingError } from './BattleLoadingError';
 import { useBattleState } from '../../hooks/useBattleState';
+import type { BattleState } from '../../../../shared/battleReplay';
 
 interface Props {
   battleId: string;
   battalionSize?: number;
   showHealthBars?: boolean;
+  overrideBattleState?: BattleState | null;
+  /** When set (replay), battalion movement progress uses virtual ms (frame `t` + wall delta), not `Date.now()` client anchors. */
+  replayMovementVirtualNowMs?: number;
+  /** Aligns live-recorded `movementState.startTime` (Unix) with virtual frame `t`. */
+  replayMovementEpochMs?: number;
 }
 
 export const BattleBattalionManager = React.memo(({
   battleId,
   battalionSize = 40,
   showHealthBars = true,
+  overrideBattleState,
+  replayMovementVirtualNowMs,
+  replayMovementEpochMs,
 }: Props) => {
   const [pollingInterval, setPollingInterval] = useState<number>(ANIMATION_CONFIG.DEFAULT_POLLING_MS);
   
@@ -31,6 +40,7 @@ export const BattleBattalionManager = React.memo(({
   } = useBattleState({
     battleId,
     pollingInterval,
+    overrideState: overrideBattleState,
   });
 
   const calculatedPollingInterval = React.useMemo(() => 
@@ -77,12 +87,23 @@ export const BattleBattalionManager = React.memo(({
                 movementState={movementState}
                 size={battalionSize}
                 showHealthBar={showHealthBars}
+                replayMovementVirtualNowMs={replayMovementVirtualNowMs}
+                replayMovementEpochMs={replayMovementEpochMs}
               />
             );
           })}
       </View>
     );
-  }, [battleState, battalionSize, showHealthBars, filteredBattalions, nodePositions, movementStateMap]);
+  }, [
+    battleState,
+    battalionSize,
+    showHealthBars,
+    filteredBattalions,
+    nodePositions,
+    movementStateMap,
+    replayMovementVirtualNowMs,
+    replayMovementEpochMs,
+  ]);
 
   return (
     <BattleLoadingError
