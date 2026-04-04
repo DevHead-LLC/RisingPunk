@@ -443,6 +443,11 @@ type Props = {
   /** TurfScreen: after opening map from world chat, pan to this cell once. */
   pendingNavigateToCell?: { x: number; y: number } | null;
   onPendingNavigateConsumed?: () => void;
+  /**
+   * TurfScreen: monotonic token — when incremented after closing replay (Messages → Watch battle), open this
+   * screen's MessagesModal (separate from TurfScreen's modal).
+   */
+  openMessagesAfterReplayToken?: number;
   /** TurfScreen: Battle Report `BTL|` → replay mode on {@link BattleGridScreen} (same as turf Messages). */
   onWatchBattle?: (battleId: string) => void;
 };
@@ -1007,6 +1012,7 @@ export const HackMapScreen: React.FC<Props> = ({
   restorePan,
   pendingNavigateToCell,
   onPendingNavigateConsumed,
+  openMessagesAfterReplayToken = 0,
   onWatchBattle,
 }) => {
   const dispatch = useAppDispatch();
@@ -1472,6 +1478,14 @@ export const HackMapScreen: React.FC<Props> = ({
     },
     [onWatchBattle]
   );
+
+  const openMessagesAfterReplayHandledRef = useRef(0);
+  useEffect(() => {
+    const t = openMessagesAfterReplayToken;
+    if (t <= 0 || t <= openMessagesAfterReplayHandledRef.current) return;
+    openMessagesAfterReplayHandledRef.current = t;
+    setShowMessagesModal(true);
+  }, [openMessagesAfterReplayToken]);
 
   useEffect(() => {
     if (!marchOwnerModalId) return;

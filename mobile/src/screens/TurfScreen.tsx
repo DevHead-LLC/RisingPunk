@@ -185,6 +185,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [battleId, setBattleId] = useState<string | null>(null);
   const [battleScreenMode, setBattleScreenMode] = useState<'live' | 'replay'>('live');
   const [openMessagesAfterReplayClose, setOpenMessagesAfterReplayClose] = useState(false);
+  /** Bump when replay closes and we return to map so HackMapScreen opens its own MessagesModal (not TurfScreen's). */
+  const [mapOpenMessagesAfterReplayToken, setMapOpenMessagesAfterReplayToken] = useState(0);
   const [pendingNpcSlug, setPendingNpcSlug] = useState<string | null>(null);
   const isAutoPanningRef = useRef(false);
   const currentPanOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -765,6 +767,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   const navigateToScreen = useCallback((screen: TurfScreenName) => {
     const previousScreenBeforeUpdate = currentScreen;
+    if (previousScreenBeforeUpdate === 'map' && screen !== 'map') {
+      setMapOpenMessagesAfterReplayToken(0);
+    }
     setPreviousScreen(currentScreen);
     setCurrentScreen(screen);
     if (screen !== 'turf') {
@@ -1157,6 +1162,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           restorePan={returnContext?.mapPan}
           pendingNavigateToCell={mapPendingNavigateCell}
           onPendingNavigateConsumed={handleMapPendingNavigateConsumed}
+          openMessagesAfterReplayToken={mapOpenMessagesAfterReplayToken}
           onWatchBattle={handleWatchBattleFromMessages}
           onClose={() => {
             const slug = (globalThis as any).pendingNpcSlug as string | undefined;
@@ -1236,7 +1242,12 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 setBattleScreenMode('live');
                 setBattleId(null);
                 navigateToScreen(previousScreen);
-                setShowMessagesModal(true);
+                // Bugbot: Turf MessagesModal only mounts on `turf`; map uses HackMapScreen's modal — bump token there.
+                if (previousScreen === 'map') {
+                  setMapOpenMessagesAfterReplayToken((n) => n + 1);
+                } else {
+                  setShowMessagesModal(true);
+                }
                 return;
               }
               setBattleScreenMode('live');
@@ -1837,7 +1848,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, battleScreenMode, openMessagesAfterReplayClose, handleWatchBattleFromMessages, handleBattleEnd, handleBattlePrepDeployComplete, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive, dispatch, returnContext]);
+  }, [currentScreen, navigateToScreen, battleId, battleScreenMode, openMessagesAfterReplayClose, mapOpenMessagesAfterReplayToken, handleWatchBattleFromMessages, handleBattleEnd, handleBattlePrepDeployComplete, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive, dispatch, returnContext]);
 
   // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
   if (!navRestoreAttempted) {
