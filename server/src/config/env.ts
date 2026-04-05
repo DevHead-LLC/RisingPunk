@@ -98,6 +98,17 @@ export const STALE_RESOLVING_WATCHDOG_INTERVAL_MS = parsePositiveIntMs(
   10_000
 );
 
+/**
+ * Multi-instance (e.g. Elastic Beanstalk): in-process `setTimeout` for march arrival / return-complete
+ * only exists on the Node process that scheduled it. If that instance is replaced, overdue rows must be
+ * picked up from MongoDB. Each process runs this sweep on an interval (default 5s).
+ */
+export const ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS',
+  5_000,
+  1_000
+);
+
 // Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
 let cachedAdminIds: mongoose.Types.ObjectId[] | null = null;
 

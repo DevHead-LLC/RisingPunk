@@ -186,6 +186,13 @@ mongoose.connect(process.env.MONGODB_URI, {
     console.warn('Stale resolving march watchdog module load failed (non-fatal):', staleModuleErr);
   }
 
+  try {
+    const { startAttackMarchDueSweepWatchdog } = require('./src/services/MarchArrivalSchedulerService');
+    startAttackMarchDueSweepWatchdog();
+  } catch (dueSweepErr: unknown) {
+    console.warn('Attack march due-date sweep watchdog failed to start (non-fatal):', dueSweepErr);
+  }
+
   // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
   try {
     const { ensureRentalPropertyConfig } = require('./src/services/RentalPropertyConfigService');
