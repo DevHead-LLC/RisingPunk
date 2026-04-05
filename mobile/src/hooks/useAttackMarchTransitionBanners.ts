@@ -1,11 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useGetMyAttackMarchesQuery } from '../store/api/attackApi';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  attackApi,
+  getAttackMarchMinePollingIntervalMs,
+  useGetMyAttackMarchesQuery,
+} from '../store/api/attackApi';
+import { useAppSelector } from '../store/hooks';
 
 type BannerPayload = { message: string; type: 'info' };
 
+/** Auto-dismiss for march state toasts in AppContent `NotificationBanner` (arrive, queue, battle done, return, recall, home). */
+export const MARCH_TRANSITION_BANNER_DURATION_MS = 1000;
+
 /**
  * Shows one-shot in-app banners when the user's own marches change state (GET /api/attack/mine poll).
- * Uses the same RTK Query cache + 15s interval as HackExpeditionCommitmentBanner.
+ * Polls faster while `returning` and refetches at `returnArriveAt` so toasts match the map return leg.
  */
 export function useAttackMarchTransitionBanners(token: string | null): {
   marchBanner: BannerPayload | null;
@@ -15,10 +23,46 @@ export function useAttackMarchTransitionBanners(token: string | null): {
   const prevStatesRef = useRef<Map<string, string>>(new Map());
   const seededRef = useRef(false);
 
-  const { data } = useGetMyAttackMarchesQuery(undefined, {
+  const mineCached = useAppSelector((s) => attackApi.endpoints.getMyAttackMarches.select(undefined)(s));
+  const pollingInterval = getAttackMarchMinePollingIntervalMs(
+    mineCached.data?.asyncMarchesEnabled,
+    mineCached.data?.marches
+  );
+
+  const { data, refetch } = useGetMyAttackMarchesQuery(undefined, {
     skip: !token,
-    pollingInterval: 15000,
+    pollingInterval,
   });
+
+  const returnScheduleKey = useMemo(() => {
+    const marches = data?.marches ?? [];
+    let min = Infinity;
+    for (const m of marches) {
+      if (m.state !== 'returning' || m.returnArriveAt == null || String(m.returnArriveAt).trim() === '') {
+        continue;
+      }
+      const t = new Date(String(m.returnArriveAt)).getTime();
+      if (Number.isFinite(t)) {
+        min = Math.min(min, t);
+      }
+    }
+    return min === Infinity ? '' : String(min);
+  }, [data?.marches]);
+
+  useEffect(() => {
+    if (!token || returnScheduleKey === '') {
+      return;
+    }
+    const min = Number(returnScheduleKey);
+    if (!Number.isFinite(min)) {
+      return;
+    }
+    const delay = Math.max(0, min - Date.now()) + 400;
+    const tid = setTimeout(() => {
+      void refetch();
+    }, delay);
+    return () => clearTimeout(tid);
+  }, [token, returnScheduleKey, refetch]);
 
   const dismissMarchBanner = useCallback(() => {
     setMarchBanner(null);

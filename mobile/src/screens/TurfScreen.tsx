@@ -1245,6 +1245,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           mode={battleScreenMode}
           _onClose={() => {
             if (battleScreenMode === 'replay') {
+              // Same as live close: server may have cleared the NPC before replay finished; replay path used to skip this.
+              dispatch(mapApi.util.invalidateTags(['Map']));
+              dispatch(authApi.util.invalidateTags(['User']));
               if (openMessagesAfterReplayClose) {
                 setOpenMessagesAfterReplayClose(false);
                 setBattleScreenMode('live');
