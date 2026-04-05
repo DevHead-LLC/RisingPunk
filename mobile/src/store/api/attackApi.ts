@@ -37,6 +37,30 @@ export type GetMyAttackMarchesResponse = {
   asyncMarchesEnabled: boolean;
 };
 
+/**
+ * RTK polling for GET /api/attack/mine. While `returning`, use a short interval so `done` (row drops),
+ * commitment banner, and transition toasts track `returnArriveAt` instead of lagging up to the default 15s.
+ */
+export function getAttackMarchMinePollingIntervalMs(
+  asyncMarchesEnabled: boolean | undefined,
+  marches: AttackMarchListItem[] | undefined
+): number {
+  if (asyncMarchesEnabled === false) {
+    return 0;
+  }
+  if (asyncMarchesEnabled !== true) {
+    return 15000;
+  }
+  const list = marches ?? [];
+  if (list.length === 0) {
+    return 15000;
+  }
+  if (list.some((m) => m.state === 'returning')) {
+    return 2000;
+  }
+  return 15000;
+}
+
 export type GetActiveAttackMarchesResponse = {
   marches: AttackMarchListItem[];
 };

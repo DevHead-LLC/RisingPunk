@@ -539,8 +539,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               typeof report.cash === 'number' && Number.isFinite(report.cash)
                                 ? Math.max(0, Math.floor(report.cash))
                                 : 0;
-                            // Bugbot: PvP cash only when attacker won (server); winner==='user' gate is intentional — update payload + this if rules change.
-                            const showWallet = report.winner === 'user' && cash > 0;
+                            // NPC: show wallet only when cash > 0 (server sets cash from processedRewards).
+                            // PvP: always show wallet line when attacker won — even $0 (defender had no remaining balance).
+                            const isPvP = report.npc !== 1;
+                            const showWallet = report.winner === 'user' && (isPvP || cash > 0);
                             const hackLocLine =
                               typeof report.hl === 'string' && report.hl.trim().length > 0
                                 ? report.hl.trim()
@@ -673,8 +675,12 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                     {report.npc === 1 && isAttacker
                                       ? `Victory reward: $${fmt(cash)}`
                                       : isAttacker
-                                        ? `Wallet stolen: $${fmt(cash)}`
-                                        : `Wallet lost: $${fmt(cash)}`}
+                                        ? cash > 0
+                                          ? `Wallet stolen: $${fmt(cash)}`
+                                          : 'Wallet stolen: $0 (No remaining balance)'
+                                        : cash > 0
+                                          ? `Wallet lost: $${fmt(cash)}`
+                                          : 'Wallet lost: $0 (No remaining balance)'}
                                   </Text>
                                 ) : null}
                                 {report.battleId && onWatchBattle ? (

@@ -2,7 +2,11 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useAppSelector } from '../../store/hooks';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { useGetMyAttackMarchesQuery } from '../../store/api/attackApi';
+import {
+  attackApi,
+  getAttackMarchMinePollingIntervalMs,
+  useGetMyAttackMarchesQuery,
+} from '../../store/api/attackApi';
 import { SIZING } from '../../styles/theme';
 
 /**
@@ -12,9 +16,14 @@ import { SIZING } from '../../styles/theme';
 export function HackExpeditionCommitmentBanner(): React.ReactElement | null {
   const token = useAppSelector((state) => state.auth.token);
   const colors = useThemeColors();
+  const mineCached = useAppSelector((s) => attackApi.endpoints.getMyAttackMarches.select(undefined)(s));
+  const pollingInterval = getAttackMarchMinePollingIntervalMs(
+    mineCached.data?.asyncMarchesEnabled,
+    mineCached.data?.marches
+  );
   const { data } = useGetMyAttackMarchesQuery(undefined, {
     skip: !token,
-    pollingInterval: 15000,
+    pollingInterval,
   });
 
   const visible = data?.asyncMarchesEnabled === true && (data?.marches?.length ?? 0) > 0;
