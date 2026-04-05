@@ -57,23 +57,35 @@ export class MovementCalculationService {
     return MOVEMENT_CONFIG;
   }
 
-  static calculateCurrentMovementPosition(movementState: any): { x: number; y: number; nodeIndex: number } {
-    const elapsedTime = Date.now() - movementState.startTime;
+  /**
+   * Interpolate along the current movement segment using an explicit elapsed time (ms).
+   * Wall-clock path: {@link calculateCurrentMovementPosition}. Headless runner will use virtual elapsed here.
+   */
+  static calculateCurrentMovementPositionFromElapsed(
+    movementState: any,
+    elapsedMs: number
+  ): { x: number; y: number; nodeIndex: number } {
     const totalDuration = movementState.estimatedDuration;
-    const progress = Math.min(elapsedTime / totalDuration, 1.0);
-        
+    const progress = Math.min(elapsedMs / totalDuration, 1.0);
+
     const currentPosition = this.interpolateAlongNetworkLine(
       movementState.startPosition,
       movementState.targetPosition,
       progress
     );
-        
-    const closestNodeIndex = progress > 0.5 ? movementState.targetPosition.nodeIndex : movementState.startPosition.nodeIndex;
-        
+
+    const closestNodeIndex =
+      progress > 0.5 ? movementState.targetPosition.nodeIndex : movementState.startPosition.nodeIndex;
+
     return {
       x: currentPosition.x,
       y: currentPosition.y,
-      nodeIndex: closestNodeIndex
+      nodeIndex: closestNodeIndex,
     };
+  }
+
+  static calculateCurrentMovementPosition(movementState: any): { x: number; y: number; nodeIndex: number } {
+    const elapsedTime = Date.now() - movementState.startTime;
+    return this.calculateCurrentMovementPositionFromElapsed(movementState, elapsedTime);
   }
 } 

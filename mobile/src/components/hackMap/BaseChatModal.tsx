@@ -29,6 +29,7 @@ import {
   parseHackLocationDisplayCoords,
 } from '../../../../shared/hackMapLocationDisplay';
 import { parseMapLocationShareMessage } from '../../../../shared/mapLocationShareMessage';
+import type { ReportContext } from '../../types/reports';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
@@ -87,6 +88,8 @@ function normalizeBattleReportBotCounts(raw: unknown): BattleReportBotCounts | n
 
 export interface BattleReportPayload {
   br: 1;
+  /** Set for computer/NPC battles (server); client adjusts reward vs PvP wallet copy. */
+  npc?: 1;
   attackerId: string;
   defenderId: string;
   attackerHandle: string;
@@ -109,6 +112,8 @@ export interface BattleReportPayload {
   mapName?: string;
   x?: number;
   y?: number;
+  /** Present on newer PvP reports; links to GET /api/battle/:id/replay. */
+  battleId?: string;
 }
 
 function parseBattleReportMessage(message: string): BattleReportPayload | null {
@@ -131,8 +136,13 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
       typeof payload.x === 'number' && Number.isFinite(payload.x) ? payload.x : undefined;
     const y =
       typeof payload.y === 'number' && Number.isFinite(payload.y) ? payload.y : undefined;
+    const battleIdRaw = (payload as { battleId?: unknown }).battleId;
+    const battleId =
+      typeof battleIdRaw === 'string' && battleIdRaw.trim().length > 0 ? battleIdRaw.trim() : undefined;
+    const isNpcReport = (payload as { npc?: unknown }).npc === 1;
     return {
       ...payload,
+      npc: isNpcReport ? 1 : undefined,
       attackerStart,
       defenderStart,
       attackerLost,
@@ -140,6 +150,7 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
       mapName,
       x: x !== undefined && Number.isFinite(x) ? x : undefined,
       y: y !== undefined && Number.isFinite(y) ? y : undefined,
+      battleId,
     };
   } catch (_) {
     // ignore
@@ -187,6 +198,20 @@ function battleReportViewerIsAttacker(
   return false;
 }
 
+function formatFetchErrorMessage(fetchError: unknown): string {
+  if (fetchError == null) return 'Unknown error';
+  if (typeof fetchError === 'object' && fetchError !== null) {
+    const o = fetchError as Record<string, unknown>;
+    const data = o.data;
+    if (data && typeof data === 'object' && data !== null && 'error' in data) {
+      const err = (data as Record<string, unknown>).error;
+      if (typeof err === 'string' && err.trim() !== '') return err;
+    }
+    if (typeof o.error === 'string' && o.error.trim() !== '') return o.error;
+  }
+  return 'Unknown error';
+}
+
 export interface ChatMessageForModal {
   id: string;
   userId: string;
@@ -209,12 +234,14 @@ export interface BaseChatModalProps {
   onSendMessage: (trimmedMessage: string) => Promise<void>;
   isSending: boolean;
   currentUser: { _id?: string; id?: string; handle?: string; isAdmin?: boolean } | null;
-  reportContext: string;
+  reportContext: ReportContext;
   getReportContextData: (reportedMessage: ChatMessageForModal) => Record<string, unknown>;
   /** When false, input is hidden (e.g. admin broadcast conversation). Default true. */
   canReply?: boolean;
   /** Tap shared map location (LOC|) to pan the HackMap to that cell. */
   onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
+  /** Battle Report: open stored replay when `battleId` is present in payload (R4). */
+  onWatchBattle?: (battleId: string) => void;
 }
 
 export const BaseChatModal: React.FC<BaseChatModalProps> = ({
@@ -231,6 +258,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
   getReportContextData,
   canReply = true,
   onNavigateToMapCell,
+  onWatchBattle,
 }) => {
   const colors = useThemeColors();
   const currentUserId = currentUser?._id || (currentUser as any)?.id;
@@ -400,9 +428,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                   <Text
                     style={[styles.errorStateText, { fontSize: SIZING.font.small, marginTop: SIZING.spacing.xs }]}
                   >
-                    {('data' in (fetchError || {}) && (fetchError as any)?.data?.error) ||
-                      ('error' in (fetchError || {}) && (fetchError as any)?.error) ||
-                      'Unknown error'}
+                    {formatFetchErrorMessage(fetchError)}
                   </Text>
                 </View>
               ) : isLoadingMessages && messages.length === 0 ? (
@@ -513,8 +539,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               typeof report.cash === 'number' && Number.isFinite(report.cash)
                                 ? Math.max(0, Math.floor(report.cash))
                                 : 0;
-                            // Bugbot: PvP cash only when attacker won (server); winner==='user' gate is intentional — update payload + this if rules change.
-                            const showWallet = report.winner === 'user' && cash > 0;
+                            // NPC: show wallet only when cash > 0 (server sets cash from processedRewards).
+                            // PvP: always show wallet line when attacker won — even $0 (defender had no remaining balance).
+                            const isPvP = report.npc !== 1;
+                            const showWallet = report.winner === 'user' && (isPvP || cash > 0);
                             const hackLocLine =
                               typeof report.hl === 'string' && report.hl.trim().length > 0
                                 ? report.hl.trim()
@@ -644,10 +672,28 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 </Text>
                                 {showWallet ? (
                                   <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                    {isAttacker
-                                      ? `Wallet stolen: $${fmt(cash)}`
-                                      : `Wallet lost: $${fmt(cash)}`}
+                                    {report.npc === 1 && isAttacker
+                                      ? `Victory reward: $${fmt(cash)}`
+                                      : isAttacker
+                                        ? cash > 0
+                                          ? `Wallet stolen: $${fmt(cash)}`
+                                          : 'Wallet stolen: $0 (No remaining balance)'
+                                        : cash > 0
+                                          ? `Wallet lost: $${fmt(cash)}`
+                                          : 'Wallet lost: $0 (No remaining balance)'}
                                   </Text>
+                                ) : null}
+                                {report.battleId && onWatchBattle ? (
+                                  <Pressable
+                                    onPress={() => onWatchBattle(report.battleId!)}
+                                    style={styles.watchBattleBtn}
+                                    accessibilityRole="button"
+                                    accessibilityLabel="Watch battle replay"
+                                  >
+                                    <Text style={[styles.messageText, styles.watchBattleBtnText, { color: colors.primary }]}>
+                                      Watch battle
+                                    </Text>
+                                  </Pressable>
                                 ) : null}
                               </View>
                             );
@@ -1023,5 +1069,13 @@ const createStyles = (colors: any) =>
       color: colors.background,
       fontSize: SIZING.font.body,
       fontWeight: 'bold',
+    },
+    watchBattleBtn: {
+      marginTop: SIZING.spacing.sm,
+      alignSelf: 'flex-start',
+    },
+    watchBattleBtnText: {
+      fontWeight: '700',
+      textDecorationLine: 'underline',
     },
   });

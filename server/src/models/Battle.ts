@@ -203,6 +203,10 @@ const battleSchema = new Schema({
   /** Hack map grid cell at attack start (for Battle Report Hack Location line). */
   hackMapCellX: { type: Number, required: false },
   hackMapCellY: { type: Number, required: false },
+  /** True when battle was started from an `AttackMarch` (inventory was committed at launch). */
+  marchSourcedAttack: { type: Boolean, default: false },
+  /** Links battle end → march follow-up (`returning` / queue promotion). */
+  sourceMarchId: { type: String, required: false },
   defenderDeployedTotals: {
     guardian: { type: Number, default: 0 },
     breacher: { type: Number, default: 0 },
@@ -235,6 +239,7 @@ battleSchema.index({ attackerId: 1, phase: 1 });
 battleSchema.index({ defenderId: 1, phase: 1 });
 battleSchema.index({ phase: 1, startTime: 1 });
 battleSchema.index({ 'battalions.owner': 1 });
+battleSchema.index({ sourceMarchId: 1 }, { sparse: true });
 
 // Instance methods
 battleSchema.methods.endBattle = async function(winner: NodeOwner): Promise<void> {

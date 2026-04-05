@@ -10,6 +10,9 @@ import { ANIMATION_CONFIG } from '../../config';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { battleGridAbbrevFor, effectiveMarkFromBattalionMark } from '../../utils/botInventory';
 
+/** Above this, `startTime` is treated as Unix ms (live battle), not virtual replay ms (headless). */
+const REPLAY_WALL_CLOCK_START_TIME_THRESHOLD_MS = 1_000_000_000_000;
+
 interface Props {
   battalion: {
     id: string;
@@ -32,6 +35,18 @@ interface Props {
   movementState?: MovementState;
   size?: number;
   showHealthBar?: boolean;
+  /** Replay: virtual battle ms (snapshot `t` + wall delta) for movement interpolation vs `startTime`. */
+  replayMovementVirtualNowMs?: number;
+  /**
+   * Persisted replay `recordingEpochMs`: subtract from wall-clock `movementState.startTime` so elapsed matches
+   * frame `t` (live capture uses Unix `Date.now()`; headless uses virtual ms — below threshold, no subtract).
+   */
+  replayMovementEpochMs?: number;
+  /**
+   * Replay: snapshot index from `useReplayPlayback`. Used to apply the same **`Animated.timing`** blend live gets
+   * on each poll only when a **new snapshot** arrives; intra-snapshot motion stays **`setValue`** (~60fps) so timings don’t stack.
+   */
+  replaySnapshotFrameIndex?: number;
 }
 
 export const BattleBattalion = React.memo(({
@@ -40,26 +55,35 @@ export const BattleBattalion = React.memo(({
   movementState,
   size = 30,
   showHealthBar = true,
+  replayMovementVirtualNowMs,
+  replayMovementEpochMs,
+  replaySnapshotFrameIndex,
 }: Props) => {
   const colors = useThemeColors();
   const animatedPosition = React.useRef(new Animated.ValueXY(position)).current;
   const [currentTime, setCurrentTime] = React.useState(Date.now());
   const [clientStartTime, setClientStartTime] = React.useState<number | null>(null);
-  
+  const [displayPosition, setDisplayPosition] = React.useState(position);
+  const replayMotionFrameRef = React.useRef<number>(-1);
+  /** Stable for effect deps — virtual `now` updates ~60fps in replay; undefined-vs-number is enough to gate live timers. */
+  const hasReplayVirtualClock = replayMovementVirtualNowMs !== undefined;
+
+  // Bugbot: no 60fps tick in replay — smoothPosition uses replayMovementVirtualNowMs only.
   React.useEffect(() => {
+    if (hasReplayVirtualClock) return;
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
     }, ANIMATION_CONFIG.FPS_60_INTERVAL_MS);
-    
     return () => clearInterval(interval);
-  }, []);
-  
+  }, [hasReplayVirtualClock]);
+
   React.useEffect(() => {
+    if (hasReplayVirtualClock) return;
     if (movementState?.movementStatus === 'moving') {
       setClientStartTime(Date.now());
     }
-  }, [movementState?.startTime, movementState?.movementStatus]);
-  
+  }, [movementState?.startTime, movementState?.movementStatus, hasReplayVirtualClock]);
+
   const smoothPosition = React.useMemo(() => {
     if (!movementState) return position;
     
@@ -67,11 +91,31 @@ export const BattleBattalion = React.memo(({
       return movementState.targetPosition;
     }
 
-    if (movementState.movementStatus !== 'moving' || !clientStartTime) {
+    if (movementState.movementStatus !== 'moving') {
       return position;
     }
-    
-    const elapsed = currentTime - clientStartTime;
+
+    let elapsed: number;
+    if (
+      replayMovementVirtualNowMs !== undefined &&
+      Number.isFinite(movementState.startTime) &&
+      Number.isFinite(replayMovementVirtualNowMs)
+    ) {
+      let moveStartMs = movementState.startTime;
+      if (
+        replayMovementEpochMs != null &&
+        Number.isFinite(replayMovementEpochMs) &&
+        moveStartMs >= REPLAY_WALL_CLOCK_START_TIME_THRESHOLD_MS
+      ) {
+        moveStartMs = moveStartMs - replayMovementEpochMs;
+      }
+      elapsed = Math.max(0, replayMovementVirtualNowMs - moveStartMs);
+    } else if (clientStartTime != null) {
+      elapsed = currentTime - clientStartTime;
+    } else {
+      return position;
+    }
+
     const progress = Math.min(elapsed / movementState.estimatedDuration, 1.0);
     
     let adjustedProgress = progress;
@@ -86,19 +130,47 @@ export const BattleBattalion = React.memo(({
       (movementState.targetPosition.y - movementState.startPosition.y) * adjustedProgress;
     
     return { x: smoothX, y: smoothY };
-  }, [movementState, position, currentTime, clientStartTime]);
-  
+  }, [movementState, position, currentTime, clientStartTime, replayMovementVirtualNowMs, replayMovementEpochMs]);
+
+  // Live: timing every smoothPosition tick (~60fps + polls). Replay: timing only when snapshot index advances
+  // (like a live poll boundary); otherwise setValue so virtual-clock lerp does not stack 32ms animations (Bugbot).
   React.useEffect(() => {
-    Animated.timing(animatedPosition, {
-      toValue: smoothPosition,
-      duration: ANIMATION_CONFIG.QUICK_SYNC_DURATION_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: false,
-    }).start();
-  }, [smoothPosition.x, smoothPosition.y, animatedPosition]);
-  
-  const [displayPosition, setDisplayPosition] = React.useState(position);
-  
+    if (!hasReplayVirtualClock) {
+      Animated.timing(animatedPosition, {
+        toValue: smoothPosition,
+        duration: ANIMATION_CONFIG.QUICK_SYNC_DURATION_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }).start();
+      return;
+    }
+
+    const idx = replaySnapshotFrameIndex;
+    const snapshotBoundary =
+      typeof idx === 'number' &&
+      idx !== replayMotionFrameRef.current;
+
+    if (snapshotBoundary) {
+      replayMotionFrameRef.current = idx;
+      Animated.timing(animatedPosition, {
+        toValue: smoothPosition,
+        duration: ANIMATION_CONFIG.QUICK_SYNC_DURATION_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }).start();
+      return;
+    }
+
+    animatedPosition.setValue(smoothPosition);
+    setDisplayPosition(smoothPosition);
+  }, [
+    smoothPosition.x,
+    smoothPosition.y,
+    animatedPosition,
+    hasReplayVirtualClock,
+    replaySnapshotFrameIndex,
+  ]);
+
   React.useEffect(() => {
     const listener = animatedPosition.addListener(({ x, y }) => {
       setDisplayPosition({ x, y });

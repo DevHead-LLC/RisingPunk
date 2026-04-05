@@ -16,6 +16,13 @@ import { DefenderDeploymentService } from './DefenderDeploymentService';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 import { sendBattleNotifications } from './BattleNotificationService';
 import { processPvPBattleMoneyTransfer } from './PvPBattleMoneyService';
+import { BattleReplayRecorder } from './BattleReplayRecorder';
+import {
+  detachHeadlessWorkingBattle,
+  getHeadlessWorkingBattle,
+  isHeadlessWorkingBattleActive,
+} from './HeadlessBattleRunner';
+import { MovementService } from './MovementService';
 
 export class BattleService {
   private timerService: BattleTimerService;
@@ -47,7 +54,8 @@ export class BattleService {
     unlockHackRigOnWin?: boolean,
     defenderNpcInstanceId?: string,
     hackMapCellX?: number,
-    hackMapCellY?: number
+    hackMapCellY?: number,
+    marchMeta?: { marchSourcedAttack: boolean; sourceMarchId: string }
   ): Promise<IBattleDocument> {
     try {
       const battle = await BattleSetupService.createBattle(
@@ -60,7 +68,8 @@ export class BattleService {
         unlockHackRigOnWin === true,
         defenderNpcInstanceId,
         hackMapCellX,
-        hackMapCellY
+        hackMapCellY,
+        marchMeta
       );
       
       ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);
@@ -68,7 +77,13 @@ export class BattleService {
       this.timerService.startTimer(battle.battleId);
       
       this.setupTimerListeners(battle.battleId);
-      
+
+      void BattleReplayRecorder.getInstance()
+        .onBattleCreated(battle)
+        .catch((err) => {
+          console.error('[BattleService] BattleReplayRecorder.onBattleCreated failed:', err);
+        });
+
       return battle;
     } catch (error) {
       throw error;
@@ -76,6 +91,10 @@ export class BattleService {
   }
   
   async getBattle(battleId: string): Promise<IBattleDocument | null> {
+    const w = getHeadlessWorkingBattle(battleId);
+    if (w) {
+      return w;
+    }
     return Battle.findOne({ battleId });
   }
   
@@ -83,15 +102,19 @@ export class BattleService {
     BattalionService.stopMovementUpdates(battleId);
     this.removeBattleListeners(battleId);
     
-    const battle = await Battle.findOne({ battleId });
-    if (!battle) return null;
+    const battle = getHeadlessWorkingBattle(battleId) ?? (await Battle.findOne({ battleId }));
+    if (!battle) {
+      detachHeadlessWorkingBattle(battleId);
+      return null;
+    }
     
     battle.phase = BattlePhase.COMPLETE;
     battle.winner = winner;
     battle.endTime = new Date();
     
     const updatedBattle = await battle.save();
-    
+    detachHeadlessWorkingBattle(battleId);
+
     BattalionService.clearTargetingResults(battleId);
     AttackService.clearBattleAttacks(battleId);
     AttackService.clearRetargetingQueueForBattle(battleId);
@@ -118,9 +141,12 @@ export class BattleService {
 
     events.forEach(({ name, handler }) => {
       const listener = (data: any) => {
-        if (data.battleId === battleId) handler(data);
+        if (data.battleId === battleId) {
+          return handler(data);
+        }
+        return undefined;
       };
-      
+
       this.timerService.on(name, listener);
       listeners.push({ event: name, handler: listener });
     });
@@ -146,10 +172,13 @@ export class BattleService {
   }
 
   private async updateBattle(battleId: string, updates: { countdown?: number; phase?: BattlePhase; battleTime?: number }): Promise<void> {
-    const battle = await Battle.findOne({ battleId });
+    const battle = await this.getBattle(battleId);
     if (!battle) return;
 
     Object.assign(battle, updates);
+    if (isHeadlessWorkingBattleActive(battleId)) {
+      return;
+    }
     await battle.save();
   }
 
@@ -171,6 +200,20 @@ export class BattleService {
       if (battle?.isUserDefender) {
         await DefenderDeploymentService.onTick(battleId);
       }
+      // Async march battles never hit BattleController.getBattleState; without this, targeting never
+      // starts and timer expiry yields a 0–0 tie → defender wins (Hack Failed, no casualties).
+      const marchSourced = (battle as { marchSourcedAttack?: boolean } | null)?.marchSourcedAttack === true;
+      if (marchSourced && battle && BattalionService.getTargetingResults(battleId).length === 0) {
+        await this.triggerInitialTargeting(battleId);
+        const primed = await this.getBattle(battleId);
+        if (primed) {
+          await MovementService.updateBattleMovement(
+            battleId,
+            primed,
+            BattalionService.getTargetingResults(battleId)
+          );
+        }
+      }
     }
   }
 
@@ -191,7 +234,10 @@ export class BattleService {
     BattalionService.stopMovementUpdates(battleId);
     
     const battle = await this.getBattle(battleId);
-    if (!battle) return;
+    if (!battle) {
+      BattleReplayRecorder.getInstance().abandonRecording(battleId);
+      return;
+    }
 
     // Check for complete elimination first
     const eliminationResult = CombatService.checkCompleteElimination(battle.battalions);
@@ -223,7 +269,8 @@ export class BattleService {
       endCondition = 'timer';
     }
 
-    // Store end condition and winner for response
+    // Store end condition and winner for response.
+    // Must persist before PvP money transfer (reads winner from MongoDB).
     (battle as any).endCondition = endCondition;
     battle.winner = winner;
     await battle.save();
@@ -251,17 +298,41 @@ export class BattleService {
     const npcInstanceId: string = (battle as any).defenderNpcInstanceId || '';
     
     if (npcSlug && winner === NodeOwner.USER) {
-      try {
-        if (npcInstanceId) {
+      if (npcInstanceId) {
+        try {
           await NPCRespawnService.clearNpcInstanceFromMap(npcInstanceId, 'main');
-          const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
-          const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
-          await NPCRespawnService.scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
-        } else {
-          console.warn('[BattleService.handleBattleEnd] Skipping NPC respawn schedule: battle has defenderNpcSlug but no defenderNpcInstanceId. Ensure the client sends defenderNpcInstanceId when starting an NPC battle.', { battleId, defenderNpcSlug: npcSlug });
+          try {
+            const npcDoc: any = await NPCService.getNPCBySlug(npcSlug);
+            const delay = typeof npcDoc?.mapRecoverySeconds === 'number' ? npcDoc.mapRecoverySeconds : 300;
+            await NPCRespawnService.scheduleRespawnForInstance(npcSlug, npcInstanceId, delay, 'main');
+          } catch (schedErr) {
+            console.error(
+              '[BattleService.handleBattleEnd] NPC respawn schedule failed (map already cleared):',
+              { battleId, npcSlug, npcInstanceId },
+              schedErr
+            );
+          }
+          try {
+            const { sweepQueuedMarchesAfterNpcInstanceDefeated } = await import(
+              './MarchNpcKnockoutSweepService'
+            );
+            await sweepQueuedMarchesAfterNpcInstanceDefeated(npcInstanceId);
+          } catch (sweepErr) {
+            console.error(
+              '[BattleService.handleBattleEnd] NPC knockout march sweep failed:',
+              { battleId, npcInstanceId },
+              sweepErr
+            );
+          }
+        } catch (clearErr) {
+          console.error(
+            '[BattleService.handleBattleEnd] NPC clear from map failed (knockout sweep skipped):',
+            { battleId, npcSlug, npcInstanceId },
+            clearErr
+          );
         }
-      } catch (error) {
-        console.error('[BattleService.handleBattleEnd] NPC respawn failed (battle will still complete):', { battleId, npcSlug, npcInstanceId: npcInstanceId || '(none)' }, error);
+      } else {
+        console.warn('[BattleService.handleBattleEnd] Skipping NPC respawn schedule: battle has defenderNpcSlug but no defenderNpcInstanceId. Ensure the client sends defenderNpcInstanceId when starting an NPC battle.', { battleId, defenderNpcSlug: npcSlug });
       }
     }
 
@@ -304,18 +375,83 @@ export class BattleService {
       } catch (e) {
         console.error('Battle notifications failed for', battleId, e);
       }
+
+      // March-sourced PvP: return leg + reconcile queue (NPC march uses the path inside NPC rewards)
+      const marchSourced = (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true;
+      if (marchSourced) {
+        try {
+          const { onMarchNpcBattleEnded } = await import('./MarchBattleFollowupService');
+          await onMarchNpcBattleEnded(battle);
+        } catch (marchFollowErr) {
+          console.error('[BattleService.handleBattleEnd] March follow-up (PvP) failed:', battleId, marchFollowErr);
+        }
+      }
     }
 
     // Process battle rewards and bot losses if this was a battle against an NPC
     if (npcSlug) {
       try {
-        const result = await BattleRewardService.processBattleRewards(battle, battle.attackerId);
+        const rewardResult = await BattleRewardService.processBattleRewards(battle, battle.attackerId);
+        if (rewardResult.success) {
+          try {
+            const { onMarchNpcBattleEnded } = await import('./MarchBattleFollowupService');
+            await onMarchNpcBattleEnded(battle);
+          } catch (marchFollowErr) {
+            console.error('[BattleService.handleBattleEnd] March follow-up failed:', battleId, marchFollowErr);
+          }
+        } else {
+          console.error(
+            '[BattleService.handleBattleEnd] NPC rewards failed; march follow-up skipped:',
+            battleId,
+            rewardResult.error
+          );
+        }
       } catch (e) {
         console.error('Battle reward processing failed for', battleId, e);
       }
+      try {
+        const battleForNpcDm = await this.getBattle(battleId);
+        if (battleForNpcDm && !battleForNpcDm.isUserDefender) {
+          const { sendNpcBattleNotification } = await import('./BattleNotificationService');
+          await sendNpcBattleNotification(battleForNpcDm);
+        }
+      } catch (dmErr) {
+        console.error('[BattleService.handleBattleEnd] NPC battle report DM failed:', battleId, dmErr);
+      }
     }
 
-    await this.endBattle(battleId, winner);
+    const completed = await this.endBattle(battleId, winner);
+    if (completed) {
+      await BattleReplayRecorder.getInstance().finalizeAfterBattleEnd(battleId, completed);
+    }
+  }
+
+  /**
+   * Stop timer/listeners/movement/replay capture and mark the battle COMPLETE with enemy win,
+   * without running `handleBattleEnd` (used when a march stays `resolving` too long).
+   */
+  async abandonMarchBattleRuntimeNoSettlement(battleId: string): Promise<void> {
+    BattalionService.stopMovementUpdates(battleId);
+    this.removeBattleListeners(battleId);
+    this.timerService.stopTimer(battleId);
+    BattalionService.clearTargetingResults(battleId);
+    AttackService.clearBattleAttacks(battleId);
+    AttackService.clearRetargetingQueueForBattle(battleId);
+    ScreenDimensionService.clearBattleScreenDimensions(battleId);
+    BattleReplayRecorder.getInstance().abandonRecording(battleId);
+    detachHeadlessWorkingBattle(battleId);
+
+    const battle = await Battle.findOne({ battleId });
+    if (!battle) {
+      return;
+    }
+    if (battle.phase === BattlePhase.COMPLETE) {
+      return;
+    }
+    battle.phase = BattlePhase.COMPLETE;
+    battle.winner = NodeOwner.ENEMY;
+    battle.endTime = new Date();
+    await battle.save();
   }
 
   private async unlockHackRigForUser(userId: string): Promise<void> {

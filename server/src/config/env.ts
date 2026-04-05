@@ -60,6 +60,55 @@ export const DESKTOP_LANDING_URL = process.env.DESKTOP_LANDING_URL || 'https://r
 export const MIN_APP_VERSION: string | undefined = process.env.MIN_APP_VERSION;
 export const RECOMMENDED_APP_VERSION: string | undefined = process.env.RECOMMENDED_APP_VERSION;
 
+/** When `true`, live battles persist one `battle_replays` document per fight (see BattleReplayRecorder). */
+export const ENABLE_BATTLE_REPLAY_RECORDING = process.env.ENABLE_BATTLE_REPLAY_RECORDING === 'true';
+
+/** When `true`, `POST /api/attack/launch` creates a persisted march instead of using only the legacy live battle path. */
+export const ENABLE_ASYNC_BATTLES = process.env.ENABLE_ASYNC_BATTLES === 'true';
+
+/**
+ * When `true` (with `ENABLE_ASYNC_BATTLES`), march-spawned battles drain countdown + 45s + movement via
+ * `BattleTimerService.runSyntheticTicksToCompletion` instead of wall-clock `setInterval`.
+ *
+ * If `ENABLE_ASYNC_BATTLES` is on but this is off, marches still work (targeting is primed on ACTIVE),
+ * but each battle burns ~48s wall-clock while the march icon sits on the target.
+ */
+export const ENABLE_HEADLESS_MARCH_BATTLE_RESOLUTION =
+  process.env.ENABLE_HEADLESS_MARCH_BATTLE_RESOLUTION === 'true';
+
+function parsePositiveIntMs(envName: string, fallbackMs: number, minMs: number): number {
+  const raw = process.env[envName];
+  if (raw === undefined || raw === '') {
+    return fallbackMs;
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < minMs) {
+    throw new Error(`${envName} must be unset or an integer >= ${minMs} (milliseconds)`);
+  }
+  return Math.floor(n);
+}
+
+/** Max age for `AttackMarch.state === 'resolving'` before watchdog refunds + abandons battle (default 5 min). */
+export const STALE_RESOLVING_MARCH_MS = parsePositiveIntMs('STALE_RESOLVING_MARCH_MS', 5 * 60 * 1000, 60_000);
+
+/** How often the stale-`resolving` watchdog runs (default 60s). */
+export const STALE_RESOLVING_WATCHDOG_INTERVAL_MS = parsePositiveIntMs(
+  'STALE_RESOLVING_WATCHDOG_INTERVAL_MS',
+  60_000,
+  10_000
+);
+
+/**
+ * Multi-instance (e.g. Elastic Beanstalk): in-process `setTimeout` for march arrival / return-complete
+ * only exists on the Node process that scheduled it. If that instance is replaced, overdue rows must be
+ * picked up from MongoDB. Each process runs this sweep on an interval (default 5s).
+ */
+export const ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS',
+  5_000,
+  1_000
+);
+
 // Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
 let cachedAdminIds: mongoose.Types.ObjectId[] | null = null;
 

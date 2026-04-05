@@ -26,6 +26,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trackAppReturned, trackFirstOpen, getAccountCreatedThisSession, clearAccountCreatedThisSession } from '../services/analyticsService';
 import { checkAppVersion } from '../services/appVersionService';
 import { UpdateRequiredScreen } from './UpdateRequiredScreen';
+import {
+  MARCH_TRANSITION_BANNER_DURATION_MS,
+  useAttackMarchTransitionBanners,
+} from '../hooks/useAttackMarchTransitionBanners';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -42,6 +46,8 @@ const AppContent = memo(() => {
   const appStateRef = useRef(AppState.currentState);
   const hasTrackedInitialOpenRef = useRef<boolean>(false);
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
+
+  const { marchBanner, dismissMarchBanner } = useAttackMarchTransitionBanners(token);
 
   // Function to center the turf view to home/digital barracks position
   const centerTurfView = useCallback(() => {
@@ -404,6 +410,13 @@ const AppContent = memo(() => {
         type="success"
         duration={5000}
         onClose={() => dispatch(setShowEmailVerificationBanner(false))}
+      />
+      <NotificationBanner
+        visible={!!marchBanner && !showEmailVerificationBanner}
+        message={marchBanner?.message ?? ''}
+        type={marchBanner?.type ?? 'info'}
+        duration={MARCH_TRANSITION_BANNER_DURATION_MS}
+        onClose={dismissMarchBanner}
       />
       <GlobalErrorModal
         visible={showGlobalError && !!token}

@@ -9,6 +9,7 @@ import { NodeHealthBar } from './NodeHealthBar';
 import { BattleLoadingError } from './BattleLoadingError';
 import { useBattleState } from '../../hooks/useBattleState';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import type { BattleState } from '../../../../shared/battleReplay';
 
 export interface NetworkConnection {
   from: number;
@@ -36,6 +37,11 @@ interface Props {
   lineColor?: string;
   lineWidth?: number;
   showNodeLabels?: boolean;
+  overrideBattleState?: BattleState | null;
+  /** Replay only: viewport-mapped next snapshot; paired with `replayTugBlendAlpha` for tug display. */
+  replayTugBlendTo?: BattleState | null;
+  /** Replay only: 0–1 between current frame `t` and next; `null`/`undefined` disables blending. */
+  replayTugBlendAlpha?: number | null;
 }
 
 export const BattleNetworkGrid = React.memo(({
@@ -44,6 +50,9 @@ export const BattleNetworkGrid = React.memo(({
   lineColor,
   lineWidth = 2,
   showNodeLabels = true,
+  overrideBattleState,
+  replayTugBlendTo,
+  replayTugBlendAlpha,
 }: Props) => {
   const colors = useThemeColors();
   const {
@@ -53,6 +62,7 @@ export const BattleNetworkGrid = React.memo(({
   } = useBattleState({
     battleId,
     pollingInterval: 1000,
+    overrideState: overrideBattleState,
   });
 
   useEffect(() => {
@@ -68,6 +78,11 @@ export const BattleNetworkGrid = React.memo(({
   const neutralNodes = React.useMemo(() => 
     nodes.filter(node => node.owner === 'neutral'), [nodes]
   );
+
+  const replayTugBlendNextByIndex = React.useMemo(() => {
+    if (!replayTugBlendTo?.nodes?.length) return null;
+    return new Map(replayTugBlendTo.nodes.map((n) => [n.index, n]));
+  }, [replayTugBlendTo]);
 
   const getNodeColor = React.useCallback((owner: 'user' | 'enemy' | 'neutral'): string => {
     switch (owner) {
@@ -115,7 +130,24 @@ export const BattleNetworkGrid = React.memo(({
           );
         })}
 
-        {nodes?.map((node) => (
+        {nodes?.map((node) => {
+          let healthBarNode = node;
+          if (
+            replayTugBlendAlpha != null &&
+            replayTugBlendNextByIndex != null &&
+            node.owner === 'neutral'
+          ) {
+            const nxt = replayTugBlendNextByIndex.get(node.index);
+            if (nxt != null && nxt.owner === 'neutral') {
+              healthBarNode = {
+                ...node,
+                tugOfWarProgress:
+                  node.tugOfWarProgress +
+                  (nxt.tugOfWarProgress - node.tugOfWarProgress) * replayTugBlendAlpha,
+              };
+            }
+          }
+          return (
           <React.Fragment key={node.index}>
             <View
               style={[
@@ -145,13 +177,28 @@ export const BattleNetworkGrid = React.memo(({
             </View>
             
             {node.owner === 'neutral' && (
-              <NodeHealthBar node={node} />
+              <NodeHealthBar node={healthBarNode} />
             )}
           </React.Fragment>
-        ))}
+          );
+        })}
       </View>
     );
-  }, [battleState, lineWidth, lineColor, nodeSize, showNodeLabels, nodes, connections, lineProperties, colors, getNodeColor, getNodeBorderColor]);
+  }, [
+    battleState,
+    lineWidth,
+    lineColor,
+    nodeSize,
+    showNodeLabels,
+    nodes,
+    connections,
+    lineProperties,
+    colors,
+    getNodeColor,
+    getNodeBorderColor,
+    replayTugBlendAlpha,
+    replayTugBlendNextByIndex,
+  ]);
 
   return (
     <BattleLoadingError

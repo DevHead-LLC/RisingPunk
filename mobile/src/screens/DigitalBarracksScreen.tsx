@@ -20,6 +20,7 @@ import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { formatBotStatValue, formatNumber } from '../utils/formatUtils';
 import { BOT_FAMILY_ORDER, MARK2_DISPLAY_NAMES } from '../utils/botInventory';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
+import { HackExpeditionCommitmentBanner } from '../components/common/HackExpeditionCommitmentBanner';
 
 type MarkLevel = 1 | 2 | 3 | 4;
 
@@ -258,6 +259,8 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
       </View>
 
       <Text style={styles.title}>Digital Barracks</Text>
+
+      <HackExpeditionCommitmentBanner />
 
       <View style={styles.markSelector}>
         {[1, 2, 3, 4].map((mark) => {

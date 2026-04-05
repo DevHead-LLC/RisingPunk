@@ -11,6 +11,13 @@ import {
   BATTLE_REPORT_SENDER_ID,
   BATTLE_REPORT_SENDER_USERNAME,
 } from '../constants/systemSenders';
+import {
+  applyRetentionAfterAdminSendAll,
+  applyRetentionAfterInsert,
+} from '../services/PrivateMessageRetentionService';
+import { MAX_PM_MESSAGES_PER_THREAD } from '../constants/privateMessageCaps';
+import { listConversationsForUser, dismissThreadForUser, touchInboxThreadOnOpen } from '../services/PrivateInboxService';
+import '../models/PrivateInboxThread';
 
 const router = express.Router();
 
@@ -57,9 +64,7 @@ const PM_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const PM_RATE_LIMIT_MAX = 10;
 const pmRateLimit = new Map<string, { count: number; windowStartMs: number }>();
 
-/** Max conversation rows returned per user for the inbox list (FIFO eviction of older threads is separate). */
-const CONVERSATION_LIST_LIMIT = 10;
-const THREAD_MESSAGE_LIMIT = 20;
+const THREAD_MESSAGE_LIMIT = MAX_PM_MESSAGES_PER_THREAD;
 
 function evictExpiredPmRateLimit(nowMs: number): void {
   for (const [key, val] of pmRateLimit.entries()) {
@@ -69,20 +74,7 @@ function evictExpiredPmRateLimit(nowMs: number): void {
   }
 }
 
-/** 24-char hex MongoDB ObjectId (optional :broadcast suffix for conversation key). */
-const VALID_CONVERSATION_KEY = /^[a-f0-9]{24}(:broadcast)?$/i;
-
-function getConversationKeyString(row: any): string {
-  const raw = row._id;
-  if (raw == null) return '';
-  let s: string;
-  if (typeof raw === 'string') s = raw;
-  else if (typeof (raw as any).toString === 'function') s = (raw as any).toString();
-  else s = String(raw);
-  return s.trim();
-}
-
-// GET /conversations — list conversations; admin broadcast is a separate "Announcements" thread so 1-on-1 stays separate
+// GET /conversations — per-user inbox (PrivateInboxThread); top MAX_PM_THREADS by activity; no shared thread deletion
 router.get('/conversations', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -92,231 +84,57 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
     }
 
     const userIdStr = String(userId);
-    const userIdObj = typeof userId === 'string'
-      ? new mongoose.Types.ObjectId(userId)
-      : (userId as mongoose.Types.ObjectId);
-
-    const rawCount = await PrivateMessage.countDocuments({
-      $or: [{ senderId: userIdObj }, { recipientId: userIdObj }],
-    });
 
     const user = await User.findById(userId).select('blockedUserIds').lean();
     const adminIds = getAdminUserIds();
     const adminIdSet = new Set(adminIds.map((id) => id.toString()));
-    // Exclude admins from block filter so admin broadcasts always appear
     const blockedList = (user?.blockedUserIds || [])
       .map((id: unknown) => new mongoose.Types.ObjectId(String(id)))
       .filter((id) => !adminIdSet.has(id.toString()));
 
-    // Send-all rows group as `…:broadcast`. If we $limit before filtering out only **our** outbound broadcast
-    // threads, the "top 10" can all be `recipientId:broadcast` (each send-all) and the post-filter removed every
-    // row — empty inbox for the sending admin despite DB rows.
-    // Hide **only** threads where this user was the sender of the latest message in a `:broadcast` group (our
-    // send-all "per-recipient" rows). Do **not** hide `adminOther:broadcast` when we are another admin receiving
-    // that admin's announcement (lastSenderId is the other admin, not us).
-    const hideMyOutboundBroadcastThreads = [
-      {
-        $match: {
-          $expr: {
-            $or: [
-              {
-                $not: {
-                  $regexMatch: {
-                    input: { $toString: '$_id' },
-                    regex: ':broadcast$',
-                  },
-                },
-              },
-              {
-                $ne: [{ $toString: { $ifNull: ['$lastSenderId', ''] } }, userIdStr],
-              },
-            ],
-          },
-        },
-      },
-    ];
-
-    const pipeline: any[] = [
-      { $match: { $or: [{ senderId: userIdObj }, { recipientId: userIdObj }] } },
-      { $addFields: {
-        otherId: { $cond: [{ $eq: ['$senderId', userIdObj] }, '$recipientId', '$senderId'] },
-        groupKey: {
-          $cond: [
-            // Admin sent broadcast to otherId → separate :broadcast thread (listed for recipients; hidden from admin inbox via $match above)
-            {
-              $and: [
-                { $eq: ['$senderId', userIdObj] },
-                { $eq: ['$isAdminBroadcast', true] },
-              ],
-            },
-            { $concat: [{ $toString: '$otherId' }, ':broadcast'] },
-            {
-              ['$cond']: [
-                // Recipient view: broadcast from otherId (admin) → announcements thread
-                {
-                  $and: [
-                    { $eq: ['$senderId', '$otherId'] },
-                    { $eq: ['$isAdminBroadcast', true] },
-                  ],
-                },
-                { $concat: [{ $toString: '$otherId' }, ':broadcast'] },
-                { $toString: '$otherId' },
-              ],
-            },
-          ],
-        },
-      } },
-      // Admin broadcasts bypass block filter; other conversations respect blockedList
-      ...(blockedList.length > 0
-        ? [{ $match: { $or: [{ otherId: { $nin: blockedList } }, { isAdminBroadcast: true }] } }]
-        : []),
-      { $sort: { createdAt: -1 } },
-      { $group: {
-        _id: { $toString: '$groupKey' },
-        lastMessage: { $first: '$message' },
-        lastAt: { $first: '$createdAt' },
-        lastSenderId: { $first: '$senderId' },
-        lastIsAdminBroadcast: { $first: '$isAdminBroadcast' },
-        unreadCount: { $sum: { $cond: [
-          { $and: [{ $eq: ['$recipientId', userIdObj] }, { $eq: ['$readAt', null] }] },
-          1,
-          0,
-        ] } },
-      } },
-      ...hideMyOutboundBroadcastThreads,
-      { $sort: { lastAt: -1 } },
-      { $limit: CONVERSATION_LIST_LIMIT },
-    ];
-    let aggregated = await PrivateMessage.aggregate(pipeline);
-
-    async function runFallback(): Promise<typeof aggregated> {
-      const fallbackDocs = await PrivateMessage.find({
-        $or: [{ senderId: userIdObj }, { recipientId: userIdObj }],
-      })
-        .sort({ createdAt: -1 })
-        .limit(100)
-        .lean();
-      const blockedSet = new Set(blockedList.map((id) => id.toString()));
-      const groupMap = new Map<
-        string,
-        { lastMessage: string; lastAt: Date; lastSenderId: unknown; lastIsAdminBroadcast: boolean; unreadCount: number }
-      >();
-      for (const doc of fallbackDocs as any[]) {
-        const otherId =
-          String(doc.senderId) === String(userId) ? doc.recipientId : doc.senderId;
-        const otherIdStr = String(otherId);
-        if (blockedSet.has(otherIdStr) && doc.isAdminBroadcast !== true) continue; // admin broadcasts bypass block
-        // Broadcast thread: either current user received broadcast from otherId, or current user (admin) sent broadcast to otherId
-        const isBroadcast =
-          doc.isAdminBroadcast === true &&
-          (String(doc.senderId) === otherIdStr || String(doc.senderId) === String(userId));
-        const groupKey = isBroadcast ? `${otherIdStr}:broadcast` : otherIdStr;
-        const isUnread =
-          doc.recipientId && String(doc.recipientId) === String(userId) && !doc.readAt;
-        if (!groupMap.has(groupKey)) {
-          groupMap.set(groupKey, {
-            lastMessage: doc.message,
-            lastAt: doc.createdAt,
-            lastSenderId: doc.senderId,
-            lastIsAdminBroadcast: !!doc.isAdminBroadcast,
-            unreadCount: isUnread ? 1 : 0,
-          });
-        } else {
-          const g = groupMap.get(groupKey)!;
-          if (isUnread) g.unreadCount += 1;
-        }
-      }
-      const rows = Array.from(groupMap.entries())
-        .map(([_id, g]) => ({
-          _id,
-          lastMessage: g.lastMessage,
-          lastAt: g.lastAt,
-          lastSenderId: g.lastSenderId,
-          lastIsAdminBroadcast: g.lastIsAdminBroadcast,
-          unreadCount: g.unreadCount,
-        }))
-        .filter((row) => {
-          const id = String(row._id);
-          if (!id.endsWith(':broadcast')) return true;
-          const last = row.lastSenderId != null ? String(row.lastSenderId) : '';
-          return last !== userIdStr;
-        })
-        .sort((a, b) => new Date((b as any).lastAt).getTime() - new Date((a as any).lastAt).getTime());
-      return rows.slice(0, CONVERSATION_LIST_LIMIT);
-    }
-
-    if (aggregated.length === 0) {
-      aggregated = await runFallback();
-    }
-
-    const currentUserStr = userIdStr;
-
-    let filtered = aggregated.filter((row: any) => {
-      const key = getConversationKeyString(row);
-      const isBroadcast = key.endsWith(':broadcast');
-      if (!key || !VALID_CONVERSATION_KEY.test(key)) return false;
-      if (isBroadcast) {
-        const lastSender = row.lastSenderId != null ? String(row.lastSenderId) : '';
-        if (lastSender === currentUserStr) return false;
-      }
-      return true;
+    const rows = await listConversationsForUser(userIdStr, {
+      blockedObjectIds: blockedList,
+      adminIdSet,
+      probeReportSenderIdStr: PROBE_REPORT_SENDER_ID.toString(),
+      battleReportSenderIdStr: BATTLE_REPORT_SENDER_ID.toString(),
+      conversationListLastMessagePreview,
+      getBattleReportPreview,
     });
 
-    // Aggregation can return _id as object (driver/BSON); fallback builds string _id so list displays
-    if (filtered.length === 0 && rawCount > 0 && aggregated.length > 0) {
-      aggregated = await runFallback();
-      filtered = aggregated.filter((row: any) => {
-        const key = getConversationKeyString(row);
-        const isBroadcast = key.endsWith(':broadcast');
-        if (!key || !VALID_CONVERSATION_KEY.test(key)) return false;
-        if (isBroadcast) {
-          const lastSender = row.lastSenderId != null ? String(row.lastSenderId) : '';
-          if (lastSender === currentUserStr) return false;
-        }
-        return true;
-      });
-    }
+    const conversations = rows.map((row) => ({
+      otherUserId: row.otherUserId,
+      otherUsername: row.otherUsername,
+      lastMessage: row.lastMessage,
+      lastAt: row.lastAt.toISOString(),
+      unreadCount: row.unreadCount,
+      isBroadcast: row.isBroadcast,
+    }));
 
-    const probeReportSenderIdStr = PROBE_REPORT_SENDER_ID.toString();
-    const battleReportSenderIdStr = BATTLE_REPORT_SENDER_ID.toString();
-    const withUsernames = await Promise.all(
-      filtered
-        .map(async (row: any) => {
-          const key = getConversationKeyString(row);
-          const keyIsBroadcast = key.endsWith(':broadcast');
-          const otherUserIdFromKey = keyIsBroadcast ? key.slice(0, -':broadcast'.length) : key;
-          const isBroadcast =
-            keyIsBroadcast || (row.lastIsAdminBroadcast === true && adminIdSet.has(otherUserIdFromKey));
-          const isProbeReport = otherUserIdFromKey === probeReportSenderIdStr;
-          const isBattleReport = otherUserIdFromKey === battleReportSenderIdStr;
-          const other =
-            isProbeReport || isBattleReport
-              ? null
-              : await User.findById(new mongoose.Types.ObjectId(otherUserIdFromKey)).select('handle').lean();
-          const otherUsername = isBroadcast
-            ? 'RisingPunk (Announcements)'
-            : isProbeReport
-              ? PROBE_REPORT_SENDER_USERNAME
-              : isBattleReport
-                ? BATTLE_REPORT_SENDER_USERNAME
-                : (other?.handle ?? 'Unknown');
-          const lastMessage = isBattleReport
-            ? getBattleReportPreview(row.lastMessage, currentUserStr)
-            : conversationListLastMessagePreview(row.lastMessage, isProbeReport);
-          return {
-            otherUserId: otherUserIdFromKey,
-            otherUsername,
-            lastMessage,
-            lastAt: row.lastAt,
-            unreadCount: row.unreadCount ?? 0,
-            isBroadcast: !!isBroadcast || isProbeReport || isBattleReport,
-          };
-        }),
-    );
-
-    res.json({ success: true, conversations: withUsernames });
+    res.json({ success: true, conversations });
   } catch (error: any) {
     console.error('Error listing PM conversations:', error?.message ?? error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /conversations/:otherUserId — remove thread from this user's inbox; purge DB when both parties released (see PrivateInboxService)
+router.delete('/conversations/:otherUserId', auth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+    const otherUserId = req.params.otherUserId;
+    if (!otherUserId || !mongoose.Types.ObjectId.isValid(otherUserId)) {
+      res.status(400).json({ error: 'Valid other user ID is required' });
+      return;
+    }
+    const broadcastOnly = req.query.broadcastOnly === 'true';
+    await dismissThreadForUser(String(userId), otherUserId, broadcastOnly);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error dismissing PM conversation:', error?.message ?? error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -384,6 +202,14 @@ router.get('/conversations/:otherUserId/messages', auth, async (req: Request, re
       isFromAdmin: msg.isFromAdmin ?? false,
       isAdminBroadcast: msg.isAdminBroadcast ?? false,
     }));
+
+    if (formatted.length > 0) {
+      try {
+        await touchInboxThreadOnOpen(String(userId), otherUserId, broadcastOnly);
+      } catch (touchErr: any) {
+        console.error('touch inbox on open:', touchErr?.message ?? touchErr);
+      }
+    }
 
     res.json({ success: true, messages: formatted });
   } catch (error: any) {
@@ -478,6 +304,12 @@ router.post('/conversations/:recipientId/messages', auth, async (req: Request, r
     });
     await doc.save();
 
+    try {
+      await applyRetentionAfterInsert(doc.toObject() as any);
+    } catch (retentionErr: any) {
+      console.error('PM retention after send:', retentionErr?.message ?? retentionErr);
+    }
+
     res.json({
       success: true,
       message: {
@@ -560,6 +392,14 @@ router.post('/admin/send-all', auth, async (req: Request, res: Response) => {
     }));
     if (docs.length > 0) {
       await PrivateMessage.insertMany(docs);
+      try {
+        await applyRetentionAfterAdminSendAll(
+          userId,
+          docs.map((d: { recipientId: mongoose.Types.ObjectId }) => String(d.recipientId)),
+        );
+      } catch (retentionErr: any) {
+        console.error('PM retention after send-all:', retentionErr?.message ?? retentionErr);
+      }
     }
 
     res.json({ success: true, sentCount: docs.length });
