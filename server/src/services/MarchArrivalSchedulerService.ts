@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { ENABLE_ASYNC_BATTLES } from '../config/env';
+import { ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS, ENABLE_ASYNC_BATTLES } from '../config/env';
 import { AttackMarch } from '../models/AttackMarch';
 import type { AttackMarchArmySnapshot } from '../types/attackMarch';
 import { consumedRowsMatchArmySnapshot } from './AttackMarchLaunchService';
@@ -301,4 +301,59 @@ export async function rescheduleArrivedMarchBattleStarts(): Promise<void> {
       await tryStartNextMarchResolutionForQueueKey(key);
     });
   }
+}
+
+const DUE_SWEEP_BATCH_LIMIT = 100;
+let dueSweepInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Catches marches whose `setTimeout` lived on another instance or was lost on crash/deploy.
+ * Safe to run on every instance; `processMarchArrival` / `processReturnMarchComplete` are state-checked.
+ */
+export async function sweepAttackMarchesPastDueDates(): Promise<void> {
+  if (!ENABLE_ASYNC_BATTLES) {
+    return;
+  }
+  const now = new Date();
+
+  const overdueOutbound = await AttackMarch.find({
+    state: 'outbound',
+    arriveAt: { $lte: now },
+  })
+    .select('marchId')
+    .sort({ arriveAt: 1, marchId: 1 })
+    .limit(DUE_SWEEP_BATCH_LIMIT)
+    .lean();
+
+  for (const m of overdueOutbound) {
+    if (m.marchId) {
+      void processMarchArrival(m.marchId);
+    }
+  }
+
+  const overdueReturning = await AttackMarch.find({
+    state: 'returning',
+    returnArriveAt: { $lte: now },
+  })
+    .select('marchId')
+    .sort({ returnArriveAt: 1, marchId: 1 })
+    .limit(DUE_SWEEP_BATCH_LIMIT)
+    .lean();
+
+  for (const m of overdueReturning) {
+    if (m.marchId) {
+      void processReturnMarchComplete(m.marchId);
+    }
+  }
+}
+
+export function startAttackMarchDueSweepWatchdog(): void {
+  if (!ENABLE_ASYNC_BATTLES || dueSweepInterval) {
+    return;
+  }
+  dueSweepInterval = setInterval(() => {
+    void sweepAttackMarchesPastDueDates().catch((err) =>
+      console.error('[MarchDueSweep] tick failed:', err)
+    );
+  }, ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS);
 }
