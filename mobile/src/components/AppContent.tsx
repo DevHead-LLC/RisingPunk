@@ -25,7 +25,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trackAppReturned, trackFirstOpen, getAccountCreatedThisSession, clearAccountCreatedThisSession } from '../services/analyticsService';
 import { checkAppVersion } from '../services/appVersionService';
 import { UpdateRequiredScreen } from './UpdateRequiredScreen';
-import { useAttackMarchTransitionBanners } from '../hooks/useAttackMarchTransitionBanners';
+import {
+  MARCH_TRANSITION_BANNER_DURATION_MS,
+  useAttackMarchTransitionBanners,
+} from '../hooks/useAttackMarchTransitionBanners';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -409,7 +412,7 @@ const AppContent = memo(() => {
         visible={!!marchBanner && !showEmailVerificationBanner}
         message={marchBanner?.message ?? ''}
         type={marchBanner?.type ?? 'info'}
-        duration={6000}
+        duration={MARCH_TRANSITION_BANNER_DURATION_MS}
         onClose={dismissMarchBanner}
       />
       <GlobalErrorModal
