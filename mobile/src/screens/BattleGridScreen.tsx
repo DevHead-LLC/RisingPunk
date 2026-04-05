@@ -3,7 +3,7 @@
  * @description Main battle screen container - orchestrates battle components (live poll or replay playback).
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   SafeAreaView,
@@ -13,7 +13,6 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { ANIMATION_CONFIG } from '../config';
 import { useAppSelector } from '../store/hooks';
 import { BattleNetworkGrid } from '../components/battle/BattleNetworkGrid';
 import { BattleBattalionManager } from '../components/battle/BattleBattalionManager';
@@ -69,43 +68,11 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
   const battalionSize = Math.max(12, Math.round(35 * layoutScale));
 
   /**
-   * Replay node‑grid throttle (BattleNetworkGrid only):
-   * Live grid polls at 1000ms; replay snapshots are 250ms — 4× more frequent — so
-   * node ownership / tug‑of‑war changes appeared unrealistically fast without pacing.
-   *
-   * BattleBattalionManager receives UN‑THROTTLED viewportBattleState so movementState
-   * (startTime, target, duration) updates every ~250ms snapshot. The 60fps
-   * replayMovementVirtualNowMs interpolates within each segment; throttling movementState
-   * to 2000ms caused battalions to finish a segment then snap when the held state released.
+   * Replay: grid and battalions must use the same `viewportBattleState` per snapshot.
+   * A prior experiment throttled only BattleNetworkGrid to ~2s game time (live poll pace)
+   * while battalions stayed on ~250ms frames — two timelines: units moved/retargeted on
+   * fresh `nodes` while the tug bar lagged, so capture looked “done” before the bar hit 100%.
    */
-  const gridThrottleRef = useRef<{
-    state: ReturnType<typeof mapBattleStateToViewport> | null;
-    gameTimeMs: number;
-  }>({ state: null, gameTimeMs: 0 });
-  const gridThrottleBattleIdRef = useRef(battleId);
-  if (gridThrottleBattleIdRef.current !== battleId) {
-    gridThrottleBattleIdRef.current = battleId;
-    gridThrottleRef.current = { state: null, gameTimeMs: 0 };
-  }
-
-  let replayGridState = viewportBattleState;
-  if (isReplay && viewportBattleState) {
-    const ref = gridThrottleRef.current;
-    const virtualNow = replay.replayVirtualNowMs ?? 0;
-
-    if (
-      viewportBattleState.phase === 'battle' &&
-      ref.state?.phase === 'battle' &&
-      virtualNow - ref.gameTimeMs < ANIMATION_CONFIG.BATTLE_PHASE_POLLING_MS
-    ) {
-      replayGridState = ref.state;
-    } else {
-      gridThrottleRef.current = {
-        state: viewportBattleState,
-        gameTimeMs: virtualNow,
-      };
-    }
-  }
 
   const handleUserWin = useCallback(() => {
     if (isReplay) return;
@@ -213,8 +180,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
     );
   }
 
-  const gridOverride = isReplay ? replayGridState : undefined;
-  const unthrottledOverride = isReplay ? viewportBattleState : undefined;
+  const replayBattleStateOverride = isReplay ? viewportBattleState : undefined;
 
   return (
     <SafeAreaView style={themeStyles.container} testID="battle-grid-screen">
@@ -234,7 +200,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
           battleId={battleId}
           onClose={_onClose}
           onUserWin={handleUserWin}
-          overrideBattleState={unthrottledOverride}
+          overrideBattleState={replayBattleStateOverride}
           isReplay={isReplay}
         />
 
@@ -249,16 +215,17 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
             nodeSize={nodeSize}
             lineWidth={lineW}
             showNodeLabels={true}
-            overrideBattleState={gridOverride}
+            overrideBattleState={replayBattleStateOverride}
           />
 
           <BattleBattalionManager
             battleId={battleId}
             battalionSize={battalionSize}
             showHealthBars={true}
-            overrideBattleState={unthrottledOverride}
+            overrideBattleState={replayBattleStateOverride}
             replayMovementVirtualNowMs={isReplay ? replay.replayVirtualNowMs : undefined}
             replayMovementEpochMs={isReplay ? replay.replayDoc?.recordingEpochMs : undefined}
+            replaySnapshotFrameIndex={isReplay ? replay.frameIndex : undefined}
           />
         </View>
       </View>

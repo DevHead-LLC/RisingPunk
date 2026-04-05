@@ -42,6 +42,11 @@ interface Props {
    * frame `t` (live capture uses Unix `Date.now()`; headless uses virtual ms — below threshold, no subtract).
    */
   replayMovementEpochMs?: number;
+  /**
+   * Replay: snapshot index from `useReplayPlayback`. Used to apply the same **`Animated.timing`** blend live gets
+   * on each poll only when a **new snapshot** arrives; intra-snapshot motion stays **`setValue`** (~60fps) so timings don’t stack.
+   */
+  replaySnapshotFrameIndex?: number;
 }
 
 export const BattleBattalion = React.memo(({
@@ -52,12 +57,14 @@ export const BattleBattalion = React.memo(({
   showHealthBar = true,
   replayMovementVirtualNowMs,
   replayMovementEpochMs,
+  replaySnapshotFrameIndex,
 }: Props) => {
   const colors = useThemeColors();
   const animatedPosition = React.useRef(new Animated.ValueXY(position)).current;
   const [currentTime, setCurrentTime] = React.useState(Date.now());
   const [clientStartTime, setClientStartTime] = React.useState<number | null>(null);
   const [displayPosition, setDisplayPosition] = React.useState(position);
+  const replayMotionFrameRef = React.useRef<number>(-1);
   /** Stable for effect deps — virtual `now` updates ~60fps in replay; undefined-vs-number is enough to gate live timers. */
   const hasReplayVirtualClock = replayMovementVirtualNowMs !== undefined;
 
@@ -125,20 +132,44 @@ export const BattleBattalion = React.memo(({
     return { x: smoothX, y: smoothY };
   }, [movementState, position, currentTime, clientStartTime, replayMovementVirtualNowMs, replayMovementEpochMs]);
 
-  // Replay: smoothPosition updates ~60fps; QUICK_SYNC timing lags behind and stacks — causes jitter/jumps (Bugbot).
+  // Live: timing every smoothPosition tick (~60fps + polls). Replay: timing only when snapshot index advances
+  // (like a live poll boundary); otherwise setValue so virtual-clock lerp does not stack 32ms animations (Bugbot).
   React.useEffect(() => {
-    if (hasReplayVirtualClock) {
-      animatedPosition.setValue(smoothPosition);
-      setDisplayPosition(smoothPosition);
+    if (!hasReplayVirtualClock) {
+      Animated.timing(animatedPosition, {
+        toValue: smoothPosition,
+        duration: ANIMATION_CONFIG.QUICK_SYNC_DURATION_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }).start();
       return;
     }
-    Animated.timing(animatedPosition, {
-      toValue: smoothPosition,
-      duration: ANIMATION_CONFIG.QUICK_SYNC_DURATION_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: false,
-    }).start();
-  }, [smoothPosition.x, smoothPosition.y, animatedPosition, hasReplayVirtualClock]);
+
+    const idx = replaySnapshotFrameIndex;
+    const snapshotBoundary =
+      typeof idx === 'number' &&
+      idx !== replayMotionFrameRef.current;
+
+    if (snapshotBoundary) {
+      replayMotionFrameRef.current = idx;
+      Animated.timing(animatedPosition, {
+        toValue: smoothPosition,
+        duration: ANIMATION_CONFIG.QUICK_SYNC_DURATION_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      }).start();
+      return;
+    }
+
+    animatedPosition.setValue(smoothPosition);
+    setDisplayPosition(smoothPosition);
+  }, [
+    smoothPosition.x,
+    smoothPosition.y,
+    animatedPosition,
+    hasReplayVirtualClock,
+    replaySnapshotFrameIndex,
+  ]);
 
   React.useEffect(() => {
     const listener = animatedPosition.addListener(({ x, y }) => {
