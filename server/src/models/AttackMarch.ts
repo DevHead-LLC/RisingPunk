@@ -92,6 +92,8 @@ const attackMarchSchema = new Schema<IAttackMarchDocument>(
 attackMarchSchema.index({ defenderId: 1, state: 1 });
 attackMarchSchema.index({ attackerId: 1, state: 1 });
 attackMarchSchema.index({ arriveAt: 1 });
+attackMarchSchema.index({ state: 1, arriveAt: 1 });
+attackMarchSchema.index({ state: 1, returnArriveAt: 1 });
 attackMarchSchema.index({ defenderQueueKey: 1, state: 1 });
 attackMarchSchema.index({ state: 1, resolvingSince: 1 });
 

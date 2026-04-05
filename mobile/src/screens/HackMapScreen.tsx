@@ -1367,9 +1367,14 @@ export const HackMapScreen: React.FC<Props> = ({
           if (nextById.has(p.marchId)) continue;
           const inst = p.defenderNpcInstanceId;
           const npcTarget = typeof inst === 'string' && inst.trim() !== '';
+          // Include `returning`: row leaves /attack/active when state becomes `done` (not map-visible).
+          // Without this, client last saw `returning` then empty list → no invalidation → ghost NPC until unrelated refetch.
           if (
             npcTarget &&
-            (p.state === 'outbound' || p.state === 'arrived' || p.state === 'queued')
+            (p.state === 'outbound' ||
+              p.state === 'arrived' ||
+              p.state === 'queued' ||
+              p.state === 'returning')
           ) {
             shouldInvalidate = true;
             break;
@@ -1386,8 +1391,12 @@ export const HackMapScreen: React.FC<Props> = ({
           if (!npcTarget) continue;
           const n = nextById.get(p.marchId);
           if (!n) continue;
+          // Include `outbound`: fast resolution can skip client-visible arrived/queued/resolving between polls.
           const wasPreReturn =
-            p.state === 'arrived' || p.state === 'resolving' || p.state === 'queued';
+            p.state === 'outbound' ||
+            p.state === 'arrived' ||
+            p.state === 'resolving' ||
+            p.state === 'queued';
           const nowReturnOrComplete = n.state === 'returning' || n.state === 'done';
           if (wasPreReturn && nowReturnOrComplete && p.state !== n.state) {
             shouldInvalidate = true;
