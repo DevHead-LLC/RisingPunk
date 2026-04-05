@@ -114,6 +114,9 @@ export interface IBattle extends Document {
   /** Map cell X/Y when battle was started from Hack Map (optional). */
   hackMapCellX?: number;
   hackMapCellY?: number;
+  /** Set when battle was created from an async attack march (bots deducted at launch). */
+  marchSourcedAttack?: boolean;
+  sourceMarchId?: string;
   defenderDeployedTotals?: {
     guardian: number;
     breacher: number;

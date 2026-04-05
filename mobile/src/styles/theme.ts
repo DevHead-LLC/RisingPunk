@@ -102,8 +102,10 @@ export const LIGHT_COLORS = {
   },
   error: '#B71C1C', // Darker red for better contrast
   success: '#2E7D32', // Dark green for success states
+  successDark: '#1B5E20',
   neutral: '#2E2E2E', // Darker neutral for better readability
   border: '#4717F6', // Blue border for consistency
+  modalBorder: '#BDBDBD',
 };
 
 export const COLORS = DARK_COLORS; // Default to dark theme for backward compatibility

@@ -13,6 +13,7 @@ import { BattleEndOverlay } from './BattleEndOverlay';
 import { BattlePhase } from '../../types/battleTypes';
 import { NodeOwner } from '../../types/battleTypes';
 import { BATTLE_CONFIG } from '../../config/battleConstants';
+import type { BattleState } from '../../../../shared/battleReplay';
 
 // Server phase types (from server/src/types/battle.ts)
 type ServerPhase = 'setup' | 'countdown' | 'active' | 'battle' | 'victory' | 'defeat' | 'complete';
@@ -40,12 +41,18 @@ interface BattleOverlayManagerProps {
   onClose?: () => void;
   /** Called once when this battle ends with the user as winner (e.g. to show a one-time review prompt). */
   onUserWin?: () => void;
+  /** Replay: drive overlays from this snapshot instead of polling. */
+  overrideBattleState?: BattleState | null;
+  /** When true, skip review prompt / live-only side effects. */
+  isReplay?: boolean;
 }
 
 export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
   battleId,
   onClose,
   onUserWin,
+  overrideBattleState,
+  isReplay = false,
 }) => {
   // Track logged errors to prevent spam
   const loggedErrors = useRef<Set<string>>(new Set());
@@ -59,6 +66,7 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
   } = useBattleState({
     battleId,
     pollingInterval: 5000, // Reduced from 1000ms to 5 seconds
+    overrideState: overrideBattleState,
   });
 
   // SIMPLE LOG: Only log problems (once per error)
@@ -112,6 +120,7 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
 
   // Notify parent once when user wins this battle (for one-time review prompt)
   useEffect(() => {
+    if (isReplay) return;
     if (
       phaseData?.clientPhase === BattlePhase.COMPLETE &&
       battleState?.winner === 'user' &&
@@ -121,7 +130,7 @@ export const BattleOverlayManager: React.FC<BattleOverlayManagerProps> = ({
       userWinNotifiedRef.current = true;
       onUserWin();
     }
-  }, [phaseData?.clientPhase, battleState?.winner, onUserWin]);
+  }, [phaseData?.clientPhase, battleState?.winner, onUserWin, isReplay]);
 
   const renderOverlays = React.useMemo(() => {
     if (!phaseData) return null;

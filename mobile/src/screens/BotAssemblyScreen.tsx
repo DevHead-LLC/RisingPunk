@@ -21,6 +21,7 @@ import { BuildSection } from '../components/botAssembly/BuildSection';
 import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
+import { HackExpeditionCommitmentBanner } from '../components/common/HackExpeditionCommitmentBanner';
 
 const LEVELS = [1, 2, 3, 4];
 
@@ -160,6 +161,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
       <View style={{ zIndex: isBuildGuardians ? 3 : 1000, pointerEvents: isBuildGuardians ? 'none' : 'auto' }}>
         <BotAssemblyHeader onClose={onClose} />
       </View>
+      <HackExpeditionCommitmentBanner />
       <KeyboardAvoidingView 
         style={[styles.keyboardAvoidingView, (isGuardianSelectionHighlight || isBuildButtonHighlight) && { zIndex: 1001 }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

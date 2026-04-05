@@ -8,6 +8,7 @@ import { BattleRewardService } from '../services/BattleRewardService';
 import { NPCService } from '../services/NPCService';
 import { ResearchFeatureService } from '../services/ResearchFeatureService';
 import { ShieldService } from '../services/ShieldService';
+import { applyRetentionAfterInsert } from '../services/PrivateMessageRetentionService';
 
 const router = express.Router();
 
@@ -121,6 +122,12 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<CompleteProbeResu
       isFromAdmin: false,
     });
     await doc.save();
+
+    try {
+      await applyRetentionAfterInsert(doc.toObject() as any);
+    } catch (re: any) {
+      console.error('probe PM retention failed', re?.message ?? re);
+    }
 
     const returnDurationSec = getOutboundDurationSec(entry);
     entry.phase = 'returning';

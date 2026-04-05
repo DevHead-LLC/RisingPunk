@@ -11,6 +11,12 @@ import mongoose from 'mongoose';
 import { parseInventoryKeyToFamilyAndMark, BotInventoryKey } from '../utils/botInventoryKeys';
 import { syncAndResolveUserBotProgrammingBonuses } from '../utils/syncUserBotProgrammingBonuses';
 import { getCrewArmyBonusTotalsForUser, mergeCrewArmyIntoArmyBonus } from '../utils/researchFeatureUtils';
+import {
+  battleEngineNowMs,
+  getHeadlessWorkingBattle,
+  headlessDeterministicPickIndex,
+  isHeadlessWorkingBattleActive,
+} from './HeadlessBattleRunner';
 
 // Safety constants for defender deployment
 const MAX_DEFENDER_PER_BATTALION = 250000;
@@ -49,7 +55,7 @@ export class DefenderDeploymentService {
    * Called once per second during active battle phase
    */
   static async onTick(battleId: string): Promise<void> {
-    const battle = await Battle.findOne({ battleId });
+    const battle = getHeadlessWorkingBattle(battleId) ?? (await Battle.findOne({ battleId }));
     if (!battle) {
       return;
     }
@@ -95,17 +101,20 @@ export class DefenderDeploymentService {
 
     await this.deployWave(battle);
 
-    // Mark this tick as processed using atomic update to avoid version conflicts
-    await Battle.updateOne(
-      { _id: battle._id },
-      {
-        $set: { lastTickProcessed: battle.battleTime },
-        $setOnInsert: {
-          defenderDeployedTotals: { ...EMPTY_DEFENDER_DEPLOYED_TOTALS },
-          startingBattalions: [],
-        },
-      }
-    );
+    if (isHeadlessWorkingBattleActive(battleId)) {
+      battle.lastTickProcessed = battle.battleTime;
+    } else {
+      await Battle.updateOne(
+        { _id: battle._id },
+        {
+          $set: { lastTickProcessed: battle.battleTime },
+          $setOnInsert: {
+            defenderDeployedTotals: { ...EMPTY_DEFENDER_DEPLOYED_TOTALS },
+            startingBattalions: [],
+          },
+        }
+      );
+    }
   }
 
   /**
@@ -129,7 +138,9 @@ export class DefenderDeploymentService {
     const totalAvailable = Object.values(defenderBots.bots).reduce((sum: number, count: any) => sum + (count || 0), 0);
     if (totalAvailable === 0) {
       battle.defenderDeploymentExhausted = true;
-      await battle.save();
+      if (!isHeadlessWorkingBattleActive(battle.battleId)) {
+        await battle.save();
+      }
       return;
     }
 
@@ -143,6 +154,7 @@ export class DefenderDeploymentService {
       const deploymentResult = await this.prepareSingleBattalion(
         battle,
         remainingBots,
+        i,
         defenderLevel,
         defenderArmyBonus,
         defenderGuardianBonus,
@@ -195,16 +207,18 @@ export class DefenderDeploymentService {
 
       await BotModel.updateOne({ userId: battle.defenderId }, { $inc: botInc });
 
-      await Battle.updateOne(
-        { _id: battle._id },
-        {
-          $push: {
-            battalions: { $each: deployments.map((d) => d.battalion) },
-            startingBattalions: { $each: deployments.map((d) => d.battalion) },
-          },
-          $inc: defenderTotalsInc,
-        }
-      );
+      if (!isHeadlessWorkingBattleActive(battle.battleId)) {
+        await Battle.updateOne(
+          { _id: battle._id },
+          {
+            $push: {
+              battalions: { $each: deployments.map((d) => d.battalion) },
+              startingBattalions: { $each: deployments.map((d) => d.battalion) },
+            },
+            $inc: defenderTotalsInc,
+          }
+        );
+      }
 
       try {
         const { ScreenDimensionService } = require('./ScreenDimensionService');
@@ -234,6 +248,7 @@ export class DefenderDeploymentService {
   private static async prepareSingleBattalion(
     battle: IBattleDocument,
     remainingBots: Record<string, number>,
+    deploySlotIndex: number,
     defenderLevel: number,
     defenderArmyBonus?: { strength: number; defense: number; speed: number; health: number },
     defenderGuardianBonus?: { strength: number; defense: number; speed: number; health: number },
@@ -262,7 +277,20 @@ export class DefenderDeploymentService {
       return { success: false };
     }
 
-    const selectedKey = availableKeys[Math.floor(Math.random() * availableKeys.length)];
+    const headless = isHeadlessWorkingBattleActive(battle.battleId);
+    const selectedKey = (() => {
+      if (headless) {
+        const sorted = [...availableKeys].sort((a, b) => a.localeCompare(b));
+        const pick = headlessDeterministicPickIndex(
+          battle.battleId,
+          battleEngineNowMs(battle.battleId),
+          `deploy-inv-${deploySlotIndex}`,
+          sorted.length
+        );
+        return sorted[pick]!;
+      }
+      return availableKeys[Math.floor(Math.random() * availableKeys.length)]!;
+    })();
     const parsed = parseInventoryKeyToFamilyAndMark(selectedKey);
     if (!parsed) {
       throw new Error(`Invariant: invalid inventory key ${selectedKey}`);
@@ -274,7 +302,10 @@ export class DefenderDeploymentService {
       return { success: false };
     }
 
+    const battalionId = this.makeDefenderBattalionId(battle, deploySlotIndex);
+
     const battalion = await this.createDefenderBattalion(
+      battalionId,
       battle.nodes,
       parsed.family as BotType,
       quantity,
@@ -293,10 +324,20 @@ export class DefenderDeploymentService {
     };
   }
 
+  private static makeDefenderBattalionId(battle: IBattleDocument, deploySlotIndex: number): string {
+    const bid = String(battle.battleId).trim();
+    if (isHeadlessWorkingBattleActive(bid)) {
+      const v = battleEngineNowMs(bid);
+      return `defender-battalion-${bid}-${v}-${deploySlotIndex}`;
+    }
+    return `defender-battalion-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  }
+
   /**
    * Create a defender battalion with proper positioning and stats
    */
   private static async createDefenderBattalion(
+    battalionId: string,
     nodes: INode[],
     family: BotType,
     quantity: number,
@@ -306,8 +347,6 @@ export class DefenderDeploymentService {
     defenderGuardianBonus?: { strength: number; defense: number; speed: number; health: number },
     defenderPhreakBonus?: { strength: number; defense: number; speed: number; health: number }
   ): Promise<IBattalion> {
-    const battalionId = `defender-battalion-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
     return BattalionFactory.createDefenderBattalion(
       battalionId,
       family,

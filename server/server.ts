@@ -17,6 +17,8 @@ import { Error } from 'mongoose';
 import mapRoutes from './src/routes/map';
 import userRoutes from './src/routes/userRoutes';
 import battleRoutes from './src/routes/battle';
+import './src/models/BattleReplay';
+import './src/models/AttackMarch';
 import healthRoute from './src/routes/health';
 import researchRoutes from './src/routes/research';
 import documentsRoutes from './src/routes/documents';
@@ -28,6 +30,7 @@ import crewRoutes from './src/routes/crew';
 import reportsRoutes from './src/routes/reports';
 import privateMessagesRoutes from './src/routes/privateMessages';
 import probeRoutes from './src/routes/probe';
+import attackRoutes from './src/routes/attack';
 import leaderboardRoutes from './src/routes/leaderboardRoutes';
 import userGuideRoutes from './src/routes/userGuideRoutes';
 import marketingRoutes from './src/routes/marketing';
@@ -137,6 +140,57 @@ mongoose.connect(process.env.MONGODB_URI, {
     await NPCRespawnService.runRespawnCatchUp();
   } catch (respawnErr: unknown) {
     console.warn('NPC respawn catch-up failed (non-fatal):', respawnErr);
+  }
+
+  try {
+    const {
+      rescheduleAllOutboundMarches,
+      rescheduleAllReturningMarches,
+      rescheduleArrivedMarchBattleStarts,
+    } = require('./src/services/MarchArrivalSchedulerService');
+    try {
+      await rescheduleAllOutboundMarches();
+    } catch (outboundErr: unknown) {
+      console.warn('Attack march outbound reschedule failed (non-fatal):', outboundErr);
+    }
+    try {
+      await rescheduleAllReturningMarches();
+    } catch (returningErr: unknown) {
+      console.warn('Attack march returning reschedule failed (non-fatal):', returningErr);
+    }
+    try {
+      await rescheduleArrivedMarchBattleStarts();
+    } catch (arrivedErr: unknown) {
+      console.warn('Attack march arrived battle-start reschedule failed (non-fatal):', arrivedErr);
+    }
+  } catch (marchModuleErr: unknown) {
+    console.warn('Attack march scheduler load failed (non-fatal):', marchModuleErr);
+  }
+
+  try {
+    const {
+      runStaleResolvingMarchRecoveryOnce,
+      startStaleResolvingMarchWatchdog,
+    } = require('./src/services/MarchStaleResolvingWatchdogService');
+    try {
+      await runStaleResolvingMarchRecoveryOnce();
+    } catch (recoveryErr: unknown) {
+      console.warn('Stale resolving march one-shot recovery failed (non-fatal):', recoveryErr);
+    }
+    try {
+      startStaleResolvingMarchWatchdog();
+    } catch (watchdogErr: unknown) {
+      console.warn('Stale resolving march watchdog failed to start (non-fatal):', watchdogErr);
+    }
+  } catch (staleModuleErr: unknown) {
+    console.warn('Stale resolving march watchdog module load failed (non-fatal):', staleModuleErr);
+  }
+
+  try {
+    const { startAttackMarchDueSweepWatchdog } = require('./src/services/MarchArrivalSchedulerService');
+    startAttackMarchDueSweepWatchdog();
+  } catch (dueSweepErr: unknown) {
+    console.warn('Attack march due-date sweep watchdog failed to start (non-fatal):', dueSweepErr);
   }
 
   // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
@@ -609,6 +663,7 @@ app.use('/api/crew', crewRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/private-messages', privateMessagesRoutes);
 app.use('/api/probe', probeRoutes);
+app.use('/api/attack', attackRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/daily-haul', dailyHaulRoutes);
 app.use('/api/packet-breach', packetBreachRoutes);
