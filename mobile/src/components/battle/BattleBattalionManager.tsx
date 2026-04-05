@@ -21,6 +21,8 @@ interface Props {
   replayMovementVirtualNowMs?: number;
   /** Aligns live-recorded `movementState.startTime` (Unix) with virtual frame `t`. */
   replayMovementEpochMs?: number;
+  /** Replay: current snapshot index — battalion motion uses `Animated.timing` on index boundaries only. */
+  replaySnapshotFrameIndex?: number;
 }
 
 export const BattleBattalionManager = React.memo(({
@@ -30,6 +32,7 @@ export const BattleBattalionManager = React.memo(({
   overrideBattleState,
   replayMovementVirtualNowMs,
   replayMovementEpochMs,
+  replaySnapshotFrameIndex,
 }: Props) => {
   const [pollingInterval, setPollingInterval] = useState<number>(ANIMATION_CONFIG.DEFAULT_POLLING_MS);
   
@@ -89,6 +92,7 @@ export const BattleBattalionManager = React.memo(({
                 showHealthBar={showHealthBars}
                 replayMovementVirtualNowMs={replayMovementVirtualNowMs}
                 replayMovementEpochMs={replayMovementEpochMs}
+                replaySnapshotFrameIndex={replaySnapshotFrameIndex}
               />
             );
           })}
@@ -103,6 +107,7 @@ export const BattleBattalionManager = React.memo(({
     movementStateMap,
     replayMovementVirtualNowMs,
     replayMovementEpochMs,
+    replaySnapshotFrameIndex,
   ]);
 
   return (
