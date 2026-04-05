@@ -83,7 +83,7 @@ export const BattleBattalion = React.memo(({
       setClientStartTime(Date.now());
     }
   }, [movementState?.startTime, movementState?.movementStatus, hasReplayVirtualClock]);
-  
+
   const smoothPosition = React.useMemo(() => {
     if (!movementState) return position;
     
