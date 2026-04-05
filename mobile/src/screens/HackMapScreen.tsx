@@ -1377,6 +1377,25 @@ export const HackMapScreen: React.FC<Props> = ({
         }
       }
 
+      // Headless march battle can finish before the next /attack/active poll ever shows `resolving`
+      // (arrived → returning in one server pass). Without this, map tags never invalidate until a slow poll or manual refetch.
+      if (!shouldInvalidate) {
+        for (const p of prev) {
+          const inst = p.defenderNpcInstanceId;
+          const npcTarget = typeof inst === 'string' && inst.trim() !== '';
+          if (!npcTarget) continue;
+          const n = nextById.get(p.marchId);
+          if (!n) continue;
+          const wasPreReturn =
+            p.state === 'arrived' || p.state === 'resolving' || p.state === 'queued';
+          const nowReturnOrComplete = n.state === 'returning' || n.state === 'done';
+          if (wasPreReturn && nowReturnOrComplete && p.state !== n.state) {
+            shouldInvalidate = true;
+            break;
+          }
+        }
+      }
+
       if (shouldInvalidate) {
         dispatch(mapApi.util.invalidateTags(['Map']));
       }
