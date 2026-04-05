@@ -53,6 +53,18 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
     );
   }, [isReplay, replay.replayDoc, replay.battleState, vw, vh]);
 
+  /** Next-frame viewport state for replay tug bar only (linear blend vs virtual clock). */
+  const viewportNextBattleState = useMemo(() => {
+    if (!isReplay || !replay.replayDoc || !replay.nextBattleState) return null;
+    return mapBattleStateToViewport(
+      replay.nextBattleState,
+      replay.replayDoc.canonicalScreenWidth,
+      replay.replayDoc.canonicalScreenHeight,
+      vw,
+      vh
+    );
+  }, [isReplay, replay.replayDoc, replay.nextBattleState, vw, vh]);
+
   const layoutScale = useMemo(() => {
     if (!isReplay || !replay.replayDoc) return 1;
     return computeReplayLetterbox(
@@ -216,6 +228,8 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
             lineWidth={lineW}
             showNodeLabels={true}
             overrideBattleState={replayBattleStateOverride}
+            replayTugBlendTo={isReplay ? viewportNextBattleState : undefined}
+            replayTugBlendAlpha={isReplay ? replay.replayTugBlendAlpha : undefined}
           />
 
           <BattleBattalionManager

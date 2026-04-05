@@ -99,8 +99,49 @@ export function useReplayPlayback(
   // Bugbot: inactive → undefined (not 0) so BattleBattalion `!== undefined` does not treat 0 as replay clock.
   const replayVirtualNowMs: number | undefined =
     playbackActive && rawFrame
-      ? rawFrame.t + (Date.now() - wallAtFrameRef.current)
+      ? (() => {
+          const wallDelta = Date.now() - wallAtFrameRef.current;
+          let vn = rawFrame.t + wallDelta;
+          const nextFrame = snapshots[index + 1] as BattleReplaySnapshotFrame | undefined;
+          if (
+            nextFrame != null &&
+            Number.isFinite(nextFrame.t) &&
+            nextFrame.t >= rawFrame.t
+          ) {
+            vn = Math.min(vn, nextFrame.t);
+          }
+          return vn;
+        })()
       : undefined;
+
+  /** Next snapshot body (no `t`), for replay-only tug blending between frames. */
+  const nextBattleState = useMemo((): BattleState | null => {
+    if (!playbackActive || index >= snapshots.length - 1) return null;
+    const fr = snapshots[index + 1] as BattleReplaySnapshotFrame | undefined;
+    if (!fr) return null;
+    const { t: _t, ...rest } = fr;
+    return rest as BattleState;
+  }, [playbackActive, index, snapshots]);
+
+  /**
+   * Replay Watch battle: interpolate neutral-node tug display between current and next frame so the bar tracks
+   * `replayVirtualNowMs` the same way battalion motion does (discrete 250ms snapshots + smooth virtual clock).
+   */
+  const replayTugBlendAlpha = useMemo((): number | null => {
+    if (
+      !playbackActive ||
+      !rawFrame ||
+      replayVirtualNowMs === undefined ||
+      index >= snapshots.length - 1
+    ) {
+      return null;
+    }
+    const nextF = snapshots[index + 1] as BattleReplaySnapshotFrame | undefined;
+    if (!nextF || !Number.isFinite(nextF.t) || !Number.isFinite(rawFrame.t)) return null;
+    const dt = nextF.t - rawFrame.t;
+    if (dt <= 0) return null;
+    return Math.min(1, Math.max(0, (replayVirtualNowMs - rawFrame.t) / dt));
+  }, [playbackActive, rawFrame, replayVirtualNowMs, index, snapshots]);
 
   // Bugbot: `battleState` must not track `rawFrame` reference — RTK refetch replaces `snapshots` with a new array
   // and new per-frame object identities even when payload is unchanged, which would recompute viewport state every
@@ -160,8 +201,11 @@ export function useReplayPlayback(
     replayDoc: data,
     frameIndex: index,
     battleState,
+    nextBattleState,
     /** Virtual battle ms while playing; `undefined` when replay is not active (no sentinel `0`). */
     replayVirtualNowMs,
+    /** `null` unless replay is playing and a next snapshot exists; tug UI may lerp vs `nextBattleState`. */
+    replayTugBlendAlpha,
     isLoading,
     error,
     isError,
