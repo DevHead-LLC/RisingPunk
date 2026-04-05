@@ -8,8 +8,12 @@ import { useAppSelector } from '../store/hooks';
 
 type BannerPayload = { message: string; type: 'info' };
 
-/** Auto-dismiss for march state toasts in AppContent `NotificationBanner` (arrive, queue, battle done, return, recall, home). */
-export const MARCH_TRANSITION_BANNER_DURATION_MS = 1000;
+/**
+ * Auto-dismiss for march state toasts in AppContent `NotificationBanner` (arrive, queue, battle done, return, recall, home).
+ * `NotificationBanner` runs a 300ms fade-in and starts fade-out after this many ms (full-opacity window ≈ duration − 300ms).
+ * Bugbot: 2000ms is intentional product timing (between prior 1s “too fast to read” and legacy 6s).
+ */
+export const MARCH_TRANSITION_BANNER_DURATION_MS = 2000;
 
 /**
  * Shows one-shot in-app banners when the user's own marches change state (GET /api/attack/mine poll).
