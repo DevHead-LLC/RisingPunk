@@ -17,6 +17,8 @@ import {
 } from '../store/api/botsApi';
 import { useStartBattleMutation } from '../store/api/battleApi';
 import {
+  attackApi,
+  getAttackMarchMinePollingIntervalMs,
   useGetMyAttackMarchesQuery,
   useLaunchAttackMarchMutation,
 } from '../store/api/attackApi';
@@ -110,9 +112,14 @@ export const BattlePreparationScreen = React.memo(
   const { refetch: refetchBots } = useFetchBotsQuery(undefined, { skip: !token });
   const [startBattle] = useStartBattleMutation();
   const [launchAttackMarch] = useLaunchAttackMarchMutation();
+  const mineCached = useAppSelector((s) => attackApi.endpoints.getMyAttackMarches.select(undefined)(s));
+  const attackMarchPollMs = getAttackMarchMinePollingIntervalMs(
+    mineCached.data?.asyncMarchesEnabled,
+    mineCached.data?.marches
+  );
   const { data: attackMarchMeta, refetch: refetchMyMarches } = useGetMyAttackMarchesQuery(undefined, {
     skip: !token,
-    pollingInterval: 15000,
+    pollingInterval: attackMarchPollMs,
   });
   const asyncMarchesEnabled = attackMarchMeta?.asyncMarchesEnabled === true;
   /** Orphan march rows when async is off must not block legacy live deploy (Bugbot / ENABLE_ASYNC_BATTLES). */

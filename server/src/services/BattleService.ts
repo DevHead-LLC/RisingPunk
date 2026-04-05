@@ -269,12 +269,11 @@ export class BattleService {
       endCondition = 'timer';
     }
 
-    // Store end condition and winner for response
+    // Store end condition and winner for response.
+    // Must persist before PvP money transfer (reads winner from MongoDB).
     (battle as any).endCondition = endCondition;
     battle.winner = winner;
-    if (!isHeadlessWorkingBattleActive(battleId)) {
-      await battle.save();
-    }
+    await battle.save();
 
     // Unlock hack rig if user wins by elimination (only if flagged)
     if (winner === NodeOwner.USER && endCondition === 'elimination' && (battle as any).unlockHackRigOnWin) {
