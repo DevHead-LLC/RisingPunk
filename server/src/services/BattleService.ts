@@ -392,22 +392,27 @@ export class BattleService {
     if (npcSlug) {
       try {
         const rewardResult = await BattleRewardService.processBattleRewards(battle, battle.attackerId);
-        if (rewardResult.success) {
-          try {
-            const { onMarchNpcBattleEnded } = await import('./MarchBattleFollowupService');
-            await onMarchNpcBattleEnded(battle);
-          } catch (marchFollowErr) {
-            console.error('[BattleService.handleBattleEnd] March follow-up failed:', battleId, marchFollowErr);
-          }
-        } else {
+        if (!rewardResult.success) {
           console.error(
-            '[BattleService.handleBattleEnd] NPC rewards failed; march follow-up skipped:',
+            '[BattleService.handleBattleEnd] NPC rewards failed (march return leg still runs):',
             battleId,
             rewardResult.error
           );
         }
       } catch (e) {
         console.error('Battle reward processing failed for', battleId, e);
+      }
+      // March-sourced NPC: always advance `resolving` → `returning` + schedule return + queue reconcile.
+      // Previously this ran only when `processBattleRewards` succeeded; a reward/save failure left the row
+      // stuck in `resolving` (no return march, no DM, client commitment locked, second attack pulses at target).
+      const marchSourcedNpc = (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true;
+      if (marchSourcedNpc) {
+        try {
+          const { onMarchNpcBattleEnded } = await import('./MarchBattleFollowupService');
+          await onMarchNpcBattleEnded(battle);
+        } catch (marchFollowErr) {
+          console.error('[BattleService.handleBattleEnd] March follow-up failed:', battleId, marchFollowErr);
+        }
       }
       try {
         const battleForNpcDm = await this.getBattle(battleId);

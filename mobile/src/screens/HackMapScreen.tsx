@@ -2909,41 +2909,38 @@ export const HackMapScreen: React.FC<Props> = ({
       return cell;
     };
     
-    // Phase 7A: Virtual Scrolling - Only render tiles that are actually visible
-    if (virtualViewport.visibleTiles.size > 0) {
-      // Use virtual viewport for ultra-efficient rendering
-      virtualViewport.visibleTiles.forEach(tileKey => {
-        const [x, y] = tileKey.split(',').map(Number);
-        // Read directly from state to avoid ref timing issues after cache clears
-        const terrain = staticTerrainData[tileKey];
-        const entity = dynamicEntityData[tileKey];
-        // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
-        // This prevents entities from disappearing when panning stops before full details are loaded
-        const entityImage = entityImageData[tileKey];
-        
-        if (!terrain) return;
-        
-        const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
-        cells.push({ x, y, cell });
-      });
-    } else {
-      // Phase 5: Use ref when panning, state when not panning
+    const fillCellsFromWindowRange = () => {
       for (let y = currentWindowRange.rowStart; y <= currentWindowRange.rowEnd; y++) {
         for (let x = currentWindowRange.colStart; x <= currentWindowRange.colEnd; x++) {
           const key = `${x},${y}`;
-          // Read directly from state to avoid ref timing issues after cache clears
           const terrain = staticTerrainData[key];
           const entity = dynamicEntityData[key];
-          // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
-          // This prevents entities from disappearing when panning stops before full details are loaded
           const entityImage = entityImageData[key];
-          
           if (!terrain) continue;
-          
           const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
           cells.push({ x, y, cell });
         }
       }
+    };
+
+    // Phase 7A: Virtual Scrolling - Only render tiles that are actually visible
+    if (virtualViewport.visibleTiles.size > 0) {
+      virtualViewport.visibleTiles.forEach((tileKey) => {
+        const [x, y] = tileKey.split(',').map(Number);
+        const terrain = staticTerrainData[tileKey];
+        const entity = dynamicEntityData[tileKey];
+        const entityImage = entityImageData[tileKey];
+        if (!terrain) return;
+        const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
+        cells.push({ x, y, cell });
+      });
+      // Virtual set uses buffer=0; terrain for those keys may lag behind after state churn (e.g. march refetch).
+      // Window range uses PAN_BUFFER and often still has merged terrain — avoids an empty grid (Android: "blank" map until pan).
+      if (cells.length === 0) {
+        fillCellsFromWindowRange();
+      }
+    } else {
+      fillCellsFromWindowRange();
     }
     
     if (prevVisibleCellsCountRef.current !== cells.length) {
