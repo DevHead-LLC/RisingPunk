@@ -18,6 +18,18 @@ export function parseMarchTimeMs(v: unknown): number | null {
   return null;
 }
 
+/** Matches {@link computeMarchFrame} outbound leg duration (parsed delta, or `totalTravelSeconds` when delta invalid). */
+function outboundDurationMs(m: AttackMarchListItem, depart: number, arrive: number): number {
+  const parsedOutboundMs = arrive - depart;
+  const serverTravelSec = m.totalTravelSeconds;
+  const useServerMs =
+    (!Number.isFinite(parsedOutboundMs) || parsedOutboundMs <= 0) &&
+    typeof serverTravelSec === 'number' &&
+    Number.isFinite(serverTravelSec) &&
+    serverTravelSec > 0;
+  return useServerMs ? Math.max(1, serverTravelSec * 1000) : Math.max(1, parsedOutboundMs);
+}
+
 /**
  * Same progress scalar as {@link computeMarchFrame} outbound (0 = home tile, 1 = target tile).
  * Use when cancelling so return duration and start tile match the icon.
@@ -26,7 +38,7 @@ export function outboundProgressTForAttackMarch(m: AttackMarchListItem, nowMs: n
   const depart = parseMarchTimeMs(m.departAt);
   const arrive = parseMarchTimeMs(m.arriveAt);
   if (depart == null || arrive == null) return null;
-  const outboundDurMs = Math.max(1, arrive - depart);
+  const outboundDurMs = outboundDurationMs(m, depart, arrive);
   return Math.min(1, Math.max(0, (nowMs - depart) / outboundDurMs));
 }
 
@@ -65,7 +77,7 @@ export function computeMarchFrame(m: AttackMarchListItem, now: number): Computed
   if (depart == null || arrive == null) {
     return null;
   }
-  const outboundDurMs = Math.max(1, arrive - depart);
+  const outboundDurMs = outboundDurationMs(m, depart, arrive);
 
   if (state === 'outbound') {
     const t = Math.min(1, Math.max(0, (now - depart) / outboundDurMs));

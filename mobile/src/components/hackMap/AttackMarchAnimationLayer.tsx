@@ -6,7 +6,7 @@
  * so icon taps are not consumed by `Gesture.Tap` → tile handler (parity with `ProbeAnimationLayer`).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Image, StyleSheet, AppState, Pressable } from 'react-native';
+import { View, Image, StyleSheet, AppState, Pressable, Platform } from 'react-native';
 import Animated from 'react-native-reanimated';
 import type { AttackMarchListItem } from '../../store/api/attackApi';
 import type { useThemeColors } from '../../hooks/useThemeColors';
@@ -67,7 +67,6 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
   onOwnerMarchPress,
 }) => {
   const marchesRef = useRef(marches);
-  const nowRef = useRef(Date.now());
   /** Bumps version to re-render; throttled below so we do not reconcile at 60fps (Bugbot). */
   const [, setPaintGeneration] = useState(0);
   const rafRef = useRef<number | null>(null);
@@ -92,7 +91,6 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
         return;
       }
       const now = Date.now();
-      nowRef.current = now;
       const lastPaint = lastPaintWallMsRef.current;
       if (lastPaint === 0 || now - lastPaint >= 32) {
         lastPaintWallMsRef.current = now;
@@ -127,7 +125,8 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
     return null;
   }
 
-  const now = nowRef.current;
+  /** Wall clock at paint — do not use a ref only updated inside rAF (first paint after marches appear can run before any tick; stale `now` yields bogus progress / near-instant “travel”). */
+  const now = Date.now();
   const matrixColor = colors.matrix ?? '#00ff00';
 
   return (
@@ -135,7 +134,12 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
       style={[
         StyleSheet.absoluteFill,
         ...(animatedMapStyle != null ? [animatedMapStyle as any] : []),
-        { zIndex: 9, elevation: 9 },
+        {
+          zIndex: 9,
+          // Android: default/elevated layers can composite opaque and hide the map until the next transform
+          // (pan) invalidates; keep overlay visually transparent. zIndex still orders above the map sibling.
+          ...(Platform.OS === 'android' ? { elevation: 0, backgroundColor: 'transparent' } : { elevation: 9 }),
+        },
       ]}
       pointerEvents="box-none"
     >
