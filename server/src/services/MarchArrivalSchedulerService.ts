@@ -1,5 +1,9 @@
 import mongoose from 'mongoose';
-import { ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS, ENABLE_ASYNC_BATTLES } from '../config/env';
+import {
+  ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS,
+  ATTACK_MARCH_STALE_ARRIVED_MS,
+  ENABLE_ASYNC_BATTLES,
+} from '../config/env';
 import { AttackMarch } from '../models/AttackMarch';
 import type { AttackMarchArmySnapshot } from '../types/attackMarch';
 import { consumedRowsMatchArmySnapshot } from './AttackMarchLaunchService';
@@ -344,6 +348,25 @@ export async function sweepAttackMarchesPastDueDates(): Promise<void> {
     if (m.marchId) {
       void processReturnMarchComplete(m.marchId);
     }
+  }
+
+  const arrivedStaleCutoff = new Date(Date.now() - ATTACK_MARCH_STALE_ARRIVED_MS);
+  const staleQueueKeys = await AttackMarch.distinct('defenderQueueKey', {
+    state: { $in: ['arrived', 'queued'] },
+    arriveAt: { $lte: arrivedStaleCutoff },
+    defenderQueueKey: { $exists: true, $nin: [null, ''] },
+  });
+
+  for (const qk of staleQueueKeys) {
+    const key = String(qk ?? '').trim();
+    if (!key) {
+      continue;
+    }
+    void runDefenderQueueSerialized(key, async () => {
+      await reconcileDefenderQueue(key);
+      const { tryStartNextMarchResolutionForQueueKey } = await import('./MarchResolutionService');
+      await tryStartNextMarchResolutionForQueueKey(key);
+    });
   }
 }
 
