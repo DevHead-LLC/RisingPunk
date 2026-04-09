@@ -119,6 +119,23 @@ export const ATTACK_MARCH_STALE_ARRIVED_MS = parsePositiveIntMs(
   60_000
 );
 
+/**
+ * Delete `attack_marches` in terminal states (`done`, `cancelled`) older than this age (by `createdAt`).
+ * Default 24h — does not affect `battle_replays` (keyed by `battleId`).
+ */
+export const ATTACK_MARCH_TERMINAL_MAX_AGE_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_TERMINAL_MAX_AGE_MS',
+  24 * 60 * 60 * 1000,
+  60_000
+);
+
+/** How often each server instance runs terminal march pruning (default 1h). */
+export const ATTACK_MARCH_TERMINAL_PRUNE_INTERVAL_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_TERMINAL_PRUNE_INTERVAL_MS',
+  60 * 60 * 1000,
+  60_000
+);
+
 // Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
 let cachedAdminIds: mongoose.Types.ObjectId[] | null = null;
 

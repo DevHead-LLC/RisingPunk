@@ -193,6 +193,25 @@ mongoose.connect(process.env.MONGODB_URI, {
     console.warn('Attack march due-date sweep watchdog failed to start (non-fatal):', dueSweepErr);
   }
 
+  try {
+    const {
+      pruneTerminalAttackMarchesOnce,
+      startAttackMarchTerminalPruneWatchdog,
+    } = require('./src/services/AttackMarchTerminalPruneService');
+    try {
+      await pruneTerminalAttackMarchesOnce();
+    } catch (pruneOnceErr: unknown) {
+      console.warn('Attack march terminal prune one-shot failed (non-fatal):', pruneOnceErr);
+    }
+    try {
+      startAttackMarchTerminalPruneWatchdog();
+    } catch (pruneWatchErr: unknown) {
+      console.warn('Attack march terminal prune watchdog failed to start (non-fatal):', pruneWatchErr);
+    }
+  } catch (pruneModuleErr: unknown) {
+    console.warn('Attack march terminal prune module load failed (non-fatal):', pruneModuleErr);
+  }
+
   // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
   try {
     const { ensureRentalPropertyConfig } = require('./src/services/RentalPropertyConfigService');
