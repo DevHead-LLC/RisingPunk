@@ -390,24 +390,33 @@ export class BattleService {
 
     // Process battle rewards and bot losses if this was a battle against an NPC
     if (npcSlug) {
+      const marchNpcSourced =
+        (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true;
+      const runMarchNpcFollowUp = async (): Promise<void> => {
+        if (!marchNpcSourced) {
+          return;
+        }
+        try {
+          const { onMarchNpcBattleEnded } = await import('./MarchBattleFollowupService');
+          await onMarchNpcBattleEnded(battle);
+        } catch (marchFollowErr) {
+          console.error('[BattleService.handleBattleEnd] March follow-up failed:', battleId, marchFollowErr);
+        }
+      };
+
       try {
         const rewardResult = await BattleRewardService.processBattleRewards(battle, battle.attackerId);
-        if (rewardResult.success) {
-          try {
-            const { onMarchNpcBattleEnded } = await import('./MarchBattleFollowupService');
-            await onMarchNpcBattleEnded(battle);
-          } catch (marchFollowErr) {
-            console.error('[BattleService.handleBattleEnd] March follow-up failed:', battleId, marchFollowErr);
-          }
-        } else {
+        if (!rewardResult.success) {
           console.error(
-            '[BattleService.handleBattleEnd] NPC rewards failed; march follow-up skipped:',
+            '[BattleService.handleBattleEnd] NPC rewards failed (march follow-up still attempted if hack march):',
             battleId,
             rewardResult.error
           );
         }
+        await runMarchNpcFollowUp();
       } catch (e) {
         console.error('Battle reward processing failed for', battleId, e);
+        await runMarchNpcFollowUp();
       }
       try {
         const battleForNpcDm = await this.getBattle(battleId);
