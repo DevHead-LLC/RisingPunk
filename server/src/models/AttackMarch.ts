@@ -96,5 +96,6 @@ attackMarchSchema.index({ state: 1, arriveAt: 1 });
 attackMarchSchema.index({ state: 1, returnArriveAt: 1 });
 attackMarchSchema.index({ defenderQueueKey: 1, state: 1 });
 attackMarchSchema.index({ state: 1, resolvingSince: 1 });
+attackMarchSchema.index({ state: 1, createdAt: 1 });
 
 export const AttackMarch = mongoose.model<IAttackMarchDocument>('AttackMarch', attackMarchSchema);
