@@ -26,9 +26,14 @@ export async function onMarchNpcBattleEnded(battle: IBattleDocument): Promise<vo
     return;
   }
 
-  const travelMs = Math.ceil(Number(march.totalTravelSeconds) * 1000);
+  let travelMs = Math.ceil(Number(march.totalTravelSeconds) * 1000);
   if (!Number.isFinite(travelMs) || travelMs < 0) {
-    throw new Error(`AttackMarch ${marchId} has invalid totalTravelSeconds for return leg`);
+    console.error(
+      '[MarchBattleFollowup] invalid totalTravelSeconds; using 0ms return leg to unblock march:',
+      marchId,
+      march.totalTravelSeconds
+    );
+    travelMs = 0;
   }
   const returnArriveAt = new Date(Date.now() + travelMs);
   const qk = defenderQueueKeyFromMarchDoc(march);

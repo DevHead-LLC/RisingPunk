@@ -109,6 +109,16 @@ export const ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS = parsePositiveIntMs(
   1_000
 );
 
+/**
+ * If a march sits in `arrived` or `queued` this long after its target arrival time, periodically nudge
+ * queue reconcile + resolution (safety net if a one-shot server hook failed). Default 10 min.
+ */
+export const ATTACK_MARCH_STALE_ARRIVED_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_STALE_ARRIVED_MS',
+  10 * 60 * 1000,
+  60_000
+);
+
 // Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
 let cachedAdminIds: mongoose.Types.ObjectId[] | null = null;
 
