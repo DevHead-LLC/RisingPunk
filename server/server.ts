@@ -194,6 +194,13 @@ mongoose.connect(process.env.MONGODB_URI, {
   }
 
   try {
+    const { runStuckAtTargetRecoveryOnce } = require('./src/services/AttackMarchStuckAtTargetRecoveryService');
+    await runStuckAtTargetRecoveryOnce();
+  } catch (stuckAtTargetErr: unknown) {
+    console.warn('Attack march stuck-at-target recovery one-shot failed (non-fatal):', stuckAtTargetErr);
+  }
+
+  try {
     const {
       pruneTerminalAttackMarchesOnce,
       startAttackMarchTerminalPruneWatchdog,
