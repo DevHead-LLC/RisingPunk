@@ -111,12 +111,33 @@ export const ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS = parsePositiveIntMs(
 
 /**
  * If a march sits in `arrived` or `queued` this long after its target arrival time, periodically nudge
- * queue reconcile + resolution (safety net if a one-shot server hook failed). Default 10 min.
+ * queue reconcile + resolution (safety net if a one-shot server hook failed). Default **10 min**.
  */
 export const ATTACK_MARCH_STALE_ARRIVED_MS = parsePositiveIntMs(
   'ATTACK_MARCH_STALE_ARRIVED_MS',
   10 * 60 * 1000,
   60_000
+);
+
+/**
+ * Hard recovery: if still `arrived`, `queued`, or `resolving` this long after **`arriveAt`**, abandon any
+ * in-progress battle (when `resolving`), full-inventory refund to `cancelled`, reconcile defender queue.
+ * Default **1 min** — primary guarantee to unblock stuck expeditions.
+ */
+export const ATTACK_MARCH_STUCK_AT_TARGET_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_STUCK_AT_TARGET_MS',
+  60 * 1000,
+  60_000
+);
+
+/**
+ * Max wall-clock duration for the **return** leg (`returning` → home), after battle resolution or cancel.
+ * Clamps `totalTravelSeconds` on the victory path and proportional cancel-return duration. Default **60s**.
+ */
+export const ATTACK_MARCH_RETURN_LEG_MAX_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_RETURN_LEG_MAX_MS',
+  60 * 1000,
+  1_000
 );
 
 /**

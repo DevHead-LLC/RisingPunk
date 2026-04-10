@@ -4,6 +4,7 @@ import {
   ATTACK_MARCH_STALE_ARRIVED_MS,
   ENABLE_ASYNC_BATTLES,
 } from '../config/env';
+import { runStuckAtTargetRecoveryOnce } from './AttackMarchStuckAtTargetRecoveryService';
 import { AttackMarch } from '../models/AttackMarch';
 import type { AttackMarchArmySnapshot } from '../types/attackMarch';
 import { consumedRowsMatchArmySnapshot } from './AttackMarchLaunchService';
@@ -26,7 +27,7 @@ export async function processMarchArrival(marchId: string): Promise<void> {
   try {
     const updated = await AttackMarch.findOneAndUpdate(
       { marchId, state: 'outbound' },
-      { $set: { state: 'arrived' } },
+      { $set: { state: 'arrived', atTargetSince: new Date() } },
       { new: true, lean: true }
     );
     if (updated) {
@@ -368,6 +369,8 @@ export async function sweepAttackMarchesPastDueDates(): Promise<void> {
       await tryStartNextMarchResolutionForQueueKey(key);
     });
   }
+
+  await runStuckAtTargetRecoveryOnce();
 }
 
 export function startAttackMarchDueSweepWatchdog(): void {

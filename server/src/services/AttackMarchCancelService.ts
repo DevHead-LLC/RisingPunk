@@ -9,6 +9,7 @@ import {
   reconcileDefenderQueue,
   runDefenderQueueSerialized,
 } from './MarchDefenderQueueService';
+import { ATTACK_MARCH_RETURN_LEG_MAX_MS } from '../config/env';
 import { consumedRowsMatchArmySnapshot } from './AttackMarchLaunchService';
 
 type BattalionAssignmentRow = {
@@ -102,7 +103,10 @@ export async function cancelOutboundAttackMarch(
   const outboundDurMs = Math.max(1, arriveMs - departMs);
   const t = Math.min(1, Math.max(0, outboundProgressT));
   /** Time to retrace to home at same speed = (distance back) / speed = (t×D)/(D/T) = t×T. */
-  const returnLegMs = Math.max(0, Math.ceil(t * outboundDurMs));
+  const returnLegMs = Math.min(
+    ATTACK_MARCH_RETURN_LEG_MAX_MS,
+    Math.max(0, Math.ceil(t * outboundDurMs))
+  );
   // Fractional **tile indices** (same space as origin/target); client uses margin + (x+0.5)*cell — affine in x,y,
   // so this matches pixel lerp between tile centers (Bugbot: not wrong to pass into marchTileCenter).
   const returnLegStartX = march.originX + (march.targetX - march.originX) * t;
