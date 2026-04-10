@@ -10,6 +10,7 @@ import {
   reconcileDefenderQueue,
   runDefenderQueueSerialized,
 } from './MarchDefenderQueueService';
+import { ATTACK_MARCH_RETURN_LEG_MAX_MS } from '../config/env';
 import { scheduleReturnMarchComplete } from './MarchArrivalSchedulerService';
 import { tryStartNextMarchResolutionForQueueKey } from './MarchResolutionService';
 
@@ -35,6 +36,7 @@ export async function onMarchNpcBattleEnded(battle: IBattleDocument): Promise<vo
     );
     travelMs = 0;
   }
+  travelMs = Math.min(travelMs, ATTACK_MARCH_RETURN_LEG_MAX_MS);
   const returnArriveAt = new Date(Date.now() + travelMs);
   const qk = defenderQueueKeyFromMarchDoc(march);
 
