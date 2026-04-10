@@ -1,8 +1,9 @@
 /**
- * Hard recovery for marches stuck at the target: **`arrived` / `queued`** use wall-clock **`arriveAt`**;
- * **`resolving`** uses **`resolvingSince`** (when battle resolution started) so we do not refund based on
- * outbound travel time before the headless battle ran. Abandon non-complete battle, full refund → `cancelled`.
- * Runs on the march due sweep (multi-instance safe).
+ * Hard recovery for marches stuck at the target: **`arrived` / `queued`** use **`atTargetSince`** when set
+ * (actual transition to target); legacy rows fall back to **`arriveAt`**. Scheduled **`arriveAt`** can be far in
+ * the past for late sweeps, so we must not use it alone — otherwise the same sweep tick can refund a march that
+ * just became `arrived`. **`resolving`** uses **`resolvingSince`**. Abandon non-complete battle, full refund →
+ * `cancelled`. Runs on the march due sweep (multi-instance safe).
  */
 
 import { AttackMarch } from '../models/AttackMarch';
@@ -33,7 +34,10 @@ export async function runStuckAtTargetRecoveryOnce(): Promise<void> {
     $or: [
       {
         state: { $in: ['arrived', 'queued'] },
-        arriveAt: { $lte: cutoff },
+        $or: [
+          { atTargetSince: { $lte: cutoff } },
+          { atTargetSince: { $exists: false }, arriveAt: { $lte: cutoff } },
+        ],
       },
       {
         state: 'resolving',

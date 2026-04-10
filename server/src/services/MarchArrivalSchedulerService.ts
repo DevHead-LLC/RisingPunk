@@ -27,7 +27,7 @@ export async function processMarchArrival(marchId: string): Promise<void> {
   try {
     const updated = await AttackMarch.findOneAndUpdate(
       { marchId, state: 'outbound' },
-      { $set: { state: 'arrived' } },
+      { $set: { state: 'arrived', atTargetSince: new Date() } },
       { new: true, lean: true }
     );
     if (updated) {
