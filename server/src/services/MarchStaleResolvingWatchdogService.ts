@@ -19,7 +19,8 @@ import { tryStartNextMarchResolutionForQueueKey } from './MarchResolutionService
 let legacyResolvingSinceBackfillDone = false;
 let watchdogInterval: ReturnType<typeof setInterval> | null = null;
 
-async function backfillResolvingSinceOnLegacyRows(): Promise<void> {
+/** One-shot per process: legacy `resolving` rows may lack `resolvingSince`; use `arriveAt` as fallback age. */
+export async function backfillResolvingSinceOnLegacyRows(): Promise<void> {
   if (legacyResolvingSinceBackfillDone) {
     return;
   }
