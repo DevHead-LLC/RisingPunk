@@ -13,7 +13,8 @@
     "seed:database": "node scripts/seedDatabase.js",
     "backup:guide": "node scripts/backupRestore.js",
     "update:npc": "ts-node scripts/updateNPCs.ts",
-    "update:npc-spreadsheet": "ts-node scripts/updateNpcCollectionFromSpreadsheet.ts"
+    "update:npc-spreadsheet": "ts-node scripts/updateNpcCollectionFromSpreadsheet.ts",
+    "battle-retention:once": "ts-node scripts/runBattleDataRetentionOnce.ts"
   },
   "keywords": [],
   "author": "",

@@ -144,11 +144,15 @@ export class RetargetingService {
     if (candidateTargets.length === 0) {
       return null;
     }
-    
-    const selectedTarget = candidateTargets.length === 1 
-      ? candidateTargets[0] 
-      : candidateTargets[Math.floor(Math.random() * candidateTargets.length)];
-    
+
+    // Neutral nodes act as walls: capture them before engaging enemies at the same or further distance.
+    const neutralAtClosest = candidateTargets.filter(c => c.targetType === 'neutral_node');
+    const selectionPool = neutralAtClosest.length > 0 ? neutralAtClosest : candidateTargets;
+
+    const selectedTarget = selectionPool.length === 1 
+      ? selectionPool[0] 
+      : selectionPool[Math.floor(Math.random() * selectionPool.length)];
+
     return {
       targetNodeIndex: selectedTarget.nodeIndex,
       pathToTarget: selectedTarget.path,

@@ -61,6 +61,15 @@ export interface ProfileResponse {
   profileGender: 'male' | 'female';
   totalGuardiansBuilt?: number;
   crewBackupHelpCount?: number;
+  /** Present on GET /api/users/profile — kept in sync for Profile / Game Center after battles. */
+  battleStats?: {
+    botsDestroyed: number;
+    botsLost: number;
+    successfulAttacks: number;
+    failedAttacks: number;
+    successfulDefenses: number;
+    failedDefenses: number;
+  };
 }
 
 export interface UserLookupResponse {
