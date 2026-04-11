@@ -186,7 +186,7 @@ export class BattleRewardService {
       return {
         guardian: botDoc.bots.guardian,
         breacher: botDoc.bots.breacher,
-        phreak: botDoc.phreak
+        phreak: botDoc.bots.phreak
       };
     } catch (error) {
       console.error('❌ BATTLE REWARDS: Error getting user bot counts:', error);
