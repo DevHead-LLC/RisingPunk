@@ -11,18 +11,7 @@ import { authApi } from '../../store/api/authApi';
 import { userGuideApi } from '../../store/api/userGuideApi';
 import { balanceApi } from '../../store/api/balanceApi';
 import gameCenterService from '../../services/gameCenterService';
-
-function normalizeUserId(value: unknown): string {
-  if (value == null) return '';
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'object' && value !== null) {
-    const o = value as Record<string, unknown>;
-    if (typeof o.$oid === 'string') return o.$oid.trim();
-    if (o._id != null) return normalizeUserId(o._id);
-  }
-  const s = String(value);
-  return s === 'undefined' || s === 'null' ? '' : s.trim();
-}
+import { normalizeUserId } from '../../utils/battleUtils';
 
 interface BattleEndOverlayProps {
   winner: NodeOwner;
@@ -93,7 +82,7 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
               await gameCenterService.submitLifetimeNetWorthScore(balanceResult.lifetimeHighNetWorth, true);
             }
           }
-        } catch (error) {
+        } catch {
           // Silently fail - Game Center is optional
         }
       };
