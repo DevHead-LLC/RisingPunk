@@ -273,23 +273,19 @@ export class BattleService {
 
     // Store end condition and winner for response.
     // Must persist before PvP money transfer (reads winner from MongoDB).
-    // Also set phase + endTime here so the row is never left winner=PENDING with phase=ACTIVE if
-    // a later step fails before endBattle() (previously only endBattle set COMPLETE).
+    // Bugbot: do not set phase to COMPLETE (or endTime) here. Clients poll phase === complete and
+    // BattleResponseService only attaches battleEndData when phase is complete; an early COMPLETE
+    // save created a window with COMPLETE + missing XP/cash/level-up. endBattle() persists COMPLETE
+    // + endTime after NPC/PvP rewards and related battle fields are written.
     (battle as any).endCondition = endCondition;
     battle.winner = winner;
-    battle.phase = BattlePhase.COMPLETE;
-    battle.endTime = new Date();
     await battle.save();
 
     // Unlock hack rig if user wins by elimination (only if flagged)
     if (winner === NodeOwner.USER && endCondition === 'elimination' && (battle as any).unlockHackRigOnWin) {
       try {
         const user = await User.findById(battle.attackerId);
-        if (!user) {
-          return;
-        }
-
-        if (!user.unlockedFeatures?.hackRig) {
+        if (user && !user.unlockedFeatures?.hackRig) {
           user.unlockedFeatures = user.unlockedFeatures || {};
           user.unlockedFeatures.hackRig = true;
           await user.save();
