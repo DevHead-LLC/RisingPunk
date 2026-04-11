@@ -1,12 +1,15 @@
 /**
- * Apply experience to the attacker when they win a user-vs-user (Hack Map PvP) battle.
- * Idempotent via `pvpExperienceReward.processedAt` (same pattern as `pvpMoneyTransfer`).
+ * PvP (user defender) battle experience — plumbing for a future "bots destroyed" (or similar) reward.
+ * While {@link ENABLE_PVP_BATTLE_EXPERIENCE_REWARD} is false, this does not call `LevelingService` or persist rewards.
  */
 
 import { Battle } from '../models/Battle';
 import type { IBattleDocument } from '../models/Battle';
 import { NodeOwner } from '../types/battle';
-import { PVP_BATTLE_EXPERIENCE_REWARD } from '../config/pvpBattleRewards';
+import {
+  ENABLE_PVP_BATTLE_EXPERIENCE_REWARD,
+  PVP_BATTLE_EXPERIENCE_REWARD,
+} from '../config/pvpBattleRewards';
 import { LevelingService } from './LevelingService';
 
 export interface PvPBattleExperienceResult {
@@ -14,12 +17,16 @@ export interface PvPBattleExperienceResult {
 }
 
 /**
- * When the attacker wins a PvP battle, grant {@link PVP_BATTLE_EXPERIENCE_REWARD} once per battle.
- * Persists `processedRewards.experienceGained` / `levelUp` for replay and API parity with NPC battles.
+ * When the attacker wins a PvP battle, grant experience once per battle (when enabled).
+ * Idempotent via `pvpExperienceReward.processedAt` (same pattern as `pvpMoneyTransfer`).
  */
 export async function processPvPBattleExperienceReward(
   battleId: string
 ): Promise<PvPBattleExperienceResult> {
+  if (!ENABLE_PVP_BATTLE_EXPERIENCE_REWARD) {
+    return { experienceGained: 0 };
+  }
+
   const battle = await Battle.findOne({ battleId });
   if (!battle) {
     return { experienceGained: 0 };
