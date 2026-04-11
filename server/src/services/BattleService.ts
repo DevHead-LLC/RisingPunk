@@ -16,6 +16,7 @@ import { DefenderDeploymentService } from './DefenderDeploymentService';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 import { sendBattleNotifications } from './BattleNotificationService';
 import { processPvPBattleMoneyTransfer } from './PvPBattleMoneyService';
+import { processPvPBattleExperienceReward } from './PvPBattleExperienceService';
 import { BattleReplayRecorder } from './BattleReplayRecorder';
 import {
   detachHeadlessWorkingBattle,
@@ -363,6 +364,14 @@ export class BattleService {
         console.error('PvP battle money transfer failed for', battleId, e);
       }
 
+      let pvpExperienceGained = 0;
+      try {
+        const xpResult = await processPvPBattleExperienceReward(battleId);
+        pvpExperienceGained = xpResult.experienceGained;
+      } catch (e) {
+        console.error('PvP battle experience reward failed for', battleId, e);
+      }
+
       // Send battle result DMs to attacker and defender (same pattern as Probe Report)
       try {
         const battleForNotifications = await this.getBattle(battleId);
@@ -370,7 +379,7 @@ export class BattleService {
           console.error('Battle document missing before notifications for', battleId);
         } else {
           // Fresh read so BTL payload uses persisted battalions (in-memory battle can diverge if battle doc is updated between save and send).
-          await sendBattleNotifications(battleForNotifications, pvpCashTransferred);
+          await sendBattleNotifications(battleForNotifications, pvpCashTransferred, pvpExperienceGained);
         }
       } catch (e) {
         console.error('Battle notifications failed for', battleId, e);

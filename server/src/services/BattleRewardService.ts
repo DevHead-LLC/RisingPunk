@@ -23,8 +23,9 @@ export interface BattleRewardResult {
 
 export class BattleRewardService {
   /**
-   * Process battle rewards and losses for a user
-   * Only rewards if user wins and enemy has 0 remaining battalions (complete victory)
+   * Process battle rewards and losses for a user.
+   * Bot loss accounting always runs; XP/cash apply on any NPC win (same as `battle.winner`),
+   * including timer / point-decided wins where enemy units still remain.
    */
   static async processBattleRewards(
     battle: IBattleDocument,
@@ -103,14 +104,6 @@ export class BattleRewardService {
       let lifetimeHighUpdated = false;
 
       if (userWon) {
-        // Check if this is a complete victory (enemy has 0 remaining battalions)
-        const enemyBattalions = battle.battalions.filter(b => b.owner === NodeOwner.ENEMY);
-        const hasEnemyRemaining = enemyBattalions.some(b => b.quantity > 0);
-        
-        if (hasEnemyRemaining) {
-          return { success: true, botLosses }; // Still return bot losses even if no rewards
-        }
-
         // Get NPC data for rewards
         const { NPCService } = require('./NPCService');
         const npc = await NPCService.getNPCBySlug(npcSlug);

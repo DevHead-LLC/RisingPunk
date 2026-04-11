@@ -171,6 +171,25 @@ export class BattleResponseService {
       } catch (error) {
         console.warn('Could not fetch rewards for battle end data:', error);
       }
+    } else if (battleLosses.winner === NodeOwner.USER && battle.isUserDefender) {
+      try {
+        const pr = (
+          battle as {
+            processedRewards?: {
+              experienceGained?: number;
+              levelUp?: { levelsGained: number; newLevel: number };
+            };
+          }
+        ).processedRewards;
+        if (pr?.experienceGained != null && Number.isFinite(pr.experienceGained)) {
+          experienceGained = pr.experienceGained;
+        }
+        if (pr?.levelUp) {
+          levelUp = pr.levelUp;
+        }
+      } catch (error) {
+        console.warn('Could not fetch PvP rewards for battle end data:', error);
+      }
     }
 
     const losses: BattleLosses = {

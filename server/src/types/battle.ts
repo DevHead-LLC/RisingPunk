@@ -130,6 +130,8 @@ export interface IBattle extends Document {
   processedRewards?: any;
   /** PvP hack theft amount (defender → attacker); set once at battle end. */
   pvpMoneyTransfer?: { amount: number; processedAt: Date };
+  /** PvP experience granted to attacker on win; set once at battle end. */
+  pvpExperienceReward?: { amount: number; processedAt: Date };
   screenWidth: number;
   screenHeight: number;
   createdAt: Date;

@@ -226,6 +226,11 @@ const battleSchema = new Schema({
     amount: { type: Number },
     processedAt: { type: Date }
   },
+  /** PvP XP grant to attacker on win; set once at battle end (see PvPBattleExperienceService). */
+  pvpExperienceReward: {
+    amount: { type: Number },
+    processedAt: { type: Date }
+  },
   screenWidth: { type: Number, required: true },
   screenHeight: { type: Number, required: true }
 }, {
