@@ -106,8 +106,11 @@ export interface BattleReportPayload {
   winner: 'user' | 'enemy';
   /** Dollars moved from defender wallet to attacker when attacker won (0 or omitted if none). */
   cash?: number;
-  /** XP applied to attacker on win (PvP and NPC battle reports when server sends it). */
+  /** NPC / legacy: single XP line. */
   xp?: number;
+  /** PvP: XP from destroying opponent bots (per side). */
+  xpAttacker?: number;
+  xpDefender?: number;
   /** Synthetic IP-style hack location (server `hl`); not real map data. */
   hl?: string;
   /** When present with `x`/`y`, tap-to-navigate on map (same as shared location in chat). */
@@ -541,13 +544,27 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               typeof report.cash === 'number' && Number.isFinite(report.cash)
                                 ? Math.max(0, Math.floor(report.cash))
                                 : 0;
-                            const xp =
-                              typeof report.xp === 'number' && Number.isFinite(report.xp)
-                                ? Math.max(0, Math.floor(report.xp))
-                                : 0;
                             // NPC: show wallet only when cash > 0 (server sets cash from processedRewards).
                             // PvP: always show wallet line when attacker won — even $0 (defender had no remaining balance).
                             const isPvP = report.npc !== 1;
+                            const xpLegacy =
+                              typeof report.xp === 'number' && Number.isFinite(report.xp)
+                                ? Math.max(0, Math.floor(report.xp))
+                                : 0;
+                            const xpAtt =
+                              typeof report.xpAttacker === 'number' && Number.isFinite(report.xpAttacker)
+                                ? Math.max(0, Math.floor(report.xpAttacker))
+                                : 0;
+                            const xpDef =
+                              typeof report.xpDefender === 'number' && Number.isFinite(report.xpDefender)
+                                ? Math.max(0, Math.floor(report.xpDefender))
+                                : 0;
+                            const xp =
+                              isPvP && (xpAtt > 0 || xpDef > 0)
+                                ? isAttacker
+                                  ? xpAtt
+                                  : xpDef
+                                : xpLegacy;
                             const showWallet = report.winner === 'user' && (isPvP || cash > 0);
                             const hackLocLine =
                               typeof report.hl === 'string' && report.hl.trim().length > 0
@@ -689,7 +706,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                           : 'Wallet lost: $0 (No remaining balance)'}
                                   </Text>
                                 ) : null}
-                                {report.winner === 'user' && isAttacker && xp > 0 ? (
+                                {xp > 0 ? (
                                   <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
                                     Experience gained: {fmt(xp)} XP
                                   </Text>

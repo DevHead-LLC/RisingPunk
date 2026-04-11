@@ -189,7 +189,9 @@ export class BattleService {
     if (phase === BattlePhase.ACTIVE) {
       updates.countdown = 0;
       updates.battleTime = 0;
-      BattalionService.startMovementUpdates(battleId);
+      if (!isHeadlessWorkingBattleActive(battleId)) {
+        BattalionService.startMovementUpdates(battleId);
+      }
     }
 
     // Persist phase (and ACTIVE countdown/battleTime) before defender first-wave deploy so deployWave
@@ -198,12 +200,11 @@ export class BattleService {
 
     if (phase === BattlePhase.ACTIVE) {
       const battle = await this.getBattle(battleId);
+      const marchSourced = (battle as { marchSourcedAttack?: boolean } | null)?.marchSourcedAttack === true;
+
       if (battle?.isUserDefender) {
         await DefenderDeploymentService.onTick(battleId);
       }
-      // Async march battles never hit BattleController.getBattleState; without this, targeting never
-      // starts and timer expiry yields a 0–0 tie → defender wins (Hack Failed, no casualties).
-      const marchSourced = (battle as { marchSourcedAttack?: boolean } | null)?.marchSourcedAttack === true;
       if (marchSourced && battle && BattalionService.getTargetingResults(battleId).length === 0) {
         await this.triggerInitialTargeting(battleId);
         const primed = await this.getBattle(battleId);
@@ -272,8 +273,12 @@ export class BattleService {
 
     // Store end condition and winner for response.
     // Must persist before PvP money transfer (reads winner from MongoDB).
+    // Also set phase + endTime here so the row is never left winner=PENDING with phase=ACTIVE if
+    // a later step fails before endBattle() (previously only endBattle set COMPLETE).
     (battle as any).endCondition = endCondition;
     battle.winner = winner;
+    battle.phase = BattlePhase.COMPLETE;
+    battle.endTime = new Date();
     await battle.save();
 
     // Unlock hack rig if user wins by elimination (only if flagged)
@@ -364,10 +369,12 @@ export class BattleService {
         console.error('PvP battle money transfer failed for', battleId, e);
       }
 
-      let pvpExperienceGained = 0;
+      let pvpXpAttacker = 0;
+      let pvpXpDefender = 0;
       try {
         const xpResult = await processPvPBattleExperienceReward(battleId);
-        pvpExperienceGained = xpResult.experienceGained;
+        pvpXpAttacker = xpResult.attackerXp;
+        pvpXpDefender = xpResult.defenderXp;
       } catch (e) {
         console.error('PvP battle experience reward failed for', battleId, e);
       }
@@ -379,7 +386,7 @@ export class BattleService {
           console.error('Battle document missing before notifications for', battleId);
         } else {
           // Fresh read so BTL payload uses persisted battalions (in-memory battle can diverge if battle doc is updated between save and send).
-          await sendBattleNotifications(battleForNotifications, pvpCashTransferred, pvpExperienceGained);
+          await sendBattleNotifications(battleForNotifications, pvpCashTransferred, pvpXpAttacker, pvpXpDefender);
         }
       } catch (e) {
         console.error('Battle notifications failed for', battleId, e);

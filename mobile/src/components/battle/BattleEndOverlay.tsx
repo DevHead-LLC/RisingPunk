@@ -12,6 +12,18 @@ import { userGuideApi } from '../../store/api/userGuideApi';
 import { balanceApi } from '../../store/api/balanceApi';
 import gameCenterService from '../../services/gameCenterService';
 
+function normalizeUserId(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object' && value !== null) {
+    const o = value as Record<string, unknown>;
+    if (typeof o.$oid === 'string') return o.$oid.trim();
+    if (o._id != null) return normalizeUserId(o._id);
+  }
+  const s = String(value);
+  return s === 'undefined' || s === 'null' ? '' : s.trim();
+}
+
 interface BattleEndOverlayProps {
   winner: NodeOwner;
   onContinue: () => void;
@@ -23,27 +35,40 @@ export const BattleEndOverlay: React.FC<BattleEndOverlayProps> = ({ winner, onCo
   const dispatch = useAppDispatch();
   const [showLevelUpAnimation, setShowLevelUpAnimation] = useState(false);
   const token = useAppSelector((state) => state.auth.token);
+  const myId = useAppSelector((state) => state.auth.user?._id ?? state.auth.user?.id);
+
+  const viewerLevelUp =
+    battleEndData?.isPvPBattle === true && battleEndData.attackerId && battleEndData.defenderId
+      ? (() => {
+          const ul = normalizeUserId(myId).toLowerCase();
+          const al = normalizeUserId(battleEndData.attackerId).toLowerCase();
+          const dl = normalizeUserId(battleEndData.defenderId).toLowerCase();
+          if (ul && al && ul === al) return battleEndData.levelUpAttacker;
+          if (ul && dl && ul === dl) return battleEndData.levelUpDefender;
+          return undefined;
+        })()
+      : battleEndData?.levelUp;
 
   useEffect(() => {
-    if (battleEndData?.levelUp && battleEndData.levelUp.levelsGained > 0) {
+    if (viewerLevelUp && viewerLevelUp.levelsGained > 0) {
       setShowLevelUpAnimation(true);
     }
-  }, [battleEndData]);
+  }, [viewerLevelUp]);
 
   // When battle ends with a level-up, update auth level from the response so Research Center (and any UI) sees the new level live — no fetch, no refresh. Also invalidate caches for next time profile/tasks are loaded.
   // Refresh auth user silently so unlockedFeatures (e.g. hackRig) updates without triggering app loading state.
   useEffect(() => {
     if (battleEndData) {
-      if (battleEndData.levelUp?.newLevel != null) {
-        dispatch(setUserLevel(battleEndData.levelUp.newLevel));
+      if (viewerLevelUp?.newLevel != null) {
+        dispatch(setUserLevel(viewerLevelUp.newLevel));
       }
       dispatch(authApi.util.invalidateTags(['User']));
       dispatch(refreshUserDataSilent());
-      if (battleEndData.levelUp && battleEndData.levelUp.levelsGained > 0) {
+      if (viewerLevelUp && viewerLevelUp.levelsGained > 0) {
         dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
       }
     }
-  }, [battleEndData, dispatch]);
+  }, [battleEndData, dispatch, viewerLevelUp]);
 
   // Submit Game Center scores when battle ends
   useEffect(() => {

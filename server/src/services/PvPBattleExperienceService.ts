@@ -1,90 +1,168 @@
 /**
- * PvP (user defender) battle experience — plumbing for a future "bots destroyed" (or similar) reward.
- * While {@link ENABLE_PVP_BATTLE_EXPERIENCE_REWARD} is false, this does not call `LevelingService` or persist rewards.
+ * PvP battle experience: both attacker and defender earn XP from opponent bots destroyed
+ * (Mark I = {@link PVP_XP_PER_MARK_I_BOT_DESTROYED} XP/unit, Mark II = {@link PVP_XP_PER_MARK_II_BOT_DESTROYED} XP/unit).
+ *
+ * Idempotent via `pvpExperienceBySide.{attacker|defender}.processedAt`; MongoDB transaction bundles
+ * User XP updates + Battle document (same pattern as {@link processPvPBattleMoneyTransfer}).
  */
 
+import mongoose from 'mongoose';
 import { Battle } from '../models/Battle';
 import type { IBattleDocument } from '../models/Battle';
-import { NodeOwner } from '../types/battle';
+import { NodeOwner, IBattalion } from '../types/battle';
 import {
-  ENABLE_PVP_BATTLE_EXPERIENCE_REWARD,
-  PVP_BATTLE_EXPERIENCE_REWARD,
+  PVP_XP_PER_MARK_I_BOT_DESTROYED,
+  PVP_XP_PER_MARK_II_BOT_DESTROYED,
 } from '../config/pvpBattleRewards';
 import { LevelingService } from './LevelingService';
 
 export interface PvPBattleExperienceResult {
-  experienceGained: number;
+  attackerXp: number;
+  defenderXp: number;
+}
+
+function xpPerUnitForMark(mark: number): number {
+  return mark >= 2 ? PVP_XP_PER_MARK_II_BOT_DESTROYED : PVP_XP_PER_MARK_I_BOT_DESTROYED;
 }
 
 /**
- * When the attacker wins a PvP battle, grant experience once per battle (when enabled).
- * Idempotent via `pvpExperienceReward.processedAt` (same pattern as `pvpMoneyTransfer`).
+ * Sum XP for units **lost** by battalions owned by `opponentOwner` (enemy bots the other side destroyed).
+ */
+export function computePvpXpFromOpponentLosses(
+  startingBattalions: IBattalion[],
+  endingBattalions: IBattalion[],
+  opponentOwner: NodeOwner
+): number {
+  const starting = startingBattalions.filter(b => b.owner === opponentOwner);
+  let total = 0;
+  for (const s of starting) {
+    const e = endingBattalions.find(b => b.id === s.id);
+    const endQty = e?.quantity ?? 0;
+    const destroyed = Math.max(0, s.quantity - endQty);
+    const mark = typeof s.mark === 'number' && Number.isFinite(s.mark) ? s.mark : 1;
+    total += destroyed * xpPerUnitForMark(mark);
+  }
+  return Math.floor(total);
+}
+
+/**
+ * Grant PvP XP to attacker and defender based on opponent bots destroyed; each side processed at most once.
  */
 export async function processPvPBattleExperienceReward(
   battleId: string
 ): Promise<PvPBattleExperienceResult> {
-  if (!ENABLE_PVP_BATTLE_EXPERIENCE_REWARD) {
-    return { experienceGained: 0 };
+  const existing = await Battle.findOne({ battleId })
+    .select('pvpExperienceBySide isUserDefender')
+    .lean();
+
+  if (!existing) {
+    return { attackerXp: 0, defenderXp: 0 };
+  }
+  if (!existing.isUserDefender) {
+    return { attackerXp: 0, defenderXp: 0 };
   }
 
-  const battle = await Battle.findOne({ battleId });
-  if (!battle) {
-    return { experienceGained: 0 };
-  }
-  if (!battle.isUserDefender) {
-    return { experienceGained: 0 };
-  }
-  if (battle.pvpExperienceReward?.processedAt) {
-    return { experienceGained: battle.pvpExperienceReward.amount ?? 0 };
+  const bySide = (existing as { pvpExperienceBySide?: { attacker?: { amount?: number; processedAt?: Date }; defender?: { amount?: number; processedAt?: Date } } }).pvpExperienceBySide;
+  if (bySide?.attacker?.processedAt != null && bySide?.defender?.processedAt != null) {
+    return {
+      attackerXp: typeof bySide.attacker.amount === 'number' ? bySide.attacker.amount : 0,
+      defenderXp: typeof bySide.defender.amount === 'number' ? bySide.defender.amount : 0,
+    };
   }
 
-  const now = new Date();
-  if (battle.winner !== NodeOwner.USER) {
-    battle.pvpExperienceReward = { amount: 0, processedAt: now };
-    await battle.save();
-    return { experienceGained: 0 };
-  }
-
-  const attackerId = battle.attackerId;
-  const defenderId = battle.defenderId;
-  if (!attackerId || !defenderId || String(attackerId) === String(defenderId)) {
-    battle.pvpExperienceReward = { amount: 0, processedAt: now };
-    await battle.save();
-    return { experienceGained: 0 };
-  }
-
-  const amount = PVP_BATTLE_EXPERIENCE_REWARD;
-  if (amount <= 0) {
-    battle.pvpExperienceReward = { amount: 0, processedAt: now };
-    await battle.save();
-    return { experienceGained: 0 };
-  }
+  const session = await mongoose.startSession();
+  let attackerXp = 0;
+  let defenderXp = 0;
 
   try {
-    const levelingResult = await LevelingService.applyExperience(String(attackerId), amount);
-    const levelUp =
-      levelingResult.levelsGained > 0
-        ? { levelsGained: levelingResult.levelsGained, newLevel: levelingResult.level }
-        : undefined;
+    await session.withTransaction(async () => {
+      const battleInTxn = await Battle.findOne({ battleId }).session(session);
+      if (!battleInTxn) {
+        throw new Error('Battle not found in transaction');
+      }
 
-    const prev = (battle as IBattleDocument & { processedRewards?: Record<string, unknown> })
-      .processedRewards;
-    const merged =
-      prev && typeof prev === 'object' && prev !== null && !Array.isArray(prev)
-        ? { ...prev }
-        : {};
+      const starting = battleInTxn.startingBattalions ?? [];
+      const ending = battleInTxn.battalions ?? [];
 
-    (battle as IBattleDocument & { processedRewards?: Record<string, unknown> }).processedRewards = {
-      ...merged,
-      experienceGained: amount,
-      levelUp,
-    };
-    battle.pvpExperienceReward = { amount, processedAt: now };
-    await battle.save();
+      const xpAttackerComputed = computePvpXpFromOpponentLosses(starting, ending, NodeOwner.ENEMY);
+      const xpDefenderComputed = computePvpXpFromOpponentLosses(starting, ending, NodeOwner.USER);
 
-    return { experienceGained: amount };
+      const attackerId = String(battleInTxn.attackerId ?? '').trim();
+      const defenderId = String(battleInTxn.defenderId ?? '').trim();
+      const validPair = Boolean(attackerId && defenderId && attackerId !== defenderId);
+      const now = new Date();
+
+      const sideState = {
+        ...(battleInTxn.pvpExperienceBySide as
+          | { attacker?: { amount?: number; processedAt?: Date }; defender?: { amount?: number; processedAt?: Date } }
+          | undefined),
+      };
+
+      let levelUpAttacker: { levelsGained: number; newLevel: number } | undefined;
+      let levelUpDefender: { levelsGained: number; newLevel: number } | undefined;
+
+      if (sideState.attacker?.processedAt == null) {
+        let grantedAtt = 0;
+        if (validPair && xpAttackerComputed > 0) {
+          const lr = await LevelingService.applyExperience(attackerId, xpAttackerComputed, { session });
+          grantedAtt = xpAttackerComputed;
+          attackerXp = grantedAtt;
+          if (lr.levelsGained > 0) {
+            levelUpAttacker = { levelsGained: lr.levelsGained, newLevel: lr.level };
+          }
+        } else {
+          attackerXp = 0;
+        }
+        sideState.attacker = { amount: grantedAtt, processedAt: now };
+      } else {
+        attackerXp = typeof sideState.attacker?.amount === 'number' ? sideState.attacker.amount : 0;
+      }
+
+      if (sideState.defender?.processedAt == null) {
+        let grantedDef = 0;
+        if (validPair && xpDefenderComputed > 0) {
+          const lr = await LevelingService.applyExperience(defenderId, xpDefenderComputed, { session });
+          grantedDef = xpDefenderComputed;
+          defenderXp = grantedDef;
+          if (lr.levelsGained > 0) {
+            levelUpDefender = { levelsGained: lr.levelsGained, newLevel: lr.level };
+          }
+        } else {
+          defenderXp = 0;
+        }
+        sideState.defender = { amount: grantedDef, processedAt: now };
+      } else {
+        defenderXp = typeof sideState.defender?.amount === 'number' ? sideState.defender.amount : 0;
+      }
+
+      (battleInTxn as IBattleDocument & { pvpExperienceBySide?: unknown }).pvpExperienceBySide =
+        sideState as NonNullable<IBattleDocument['pvpExperienceBySide']>;
+
+      const prevPr = (battleInTxn as IBattleDocument & { processedRewards?: Record<string, unknown> })
+        .processedRewards;
+      const merged =
+        prevPr && typeof prevPr === 'object' && prevPr !== null && !Array.isArray(prevPr)
+          ? { ...prevPr }
+          : {};
+
+      (battleInTxn as IBattleDocument & { processedRewards?: Record<string, unknown> }).processedRewards = {
+        ...merged,
+        pvpExperienceAttacker: xpAttackerComputed,
+        pvpExperienceDefender: xpDefenderComputed,
+        ...(levelUpAttacker ? { levelUpAttacker } : {}),
+        ...(levelUpDefender ? { levelUpDefender } : {}),
+      };
+
+      (battleInTxn as IBattleDocument & { pvpExperienceReward?: unknown }).pvpExperienceReward = undefined;
+
+      await battleInTxn.save({ session });
+    });
+
+    return { attackerXp, defenderXp };
   } catch (e) {
     console.error('PvPBattleExperienceService.processPvPBattleExperienceReward', battleId, e);
-    return { experienceGained: 0 };
+    return { attackerXp: 0, defenderXp: 0 };
+  } finally {
+    session.endSession();
   }
 }

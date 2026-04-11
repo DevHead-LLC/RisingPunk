@@ -3,6 +3,19 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { BattleEndData } from '../../store/api/battleApi';
 import { BattalionLossItem } from './BattalionLossItem';
 import { useThemeColors } from '../../hooks/useThemeColors';
+import { useAppSelector } from '../../store/hooks';
+
+function normalizeUserId(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'object' && value !== null) {
+    const o = value as Record<string, unknown>;
+    if (typeof o.$oid === 'string') return o.$oid.trim();
+    if (o._id != null) return normalizeUserId(o._id);
+  }
+  const s = String(value);
+  return s === 'undefined' || s === 'null' ? '' : s.trim();
+}
 
 interface Props {
   battleEndData: BattleEndData;
@@ -10,7 +23,24 @@ interface Props {
 
 export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
   const colors = useThemeColors();
-  const { losses, winner, experienceGained, hackerRewards, isUserDefender } = battleEndData;
+  const myId = useAppSelector((s) => s.auth.user?._id ?? s.auth.user?.id);
+  const { losses, winner, experienceGained, hackerRewards } = battleEndData;
+
+  const isPvP = battleEndData.isPvPBattle === true;
+  const aid = battleEndData.attackerId;
+  const did = battleEndData.defenderId;
+  const ul = normalizeUserId(myId).toLowerCase();
+  const al = aid != null ? normalizeUserId(aid).toLowerCase() : '';
+  const dl = did != null ? normalizeUserId(did).toLowerCase() : '';
+  const isAttackerViewer = ul.length > 0 && al.length > 0 && ul === al;
+  const isDefenderViewer = ul.length > 0 && dl.length > 0 && ul === dl;
+  const pvpViewerXp = isPvP
+    ? isAttackerViewer
+      ? battleEndData.pvpExperienceAttacker
+      : isDefenderViewer
+        ? battleEndData.pvpExperienceDefender
+        : undefined
+    : undefined;
   
   const userBattalions = losses.battalionLosses.filter(b => b.owner === 'user');
   const enemyBattalions = losses.battalionLosses.filter(b => b.owner === 'enemy');
@@ -86,22 +116,25 @@ export const BattleLossBreakdown: React.FC<Props> = ({ battleEndData }) => {
         </View>
       )}
 
-      {winner === 'user' && (experienceGained || hackerRewards) && (
+      {((!isPvP && winner === 'user' && (!!experienceGained || !!hackerRewards)) ||
+        (isPvP && typeof pvpViewerXp === 'number' && pvpViewerXp > 0)) && (
         <View style={styles.rewardsSection}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Rewards</Text>
           <View style={styles.rewardsContainer}>
-            {experienceGained && (
+            {((!isPvP && experienceGained) || (isPvP && pvpViewerXp != null && pvpViewerXp > 0)) && (
               <View style={[styles.rewardItem, { backgroundColor: colors.accent, borderColor: colors.neutral }]}>
                 <Text style={[styles.rewardLabel, { color: colors.neutral }]}>Experience Gained</Text>
-                <Text style={[styles.rewardValue, { color: colors.matrix }]}>{experienceGained} XP</Text>
+                <Text style={[styles.rewardValue, { color: colors.matrix }]}>
+                  {isPvP ? pvpViewerXp : experienceGained} XP
+                </Text>
               </View>
             )}
-            {hackerRewards && (
+            {!isPvP && hackerRewards ? (
               <View style={[styles.rewardItem, { backgroundColor: colors.accent, borderColor: colors.neutral }]}>
                 <Text style={[styles.rewardLabel, { color: colors.neutral }]}>Hacker Rewards</Text>
                 <Text style={[styles.rewardValue, { color: colors.matrix }]}>${hackerRewards}</Text>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
       )}

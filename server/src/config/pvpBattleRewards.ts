@@ -1,10 +1,7 @@
 /**
- * PvP (Hack Map user defender) battle rewards — plumbing only until product is ready to test.
- *
- * When enabled, XP amount will likely be derived from defender bots destroyed (not a flat constant).
- * NPC XP is unchanged: it always comes from each NPC's `battleExperienceReward` via {@link BattleRewardService}.
+ * PvP (Hack Map user defender) experience — XP per **enemy bot unit destroyed** (by mark tier).
+ * Attacker earns from defender battalions (NODE ENEMY); defender earns from attacker battalions (NODE USER).
+ * NPC XP is unchanged: {@link BattleRewardService} uses each NPC's `battleExperienceReward`.
  */
-export const ENABLE_PVP_BATTLE_EXPERIENCE_REWARD = false;
-
-/** Placeholder for the future formula; not applied while {@link ENABLE_PVP_BATTLE_EXPERIENCE_REWARD} is false. */
-export const PVP_BATTLE_EXPERIENCE_REWARD = 250;
+export const PVP_XP_PER_MARK_I_BOT_DESTROYED = 1;
+export const PVP_XP_PER_MARK_II_BOT_DESTROYED = 4;
