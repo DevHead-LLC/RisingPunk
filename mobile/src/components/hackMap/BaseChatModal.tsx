@@ -30,6 +30,7 @@ import {
 } from '../../../../shared/hackMapLocationDisplay';
 import { parseMapLocationShareMessage } from '../../../../shared/mapLocationShareMessage';
 import type { ReportContext } from '../../types/reports';
+import { normalizeUserId } from '../../utils/battleUtils';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
@@ -163,19 +164,6 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
   return null;
 }
 
-/** Normalize user ids for comparison (Mongo hex, $oid, trim). */
-function normalizeMongoId(value: unknown): string {
-  if (value == null) return '';
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'object' && value !== null) {
-    const o = value as Record<string, unknown>;
-    if (typeof o.$oid === 'string') return o.$oid.trim();
-    if (o._id != null) return normalizeMongoId(o._id);
-  }
-  const s = String(value);
-  return s === 'undefined' || s === 'null' ? '' : s.trim();
-}
-
 /**
  * Whether the viewer is the attacker (hacker) vs defender (hackee).
  * Uses id match (case-insensitive hex) and handle fallback when ids differ in shape.
@@ -184,9 +172,9 @@ function battleReportViewerIsAttacker(
   report: BattleReportPayload,
   currentUser: BaseChatModalProps['currentUser']
 ): boolean {
-  const uid = normalizeMongoId(currentUser?._id ?? currentUser?.id);
-  const aid = normalizeMongoId(report.attackerId);
-  const did = normalizeMongoId(report.defenderId);
+  const uid = normalizeUserId(currentUser?._id ?? currentUser?.id);
+  const aid = normalizeUserId(report.attackerId);
+  const did = normalizeUserId(report.defenderId);
   const ul = uid.toLowerCase();
   const al = aid.toLowerCase();
   const dl = did.toLowerCase();
