@@ -306,10 +306,14 @@ export class BattleReplayRecorder {
   }
 
   async finalizeAfterBattleEnd(battleId: string, completedBattle: IBattleDocument): Promise<void> {
-    if (!ENABLE_BATTLE_REPLAY_RECORDING) return;
+    if (!ENABLE_BATTLE_REPLAY_RECORDING) {
+      return;
+    }
 
     const session = this.sessions.get(battleId);
-    if (!session) return;
+    if (!session) {
+      return;
+    }
 
     try {
       await session.captureChain;

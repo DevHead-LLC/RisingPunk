@@ -27,6 +27,26 @@ export class BattalionService {
     return results;
   }
 
+  /**
+   * Appends new battalions to an existing targeting map without replacing it.
+   * Used when defender waves deploy mid-battle so their IDs exist before retargeting updates them.
+   */
+  static seedNewBattalionsIntoTargetingMap(battalions: IBattalion[], nodes: INode[], battleId: string): void {
+    const newResults = TargetingService.assignInitialTargets(battalions, nodes);
+    const currentResults = this.getTargetingResults(battleId);
+    const existingIds = new Set(currentResults.map(r => r.battalionId));
+    let seeded = 0;
+    for (const result of newResults) {
+      if (!existingIds.has(result.battalionId)) {
+        currentResults.push(result);
+        seeded++;
+      }
+    }
+    if (seeded > 0) {
+      this.targetingResults.set(battleId, currentResults);
+    }
+  }
+
   static getTargetingResults(battleId?: string): BattalionTargetingResult[] {
     return battleId ? this.targetingResults.get(battleId) || [] : [];
   }
@@ -45,10 +65,6 @@ export class BattalionService {
         existingResult.targetNode = retargetResult.newTargetNodeIndex;
         existingResult.targetType = retargetResult.targetType;
         existingResult.targetBattalionId = retargetResult.targetBattalionId;
-        
-        const targetInfo = retargetResult.targetType === 'enemy_battalion' 
-          ? `${retargetResult.targetType} ${retargetResult.targetBattalionId} at node ${retargetResult.newTargetNodeIndex}`
-          : `${retargetResult.targetType} at node ${retargetResult.newTargetNodeIndex}`;
       }
     });
     
