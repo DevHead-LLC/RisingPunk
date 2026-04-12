@@ -157,6 +157,23 @@ export const ATTACK_MARCH_TERMINAL_PRUNE_INTERVAL_MS = parsePositiveIntMs(
   60_000
 );
 
+/**
+ * Delete `battles` and `battle_replays` documents older than this age (by `createdAt`; legacy battles
+ * without `createdAt` use `startTime`). Default **7 days**; first sweep on startup removes existing old rows.
+ */
+export const BATTLE_DATA_RETENTION_MS = parsePositiveIntMs(
+  'BATTLE_DATA_RETENTION_MS',
+  7 * 24 * 60 * 60 * 1000,
+  60_000
+);
+
+/** How often each process runs battle + replay retention (default 24h). */
+export const BATTLE_DATA_RETENTION_SWEEP_INTERVAL_MS = parsePositiveIntMs(
+  'BATTLE_DATA_RETENTION_SWEEP_INTERVAL_MS',
+  24 * 60 * 60 * 1000,
+  60_000
+);
+
 // Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
 let cachedAdminIds: mongoose.Types.ObjectId[] | null = null;
 

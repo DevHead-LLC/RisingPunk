@@ -130,6 +130,11 @@ export interface IBattle extends Document {
   processedRewards?: any;
   /** PvP hack theft amount (defender → attacker); set once at battle end. */
   pvpMoneyTransfer?: { amount: number; processedAt: Date };
+  /** PvP XP per participant (see PvPBattleExperienceService). */
+  pvpExperienceBySide?: {
+    attacker?: { amount: number; processedAt: Date };
+    defender?: { amount: number; processedAt: Date };
+  };
   screenWidth: number;
   screenHeight: number;
   createdAt: Date;
@@ -226,6 +231,17 @@ export interface BattleEndData {
     levelsGained: number;
     newLevel: number;
   };
+  /** PvP: Mongo attacker user id (for client to pick viewer-specific XP). */
+  attackerId?: string;
+  /** PvP: Mongo defender user id. */
+  defenderId?: string;
+  /** PvP: XP from destroying opponent Mark I/II bots (1 / 4 per unit by mark). */
+  pvpExperienceAttacker?: number;
+  pvpExperienceDefender?: number;
+  levelUpAttacker?: { levelsGained: number; newLevel: number };
+  levelUpDefender?: { levelsGained: number; newLevel: number };
+  lifetimeHighUpdated?: boolean;
+  isUserDefender?: boolean;
   isPvPBattle?: boolean;
 }
 

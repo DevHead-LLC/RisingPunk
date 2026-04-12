@@ -150,7 +150,11 @@ export class BattleResponseService {
     let experienceGained: number | undefined;
     let hackerRewards: number | undefined;
     let levelUp: { levelsGained: number; newLevel: number } | undefined;
-    
+    let pvpExperienceAttacker: number | undefined;
+    let pvpExperienceDefender: number | undefined;
+    let levelUpAttacker: { levelsGained: number; newLevel: number } | undefined;
+    let levelUpDefender: { levelsGained: number; newLevel: number } | undefined;
+
     if (battleLosses.winner === NodeOwner.USER && (battle as any).defenderNpcSlug) {
       try {
         // Check if rewards were already processed by looking for a rewards field
@@ -170,6 +174,33 @@ export class BattleResponseService {
         }
       } catch (error) {
         console.warn('Could not fetch rewards for battle end data:', error);
+      }
+    } else if (battle.isUserDefender) {
+      try {
+        const pr = (
+          battle as {
+            processedRewards?: {
+              pvpExperienceAttacker?: number;
+              pvpExperienceDefender?: number;
+              levelUpAttacker?: { levelsGained: number; newLevel: number };
+              levelUpDefender?: { levelsGained: number; newLevel: number };
+            };
+          }
+        ).processedRewards;
+        if (pr?.pvpExperienceAttacker != null && Number.isFinite(pr.pvpExperienceAttacker)) {
+          pvpExperienceAttacker = pr.pvpExperienceAttacker;
+        }
+        if (pr?.pvpExperienceDefender != null && Number.isFinite(pr.pvpExperienceDefender)) {
+          pvpExperienceDefender = pr.pvpExperienceDefender;
+        }
+        if (pr?.levelUpAttacker) {
+          levelUpAttacker = pr.levelUpAttacker;
+        }
+        if (pr?.levelUpDefender) {
+          levelUpDefender = pr.levelUpDefender;
+        }
+      } catch (error) {
+        console.warn('Could not fetch PvP rewards for battle end data:', error);
       }
     }
 
@@ -193,8 +224,10 @@ export class BattleResponseService {
                         !battle.defenderId.startsWith('npc-') && 
                         !battle.defenderId.startsWith('computer'));
 
-    const battleEndData = {
+    const battleEndData: BattleEndData = {
       battleId: battle.battleId,
+      attackerId: String(battle.attackerId),
+      defenderId: String(battle.defenderId),
       winner: battleLosses.winner,
       losses,
       endTime: battle.endTime || new Date(),
@@ -202,9 +235,13 @@ export class BattleResponseService {
       experienceGained,
       hackerRewards,
       levelUp,
+      pvpExperienceAttacker,
+      pvpExperienceDefender,
+      levelUpAttacker,
+      levelUpDefender,
       lifetimeHighUpdated: (battle as any).processedRewards?.lifetimeHighUpdated || false,
       isUserDefender: battle.isUserDefender || false,
-      isPvPBattle
+      isPvPBattle,
     };
     
     return battleEndData;

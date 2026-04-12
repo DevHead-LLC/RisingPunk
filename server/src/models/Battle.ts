@@ -226,6 +226,17 @@ const battleSchema = new Schema({
     amount: { type: Number },
     processedAt: { type: Date }
   },
+  /** PvP XP per side (destroyed opponent bots); set once per side at battle end (see PvPBattleExperienceService). */
+  pvpExperienceBySide: {
+    attacker: {
+      amount: { type: Number },
+      processedAt: { type: Date },
+    },
+    defender: {
+      amount: { type: Number },
+      processedAt: { type: Date },
+    },
+  },
   screenWidth: { type: Number, required: true },
   screenHeight: { type: Number, required: true }
 }, {
@@ -238,6 +249,7 @@ battleSchema.index({ battleId: 1 }, { unique: true });
 battleSchema.index({ attackerId: 1, phase: 1 });
 battleSchema.index({ defenderId: 1, phase: 1 });
 battleSchema.index({ phase: 1, startTime: 1 });
+battleSchema.index({ createdAt: 1 });
 battleSchema.index({ 'battalions.owner': 1 });
 battleSchema.index({ sourceMarchId: 1 }, { sparse: true });
 

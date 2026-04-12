@@ -255,6 +255,9 @@ mongoose.connect(process.env.MONGODB_URI, {
     
     // Start data cleanup service for privacy policy compliance
     DataCleanupService.startScheduledCleanup();
+
+    const { startBattleDataRetentionWatchdog } = require('./src/services/BattleDataRetentionService');
+    startBattleDataRetentionWatchdog();
     
     // Start activity aggregation service for privacy compliance
     const { ActivityAggregationService } = require('./src/services/ActivityAggregationService');
