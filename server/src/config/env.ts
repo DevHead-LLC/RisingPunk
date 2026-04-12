@@ -109,6 +109,71 @@ export const ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS = parsePositiveIntMs(
   1_000
 );
 
+/**
+ * If a march sits in `arrived` or `queued` this long after its target arrival time, periodically nudge
+ * queue reconcile + resolution (safety net if a one-shot server hook failed). Default **10 min**.
+ */
+export const ATTACK_MARCH_STALE_ARRIVED_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_STALE_ARRIVED_MS',
+  10 * 60 * 1000,
+  60_000
+);
+
+/**
+ * Hard recovery: if still `arrived`, `queued`, or `resolving` this long after **`arriveAt`**, abandon any
+ * in-progress battle (when `resolving`), full-inventory refund to `cancelled`, reconcile defender queue.
+ * Default **1 min** — primary guarantee to unblock stuck expeditions.
+ */
+export const ATTACK_MARCH_STUCK_AT_TARGET_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_STUCK_AT_TARGET_MS',
+  60 * 1000,
+  60_000
+);
+
+/**
+ * Max wall-clock duration for the **return** leg (`returning` → home), after battle resolution or cancel.
+ * Clamps `totalTravelSeconds` on the victory path and proportional cancel-return duration. Default **60s**.
+ */
+export const ATTACK_MARCH_RETURN_LEG_MAX_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_RETURN_LEG_MAX_MS',
+  60 * 1000,
+  1_000
+);
+
+/**
+ * Delete `attack_marches` in terminal states (`done`, `cancelled`) older than this age (by `createdAt`).
+ * Default 24h — does not affect `battle_replays` (keyed by `battleId`).
+ */
+export const ATTACK_MARCH_TERMINAL_MAX_AGE_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_TERMINAL_MAX_AGE_MS',
+  24 * 60 * 60 * 1000,
+  60_000
+);
+
+/** How often each server instance runs terminal march pruning (default 1h). */
+export const ATTACK_MARCH_TERMINAL_PRUNE_INTERVAL_MS = parsePositiveIntMs(
+  'ATTACK_MARCH_TERMINAL_PRUNE_INTERVAL_MS',
+  60 * 60 * 1000,
+  60_000
+);
+
+/**
+ * Delete `battles` and `battle_replays` documents older than this age (by `createdAt`; legacy battles
+ * without `createdAt` use `startTime`). Default **7 days**; first sweep on startup removes existing old rows.
+ */
+export const BATTLE_DATA_RETENTION_MS = parsePositiveIntMs(
+  'BATTLE_DATA_RETENTION_MS',
+  7 * 24 * 60 * 60 * 1000,
+  60_000
+);
+
+/** How often each process runs battle + replay retention (default 24h). */
+export const BATTLE_DATA_RETENTION_SWEEP_INTERVAL_MS = parsePositiveIntMs(
+  'BATTLE_DATA_RETENTION_SWEEP_INTERVAL_MS',
+  24 * 60 * 60 * 1000,
+  60_000
+);
+
 // Admin user IDs (comma-separated MongoDB ObjectIds). Users in this list can send PM as admin and may be used for future admin posting in crew/world chat.
 let cachedAdminIds: mongoose.Types.ObjectId[] | null = null;
 

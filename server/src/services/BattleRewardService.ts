@@ -3,7 +3,7 @@
  * @description Handles battle rewards, experience gains, and bot losses when battles conclude
  */
 
-import { User, IUser } from '../models/User';
+import { User } from '../models/User';
 import { IBattleDocument } from '../models/Battle';
 import { NodeOwner, BotType } from '../types/battle';
 import { getInventoryKey, type BotInventoryKey } from '../utils/botInventoryKeys';
@@ -23,8 +23,12 @@ export interface BattleRewardResult {
 
 export class BattleRewardService {
   /**
-   * Process battle rewards and losses for a user
-   * Only rewards if user wins and enemy has 0 remaining battalions (complete victory)
+   * Process battle rewards and losses for a user.
+   * Bot loss accounting always runs; XP/cash apply on any NPC win (same as `battle.winner`),
+   * including timer / point-decided wins where enemy units still remain.
+   *
+   * NPC XP/money run **before** march survivor inventory reconciliation so a missing `Bot` doc or
+   * failed $inc cannot block experience (march settlement errors are logged, not fatal to rewards).
    */
   static async processBattleRewards(
     battle: IBattleDocument,
@@ -33,8 +37,7 @@ export class BattleRewardService {
     try {
       const userWon = battle.winner === NodeOwner.USER;
 
-      // Check if this was a battle against an NPC
-      const npcSlug = (battle as any).defenderNpcSlug;
+      const npcSlug = String((battle as any).defenderNpcSlug ?? '').trim();
       if (!npcSlug) {
         return { success: false, error: 'Not a battle against NPC' };
       }
@@ -42,24 +45,69 @@ export class BattleRewardService {
       // Calculate bot losses from user battalions (regardless of who won)
       const userStartingBattalions = battle.startingBattalions?.filter(b => b.owner === NodeOwner.USER) || [];
       const userEndingBattalions = battle.battalions.filter(b => b.owner === NodeOwner.USER);
-      
+
       const botLosses: { [key in BotType]: number } = {
         guardian: 0,
         breacher: 0,
         phreak: 0
       };
 
-      // Calculate losses for each battalion type
       userStartingBattalions.forEach(startingBattalion => {
         const endingBattalion = userEndingBattalions.find(b => b.id === startingBattalion.id);
         const startingQuantity = startingBattalion.quantity;
         const endingQuantity = endingBattalion?.quantity || 0;
         const losses = startingQuantity - endingQuantity;
-        
+
         if (losses > 0) {
           botLosses[startingBattalion.type as BotType] += losses;
         }
       });
+
+      let experienceGained: number | undefined;
+      let moneyGained: number | undefined;
+      let levelUp: { levelsGained: number; newLevel: number } | undefined;
+      let lifetimeHighUpdated = false;
+
+      // Apply NPC XP and cash on win first — must not depend on march Bot collection writes.
+      if (userWon) {
+        const { NPCService } = require('./NPCService');
+        const npc = await NPCService.getNPCBySlug(npcSlug);
+        if (!npc) {
+          console.error(
+            '[BattleRewardService] NPC not found; cannot grant XP/cash. slug=',
+            npcSlug,
+            'battleId=',
+            battle.battleId
+          );
+        } else {
+          experienceGained = npc.battleExperienceReward;
+          if (typeof experienceGained === 'number' && Number.isFinite(experienceGained) && experienceGained > 0) {
+            const { LevelingService } = require('./LevelingService');
+            const levelingResult = await LevelingService.applyExperience(userId, experienceGained);
+
+            if (levelingResult.levelsGained > 0) {
+              levelUp = {
+                levelsGained: levelingResult.levelsGained,
+                newLevel: levelingResult.level
+              };
+            }
+          }
+
+          moneyGained = npc.victoryReward;
+          if (typeof moneyGained === 'number' && Number.isFinite(moneyGained) && moneyGained > 0) {
+            const user = await User.findById(userId);
+            if (user) {
+              user.balance.total += moneyGained;
+              user.balance.lastUpdated = new Date();
+
+              const { LifetimeHighNetWorthService } = await import('./LifetimeHighNetWorthService');
+              lifetimeHighUpdated = LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
+
+              await user.save();
+            }
+          }
+        }
+      }
 
       const marchSourced = (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true;
       const Bot = require('../models/Bot');
@@ -80,10 +128,13 @@ export class BattleRewardService {
         if (Object.keys($inc).length > 0) {
           const upd = await Bot.findOneAndUpdate({ userId }, { $inc }, { new: true });
           if (!upd) {
-            return {
-              success: false,
-              error: 'Bot document missing for march battle settlement',
-            };
+            console.error(
+              '[BattleRewardService] March bot survivor reconciliation failed (no Bot doc). userId=',
+              userId,
+              'battleId=',
+              battle.battleId,
+              '— XP/cash already applied if attacker won.'
+            );
           }
         }
       } else {
@@ -96,63 +147,6 @@ export class BattleRewardService {
         }
       }
 
-      // Only give experience and money rewards if user won
-      let experienceGained: number | undefined;
-      let moneyGained: number | undefined;
-      let levelUp: { levelsGained: number; newLevel: number } | undefined;
-      let lifetimeHighUpdated = false;
-
-      if (userWon) {
-        // Check if this is a complete victory (enemy has 0 remaining battalions)
-        const enemyBattalions = battle.battalions.filter(b => b.owner === NodeOwner.ENEMY);
-        const hasEnemyRemaining = enemyBattalions.some(b => b.quantity > 0);
-        
-        if (hasEnemyRemaining) {
-          return { success: true, botLosses }; // Still return bot losses even if no rewards
-        }
-
-        // Get NPC data for rewards
-        const { NPCService } = require('./NPCService');
-        const npc = await NPCService.getNPCBySlug(npcSlug);
-        if (!npc) {
-          return { success: true, botLosses }; // Still return bot losses even if no rewards
-        }
-
-        // Update user experience using LevelingService to trigger level ups
-        experienceGained = npc.battleExperienceReward;
-        
-        if (experienceGained) {
-          const { LevelingService } = require('./LevelingService');
-          const levelingResult = await LevelingService.applyExperience(userId, experienceGained);
-          
-          // Check if user leveled up
-          if (levelingResult.levelsGained > 0) {
-            levelUp = {
-              levelsGained: levelingResult.levelsGained,
-              newLevel: levelingResult.level
-            };
-          }
-        }
-
-        // Update user balance
-        moneyGained = npc.victoryReward;
-        if (moneyGained) {
-          const user = await User.findById(userId);
-          if (user) {
-            user.balance.total += moneyGained;
-            user.balance.lastUpdated = new Date();
-            
-            // Check and update lifetime high net worth
-            const { LifetimeHighNetWorthService } = await import('./LifetimeHighNetWorthService');
-            lifetimeHighUpdated = LifetimeHighNetWorthService.checkAndUpdateLifetimeHigh(user);
-            
-            // Save user (includes balance update and lifetime high if it was updated)
-            await user.save();
-          }
-        }
-      }
-
-      // Store processed rewards in battle document for client response
       (battle as any).processedRewards = {
         experienceGained,
         moneyGained,
@@ -160,7 +154,7 @@ export class BattleRewardService {
         levelUp,
         lifetimeHighUpdated
       };
-            
+
       await battle.save();
 
       return {
@@ -171,7 +165,6 @@ export class BattleRewardService {
         levelUp,
         lifetimeHighUpdated
       };
-
     } catch (error) {
       console.error('❌ BATTLE REWARDS: Error processing battle rewards:', error);
       return {

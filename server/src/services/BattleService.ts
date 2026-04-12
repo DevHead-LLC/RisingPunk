@@ -16,6 +16,7 @@ import { DefenderDeploymentService } from './DefenderDeploymentService';
 import { BattleInventorySettlementService } from './BattleInventorySettlementService';
 import { sendBattleNotifications } from './BattleNotificationService';
 import { processPvPBattleMoneyTransfer } from './PvPBattleMoneyService';
+import { processPvPBattleExperienceReward } from './PvPBattleExperienceService';
 import { BattleReplayRecorder } from './BattleReplayRecorder';
 import {
   detachHeadlessWorkingBattle,
@@ -188,7 +189,9 @@ export class BattleService {
     if (phase === BattlePhase.ACTIVE) {
       updates.countdown = 0;
       updates.battleTime = 0;
-      BattalionService.startMovementUpdates(battleId);
+      if (!isHeadlessWorkingBattleActive(battleId)) {
+        BattalionService.startMovementUpdates(battleId);
+      }
     }
 
     // Persist phase (and ACTIVE countdown/battleTime) before defender first-wave deploy so deployWave
@@ -197,12 +200,11 @@ export class BattleService {
 
     if (phase === BattlePhase.ACTIVE) {
       const battle = await this.getBattle(battleId);
+      const marchSourced = (battle as { marchSourcedAttack?: boolean } | null)?.marchSourcedAttack === true;
+
       if (battle?.isUserDefender) {
         await DefenderDeploymentService.onTick(battleId);
       }
-      // Async march battles never hit BattleController.getBattleState; without this, targeting never
-      // starts and timer expiry yields a 0–0 tie → defender wins (Hack Failed, no casualties).
-      const marchSourced = (battle as { marchSourcedAttack?: boolean } | null)?.marchSourcedAttack === true;
       if (marchSourced && battle && BattalionService.getTargetingResults(battleId).length === 0) {
         await this.triggerInitialTargeting(battleId);
         const primed = await this.getBattle(battleId);
@@ -271,6 +273,10 @@ export class BattleService {
 
     // Store end condition and winner for response.
     // Must persist before PvP money transfer (reads winner from MongoDB).
+    // Bugbot: do not set phase to COMPLETE (or endTime) here. Clients poll phase === complete and
+    // BattleResponseService only attaches battleEndData when phase is complete; an early COMPLETE
+    // save created a window with COMPLETE + missing XP/cash/level-up. endBattle() persists COMPLETE
+    // + endTime after NPC/PvP rewards and related battle fields are written.
     (battle as any).endCondition = endCondition;
     battle.winner = winner;
     await battle.save();
@@ -279,11 +285,7 @@ export class BattleService {
     if (winner === NodeOwner.USER && endCondition === 'elimination' && (battle as any).unlockHackRigOnWin) {
       try {
         const user = await User.findById(battle.attackerId);
-        if (!user) {
-          return;
-        }
-
-        if (!user.unlockedFeatures?.hackRig) {
+        if (user && !user.unlockedFeatures?.hackRig) {
           user.unlockedFeatures = user.unlockedFeatures || {};
           user.unlockedFeatures.hackRig = true;
           await user.save();
@@ -363,6 +365,16 @@ export class BattleService {
         console.error('PvP battle money transfer failed for', battleId, e);
       }
 
+      let pvpXpAttacker = 0;
+      let pvpXpDefender = 0;
+      try {
+        const xpResult = await processPvPBattleExperienceReward(battleId);
+        pvpXpAttacker = xpResult.attackerXp;
+        pvpXpDefender = xpResult.defenderXp;
+      } catch (e) {
+        console.error('PvP battle experience reward failed for', battleId, e);
+      }
+
       // Send battle result DMs to attacker and defender (same pattern as Probe Report)
       try {
         const battleForNotifications = await this.getBattle(battleId);
@@ -370,7 +382,7 @@ export class BattleService {
           console.error('Battle document missing before notifications for', battleId);
         } else {
           // Fresh read so BTL payload uses persisted battalions (in-memory battle can diverge if battle doc is updated between save and send).
-          await sendBattleNotifications(battleForNotifications, pvpCashTransferred);
+          await sendBattleNotifications(battleForNotifications, pvpCashTransferred, pvpXpAttacker, pvpXpDefender);
         }
       } catch (e) {
         console.error('Battle notifications failed for', battleId, e);
@@ -390,17 +402,33 @@ export class BattleService {
 
     // Process battle rewards and bot losses if this was a battle against an NPC
     if (npcSlug) {
+      const marchNpcSourced =
+        (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true;
+      const runMarchNpcFollowUp = async (): Promise<void> => {
+        if (!marchNpcSourced) {
+          return;
+        }
+        try {
+          const { onMarchNpcBattleEnded } = await import('./MarchBattleFollowupService');
+          await onMarchNpcBattleEnded(battle);
+        } catch (marchFollowErr) {
+          console.error('[BattleService.handleBattleEnd] March follow-up failed:', battleId, marchFollowErr);
+        }
+      };
+
       try {
         const rewardResult = await BattleRewardService.processBattleRewards(battle, battle.attackerId);
         if (!rewardResult.success) {
           console.error(
-            '[BattleService.handleBattleEnd] NPC rewards failed (march return leg still runs):',
+            '[BattleService.handleBattleEnd] NPC rewards failed (march follow-up still attempted if hack march):',
             battleId,
             rewardResult.error
           );
         }
+        await runMarchNpcFollowUp();
       } catch (e) {
         console.error('Battle reward processing failed for', battleId, e);
+        await runMarchNpcFollowUp();
       }
       // March-sourced NPC: always advance `resolving` → `returning` + schedule return + queue reconcile.
       // Previously this ran only when `processBattleRewards` succeeded; a reward/save failure left the row

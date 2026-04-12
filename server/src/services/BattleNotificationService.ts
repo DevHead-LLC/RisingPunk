@@ -73,10 +73,15 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
   }
 
   const winner = battle.winner === NodeOwner.USER ? 'user' : 'enemy';
-  const pr = (battle as { processedRewards?: { moneyGained?: number } }).processedRewards;
+  const pr = (battle as { processedRewards?: { moneyGained?: number; experienceGained?: number } })
+    .processedRewards;
   const cash =
     typeof pr?.moneyGained === 'number' && Number.isFinite(pr.moneyGained)
       ? Math.max(0, Math.floor(pr.moneyGained))
+      : 0;
+  const xp =
+    typeof pr?.experienceGained === 'number' && Number.isFinite(pr.experienceGained)
+      ? Math.max(0, Math.floor(pr.experienceGained))
       : 0;
 
   let payload: Record<string, unknown> = {
@@ -93,6 +98,7 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
     defenderLost,
     winner,
     cash,
+    ...(xp > 0 ? { xp } : {}),
   };
   const bx = (battle as { hackMapCellX?: number }).hackMapCellX;
   const by = (battle as { hackMapCellY?: number }).hackMapCellY;
@@ -151,11 +157,15 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
 /**
  * PvP: insert `BTL|` for attacker and defender (same payload JSON; client applies reader-relative labels).
  * @param cashTransferred dollars moved defender → attacker when attacker won (0 if none).
+ * @param xpAttacker XP from destroying defender bots (Mark I/II formula).
+ * @param xpDefender XP from destroying attacker bots.
  * Does not throw; logs errors so battle end is not blocked.
  */
 export async function sendBattleNotifications(
   battle: IBattleDocument,
-  cashTransferred: number = 0
+  cashTransferred: number = 0,
+  xpAttacker: number = 0,
+  xpDefender: number = 0
 ): Promise<void> {
   if (!battle.isUserDefender) return;
 
@@ -196,6 +206,10 @@ export async function sendBattleNotifications(
     typeof cashTransferred === 'number' && Number.isFinite(cashTransferred)
       ? Math.max(0, Math.floor(cashTransferred))
       : 0;
+  const xa =
+    typeof xpAttacker === 'number' && Number.isFinite(xpAttacker) ? Math.max(0, Math.floor(xpAttacker)) : 0;
+  const xd =
+    typeof xpDefender === 'number' && Number.isFinite(xpDefender) ? Math.max(0, Math.floor(xpDefender)) : 0;
   let payload: Record<string, unknown> = {
     br: 1,
     battleId: battle.battleId,
@@ -209,6 +223,7 @@ export async function sendBattleNotifications(
     defenderLost,
     winner,
     cash,
+    ...(xa > 0 || xd > 0 ? { xpAttacker: xa, xpDefender: xd } : {}),
   };
   const bx = (battle as any).hackMapCellX;
   const by = (battle as any).hackMapCellY;

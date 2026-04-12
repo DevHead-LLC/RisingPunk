@@ -156,6 +156,12 @@ export interface BattleWireBattleEndData {
     levelsGained: number;
     newLevel: number;
   };
+  attackerId?: string;
+  defenderId?: string;
+  pvpExperienceAttacker?: number;
+  pvpExperienceDefender?: number;
+  levelUpAttacker?: { levelsGained: number; newLevel: number };
+  levelUpDefender?: { levelsGained: number; newLevel: number };
   lifetimeHighUpdated?: boolean;
   isUserDefender?: boolean;
   isPvPBattle?: boolean;
