@@ -97,7 +97,17 @@ export class RetargetingService {
         closestDistance = distance;
         candidateTargets = [{nodeIndex, path, distance, targetType, targetBattalionId}];
       } else if (distance === closestDistance) {
-        candidateTargets.push({nodeIndex, path, distance, targetType, targetBattalionId});
+        // Bugbot: wall redirect can re-add a neutral already evaluated in the neutral loop; dedupe
+        // so random selection stays uniform across distinct nearest targets.
+        const duplicate = candidateTargets.some(
+          (c) =>
+            c.nodeIndex === nodeIndex &&
+            c.targetType === targetType &&
+            (targetType === 'neutral_node' || c.targetBattalionId === targetBattalionId)
+        );
+        if (!duplicate) {
+          candidateTargets.push({nodeIndex, path, distance, targetType, targetBattalionId});
+        }
       }
     };
     
