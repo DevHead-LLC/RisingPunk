@@ -71,11 +71,9 @@ export async function processPvPBattleExperienceReward(
   }
 
   const session = await mongoose.startSession();
-  let attackerXp = 0;
-  let defenderXp = 0;
 
   try {
-    await session.withTransaction(async () => {
+    const result = await session.withTransaction(async (): Promise<PvPBattleExperienceResult> => {
       const battleInTxn = await Battle.findOne({ battleId }).session(session);
       if (!battleInTxn) {
         throw new Error('Battle not found in transaction');
@@ -100,6 +98,8 @@ export async function processPvPBattleExperienceReward(
 
       let levelUpAttacker: { levelsGained: number; newLevel: number } | undefined;
       let levelUpDefender: { levelsGained: number; newLevel: number } | undefined;
+      let attackerXp = 0;
+      let defenderXp = 0;
 
       if (sideState.attacker?.processedAt == null) {
         let grantedAtt = 0;
@@ -110,8 +110,6 @@ export async function processPvPBattleExperienceReward(
           if (lr.levelsGained > 0) {
             levelUpAttacker = { levelsGained: lr.levelsGained, newLevel: lr.level };
           }
-        } else {
-          attackerXp = 0;
         }
         sideState.attacker = { amount: grantedAtt, processedAt: now };
       } else {
@@ -127,8 +125,6 @@ export async function processPvPBattleExperienceReward(
           if (lr.levelsGained > 0) {
             levelUpDefender = { levelsGained: lr.levelsGained, newLevel: lr.level };
           }
-        } else {
-          defenderXp = 0;
         }
         sideState.defender = { amount: grantedDef, processedAt: now };
       } else {
@@ -156,9 +152,11 @@ export async function processPvPBattleExperienceReward(
       (battleInTxn as IBattleDocument & { pvpExperienceReward?: unknown }).pvpExperienceReward = undefined;
 
       await battleInTxn.save({ session });
+
+      return { attackerXp, defenderXp };
     });
 
-    return { attackerXp, defenderXp };
+    return result ?? { attackerXp: 0, defenderXp: 0 };
   } catch (e) {
     console.error('PvPBattleExperienceService.processPvPBattleExperienceReward', battleId, e);
     return { attackerXp: 0, defenderXp: 0 };

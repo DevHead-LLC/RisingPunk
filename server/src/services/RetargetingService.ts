@@ -67,13 +67,6 @@ export class RetargetingService {
       
       const targetResult = this.findClosestTarget(battalion, neutralNodes, enemyBattalions, battleId);
       if (targetResult) {
-        
-        if (targetResult.targetType === 'enemy_battalion') {
-          const targetBattalion = enemyBattalions.find(b => b.position.nodeIndex === targetResult.targetNodeIndex);
-          if (targetBattalion) {
-          }
-        }
-        
         retargetingResults.push({
           battalionId: battalion.id,
           currentNodeIndex: battalionStartNode,
@@ -104,13 +97,24 @@ export class RetargetingService {
         closestDistance = distance;
         candidateTargets = [{nodeIndex, path, distance, targetType, targetBattalionId}];
       } else if (distance === closestDistance) {
-        candidateTargets.push({nodeIndex, path, distance, targetType, targetBattalionId});
+        // Bugbot: wall redirect can re-add a neutral already evaluated in the neutral loop; dedupe
+        // so random selection stays uniform across distinct nearest targets.
+        const duplicate = candidateTargets.some(
+          (c) =>
+            c.nodeIndex === nodeIndex &&
+            c.targetType === targetType &&
+            (targetType === 'neutral_node' || c.targetBattalionId === targetBattalionId)
+        );
+        if (!duplicate) {
+          candidateTargets.push({nodeIndex, path, distance, targetType, targetBattalionId});
+        }
       }
     };
     
     const battalionStartNode = this.getBattalionStartNode(battalion, battleId);
+    const neutralNodeIndices = new Set(neutralNodes.map(n => n.index));
     
-    // Evaluate neutral nodes
+    // Evaluate neutral nodes as direct targets.
     for (const node of neutralNodes) {
       if (battalionStartNode === node.index) continue;
       
@@ -120,7 +124,9 @@ export class RetargetingService {
       }
     }
     
-    // Evaluate enemy battalions
+    // Evaluate enemy battalions. If the path to an enemy passes through a neutral
+    // node, redirect to the first neutral on the path so it must be captured first
+    // (neutral nodes act as walls that block passage to enemies behind them).
     for (const enemyBattalion of enemyBattalions) {
       if (!CombatService.canTargetBattalion(enemyBattalion)) {
         continue;
@@ -138,14 +144,24 @@ export class RetargetingService {
         distance = path.length - 1;
       }
       
-      evaluateTarget(enemyBattalion.position.nodeIndex, path, distance, 'enemy_battalion', enemyBattalion.id);
+      const intermediateNodes = path.slice(1, -1);
+      const firstNeutralIdx = intermediateNodes.findIndex(idx => neutralNodeIndices.has(idx));
+      
+      if (firstNeutralIdx !== -1) {
+        const wallNodeIndex = intermediateNodes[firstNeutralIdx];
+        const wallPath = path.slice(0, firstNeutralIdx + 2);
+        evaluateTarget(wallNodeIndex, wallPath, wallPath.length - 1, 'neutral_node');
+      } else {
+        evaluateTarget(enemyBattalion.position.nodeIndex, path, distance, 'enemy_battalion', enemyBattalion.id);
+      }
     }
     
     if (candidateTargets.length === 0) {
       return null;
     }
 
-    // Neutral nodes act as walls: capture them before engaging enemies at the same or further distance.
+    // At equal distance, still prefer neutral nodes as a tiebreaker (e.g. enemy and
+    // neutral co-located on the same node — capture the node before engaging).
     const neutralAtClosest = candidateTargets.filter(c => c.targetType === 'neutral_node');
     const selectionPool = neutralAtClosest.length > 0 ? neutralAtClosest : candidateTargets;
 
