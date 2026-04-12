@@ -1,3 +1,4 @@
+import type { ClientSession } from 'mongoose';
 import { User } from '../models/User';
 
 interface LevelingConfig {
@@ -81,7 +82,14 @@ export class LevelingService {
     return level >= this.config.maxLevel;
   }
 
-  static async applyExperience(userId: string, amount: number): Promise<ExperienceSummary> {
+  /**
+   * @param options.session When set, reads/writes participate in that MongoDB transaction (e.g. PvP XP with Battle in one txn).
+   */
+  static async applyExperience(
+    userId: string,
+    amount: number,
+    options?: { session?: ClientSession }
+  ): Promise<ExperienceSummary> {
     if (!this.config) {
       throw new Error('LevelingService config not loaded');
     }
@@ -90,7 +98,12 @@ export class LevelingService {
       throw new Error('Experience amount must be positive');
     }
 
-    const user = await User.findById(userId);
+    const session = options?.session;
+    const userQuery = User.findById(userId);
+    if (session) {
+      userQuery.session(session);
+    }
+    const user = await userQuery;
     if (!user) {
       throw new Error('User not found');
     }
@@ -127,7 +140,7 @@ export class LevelingService {
       'experience.total': totalExp
     };
 
-    await User.findByIdAndUpdate(userId, updates);
+    await User.findByIdAndUpdate(userId, updates, session ? { session } : {});
 
     return {
       level: currentLevel,

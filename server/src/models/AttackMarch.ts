@@ -35,6 +35,8 @@ export interface IAttackMarchDocument extends Document {
   defenderQueueKey?: string;
   /** Set when entering `resolving` (stale watchdog + ops). */
   resolvingSince?: Date;
+  /** Wall-clock when this march actually reached the target (`outbound` → `arrived`). Stuck-at-target recovery uses this, not `arriveAt` (scheduled time can be far in the past for late sweeps). */
+  atTargetSince?: Date;
   state: AttackMarchState;
   departAt: Date;
   arriveAt: Date;
@@ -69,6 +71,7 @@ const attackMarchSchema = new Schema<IAttackMarchDocument>(
     consumedBattalionAssignments: { type: [consumedBattalionAssignmentSchema], required: true },
     defenderQueueKey: { type: String, required: false },
     resolvingSince: { type: Date, required: false },
+    atTargetSince: { type: Date, required: false },
     state: {
       type: String,
       enum: ['outbound', 'arrived', 'queued', 'resolving', 'returning', 'done', 'cancelled'],
@@ -96,5 +99,7 @@ attackMarchSchema.index({ state: 1, arriveAt: 1 });
 attackMarchSchema.index({ state: 1, returnArriveAt: 1 });
 attackMarchSchema.index({ defenderQueueKey: 1, state: 1 });
 attackMarchSchema.index({ state: 1, resolvingSince: 1 });
+attackMarchSchema.index({ state: 1, atTargetSince: 1 });
+attackMarchSchema.index({ state: 1, createdAt: 1 });
 
 export const AttackMarch = mongoose.model<IAttackMarchDocument>('AttackMarch', attackMarchSchema);

@@ -1,4 +1,4 @@
-# Merge Decisions — dev → android_mergeDev (2026-04-05)
+# Merge Decisions — dev → android_mergeDev (2026-04-12)
 
 ---
 
@@ -6,33 +6,33 @@
 
 | Side | Content |
 |------|---------|
-| **HEAD (android_mergeDev base = androidStaging)** | `"version": "3.7.1"`, `"versionCode": 118` |
-| **dev** | `"version": "4.0.0"` (no `versionCode`) |
+| **HEAD (android_mergeDev base = androidStaging)** | `"version": "4.0.0"`, `"versionCode": 122` |
+| **dev** | `"version": "4.0.1"` (no `versionCode`) |
 
-**Resolution:** Took dev's version (`4.0.0`) and kept Android's `versionCode: 118`.
+**Resolution:** Took dev's version (`4.0.1`) and kept Android's `versionCode: 122`.
 
 **Rationale:** Release string follows `dev`. `versionCode` is Android / Play Console authority on this branch; `dev` does not carry it.
 
-**Rejected content:** HEAD's `"version": "3.7.1"` — behind dev's release line.
+**Rejected content:** HEAD's `"version": "4.0.0"` — behind dev's patch bump.
 
 **Failure-mode hints:** Before the next Play upload from this branch, ensure `versionCode` exceeds the last value accepted in Play Console; bump if needed.
 
 ---
 
-## 2. `mobile/src/screens/HackMapScreen.tsx`
+## 2. `server/src/services/BattleService.ts`
 
 | Side | Content |
 |------|---------|
-| **HEAD** | `ProbeAnimationLayer` remains inside the panned `Animated.View` with `nestedInMapView` + `mapTapGesture={tapGesture}` (Android tap-to-cell / probe layering). No `AttackMarchAnimationLayer` after the gesture block. |
-| **dev** | Sibling `AttackMarchAnimationLayer` after `GestureDetector` (tap-through fix for march icons). Second, outer `ProbeAnimationLayer` without `nestedInMapView` / `mapTapGesture`. |
+| **HEAD** | Log: `NPC rewards failed (march return leg still runs):` |
+| **dev** | Log: `NPC rewards failed (march follow-up still attempted if hack march):` |
 
-**Resolution:** Kept HEAD's single in-map `ProbeAnimationLayer` (with `nestedInMapView` and `mapTapGesture`). Added dev's `AttackMarchAnimationLayer` block only (comment + component) as a sibling after the inner `</View>`, before the outer map `</View>`. Dropped dev's duplicate outer `ProbeAnimationLayer`.
+**Resolution:** Took dev's log message (server behavior description; not Android-specific).
 
-**Rationale:** Android-first: preserves the staging map probe + tap integration. Dev-second: brings march attack overlay without regressing probe behavior or duplicating probes.
+**Rationale:** Dev second — aligns log text with current march follow-up semantics.
 
-**Rejected content:** Dev's outer `ProbeAnimationLayer` — would duplicate probes and remove `nestedInMapView` / tap gesture wiring.
+**Rejected content:** HEAD's older phrasing.
 
-**Failure-mode hints:** If probes fail to follow the map pan/zoom or march icons open the tile modal underneath, re-check this tree: probes should stay inside the transformed map layer; attack march overlay stays outside `GestureDetector` per dev.
+**Failure-mode hints:** If debugging NPC reward failures vs march state, grep for this string in server logs.
 
 ---
 

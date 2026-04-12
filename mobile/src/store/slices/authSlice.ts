@@ -7,7 +7,7 @@ import { updateBalance } from './balanceSlice';
 import { setBots, setBuildState } from './botsSlice';
 import { resetAllApiCaches } from '../api/resetApiCaches';
 import { clearPersistedTurfNavState } from '../../utils/turfNavStatePersistence';
-import { authApi } from '../api/authApi';
+import { authApi, type ProfileResponse } from '../api/authApi';
 import { mapApi } from '../api/mapApi';
 import { logAccountCreatedOnce, markAccountExists } from '../../services/analyticsService';
 
@@ -854,12 +854,15 @@ async function fetchUserProfile(token: string): Promise<Record<string, unknown>>
 
 export const refreshUserData = createAsyncThunk(
   'auth/refreshUserData',
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { getState, rejectWithValue, dispatch }) => {
     try {
       const state = getState() as { auth: AuthState };
       const { token } = state.auth;
       if (!token) return rejectWithValue('No authentication token');
-      return await fetchUserProfile(token);
+      const data = await fetchUserProfile(token);
+      // Same payload as getProfile — keep RTK cache aligned so Profile XP/stats update immediately after refresh.
+      dispatch(authApi.util.upsertQueryData('getProfile', undefined, data as ProfileResponse));
+      return data;
     } catch (error) {
       console.error('Error refreshing user data:', error);
       return rejectWithValue('Failed to refresh user data');
@@ -870,12 +873,14 @@ export const refreshUserData = createAsyncThunk(
 /** Same fetch as refreshUserData but does not set auth.isLoading. Use when updating user (e.g. unlockedFeatures) without showing app-level loading or unmounting the UI. */
 export const refreshUserDataSilent = createAsyncThunk(
   'auth/refreshUserDataSilent',
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { getState, rejectWithValue, dispatch }) => {
     try {
       const state = getState() as { auth: AuthState };
       const { token } = state.auth;
       if (!token) return rejectWithValue('No authentication token');
-      return await fetchUserProfile(token);
+      const data = await fetchUserProfile(token);
+      dispatch(authApi.util.upsertQueryData('getProfile', undefined, data as ProfileResponse));
+      return data;
     } catch (error) {
       console.error('Error refreshing user data (silent):', error);
       return rejectWithValue('Failed to refresh user data');

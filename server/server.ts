@@ -193,6 +193,32 @@ mongoose.connect(process.env.MONGODB_URI, {
     console.warn('Attack march due-date sweep watchdog failed to start (non-fatal):', dueSweepErr);
   }
 
+  try {
+    const { runStuckAtTargetRecoveryOnce } = require('./src/services/AttackMarchStuckAtTargetRecoveryService');
+    await runStuckAtTargetRecoveryOnce();
+  } catch (stuckAtTargetErr: unknown) {
+    console.warn('Attack march stuck-at-target recovery one-shot failed (non-fatal):', stuckAtTargetErr);
+  }
+
+  try {
+    const {
+      pruneTerminalAttackMarchesOnce,
+      startAttackMarchTerminalPruneWatchdog,
+    } = require('./src/services/AttackMarchTerminalPruneService');
+    try {
+      await pruneTerminalAttackMarchesOnce();
+    } catch (pruneOnceErr: unknown) {
+      console.warn('Attack march terminal prune one-shot failed (non-fatal):', pruneOnceErr);
+    }
+    try {
+      startAttackMarchTerminalPruneWatchdog();
+    } catch (pruneWatchErr: unknown) {
+      console.warn('Attack march terminal prune watchdog failed to start (non-fatal):', pruneWatchErr);
+    }
+  } catch (pruneModuleErr: unknown) {
+    console.warn('Attack march terminal prune module load failed (non-fatal):', pruneModuleErr);
+  }
+
   // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
   try {
     const { ensureRentalPropertyConfig } = require('./src/services/RentalPropertyConfigService');
@@ -229,6 +255,9 @@ mongoose.connect(process.env.MONGODB_URI, {
     
     // Start data cleanup service for privacy policy compliance
     DataCleanupService.startScheduledCleanup();
+
+    const { startBattleDataRetentionWatchdog } = require('./src/services/BattleDataRetentionService');
+    startBattleDataRetentionWatchdog();
     
     // Start activity aggregation service for privacy compliance
     const { ActivityAggregationService } = require('./src/services/ActivityAggregationService');
