@@ -61,6 +61,21 @@ export class LevelingService {
     return this.roundToPrecision(requiredExp);
   }
 
+  /**
+   * XP to go from `level` to `level + 1` using the same exponential rule as users, without max-level capping.
+   * Used by crew leveling (levels beyond user max).
+   */
+  static getRequiredExpToNextUnchecked(level: number): number {
+    if (!this.config) {
+      throw new Error('LevelingService config not loaded');
+    }
+    if (level < 1) {
+      throw new Error('Level must be at least 1');
+    }
+    const requiredExp = this.config.baseRequiredExp * Math.pow(this.config.multiplier, level - 1);
+    return this.roundToPrecision(requiredExp);
+  }
+
   static getTotalExpToReach(level: number): number {
     if (!this.config) {
       throw new Error('LevelingService config not loaded');
@@ -141,6 +156,9 @@ export class LevelingService {
     };
 
     await User.findByIdAndUpdate(userId, updates, session ? { session } : {});
+
+    const { CrewLevelingService } = require('./CrewLevelingService');
+    await CrewLevelingService.applyExperienceFromUserGain(userId, amount, { session });
 
     return {
       level: currentLevel,

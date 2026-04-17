@@ -10,6 +10,7 @@ import {
   PROBE_REPORT_SENDER_USERNAME,
   BATTLE_REPORT_SENDER_ID,
   BATTLE_REPORT_SENDER_USERNAME,
+  SYSTEM_NOTIFICATION_SENDER_ID,
 } from '../constants/systemSenders';
 import {
   applyRetentionAfterAdminSendAll,
@@ -23,6 +24,7 @@ const router = express.Router();
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
+const SYSTEM_NOTIFICATION_PREFIX = 'SYS|';
 
 /** Return a human-readable inbox preview for probe report messages; otherwise return the raw message. */
 function conversationListLastMessagePreview(raw: string | undefined, isProbeReport: boolean): string {
@@ -58,6 +60,21 @@ function getBattleReportPreview(raw: string | undefined, currentUserId: string):
     // ignore
   }
   return 'Battle Report';
+}
+
+function getSystemNotificationPreview(raw: string | undefined): string {
+  if (typeof raw !== 'string' || !raw.startsWith(SYSTEM_NOTIFICATION_PREFIX)) {
+    return raw ?? '';
+  }
+  try {
+    const payload = JSON.parse(raw.slice(SYSTEM_NOTIFICATION_PREFIX.length)) as { m?: string };
+    if (payload?.m != null && typeof payload.m === 'string') {
+      return payload.m.length > 120 ? `${payload.m.slice(0, 117)}…` : payload.m;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return 'System Notification';
 }
 
 const PM_RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -97,8 +114,10 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
       adminIdSet,
       probeReportSenderIdStr: PROBE_REPORT_SENDER_ID.toString(),
       battleReportSenderIdStr: BATTLE_REPORT_SENDER_ID.toString(),
+      systemNotificationSenderIdStr: SYSTEM_NOTIFICATION_SENDER_ID.toString(),
       conversationListLastMessagePreview,
       getBattleReportPreview,
+      getSystemNotificationPreview,
     });
 
     const conversations = rows.map((row) => ({

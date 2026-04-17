@@ -13,6 +13,18 @@ export interface ICrew extends Document {
   presidentId: mongoose.Types.ObjectId;
   members: mongoose.Types.ObjectId[];
   executives: mongoose.Types.ObjectId[];
+  /** Crew level; curve matches users through 98, then extends to CREW_MAX_LEVEL (see CrewLevelingService). */
+  level: number;
+  experience: {
+    current: number;
+    nextLevel: number;
+    total: number;
+  };
+  /**
+   * When roster size is &lt; 3, grace window for disband; cleared when roster ≥ 3.
+   * First set at creation (understaffed) or when dropping from ≥3 to &lt;3.
+   */
+  understaffNotifiedAt?: Date | null;
   applicants: ICrewApplicant[];
   crewRules: string[];
   originalCrewRules?: string[]; // Original unfiltered content for moderation reports
@@ -60,6 +72,29 @@ const crewSchema = new Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
+  level: {
+    type: Number,
+    default: 1
+  },
+  experience: {
+    current: {
+      type: Number,
+      default: 0
+    },
+    nextLevel: {
+      type: Number,
+      default: 1000
+    },
+    total: {
+      type: Number,
+      default: 0
+    }
+  },
+  understaffNotifiedAt: {
+    type: Date,
+    required: false,
+    default: null
+  },
   applicants: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,

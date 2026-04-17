@@ -14,7 +14,7 @@ import { SIZING } from '../styles/theme';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { useTheme } from '../context/ThemeContext';
 import { BotType } from '../types/bots';
-import { useFetchBotStatsQuery, useFetchBotStatsBreakdownQuery } from '../store/api/botsApi';
+import { useFetchBotStatsQuery, useFetchBotStatsBreakdownQuery, type StatRow } from '../store/api/botsApi';
 import { useTrackDigitalBarracksVisitMutation as useTrackDigitalBarracksVisitMutationFromUserGuide } from '../store/api/userGuideApi';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { formatBotStatValue, formatNumber } from '../utils/formatUtils';
@@ -48,6 +48,15 @@ const M2_COMPOSITION_COLORS: Record<BotType, string> = {
   guardian: '#26C6DA',
   phreak: '#AB47BC',
 };
+
+const BREAKDOWN_STAT_KEYS: (keyof StatRow)[] = ['health', 'offense', 'defense', 'speed', 'range'];
+
+function statColumnLabel(stat: keyof StatRow): string {
+  if (stat === 'range') return 'ATTACK DISTANCE';
+  if (stat === 'offense') return 'ATTACK POWER';
+  if (stat === 'defense') return 'DEFENSE ABILITY';
+  return stat.toUpperCase();
+}
 
 /** RPS by type: Sprint > Brute > Remote > Sprint (shown as labels, not unit names). */
 const TYPE_MATCHUPS: Record<BotType, { strongAgainst: string; weakAgainst: string }> = {
@@ -132,6 +141,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
           : botStatsData?.botStats?.[type];
 
     const matchups = TYPE_MATCHUPS[type];
+    const breakdownForType = breakdownData?.breakdown?.[type];
 
     return (
       <View style={styles.botCard}>
@@ -178,6 +188,30 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
               )) : (
                 <Text style={styles.lockedText}>No stats available</Text>
               )}
+              {breakdownForType ? (
+                <>
+                  <View style={styles.crewBonusDivider} />
+                  <Text style={styles.crewBonusNote}>Army-wide crew bonuses (included in totals above)</Text>
+                  <Text style={styles.crewBonusHeading}>Crew Research</Text>
+                  {BREAKDOWN_STAT_KEYS.map((stat) => (
+                    <View key={`crew-r-${String(stat)}`} style={styles.statRow}>
+                      <Text style={styles.statLabel}>{statColumnLabel(stat)}</Text>
+                      <Text style={styles.statValue}>
+                        {formatBotStatValue(stat, breakdownForType.crewResearchBonus[stat])}
+                      </Text>
+                    </View>
+                  ))}
+                  <Text style={styles.crewBonusHeading}>Crew Benefits</Text>
+                  {BREAKDOWN_STAT_KEYS.map((stat) => (
+                    <View key={`crew-l-${String(stat)}`} style={styles.statRow}>
+                      <Text style={styles.statLabel}>{statColumnLabel(stat)}</Text>
+                      <Text style={styles.statValue}>
+                        {formatBotStatValue(stat, breakdownForType.crewLevelBonus[stat])}
+                      </Text>
+                    </View>
+                  ))}
+                </>
+              ) : null}
             </View>
           </View>
         </View>
@@ -497,6 +531,25 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'lig
   statsContainer: {
     flex: 2,
     gap: SIZING.spacing.sm,
+  },
+  crewBonusDivider: {
+    marginTop: SIZING.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: themeMode === 'light' ? 'rgba(0, 100, 0, 0.25)' : 'rgba(0, 255, 65, 0.25)',
+    paddingTop: SIZING.spacing.sm,
+  },
+  crewBonusNote: {
+    color: colors.text.secondary,
+    fontSize: SIZING.font.small,
+    fontStyle: 'italic',
+    marginBottom: SIZING.spacing.xs,
+  },
+  crewBonusHeading: {
+    color: colors.secondary,
+    fontSize: SIZING.font.small,
+    fontWeight: 'bold',
+    marginTop: SIZING.spacing.xs,
+    marginBottom: 2,
   },
   statRow: {
     flexDirection: 'row',

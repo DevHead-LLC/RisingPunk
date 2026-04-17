@@ -23,7 +23,11 @@ import { SIZING } from '../../styles/theme';
 import { FilteredTextInput } from '../common/FilteredTextInput';
 import { FilteredText } from '../common/FilteredText';
 import { UserReportModal } from '../modals/UserReportModal';
-import { PROBE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_ID } from '../../constants/systemSenders';
+import {
+  PROBE_REPORT_SENDER_ID,
+  BATTLE_REPORT_SENDER_ID,
+  SYSTEM_NOTIFICATION_SENDER_ID,
+} from '../../constants/systemSenders';
 import {
   formatHackLocationDisplay,
   parseHackLocationDisplayCoords,
@@ -34,6 +38,20 @@ import { normalizeUserId } from '../../utils/battleUtils';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
+const SYSTEM_NOTIFICATION_PREFIX = 'SYS|';
+
+function parseSystemNotificationMessage(message: string): { m: string } | null {
+  if (!message.startsWith(SYSTEM_NOTIFICATION_PREFIX)) return null;
+  try {
+    const payload = JSON.parse(message.slice(SYSTEM_NOTIFICATION_PREFIX.length)) as { m?: string };
+    if (payload != null && typeof payload.m === 'string' && payload.m.trim().length > 0) {
+      return { m: payload.m.trim() };
+    }
+  } catch (_) {
+    // ignore
+  }
+  return null;
+}
 
 export interface ProbeReportPayload {
   pr: 1;
@@ -711,6 +729,30 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                     </Text>
                                   </Pressable>
                                 ) : null}
+                              </View>
+                            );
+                          })() : message.userId === SYSTEM_NOTIFICATION_SENDER_ID ? (() => {
+                            const sys = parseSystemNotificationMessage(message.message);
+                            if (!sys) {
+                              return (
+                                <FilteredText
+                                  style={[
+                                    styles.messageText,
+                                    isOwnMessage ? styles.messageTextRight : styles.messageTextLeft,
+                                  ]}
+                                >
+                                  {message.message}
+                                </FilteredText>
+                              );
+                            }
+                            return (
+                              <View style={styles.probeReportBlock}>
+                                <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
+                                  System Notification
+                                </Text>
+                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                  {sys.m}
+                                </Text>
                               </View>
                             );
                           })() : (() => {

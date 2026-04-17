@@ -11,6 +11,7 @@ import { UserActivitySummary } from '../models/UserActivitySummary';
 import { Battle } from '../models/Battle';
 import { Map } from '../models/Map';
 import { Crew, ICrew } from '../models/Crew';
+import { applyUnderstaffClockAfterRosterChange, getCrewRosterCount } from './CrewRosterUnderstaff';
 import { clearUserFromMapCells } from './CellAccessorService';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 
@@ -229,7 +230,13 @@ export class AccountDeletionService {
             }
 
             if (Object.keys(updateOps).length > 0) {
+              const priorRoster = getCrewRosterCount(crew);
               await Crew.findByIdAndUpdate(crewId, updateOps, { session });
+              const updatedCrew = await Crew.findById(crewId).session(session);
+              if (updatedCrew) {
+                applyUnderstaffClockAfterRosterChange(updatedCrew, priorRoster);
+                await updatedCrew.save({ session });
+              }
               localCounts.crewsUpdated++;
             }
           }
