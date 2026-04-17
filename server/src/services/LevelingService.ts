@@ -1,4 +1,4 @@
-import type { ClientSession } from 'mongoose';
+import mongoose, { type ClientSession } from 'mongoose';
 import { User } from '../models/User';
 
 interface LevelingConfig {
@@ -99,6 +99,7 @@ export class LevelingService {
 
   /**
    * @param options.session When set, reads/writes participate in that MongoDB transaction (e.g. PvP XP with Battle in one txn).
+   * When omitted, user XP + crew mirror run in a single transaction so crew failure (e.g. orphan CrewStatus) cannot leave user XP committed alone.
    */
   static async applyExperience(
     userId: string,
@@ -113,12 +114,26 @@ export class LevelingService {
       throw new Error('Experience amount must be positive');
     }
 
-    const session = options?.session;
-    const userQuery = User.findById(userId);
-    if (session) {
-      userQuery.session(session);
+    const outerSession = options?.session;
+    if (outerSession) {
+      return await this.applyExperienceWithSession(userId, amount, outerSession);
     }
-    const user = await userQuery;
+
+    const session = await mongoose.startSession();
+    try {
+      return await session.withTransaction(() => this.applyExperienceWithSession(userId, amount, session));
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  /** User update + crew XP mirror; `session` must be used for all reads/writes. */
+  private static async applyExperienceWithSession(
+    userId: string,
+    amount: number,
+    session: ClientSession
+  ): Promise<ExperienceSummary> {
+    const user = await User.findById(userId).session(session);
     if (!user) {
       throw new Error('User not found');
     }
@@ -129,7 +144,7 @@ export class LevelingService {
     let levelsGained = 0;
     let remainingExp = amount;
 
-    while (remainingExp > 0 && currentLevel < this.config.maxLevel) {
+    while (remainingExp > 0 && currentLevel < this.config!.maxLevel) {
       const requiredForNext = this.getRequiredExpToNext(currentLevel);
       const expNeeded = requiredForNext - currentExp;
 
@@ -148,14 +163,14 @@ export class LevelingService {
 
     const nextLevelExp = this.isMaxLevel(currentLevel) ? 0 : this.getRequiredExpToNext(currentLevel);
 
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       level: currentLevel,
       'experience.current': currentExp,
       'experience.nextLevel': nextLevelExp,
       'experience.total': totalExp
     };
 
-    await User.findByIdAndUpdate(userId, updates, session ? { session } : {});
+    await User.findByIdAndUpdate(userId, updates, { session });
 
     const { CrewLevelingService } = require('./CrewLevelingService');
     await CrewLevelingService.applyExperienceFromUserGain(userId, amount, { session });
