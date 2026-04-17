@@ -746,21 +746,56 @@ export const logoutUser = createAsyncThunk(
   }
 );
 
+/**
+ * Read token + user from AsyncStorage only (no network). Used when verify-token is unavailable
+ * or returns a non-auth error so we do not force logout on transient failures.
+ */
+async function readStoredSessionFromStorage(): Promise<{ token: string; user: User } | null> {
+  const storedToken = await AsyncStorage.getItem('token');
+  const storedUserJson = await AsyncStorage.getItem('user');
+  if (!storedToken || !storedUserJson) {
+    return null;
+  }
+  try {
+    const user = JSON.parse(storedUserJson) as User;
+    if (!user || typeof user._id !== 'string' || user._id.length === 0) {
+      return null;
+    }
+    return { token: storedToken, user };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cold start dispatches loadStoredAuth immediately; "Play as Guest" may write the token a moment later.
+ * A short retry avoids hydrate reading null and fulfilling null while guest login wins the race.
+ */
+async function readTokenWithGuestRaceRetry(): Promise<string | null> {
+  let storedToken = await AsyncStorage.getItem('token');
+  if (storedToken) {
+    return storedToken;
+  }
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 120);
+  });
+  return AsyncStorage.getItem('token');
+}
+
 export const loadStoredAuth = createAsyncThunk(
   'auth/loadStored',
-  async (_, { rejectWithValue }) => {
+  async () => {
     try {
-      const storedToken = await AsyncStorage.getItem('token');
-      
+      const storedToken = await readTokenWithGuestRaceRetry();
+
       if (!storedToken) {
         return null;
       }
 
-      // Verify token and get fresh user data from database
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      let response;
+
+      let response: Response;
       try {
         response = await fetch(`${API_URL}/api/auth/verify-token`, {
           method: 'GET',
@@ -774,25 +809,37 @@ export const loadStoredAuth = createAsyncThunk(
       }
 
       if (!response.ok) {
-        // Token is invalid, clear stored data
+        if (response.status === 401 || response.status === 403 || response.status === 404) {
+          await AsyncStorage.multiRemove(['token', 'user']);
+          return null;
+        }
+        const optimistic = await readStoredSessionFromStorage();
+        if (optimistic) {
+          await markAccountExists();
+          return optimistic;
+        }
         await AsyncStorage.multiRemove(['token', 'user']);
         return null;
       }
 
-      const userData = await response.json();
-      
-      // Update stored user data with fresh database data
+      const userData = (await response.json().catch(() => null)) as { user?: User } | null;
+      if (!userData?.user) {
+        const optimistic = await readStoredSessionFromStorage();
+        if (optimistic) {
+          await markAccountExists();
+          return optimistic;
+        }
+        await AsyncStorage.multiRemove(['token', 'user']);
+        return null;
+      }
+
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
 
       if (userData.user?.isGuest) {
         await setGuestToken(storedToken);
       }
 
-      // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
       await markAccountExists();
-
-      // Note: App return tracking for auto-sign in is handled in AppContent.tsx
-      // when token/user is set, to avoid duplicate tracking
 
       return {
         token: storedToken,
@@ -800,8 +847,21 @@ export const loadStoredAuth = createAsyncThunk(
       };
     } catch (error) {
       console.error('🔴 LOAD STORED AUTH: Error verifying token:', error);
-      // On error (including network errors), clear stored data to force re-authentication
-      await AsyncStorage.multiRemove(['token', 'user']);
+      try {
+        const optimistic = await readStoredSessionFromStorage();
+        if (optimistic) {
+          await markAccountExists();
+          return optimistic;
+        }
+        await AsyncStorage.multiRemove(['token', 'user']);
+      } catch (inner) {
+        console.error('🔴 LOAD STORED AUTH: Recovery or storage clear failed:', inner);
+        try {
+          await AsyncStorage.multiRemove(['token', 'user']);
+        } catch {
+          /* ignore — avoid rejecting thunk; reducer handles missing session */
+        }
+      }
       return null;
     }
   }
@@ -1316,7 +1376,10 @@ export const authSlice = createSlice({
           
           // Force fetch fresh balance and bot data immediately after auth
         } else {
-          // No stored auth, reset all states
+          // No stored auth from hydrate — unless Play as Guest / login completed while verify was in flight
+          if (state.token !== null && state.user !== null) {
+            return;
+          }
           state.token = null;
           state.user = null;
           state.showOnboarding = false;
@@ -1327,7 +1390,10 @@ export const authSlice = createSlice({
       })
       .addCase(loadStoredAuth.rejected, (state) => {
         state.isLoading = false;
-        // On error, reset all states
+        // Match loadStoredAuth.fulfilled null guard: concurrent login/guest may have completed
+        if (state.token !== null && state.user !== null) {
+          return;
+        }
         state.token = null;
         state.user = null;
         state.showOnboarding = false;
