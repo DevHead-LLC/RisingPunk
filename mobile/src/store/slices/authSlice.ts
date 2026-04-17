@@ -847,12 +847,21 @@ export const loadStoredAuth = createAsyncThunk(
       };
     } catch (error) {
       console.error('🔴 LOAD STORED AUTH: Error verifying token:', error);
-      const optimistic = await readStoredSessionFromStorage();
-      if (optimistic) {
-        await markAccountExists();
-        return optimistic;
+      try {
+        const optimistic = await readStoredSessionFromStorage();
+        if (optimistic) {
+          await markAccountExists();
+          return optimistic;
+        }
+        await AsyncStorage.multiRemove(['token', 'user']);
+      } catch (inner) {
+        console.error('🔴 LOAD STORED AUTH: Recovery or storage clear failed:', inner);
+        try {
+          await AsyncStorage.multiRemove(['token', 'user']);
+        } catch {
+          /* ignore — avoid rejecting thunk; reducer handles missing session */
+        }
       }
-      await AsyncStorage.multiRemove(['token', 'user']);
       return null;
     }
   }
@@ -1381,7 +1390,10 @@ export const authSlice = createSlice({
       })
       .addCase(loadStoredAuth.rejected, (state) => {
         state.isLoading = false;
-        // On error, reset all states
+        // Match loadStoredAuth.fulfilled null guard: concurrent login/guest may have completed
+        if (state.token !== null && state.user !== null) {
+          return;
+        }
         state.token = null;
         state.user = null;
         state.showOnboarding = false;
