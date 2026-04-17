@@ -73,17 +73,17 @@ const AppContent = memo(() => {
   }, []);
 
   // Fetch data when authenticated
-  const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery(undefined, {
+  const { data: balanceData } = useFetchBalanceQuery(undefined, {
     skip: !token,
     pollingInterval: 10000, // Poll every 10 seconds
   });
 
-  const { data: botsData, isLoading: botsLoading } = useFetchBotsQuery(undefined, {
+  const { data: botsData } = useFetchBotsQuery(undefined, {
     skip: !token,
     pollingInterval: 10000, // Poll every 10 seconds
   });
 
-  const { data: buildStateData, isLoading: buildStateLoading } = useFetchBuildStateQuery(undefined, {
+  const { data: buildStateData } = useFetchBuildStateQuery(undefined, {
     skip: !token,
     // While a build is active, poll often so Redux stays near server; idle stays at 10s.
     // Completion also triggers an explicit refetch from BuildSection when the timer hits zero.
@@ -356,9 +356,10 @@ const AppContent = memo(() => {
     );
   }
 
-  // Show loading state while checking stored auth or fetching data
-  // Return a View with background color instead of null to prevent black screen
-  if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {
+  // Auth bootstrap only — do not block Turf on RTK Query first loads. Waiting for balance/bots/build-state
+  // could hang indefinitely (slow/hung requests) and matches a full-screen "black" loading state on Android.
+  // Turf and children already use queries with skip/loading where needed.
+  if (isLoading) {
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;
   }
 
