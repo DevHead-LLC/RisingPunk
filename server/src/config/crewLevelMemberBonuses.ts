@@ -41,10 +41,11 @@ function rowForLevels41To50(): CrewLevelMemberBonuses {
 
 /**
  * Levels 51–75 — **total** row for this band (not incremental).
- * Income **0.18** $/s per spec; Str/Def/Health unchanged from level 50 until a fuller sheet replaces this.
+ * Income **0.02** $/s (same band as 41–50 and 76–80) so income does not regress at 76.
+ * Bugbot: 0.18 was erroneous (same as 171–175); Str/Def/Health unchanged from level 50 until a fuller sheet replaces this.
  */
 function rowForLevels51To75(): CrewLevelMemberBonuses {
-  return { strength: 1, defense: 0.01, health: 5, incomePerSecond: 0.18 };
+  return { strength: 1, defense: 0.01, health: 5, incomePerSecond: 0.02 };
 }
 
 /** Levels 76–80. */

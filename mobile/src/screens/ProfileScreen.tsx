@@ -1031,7 +1031,7 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       { label: 'Mark IV', values: null },
       { label: '+User Level', values: data.levelBonus },
       { label: '+Programming', values: data.programmingBonus },
-      { label: '+Crew Research', values: data.crewResearchBonus },
+      { label: '+Research', values: data.crewResearchBonus },
       { label: '+Crew Benefits', values: data.crewLevelBonus },
       { label: `${markOneUnitName} Total`, values: data.total },
       { label: markTwoTotalLabel, values: mark2Total },

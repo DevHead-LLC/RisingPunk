@@ -176,10 +176,7 @@ export function DigitalBarracksScreen({ onClose }: { onClose: () => void }): Rea
               {botStats?.stats ? Object.entries(botStats.stats).map(([stat, value]) => (
                 <View key={stat} style={styles.statRow}>
                   <Text style={styles.statLabel}>
-                    {stat === 'range' ? 'ATTACK DISTANCE' :
-                     stat === 'offense' ? 'ATTACK POWER' :
-                     stat === 'defense' ? 'DEFENSE ABILITY' :
-                     stat.toUpperCase()}
+                    {statColumnLabel(stat as keyof StatRow)}
                   </Text>
                   <Text style={styles.statValue}>
                     {formatBotStatValue(stat, Number(value))}
