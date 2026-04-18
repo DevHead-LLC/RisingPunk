@@ -1,5 +1,5 @@
 /**
- * Authoritative march distance and pace per [taskItems/in-progress.md § secondsPerDu from army composition].
+ * Authoritative march distance and pace (seconds per DU from army composition); see taskItems/featuresAndBugs/map-hack-travel-async-battles.md and taskItems/historical-actions.md § Map hack.
  */
 
 import type { AttackMarchArmySnapshot } from '../types/attackMarch';
@@ -16,7 +16,7 @@ function clampSecondsPerDu(raw: number): number {
 
 /**
  * Euclidean distance in DU between tile centers (integer grid coords).
- * @see taskItems/in-progress.md — Resolved: march distance & travel time
+ * @see taskItems/featuresAndBugs/map-hack-travel-async-battles.md — march distance & travel time
  */
 export function distanceDuTileUnits(
   originX: number,

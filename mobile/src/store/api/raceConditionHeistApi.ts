@@ -133,7 +133,7 @@ export interface RaceConditionHeistSessionResponse {
   };
 }
 
-/** Client viewpoint at tap (onPressIn) for server comparison; problem-solving notes live in taskItems/in-progress.md when relevant. */
+/** Client viewpoint at tap (onPressIn) for server comparison; problem-solving notes live in taskItems/problemSolvingTempFile.md when relevant. */
 export interface RaceConditionHeistClientViewpoint {
   clientTimestampMs: number;
   displayedWordIndex: number;
