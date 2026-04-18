@@ -69,9 +69,8 @@ export function IncomeRateBreakdownPanel({ data, isLoading, hasError, walletRate
     return <Text style={noteStyle}>Could not load income breakdown. Pull to refresh or reopen Financials.</Text>;
   }
 
-  const w = truncToHundredths(walletRatePerSecond);
-  const t = truncToHundredths(data.totalEffectiveRatePerSecond);
-  const delta = Math.abs(w - t) < 0.005;
+  const ratesMatch =
+    Math.abs(truncToHundredths(walletRatePerSecond) - truncToHundredths(data.totalEffectiveRatePerSecond)) < 0.005;
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -193,7 +192,7 @@ export function IncomeRateBreakdownPanel({ data, isLoading, hasError, walletRate
         <Text style={valTextStyle}>{fmtSigned(walletRatePerSecond)}</Text>
       </View>
       <Text style={noteStyle}>
-        {delta
+        {ratesMatch
           ? 'Matches your current wallet rate.'
           : 'Differs slightly from wallet until the next balance sync; both use the same server formula.'}
       </Text>
