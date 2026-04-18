@@ -187,8 +187,6 @@ router.post('/create', auth, async (req: CreateCrewRequest, res: Response) => {
       executives: []
     });
 
-    await newCrew.save();
-
     applyUnderstaffClockAfterRosterChange(newCrew, 0);
     await newCrew.save();
 
