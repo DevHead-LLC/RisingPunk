@@ -14,6 +14,12 @@ export function getCrewRosterCount(crew: {
 /**
  * Updates `understaffNotifiedAt` / `understaffLastReminderAt` when roster size crosses the minimum threshold.
  * @param previousRosterCount — roster count before the mutation (use `0` for brand-new crew).
+ *
+ * Bugbot: Call this when total roster (1 + executives + members) changes. Role-only moves
+ * (promote/demote, resign, choose-successor) keep the same count and do not need this.
+ * If a mutation omits this helper, `CrewUnderstaffSweepService` still sets `understaffNotifiedAt`
+ * on the next sweep while understaffed (default 24h interval), so the 7-day disband window
+ * applies—only the exact start time may defer to that tick.
  */
 export function applyUnderstaffClockAfterRosterChange(
   crew: ICrew,
