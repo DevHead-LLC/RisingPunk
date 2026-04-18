@@ -63,7 +63,12 @@ export class CrewLevelingService {
     }
     const crew = await crewQuery;
     if (!crew) {
-      throw new Error('Crew not found');
+      // Bugbot: do not throw — runs inside LevelingService transaction; throwing would roll back user XP if CrewStatus.crewId is stale.
+      console.warn(
+        '[CrewLevelingService] Crew not found for XP mirror; skipping crew grant (stale CrewStatus.crewId?). crewId=%s',
+        crewId
+      );
+      return;
     }
 
     let currentLevel = crew.level ?? 1;

@@ -12,6 +12,13 @@ import {
   INSURANCE_LEGACY_REPLACEMENT_ID,
   RENTAL_PROFIT_FEATURES,
   RENTAL_LEGACY_REPLACEMENT_ID,
+  getBaseIncomeRateBonus,
+  getInsuranceReductionBonus,
+  getTaxReductionBonus,
+  getRentMortgageReductionBonus,
+  getUtilitiesReductionBonus,
+  getMiscEntertainmentReductionBonus,
+  getRentalProfitBonusPerRoom,
 } from './researchFeatureUtils';
 
 /** One unlocked research contribution to $/sec (job rate or per-room rental bonus). */
@@ -30,14 +37,15 @@ function checkFn(userId: string, prefetch: BonusPrefetch | undefined) {
     : (cat: string, fid: string) => isResearchFeatureUnlocked(userId, cat, fid);
 }
 
-/** Mirrors {@link getBaseIncomeRateBonus} — lines + total. */
+/**
+ * Line items for UI; **total** always from {@link getBaseIncomeRateBonus} so breakdown matches balance sync (Bugbot: no duplicated total math).
+ */
 export async function getBaseIncomeRateBonusLines(
   userId: string,
   prefetch?: BonusPrefetch
 ): Promise<{ lines: IncomeRateLine[]; total: number }> {
   const check = checkFn(userId, prefetch);
   const lines: IncomeRateLine[] = [];
-  let total = 0;
   for (const { featureId, value } of INCOME_RATE_FEATURES) {
     if (await check('cash-flow', featureId)) {
       lines.push({
@@ -46,7 +54,6 @@ export async function getBaseIncomeRateBonusLines(
         label: `Income research: ${featureId}`,
         perSecond: value,
       });
-      total += value;
     }
   }
   const hasFullReplacement = (
@@ -59,19 +66,17 @@ export async function getBaseIncomeRateBonusLines(
       label: 'Legacy: increase-income-rate',
       perSecond: 0.05,
     });
-    total += 0.05;
   }
+  const total = await getBaseIncomeRateBonus(userId, prefetch);
   return { lines, total };
 }
 
-/** Mirrors {@link getInsuranceReductionBonus}. */
 export async function getInsuranceReductionLines(
   userId: string,
   prefetch?: BonusPrefetch
 ): Promise<{ lines: IncomeRateLine[]; total: number }> {
   const check = checkFn(userId, prefetch);
   const lines: IncomeRateLine[] = [];
-  let total = 0;
   for (const { featureId, value } of INSURANCE_REDUCTION_FEATURES) {
     if (await check('cash-flow', featureId)) {
       lines.push({
@@ -80,7 +85,6 @@ export async function getInsuranceReductionLines(
         label: `Insurance offset: ${featureId}`,
         perSecond: value,
       });
-      total += value;
     }
   }
   const hasReplacement = await check('cash-flow', INSURANCE_LEGACY_REPLACEMENT_ID);
@@ -91,19 +95,18 @@ export async function getInsuranceReductionLines(
       label: 'Legacy: reduce-insurance-expense',
       perSecond: 0.02,
     });
-    total += 0.02;
   }
+  const total = await getInsuranceReductionBonus(userId, prefetch);
   return { lines, total };
 }
 
-/** Mirrors {@link getTaxReductionBonus}. */
 export async function getTaxReductionLines(
   userId: string,
   prefetch?: BonusPrefetch
 ): Promise<{ lines: IncomeRateLine[]; total: number }> {
   const check = checkFn(userId, prefetch);
   const lines: IncomeRateLine[] = [];
-  let total = 0;
+  let stackSum = 0;
   for (const { featureId, value } of CASH_FLOW_TAX_REDUCTION_STACK) {
     if (await check('cash-flow', featureId)) {
       lines.push({
@@ -112,29 +115,27 @@ export async function getTaxReductionLines(
         label: `Tax expense offset: ${featureId}`,
         perSecond: value,
       });
-      total += value;
+      stackSum += value;
     }
   }
-  if (total === 0 && (await check('financial', 'reduce-expenses'))) {
+  if (stackSum === 0 && (await check('financial', 'reduce-expenses'))) {
     lines.push({
       categoryId: 'financial',
       featureId: 'reduce-expenses',
       label: 'Legacy financial: reduce-expenses',
       perSecond: 0.02,
     });
-    total = 0.02;
   }
+  const total = await getTaxReductionBonus(userId, prefetch);
   return { lines, total };
 }
 
-/** Mirrors {@link getRentMortgageReductionBonus}. */
 export async function getRentMortgageReductionLines(
   userId: string,
   prefetch?: BonusPrefetch
 ): Promise<{ lines: IncomeRateLine[]; total: number }> {
   const check = checkFn(userId, prefetch);
   const lines: IncomeRateLine[] = [];
-  let total = 0;
   for (const { featureId, value } of RENT_MORTGAGE_REDUCTION_FEATURES) {
     if (await check('cash-flow', featureId)) {
       lines.push({
@@ -143,20 +144,18 @@ export async function getRentMortgageReductionLines(
         label: `Rent/mortgage offset: ${featureId}`,
         perSecond: value,
       });
-      total += value;
     }
   }
+  const total = await getRentMortgageReductionBonus(userId, prefetch);
   return { lines, total };
 }
 
-/** Mirrors {@link getUtilitiesReductionBonus}. */
 export async function getUtilitiesReductionLines(
   userId: string,
   prefetch?: BonusPrefetch
 ): Promise<{ lines: IncomeRateLine[]; total: number }> {
   const check = checkFn(userId, prefetch);
   const lines: IncomeRateLine[] = [];
-  let total = 0;
   for (const { featureId, value } of UTILITIES_REDUCTION_FEATURES) {
     if (await check('cash-flow', featureId)) {
       lines.push({
@@ -165,20 +164,18 @@ export async function getUtilitiesReductionLines(
         label: `Utilities offset: ${featureId}`,
         perSecond: value,
       });
-      total += value;
     }
   }
+  const total = await getUtilitiesReductionBonus(userId, prefetch);
   return { lines, total };
 }
 
-/** Mirrors {@link getMiscEntertainmentReductionBonus}. */
 export async function getMiscEntertainmentReductionLines(
   userId: string,
   prefetch?: BonusPrefetch
 ): Promise<{ lines: IncomeRateLine[]; total: number }> {
   const check = checkFn(userId, prefetch);
   const lines: IncomeRateLine[] = [];
-  let total = 0;
   for (const { featureId, value } of MISC_ENTERTAINMENT_REDUCTION_FEATURES) {
     if (await check('cash-flow', featureId)) {
       lines.push({
@@ -187,20 +184,18 @@ export async function getMiscEntertainmentReductionLines(
         label: `Misc/entertainment offset: ${featureId}`,
         perSecond: value,
       });
-      total += value;
     }
   }
+  const total = await getMiscEntertainmentReductionBonus(userId, prefetch);
   return { lines, total };
 }
 
-/** Mirrors {@link getRentalProfitBonusPerRoom} — each line is per room $/sec added to every room rate. */
 export async function getRentalProfitResearchLines(
   userId: string,
   prefetch?: BonusPrefetch
 ): Promise<{ lines: IncomeRateLine[]; perRoomTotal: number }> {
   const check = checkFn(userId, prefetch);
   const lines: IncomeRateLine[] = [];
-  let perRoomTotal = 0;
   for (const { featureId, value, categoryId } of RENTAL_PROFIT_FEATURES) {
     if (await check(categoryId, featureId)) {
       lines.push({
@@ -209,7 +204,6 @@ export async function getRentalProfitResearchLines(
         label: `Rental profit research: ${featureId} (per room)`,
         perSecond: value,
       });
-      perRoomTotal += value;
     }
   }
   const hasReplacement = await check('investments', RENTAL_LEGACY_REPLACEMENT_ID);
@@ -220,7 +214,7 @@ export async function getRentalProfitResearchLines(
       label: 'Legacy: rental-profit-increase (per room)',
       perSecond: 0.01,
     });
-    perRoomTotal += 0.01;
   }
+  const perRoomTotal = await getRentalProfitBonusPerRoom(userId, prefetch);
   return { lines, perRoomTotal };
 }

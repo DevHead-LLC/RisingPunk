@@ -1,11 +1,7 @@
 import type { IUser } from '../models/User';
 import { Crew } from '../models/Crew';
 import { CrewStatus } from '../models/CrewStatus';
-import {
-  getResearchFeaturesForBonusSync,
-  getCrewLevelIncomeBonusForUser,
-  getRentalProfitBonusPerRoom,
-} from '../utils/researchFeatureUtils';
+import { getResearchFeaturesForBonusSync, getCrewLevelIncomeBonusForUser } from '../utils/researchFeatureUtils';
 import { RentalHousingIncomeService } from './RentalHousingIncomeService';
 import { RentalHousingSyncService } from './RentalHousingSyncService';
 import {
@@ -72,7 +68,6 @@ export class IncomeRateBreakdownService {
     await RentalHousingSyncService.ensureLegacyRentalLevels(user);
 
     const prefetch = await getResearchFeaturesForBonusSync(userId);
-    const rentalBonusPerRoom = await getRentalProfitBonusPerRoom(userId, prefetch);
 
     const [
       incomeRes,
@@ -91,6 +86,8 @@ export class IncomeRateBreakdownService {
       getMiscEntertainmentReductionLines(userId, prefetch),
       getRentalProfitResearchLines(userId, prefetch),
     ]);
+
+    const rentalBonusPerRoom = rentalProfitLinesRes.perRoomTotal;
 
     const withBonus = await RentalHousingIncomeService.calculateRentalHousingIncome(user, {
       rentalProfitBonusPerRoom: rentalBonusPerRoom,
