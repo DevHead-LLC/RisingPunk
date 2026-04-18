@@ -364,49 +364,54 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [user, showOnboarding, showTurfIntro, showEmailVerification, emailVerificationPromptedUserId, dispatch]);
 
-  // Android-specific bounds calculation (only for Android)
-  useEffect(() => {
-    if (Platform.OS === 'android' && computePanBounds) {
-      const WINDOW_WIDTH = Dimensions.get('window').width;
-      const WINDOW_HEIGHT = Dimensions.get('window').height;
-      const SCREEN_WIDTH = Dimensions.get('screen').width;
-      const SCREEN_HEIGHT = Dimensions.get('screen').height;
-      const CONTENT_SIZE = 2000;
-      const MARGIN_SIZE = 0; // No margin for turf screen
-      
-      // Hybrid approach: window for top/bottom, screen for left/right
-      const ADJUSTED_WIDTH = SCREEN_WIDTH;  // Use screen width for left/right
-      const ADJUSTED_HEIGHT = WINDOW_HEIGHT; // Use window height for top/bottom
+  // Android-specific bounds: recompute when dimensions change or app resumes (stale metrics caused turf to slide off-screen until reboot — bug-fixes-and-updates § Android black screen).
+  const applyAndroidPanBounds = useCallback(() => {
+    if (Platform.OS !== 'android' || !computePanBounds) return;
+    const WINDOW_HEIGHT = Dimensions.get('window').height;
+    const SCREEN_WIDTH = Dimensions.get('screen').width;
+    const CONTENT_SIZE = 2000;
+    const MARGIN_SIZE = 0;
 
-      const bounds = computePanBounds({
-        totalSize: CONTENT_SIZE,
-        containerWidth: ADJUSTED_WIDTH,
-        containerHeight: ADJUSTED_HEIGHT,
-        marginSize: MARGIN_SIZE,
-      });
+    const ADJUSTED_WIDTH = SCREEN_WIDTH;
+    const ADJUSTED_HEIGHT = WINDOW_HEIGHT;
 
-      // Calculate Android header/toolbar height for landscape mode
-      // Status bar is hidden, but we need to account for the space it would take
-      // In landscape mode, navigation bar is 24dp
-      // Since status bar is hidden, we only need to account for navigation bar
-      const ANDROID_NAVIGATION_BAR_HEIGHT = 24; // 24dp in landscape mode
-      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT; // Total hidden header height
-      
-      // Adjust only the bottom boundary to allow scroll past bottom by header height
-      // This allows the bottom border to be visible when user scrolls past the normal bottom
-      const adjustedBounds = {
-        ...bounds,
-        minY: bounds.minY - ANDROID_HEADER_HEIGHT // Allow scroll past bottom by header height
-      };
+    const bounds = computePanBounds({
+      totalSize: CONTENT_SIZE,
+      containerWidth: ADJUSTED_WIDTH,
+      containerHeight: ADJUSTED_HEIGHT,
+      marginSize: MARGIN_SIZE,
+    });
 
+    const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
+    const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
 
-      minX.value = adjustedBounds.minX;
-      maxX.value = adjustedBounds.maxX;
-      minY.value = adjustedBounds.minY;
-      maxY.value = adjustedBounds.maxY;
-      boundsReady.value = true;
-    }
+    const adjustedBounds = {
+      ...bounds,
+      minY: bounds.minY - ANDROID_HEADER_HEIGHT,
+    };
+
+    minX.value = adjustedBounds.minX;
+    maxX.value = adjustedBounds.maxX;
+    minY.value = adjustedBounds.minY;
+    maxY.value = adjustedBounds.maxY;
+    boundsReady.value = true;
   }, [minX, maxX, minY, maxY, boundsReady, computePanBounds]);
+
+  useEffect(() => {
+    applyAndroidPanBounds();
+  }, [applyAndroidPanBounds]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const dimSub = Dimensions.addEventListener('change', applyAndroidPanBounds);
+    const appSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') applyAndroidPanBounds();
+    });
+    return () => {
+      dimSub.remove();
+      appSub.remove();
+    };
+  }, [applyAndroidPanBounds]);
 
   // Expose horizontalScrollRef, centerAndroidView, and pan method to parent component
   useImperativeHandle(ref, () => ({

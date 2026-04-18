@@ -71,17 +71,17 @@ const AppContent = memo(() => {
   }, []);
 
   // Fetch data when authenticated
-  const { data: balanceData, isLoading: balanceLoading } = useFetchBalanceQuery(undefined, {
+  const { data: balanceData } = useFetchBalanceQuery(undefined, {
     skip: !token,
     pollingInterval: 10000, // Poll every 10 seconds
   });
 
-  const { data: botsData, isLoading: botsLoading } = useFetchBotsQuery(undefined, {
+  const { data: botsData } = useFetchBotsQuery(undefined, {
     skip: !token,
     pollingInterval: 10000, // Poll every 10 seconds
   });
 
-  const { data: buildStateData, isLoading: buildStateLoading } = useFetchBuildStateQuery(undefined, {
+  const { data: buildStateData } = useFetchBuildStateQuery(undefined, {
     skip: !token,
     // While a build is active, poll often so Redux stays near server; idle stays at 10s.
     // Completion also triggers an explicit refetch from BuildSection when the timer hits zero.
@@ -354,8 +354,8 @@ const AppContent = memo(() => {
     );
   }
 
-  // Show loading state while checking stored auth or fetching data
-  if (isLoading || (token && (balanceLoading || botsLoading || buildStateLoading))) {
+  // Only gate on auth hydrate; RTK balance/bots/build-state can hang on bad networks and would block Turf (black screen).
+  if (isLoading) {
     return null; // or a loading component
   }
 

@@ -706,21 +706,58 @@ export const logoutUser = createAsyncThunk(
   }
 );
 
+/** Guest / Play-as-Guest can finish writing AsyncStorage after hydrate starts; second read reduces race to null. */
+async function readTokenWithGuestRaceRetry(): Promise<string | null> {
+  let token = await AsyncStorage.getItem('token');
+  if (token != null && token.length > 0) {
+    return token;
+  }
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 120);
+  });
+  token = await AsyncStorage.getItem('token');
+  return token != null && token.length > 0 ? token : null;
+}
+
+async function readStoredUserFromStorage(): Promise<User | null> {
+  const raw = await AsyncStorage.getItem('user');
+  if (raw == null || raw.length === 0) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      '_id' in parsed &&
+      typeof (parsed as { _id: unknown })._id === 'string' &&
+      'handle' in parsed &&
+      typeof (parsed as { handle: unknown }).handle === 'string'
+    ) {
+      return parsed as User;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 export const loadStoredAuth = createAsyncThunk(
   'auth/loadStored',
-  async (_, { rejectWithValue }) => {
+  async () => {
     try {
-      const storedToken = await AsyncStorage.getItem('token');
-      
+      const storedToken = await readTokenWithGuestRaceRetry();
+
       if (!storedToken) {
         return null;
       }
 
-      // Verify token and get fresh user data from database
+      const storedUserFallback = await readStoredUserFromStorage();
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      let response;
+
+      let response: Response;
       try {
         response = await fetch(`${API_URL}/api/auth/verify-token`, {
           method: 'GET',
@@ -734,25 +771,41 @@ export const loadStoredAuth = createAsyncThunk(
       }
 
       if (!response.ok) {
-        // Token is invalid, clear stored data
+        const status = response.status;
+        if (status === 401 || status === 403 || status === 404) {
+          await AsyncStorage.multiRemove(['token', 'user']);
+          return null;
+        }
+        if (storedUserFallback) {
+          await markAccountExists();
+          return {
+            token: storedToken,
+            user: storedUserFallback,
+          };
+        }
         await AsyncStorage.multiRemove(['token', 'user']);
         return null;
       }
 
-      const userData = await response.json();
-      
-      // Update stored user data with fresh database data
+      let userData: { user: User };
+      try {
+        userData = await response.json();
+      } catch {
+        if (storedUserFallback) {
+          await markAccountExists();
+          return { token: storedToken, user: storedUserFallback };
+        }
+        await AsyncStorage.multiRemove(['token', 'user']);
+        return null;
+      }
+
       await AsyncStorage.setItem('user', JSON.stringify(userData.user));
 
       if (userData.user?.isGuest) {
         await setGuestToken(storedToken);
       }
 
-      // Mark that user has an account (so app_open tracking works for auto-sign-in returning users)
       await markAccountExists();
-
-      // Note: App return tracking for auto-sign in is handled in AppContent.tsx
-      // when token/user is set, to avoid duplicate tracking
 
       return {
         token: storedToken,
@@ -760,8 +813,18 @@ export const loadStoredAuth = createAsyncThunk(
       };
     } catch (error) {
       console.error('🔴 LOAD STORED AUTH: Error verifying token:', error);
-      // On error (including network errors), clear stored data to force re-authentication
-      await AsyncStorage.multiRemove(['token', 'user']);
+      const tokenAfterError = await AsyncStorage.getItem('token');
+      const userFallback = await readStoredUserFromStorage();
+      if (tokenAfterError != null && tokenAfterError.length > 0 && userFallback) {
+        await markAccountExists();
+        return {
+          token: tokenAfterError,
+          user: userFallback,
+        };
+      }
+      if (tokenAfterError != null && tokenAfterError.length > 0 && !userFallback) {
+        await AsyncStorage.multiRemove(['token', 'user']);
+      }
       return null;
     }
   }
@@ -1276,6 +1339,11 @@ export const authSlice = createSlice({
           
           // Force fetch fresh balance and bot data immediately after auth
         } else {
+          if (state.token && state.user) {
+            // Hydrate returned null after a concurrent Play as Guest succeeded; do not wipe the new session.
+            state.isInitialized = true;
+            return;
+          }
           // No stored auth, reset all states
           state.token = null;
           state.user = null;

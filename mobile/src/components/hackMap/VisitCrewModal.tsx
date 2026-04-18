@@ -443,7 +443,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
   },
   visitCrewMeta: {
-    fontSize: SIZING.font.sm,
+    fontSize: SIZING.font.small,
     marginTop: 4,
     textAlign: 'center',
   },
