@@ -256,6 +256,13 @@ mongoose.connect(process.env.MONGODB_URI, {
     // Start data cleanup service for privacy policy compliance
     DataCleanupService.startScheduledCleanup();
 
+    try {
+      const { startCrewUnderstaffSweepWatchdog } = require('./src/services/CrewUnderstaffSweepService');
+      startCrewUnderstaffSweepWatchdog();
+    } catch (crewSweepErr: unknown) {
+      console.warn('Crew understaff sweep watchdog failed to start (non-fatal):', crewSweepErr);
+    }
+
     const { startBattleDataRetentionWatchdog } = require('./src/services/BattleDataRetentionService');
     startBattleDataRetentionWatchdog();
     

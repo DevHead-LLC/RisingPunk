@@ -7,7 +7,11 @@ import mongoose from 'mongoose';
 import { PrivateMessage } from '../models/PrivateMessage';
 import { PrivateInboxThread } from '../models/PrivateInboxThread';
 import { User } from '../models/User';
-import { BATTLE_REPORT_SENDER_ID, PROBE_REPORT_SENDER_ID } from '../constants/systemSenders';
+import {
+  BATTLE_REPORT_SENDER_ID,
+  PROBE_REPORT_SENDER_ID,
+  SYSTEM_NOTIFICATION_SENDER_ID,
+} from '../constants/systemSenders';
 import {
   canonicalThreadKeyFromMessage,
   canonicalThreadKeyFromRoute,
@@ -24,6 +28,7 @@ import {
 const SYSTEM_PM_SENDER_IDS = new Set([
   PROBE_REPORT_SENDER_ID.toString(),
   BATTLE_REPORT_SENDER_ID.toString(),
+  SYSTEM_NOTIFICATION_SENDER_ID.toString(),
 ]);
 
 type LeanPm = {
@@ -240,8 +245,10 @@ export async function listConversationsForUser(
     adminIdSet: Set<string>;
     probeReportSenderIdStr: string;
     battleReportSenderIdStr: string;
+    systemNotificationSenderIdStr: string;
     conversationListLastMessagePreview: (raw: string | undefined, isProbe: boolean) => string;
     getBattleReportPreview: (raw: string | undefined, currentUserId: string) => string;
+    getSystemNotificationPreview: (raw: string | undefined) => string;
   }
 ): Promise<ConversationRowOut[]> {
   await backfillPrivateInboxForUserIfNeeded(userId);
@@ -271,6 +278,7 @@ export async function listConversationsForUser(
     const isBcKey = key.startsWith('bc:');
     const isProbe = otherId === opts.probeReportSenderIdStr;
     const isBattle = otherId === opts.battleReportSenderIdStr;
+    const isSystemNotification = otherId === opts.systemNotificationSenderIdStr;
     if (blockedSet.has(otherId) && !isBcKey) continue;
 
     const filter = threadMessagesFilter(key) as any;
@@ -288,7 +296,7 @@ export async function listConversationsForUser(
     } as any);
 
     const other =
-      isProbe || isBattle
+      isProbe || isBattle || isSystemNotification
         ? null
         : await User.findById(new mongoose.Types.ObjectId(otherId)).select('handle').lean();
 
@@ -298,6 +306,8 @@ export async function listConversationsForUser(
       lastMessage = opts.getBattleReportPreview(rawLast, userId);
     } else if (isProbe) {
       lastMessage = opts.conversationListLastMessagePreview(rawLast, true);
+    } else if (isSystemNotification) {
+      lastMessage = opts.getSystemNotificationPreview(rawLast);
     }
 
     const announcements = isBcKey;
@@ -307,7 +317,9 @@ export async function listConversationsForUser(
         ? 'Probe Report'
         : isBattle
           ? 'Battle Report'
-          : (other as any)?.handle ?? 'Unknown';
+          : isSystemNotification
+            ? 'System Notification'
+            : (other as any)?.handle ?? 'Unknown';
 
     out.push({
       otherUserId: otherId,
@@ -315,7 +327,7 @@ export async function listConversationsForUser(
       lastMessage,
       lastAt: latest.createdAt ? new Date(latest.createdAt) : new Date(),
       unreadCount,
-      isBroadcast: announcements || isProbe || isBattle,
+      isBroadcast: announcements || isProbe || isBattle || isSystemNotification,
     });
   }
 

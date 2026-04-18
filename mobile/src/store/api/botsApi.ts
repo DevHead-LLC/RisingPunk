@@ -84,7 +84,10 @@ export const botsApi = createApi({
             base: StatRow;
             levelBonus: StatRow;
             programmingBonus: StatRow;
-            researchBonus: StatRow;
+            /** Hack Crew research army unlocks (not crew level). */
+            crewResearchBonus: StatRow;
+            /** Crew level member bonus table (army-wide). */
+            crewLevelBonus: StatRow;
             total: StatRow;
             mark2: { base: StatRow; levelBonus: StatRow; total: StatRow };
           }

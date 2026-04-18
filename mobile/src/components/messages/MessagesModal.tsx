@@ -23,7 +23,11 @@ import {
 } from '../../store/api/privateMessagesApi';
 import { BaseChatModal, ChatMessageForModal } from '../hackMap/BaseChatModal';
 import { useAppSelector } from '../../store/hooks';
-import { PROBE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_ID } from '../../constants/systemSenders';
+import {
+  PROBE_REPORT_SENDER_ID,
+  BATTLE_REPORT_SENDER_ID,
+  SYSTEM_NOTIFICATION_SENDER_ID,
+} from '../../constants/systemSenders';
 
 interface MessagesModalProps {
   visible: boolean;
@@ -63,7 +67,10 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   const isBroadcast = view !== 'inbox' && view.isBroadcast === true;
   /** Only use broadcastOnly for real admin announcements; Probe Report and Battle Report threads must fetch normal PMs. */
   const threadBroadcastOnly =
-    isBroadcast && otherUserId !== PROBE_REPORT_SENDER_ID && otherUserId !== BATTLE_REPORT_SENDER_ID;
+    isBroadcast &&
+    otherUserId !== PROBE_REPORT_SENDER_ID &&
+    otherUserId !== BATTLE_REPORT_SENDER_ID &&
+    otherUserId !== SYSTEM_NOTIFICATION_SENDER_ID;
 
   const { data: threadData, isLoading: isLoadingThread, error: threadError } = useGetThreadQuery(
     { otherUserId: otherUserId!, broadcastOnly: threadBroadcastOnly },
@@ -80,7 +87,8 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
     return (
       c.isBroadcast === true &&
       c.otherUserId !== PROBE_REPORT_SENDER_ID &&
-      c.otherUserId !== BATTLE_REPORT_SENDER_ID
+      c.otherUserId !== BATTLE_REPORT_SENDER_ID &&
+      c.otherUserId !== SYSTEM_NOTIFICATION_SENDER_ID
     );
   }, []);
 
@@ -134,7 +142,10 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
   }));
 
   const canReply =
-    !isBroadcast && otherUserId !== PROBE_REPORT_SENDER_ID && otherUserId !== BATTLE_REPORT_SENDER_ID;
+    !isBroadcast &&
+    otherUserId !== PROBE_REPORT_SENDER_ID &&
+    otherUserId !== BATTLE_REPORT_SENDER_ID &&
+    otherUserId !== SYSTEM_NOTIFICATION_SENDER_ID;
 
   const onSendMessage = useCallback(
     async (trimmedMessage: string) => {
@@ -170,7 +181,8 @@ export const MessagesModal: React.FC<MessagesModalProps> = ({
         broadcastOnly:
           c.isBroadcast === true &&
           c.otherUserId !== PROBE_REPORT_SENDER_ID &&
-          c.otherUserId !== BATTLE_REPORT_SENDER_ID,
+          c.otherUserId !== BATTLE_REPORT_SENDER_ID &&
+          c.otherUserId !== SYSTEM_NOTIFICATION_SENDER_ID,
       });
     },
     [markRead],

@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, Alert, unstable_batchedUpdates, Modal, AppState } from 'react-native';
+import { View, Text, StyleSheet, LayoutChangeEvent, Pressable, Image, Dimensions, TouchableOpacity, ScrollView, Alert, unstable_batchedUpdates, Modal, AppState, Platform } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withDecay, runOnJS, useAnimatedReaction } from 'react-native-reanimated';
 import { CloseButton } from '../components/common/CloseButton';
@@ -1571,6 +1571,28 @@ export const HackMapScreen: React.FC<Props> = ({
   const boundsReady = useSharedValue(false);
   const initialDims = Dimensions.get('window');
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: initialDims.width, height: initialDims.height });
+
+  // Android: onLayout may not re-fire after sleep/resume; re-read window on dimension change and when foregrounded so pan/tap-to-cell use current size (bug-fixes-and-updates § Android black screen).
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const applyWindowSize = () => {
+      const d = Dimensions.get('window');
+      if (d.width <= 0 || d.height <= 0) return;
+      setContainerSize((prev) => {
+        if (prev.width === d.width && prev.height === d.height) return prev;
+        return { width: d.width, height: d.height };
+      });
+    };
+    const dimSub = Dimensions.addEventListener('change', applyWindowSize);
+    const appSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') applyWindowSize();
+    });
+    return () => {
+      dimSub.remove();
+      appSub.remove();
+    };
+  }, []);
+
   const containerSizeRef = useRef(containerSize);
   containerSizeRef.current = containerSize;
   const authoritativeGridSize = mapGridSize ?? getGridSize(grid);

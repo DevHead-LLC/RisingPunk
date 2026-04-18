@@ -203,6 +203,7 @@ router.get('/crew/bots-destroyed', auth, async (req: Request, res: Response) => 
         crewIdentifier: crew.crewIdentifier,
         totalBotsDestroyed,
         memberCount: memberIds.length,
+        level: typeof (crew as { level?: number }).level === 'number' ? (crew as { level: number }).level : 1,
       };
     }).filter(crew => crew.totalBotsDestroyed > 0)
       .sort((a, b) => b.totalBotsDestroyed - a.totalBotsDestroyed)
@@ -214,6 +215,7 @@ router.get('/crew/bots-destroyed', auth, async (req: Request, res: Response) => 
       crewIdentifier: crew.crewIdentifier || '',
       botsDestroyed: crew.totalBotsDestroyed || 0,
       memberCount: crew.memberCount || 0,
+      level: typeof crew.level === 'number' ? crew.level : 1,
     }));
 
     const response = {
@@ -290,6 +292,7 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
         crewIdentifier: crew.crewIdentifier,
         totalNetWorth,
         memberCount: memberIds.length,
+        level: typeof (crew as { level?: number }).level === 'number' ? (crew as { level: number }).level : 1,
       };
     }).filter(crew => crew.totalNetWorth > 0)
       .sort((a, b) => b.totalNetWorth - a.totalNetWorth)
@@ -301,6 +304,7 @@ router.get('/crew/net-worth', auth, async (req: Request, res: Response) => {
       crewIdentifier: crew.crewIdentifier || '',
       netWorth: crew.totalNetWorth || 0,
       memberCount: crew.memberCount || 0,
+      level: typeof crew.level === 'number' ? crew.level : 1,
     }));
 
     const response = {
