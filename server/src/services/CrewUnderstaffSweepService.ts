@@ -19,15 +19,15 @@ export async function runCrewUnderstaffSweepOnce(): Promise<void> {
       executives?: mongoose.Types.ObjectId[];
       members?: mongoose.Types.ObjectId[];
       understaffNotifiedAt?: Date | null;
-      createdAt?: Date | null;
+      understaffLastReminderAt?: Date | null;
     };
 
     const id = crew._id;
     const count = getCrewRosterCount(crew);
 
     if (count >= MIN_CREW_ROSTER) {
-      if (crew.understaffNotifiedAt != null) {
-        await Crew.updateOne({ _id: id }, { $set: { understaffNotifiedAt: null } });
+      if (crew.understaffNotifiedAt != null || crew.understaffLastReminderAt != null) {
+        await Crew.updateOne({ _id: id }, { $set: { understaffNotifiedAt: null, understaffLastReminderAt: null } });
       }
       continue;
     }
@@ -36,7 +36,8 @@ export async function runCrewUnderstaffSweepOnce(): Promise<void> {
     if (crew.understaffNotifiedAt) {
       start = new Date(crew.understaffNotifiedAt);
     } else {
-      start = crew.createdAt ? new Date(crew.createdAt) : new Date();
+      // Bugbot: do not use createdAt — understaffed crews predating this field would else get a deadline in the past and disband on first sweep.
+      start = new Date();
       await Crew.updateOne({ _id: id }, { $set: { understaffNotifiedAt: start } });
     }
 
@@ -54,12 +55,19 @@ export async function runCrewUnderstaffSweepOnce(): Promise<void> {
       continue;
     }
 
+    // Bugbot: dedupe — sweep interval can be <24h (CREW_UNDERSTAFF_SWEEP_INTERVAL_MS); only one reminder per 24h.
+    const lastReminder = crew.understaffLastReminderAt ? new Date(crew.understaffLastReminderAt).getTime() : null;
+    if (lastReminder != null && Date.now() - lastReminder < ONE_DAY_MS) {
+      continue;
+    }
+
     const presidentId = String(crew.presidentId);
     const crewName = crew.crewName ?? 'Your crew';
     const deadlineIso = new Date(deadlineMs).toISOString();
     const msg = `Reminder: "${crewName}" has fewer than ${MIN_CREW_ROSTER} members. Recruit more or this crew will disband after ${deadlineIso} (UTC).`;
     try {
       await sendSystemNotificationDm(presidentId, msg);
+      await Crew.updateOne({ _id: id }, { $set: { understaffLastReminderAt: new Date() } });
     } catch (e) {
       console.error('[CrewUnderstaffSweep] reminder DM failed', String(id), e);
     }

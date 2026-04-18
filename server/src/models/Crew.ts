@@ -25,6 +25,11 @@ export interface ICrew extends Document {
    * First set at creation (understaffed) or when dropping from ≥3 to &lt;3.
    */
   understaffNotifiedAt?: Date | null;
+  /**
+   * Last time the understaff sweep sent a reminder DM to the president. At most one reminder per 24h
+   * while understaffed (sweep interval can be &lt; 24h). Cleared when roster ≥ 3.
+   */
+  understaffLastReminderAt?: Date | null;
   applicants: ICrewApplicant[];
   crewRules: string[];
   originalCrewRules?: string[]; // Original unfiltered content for moderation reports
@@ -91,6 +96,11 @@ const crewSchema = new Schema({
     }
   },
   understaffNotifiedAt: {
+    type: Date,
+    required: false,
+    default: null
+  },
+  understaffLastReminderAt: {
     type: Date,
     required: false,
     default: null

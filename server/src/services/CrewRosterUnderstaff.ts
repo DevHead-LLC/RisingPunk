@@ -12,7 +12,7 @@ export function getCrewRosterCount(crew: {
 }
 
 /**
- * Updates `understaffNotifiedAt` when roster size crosses the minimum threshold.
+ * Updates `understaffNotifiedAt` / `understaffLastReminderAt` when roster size crosses the minimum threshold.
  * @param previousRosterCount — roster count before the mutation (use `0` for brand-new crew).
  */
 export function applyUnderstaffClockAfterRosterChange(
@@ -22,14 +22,18 @@ export function applyUnderstaffClockAfterRosterChange(
   const n = getCrewRosterCount(crew);
   if (n >= MIN_CREW_ROSTER) {
     crew.understaffNotifiedAt = null;
+    crew.understaffLastReminderAt = null;
     return;
   }
   const prev = previousRosterCount ?? n;
   if (prev >= MIN_CREW_ROSTER && n < MIN_CREW_ROSTER) {
     crew.understaffNotifiedAt = new Date();
+    crew.understaffLastReminderAt = null;
     return;
   }
   if (crew.understaffNotifiedAt == null) {
-    crew.understaffNotifiedAt = (crew.createdAt as Date) ?? new Date();
+    // Bugbot: use "now", not createdAt — legacy understaffed crews need a fresh grace window when the clock is first set.
+    crew.understaffNotifiedAt = new Date();
+    crew.understaffLastReminderAt = null;
   }
 }
