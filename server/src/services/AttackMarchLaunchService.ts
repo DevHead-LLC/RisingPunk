@@ -11,6 +11,7 @@ import {
 } from './MarchTimingService';
 import type { ResolvedMarchLaunchTarget } from './MarchTargetValidationService';
 import { defenderQueueKeyForLaunchTarget } from './MarchDefenderQueueService';
+import { recordNpcAttackProgressForGuidedTasks } from './GuidedTaskNpcAttackService';
 
 const Bot = require('../models/Bot');
 
@@ -306,6 +307,7 @@ export async function executeAttackMarchLaunch(
       });
 
       if (resultPayload) {
+        await recordNpcAttackProgressForGuidedTasks(String(attackerId), target.defenderNpcSlug);
         return resultPayload;
       }
     } catch (e: unknown) {

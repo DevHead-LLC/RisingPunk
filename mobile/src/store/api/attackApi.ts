@@ -3,6 +3,7 @@ import { API_URL } from '../../config';
 import type { RootState } from '../index';
 import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
+import { userGuideApi } from './userGuideApi';
 
 /** Lean march row (no `armySnapshot`) from GET /api/attack/mine or /active. */
 export type AttackMarchListItem = {
@@ -138,6 +139,14 @@ export const attackApi = createApi({
         body,
       }),
       invalidatesTags: ['AttackMarch', 'Bots'],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+        } catch {
+          // Error handling is done by the mutation itself
+        }
+      },
     }),
     cancelOutboundAttackMarch: builder.mutation<
       CancelAttackMarchResponse,
