@@ -809,6 +809,23 @@ router.get('/finance/templates', auth, async (_req: Request, res: Response) => {
   }
 });
 
+/** Per-second income breakdown: job rate (research + expense offsets), passive (properties + rental-profit research), crew benefits — matches balance ratePerSecond math. */
+router.get('/finance/income-rate-breakdown', auth, async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const { IncomeRateBreakdownService } = await import('../services/IncomeRateBreakdownService');
+    const breakdown = await IncomeRateBreakdownService.getBreakdownForUser(user);
+    res.json(breakdown);
+  } catch (error) {
+    console.error('Income rate breakdown error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Rental Housing endpoints
 router.get('/rental-housing-status/:propertyId', auth, async (req, res): Promise<void> => {
   try {

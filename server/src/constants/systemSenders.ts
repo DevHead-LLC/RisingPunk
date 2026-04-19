@@ -15,3 +15,9 @@ export const BATTLE_REPORT_SENDER_ID: mongoose.Types.ObjectId =
   new mongoose.Types.ObjectId('000000000000000000000002');
 
 export const BATTLE_REPORT_SENDER_USERNAME = 'Battle Report';
+
+/** System DMs (crew policy, etc.); same PM mechanics as Probe/Battle reports. */
+export const SYSTEM_NOTIFICATION_SENDER_ID: mongoose.Types.ObjectId =
+  new mongoose.Types.ObjectId('000000000000000000000003');
+
+export const SYSTEM_NOTIFICATION_SENDER_USERNAME = 'System Notification';

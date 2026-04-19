@@ -16,6 +16,8 @@ export interface LeaderboardCrew {
   rank: number;
   crewName: string;
   crewIdentifier: string;
+  /** Crew level (from `Crew.level`). */
+  level: number;
   botsDestroyed?: number;
   netWorth?: number;
   memberCount: number;
