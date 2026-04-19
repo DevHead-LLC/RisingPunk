@@ -307,7 +307,12 @@ export async function executeAttackMarchLaunch(
       });
 
       if (resultPayload) {
-        await recordNpcAttackProgressForGuidedTasks(String(attackerId), target.defenderNpcSlug);
+        // Match battle.ts: must not fail the launch response after the transaction committed.
+        try {
+          await recordNpcAttackProgressForGuidedTasks(String(attackerId), target.defenderNpcSlug);
+        } catch (taskTrackingError) {
+          console.error('[AttackMarchLaunchService] guided task NPC attack tracking failed:', taskTrackingError);
+        }
         return resultPayload;
       }
     } catch (e: unknown) {
