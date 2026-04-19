@@ -12,6 +12,7 @@ import { Battle } from '../models/Battle';
 import { Map } from '../models/Map';
 import { Crew, ICrew } from '../models/Crew';
 import { applyUnderstaffClockAfterRosterChange, getCrewRosterCount } from './CrewRosterUnderstaff';
+import { invalidateCrewLeaderboardCaches } from '../routes/leaderboardRoutes';
 import { clearUserFromMapCells } from './CellAccessorService';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 
@@ -246,6 +247,9 @@ export class AccountDeletionService {
       // Update result only after transaction commits successfully
       result.deletedRecords.crewsUpdated += localCounts.crewsUpdated;
       result.deletedRecords.crewsDisbanded += localCounts.crewsDisbanded;
+      if (localCounts.crewsDisbanded > 0) {
+        invalidateCrewLeaderboardCaches();
+      }
     } catch (error: any) {
       result.errors.push(`Crew membership handling error: ${error.message || String(error)}`);
       console.error('Error handling crew memberships:', error);
