@@ -1355,7 +1355,12 @@ export const authSlice = createSlice({
       })
       .addCase(loadStoredAuth.rejected, (state) => {
         state.isLoading = false;
-        // On error, reset all states
+        // Bugbot: match loadStoredAuth.fulfilled null branch — if hydrate threw after a concurrent
+        // Play as Guest (or similar) already set state, do not wipe the active session.
+        if (state.token && state.user) {
+          state.isInitialized = true;
+          return;
+        }
         state.token = null;
         state.user = null;
         state.showOnboarding = false;
