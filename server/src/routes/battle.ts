@@ -7,9 +7,8 @@ import {
   buildAdminIdSet,
   canUserAccessBattleReplay,
 } from '../services/BattleReplayLifecycleService';
-import { UserTaskProgress } from '../models/UserTaskProgress';
-import { NPCService } from '../services/NPCService';
 import { normalizeUserBattalionsForBattleStart } from '../utils/normalizeUserBattalionsForBattleStart';
+import { recordNpcAttackProgressForGuidedTasks } from '../services/GuidedTaskNpcAttackService';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -156,72 +155,7 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
       try {
         const battleDoc = await Battle.findOne({ battleId: battle.battleId });
         const actualDefenderNpcSlug = (battleDoc as any)?.defenderNpcSlug;
-        
-        if (actualDefenderNpcSlug) {
-          const npc = await NPCService.getNPCBySlug(actualDefenderNpcSlug);
-          if (npc && npc.userLevelAssociation === 1) {
-            const existingProgress = await UserTaskProgress.findOne({ userId: req.user._id });
-            const wasAlreadyAttacked = existingProgress?.attackedLevel1NpcAt;
-            
-            if (!wasAlreadyAttacked) {
-              await UserTaskProgress.findOneAndUpdate(
-                { userId: req.user._id },
-                {
-                  $set: { attackedLevel1NpcAt: new Date() },
-                  $setOnInsert: {
-                    completedTasks: [],
-                    collectedTasks: [],
-                    skippedTasks: [],
-                    showTaskGuide: true
-                  }
-                },
-                { upsert: true, new: true }
-              );
-            }
-          }
-          // Display level 5 (shown on hack map tile) = userLevelAssociation 20 (see map.ts getDisplayLevel)
-          if (npc && npc.userLevelAssociation === 20) {
-            const existingProgress = await UserTaskProgress.findOne({ userId: req.user._id });
-            const wasAlreadyAttacked = existingProgress?.attackedLevel5NpcAt;
-            
-            if (!wasAlreadyAttacked) {
-              await UserTaskProgress.findOneAndUpdate(
-                { userId: req.user._id },
-                {
-                  $set: { attackedLevel5NpcAt: new Date() },
-                  $setOnInsert: {
-                    completedTasks: [],
-                    collectedTasks: [],
-                    skippedTasks: [],
-                    showTaskGuide: true
-                  }
-                },
-                { upsert: true, new: true }
-              );
-            }
-          }
-          // Display level 6 (shown on hack map tile) = userLevelAssociation 25 (see map.ts getDisplayLevel)
-          if (npc && npc.userLevelAssociation === 25) {
-            const existingProgress = await UserTaskProgress.findOne({ userId: req.user._id });
-            const wasAlreadyAttacked = existingProgress?.attackedLevel6NpcAt;
-            
-            if (!wasAlreadyAttacked) {
-              await UserTaskProgress.findOneAndUpdate(
-                { userId: req.user._id },
-                {
-                  $set: { attackedLevel6NpcAt: new Date() },
-                  $setOnInsert: {
-                    completedTasks: [],
-                    collectedTasks: [],
-                    skippedTasks: [],
-                    showTaskGuide: true
-                  }
-                },
-                { upsert: true, new: true }
-              );
-            }
-          }
-        }
+        await recordNpcAttackProgressForGuidedTasks(String(req.user._id), actualDefenderNpcSlug);
       } catch (taskTrackingError) {
         console.error('Error tracking Level 1/5/6 NPC attack for task guide:', taskTrackingError);
       }

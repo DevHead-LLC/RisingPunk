@@ -434,7 +434,7 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                                 Language: {crew.nativeLanguage}
                               </Text>
                               <Text style={[styles.crewResultDetail, { color: colors.text.secondary }]}>
-                                Members: {crew.memberCount}
+                                Crew Lv {crew.level} • Members: {crew.memberCount}
                               </Text>
                             </View>
                             <View style={styles.crewResultButtons}>
@@ -521,7 +521,7 @@ export const CrewOnboardingModal: React.FC<CrewOnboardingModalProps> = ({
                                 Language: {crew.nativeLanguage}
                               </Text>
                               <Text style={[styles.suggestedCrewDetail, { color: colors.text.secondary }]}>
-                                Members: {crew.memberCount}
+                                Crew Lv {crew.level} • Members: {crew.memberCount}
                               </Text>
                             </View>
                             <View style={styles.suggestedCrewButtons}>
