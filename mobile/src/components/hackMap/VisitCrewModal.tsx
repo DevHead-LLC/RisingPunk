@@ -282,9 +282,16 @@ export const VisitCrewModal: React.FC<VisitCrewModalProps> = ({
     return (
       <SafeAreaView style={styles.visitCrewModalContainer}>
         <View style={styles.visitCrewHeader}>
-          <Text style={styles.visitCrewTitle}>
-            {crewDetails?.crew?.crewName ? `${crewDetails.crew.crewName} - Crew View` : crewName ? `${crewName} - Crew View` : 'Crew View'}
-          </Text>
+          <View style={styles.visitCrewHeaderCenter}>
+            <Text style={styles.visitCrewTitle}>
+              {crewDetails?.crew?.crewName ? `${crewDetails.crew.crewName} - Crew View` : crewName ? `${crewName} - Crew View` : 'Crew View'}
+            </Text>
+            {crewDetails?.crew ? (
+              <Text style={[styles.visitCrewMeta, { color: colors.text.secondary }]}>
+                Crew Lv {crewDetails.crew.level ?? 1} • {crewDetails.crew.memberCount} members
+              </Text>
+            ) : null}
+          </View>
           <TouchableOpacity
             style={styles.visitCrewCloseButton}
             onPress={handleClose}
@@ -417,17 +424,27 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   visitCrewHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     padding: SIZING.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: colors.secondary,
   },
+  visitCrewHeaderCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SIZING.spacing.md,
+  },
   visitCrewTitle: {
     color: colors.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
-    flex: 1,
+    textAlign: 'center',
+  },
+  visitCrewMeta: {
+    fontSize: SIZING.font.small,
+    marginTop: 4,
     textAlign: 'center',
   },
   visitCrewCloseButton: {

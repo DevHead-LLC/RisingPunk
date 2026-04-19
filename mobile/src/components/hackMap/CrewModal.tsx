@@ -682,7 +682,14 @@ export const CrewModal: React.FC<CrewModalProps> = ({
               </TouchableOpacity>
             )}
           </View>
-          <Text style={styles.title}>{title}</Text>
+          <View style={styles.headerTitleBlock}>
+            <Text style={styles.title}>{title}</Text>
+            {activeCrewDetails?.crew ? (
+              <Text style={[styles.crewHeaderMeta, { color: colors.text.secondary }]}>
+                Crew Lv {activeCrewDetails.crew.level ?? 1} • {activeCrewDetails.crew.memberCount} members
+              </Text>
+            ) : null}
+          </View>
           <TouchableOpacity
             style={styles.closeButton}
             onPress={handleClose}
@@ -1149,6 +1156,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
             </Text>
             <Text style={[styles.infoValue, { color: colors.text.primary }]}>
               {crew.nativeLanguage}
+            </Text>
+          </View>
+
+          <View style={[styles.infoItem, { borderColor: colors.secondary, backgroundColor: colors.surface }]}>
+            <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>
+              Crew Level
+            </Text>
+            <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+              {crew.level ?? 1}
             </Text>
           </View>
 
@@ -2154,6 +2170,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  headerTitleBlock: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  crewHeaderMeta: {
+    fontSize: SIZING.font.small,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   chatIconButton: {
     width: 44,
     height: 44,
@@ -2202,7 +2228,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
-    flex: 1,
     textAlign: 'center',
   },
   closeButton: {

@@ -1008,7 +1008,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
           base: StatRow;
           levelBonus: StatRow;
           programmingBonus: StatRow;
-          researchBonus: StatRow;
+          crewResearchBonus: StatRow;
+          crewLevelBonus: StatRow;
           total: StatRow;
           mark2?: { base: StatRow; levelBonus: StatRow; total: StatRow };
         }
@@ -1030,7 +1031,8 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
       { label: 'Mark IV', values: null },
       { label: '+User Level', values: data.levelBonus },
       { label: '+Programming', values: data.programmingBonus },
-      { label: '+Research', values: data.researchBonus },
+      { label: '+Research', values: data.crewResearchBonus },
+      { label: '+Crew Benefits', values: data.crewLevelBonus },
       { label: `${markOneUnitName} Total`, values: data.total },
       { label: markTwoTotalLabel, values: mark2Total },
       { label: 'Mark III Total', values: null },

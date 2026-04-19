@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 import { UserResearchFeature } from '../models/UserResearchFeature';
 import { CrewStatus } from '../models/CrewStatus';
+import { Crew } from '../models/Crew';
 import { CREW_ARMY_BONUS_CHAIN, CREW_ARMY_BONUS_FEATURE_IDS } from '../config/crewArmyBonusResearch';
+import { getCrewLevelMemberBonuses } from '../config/crewLevelMemberBonuses';
 import type { ArmyBonus } from '../services/BotService';
 
 /** Prefetched research feature rows for bonus sync (cash-flow, financial, investments). One batch query replaces N findOne (Bugbot). */
@@ -24,7 +26,7 @@ export async function getResearchFeaturesForBonusSync(userId: string): Promise<B
   }));
 }
 
-function isUnlockedInPrefetch(prefetch: BonusPrefetch, categoryId: string, featureId: string): boolean {
+export function isUnlockedInPrefetch(prefetch: BonusPrefetch, categoryId: string, featureId: string): boolean {
   const doc = prefetch.find(d => d.categoryId === categoryId && d.featureId === featureId);
   return !!doc?.isUnlocked;
 }
@@ -35,7 +37,7 @@ function getUnlockTimeInPrefetch(prefetch: BonusPrefetch, categoryId: string, fe
 }
 
 /** Cash-flow feature IDs that add to base income rate (spec 18). Bugbot: no legacy IDs in DB — legacy financial/reduce-expenses is handled only in getTaxReductionBonus. Grandfather migration for increase-income-rate intentionally grants 01+02+025 ($0.055/sec), slightly more than old $0.05/sec. */
-const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
+export const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'increase-income-01', value: 0.01 },
   { featureId: 'increase-income-02', value: 0.02 },
   { featureId: 'increase-income-025', value: 0.025 },
@@ -50,31 +52,31 @@ const INCOME_RATE_FEATURES: { featureId: string; value: number }[] = [
 ];
 
 /** Cash-flow feature IDs that reduce insurance expense (spec 18). Bugbot: no legacy IDs (e.g. reduce-insurance-expense) — never used in this project. */
-const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+export const INSURANCE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-insurance-01', value: 0.01 },
   { featureId: 'reduce-insurance-02', value: 0.02 },
   { featureId: 'reduce-insurance-03', value: 0.02 }
 ];
 
 /** Cash-flow tax tiers stack (spec 18). Legacy financial/reduce-expenses applies only when no cash-flow tax tier is unlocked. */
-const CASH_FLOW_TAX_REDUCTION_STACK: { featureId: string; value: number }[] = [
+export const CASH_FLOW_TAX_REDUCTION_STACK: { featureId: string; value: number }[] = [
   { featureId: 'reduce-tax-expense-02', value: 0.02 },
   { featureId: 'reduce-tax-expense-03', value: 0.03 }
 ];
 
 /** Cash-flow feature IDs that reduce rent/mortgage expense. No legacy. */
-const RENT_MORTGAGE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+export const RENT_MORTGAGE_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-rent-mortgage-05', value: 0.05 },
   { featureId: 'reduce-rent-mortgage-10', value: 0.1 }
 ];
 
 /** Cash-flow utilities expense reduction (spec 18). */
-const UTILITIES_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+export const UTILITIES_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-utilities-05', value: 0.05 }
 ];
 
 /** Cash-flow misc/entertainment expense reduction (spec 18). */
-const MISC_ENTERTAINMENT_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
+export const MISC_ENTERTAINMENT_REDUCTION_FEATURES: { featureId: string; value: number }[] = [
   { featureId: 'reduce-misc-entertainment-10', value: 0.1 },
   { featureId: 'reduce-misc-entertainment-15', value: 0.15 }
 ];
@@ -89,7 +91,7 @@ export const RENTAL_PROFIT_FEATURES: { featureId: string; value: number; categor
 ];
 
 /** Migration replacement set for increase-income-rate (grandfather creates 01+02+025). Add legacy only when user doesn't have all of these (Bugbot). */
-const INCOME_RATE_LEGACY_REPLACEMENT_IDS = ['increase-income-01', 'increase-income-02', 'increase-income-025'];
+export const INCOME_RATE_LEGACY_REPLACEMENT_IDS = ['increase-income-01', 'increase-income-02', 'increase-income-025'];
 
 /**
  * Total base income rate bonus from all unlocked cash-flow income features (spec 18).
@@ -110,7 +112,7 @@ export async function getBaseIncomeRateBonus(userId: string, prefetch?: BonusPre
 }
 
 /** Migration replacement for reduce-insurance-expense is reduce-insurance-02. Add legacy only when user doesn't have it (Bugbot). */
-const INSURANCE_LEGACY_REPLACEMENT_ID = 'reduce-insurance-02';
+export const INSURANCE_LEGACY_REPLACEMENT_ID = 'reduce-insurance-02';
 
 /**
  * Total insurance expense reduction from all unlocked cash-flow features (spec 18).
@@ -192,7 +194,7 @@ export async function getMiscEntertainmentReductionBonus(userId: string, prefetc
 }
 
 /** Migration replacement for rental-profit-increase is rental-profit-01. Add legacy only when user doesn't have it (Bugbot). */
-const RENTAL_LEGACY_REPLACEMENT_ID = 'rental-profit-01';
+export const RENTAL_LEGACY_REPLACEMENT_ID = 'rental-profit-01';
 
 /**
  * Total rental profit bonus per room per second from all unlocked investments features (spec 18).
@@ -428,14 +430,31 @@ export async function getResearchFeatureUnlockTime(
   }
 }
 
-/** Stacked Crew Bonus (Hack Crew) ATK/DEF/HP — active only while user is in a crew. */
-export async function getCrewArmyBonusTotalsForUser(
-  userId: mongoose.Types.ObjectId | string
-): Promise<{ atk: number; def: number; hp: number }> {
-  const crewStatus = await CrewStatus.findOne({ userId }).select('isInCrew').lean();
-  if (!crewStatus?.isInCrew) {
-    return { atk: 0, def: 0, hp: 0 };
+/**
+ * Crew army bonuses split for UI (stats breakdown + Digital Barracks): **level table** vs **Hack Crew research** unlocks.
+ * Battles use {@link getCrewArmyBonusTotalsForUser} (sum of both). Not in a crew → both zero.
+ */
+export async function getCrewArmyBonusPartsForUser(userId: mongoose.Types.ObjectId | string): Promise<{
+  levelTable: { atk: number; def: number; hp: number };
+  hackCrewResearch: { atk: number; def: number; hp: number };
+}> {
+  const crewStatus = await CrewStatus.findOne({ userId }).select('isInCrew crewId').lean();
+  if (!crewStatus?.isInCrew || !crewStatus.crewId) {
+    return {
+      levelTable: { atk: 0, def: 0, hp: 0 },
+      hackCrewResearch: { atk: 0, def: 0, hp: 0 },
+    };
   }
+
+  const crewDoc = await Crew.findById(crewStatus.crewId).select('level').lean();
+  const crewLevel = crewDoc?.level ?? 1;
+  const levelRow = getCrewLevelMemberBonuses(crewLevel);
+  const levelTable = {
+    atk: levelRow.strength,
+    def: levelRow.defense,
+    hp: levelRow.health,
+  };
+
   const docs = await UserResearchFeature.find({
     userId,
     categoryId: 'hack-crew',
@@ -455,7 +474,33 @@ export async function getCrewArmyBonusTotalsForUser(
       hp += row.hp;
     }
   }
-  return { atk, def, hp };
+  const hackCrewResearch = { atk, def, hp };
+  return { levelTable, hackCrewResearch };
+}
+
+/** Stacked Crew Bonus (Hack Crew research + crew level table) ATK/DEF/HP — only while user is in a crew. */
+export async function getCrewArmyBonusTotalsForUser(
+  userId: mongoose.Types.ObjectId | string
+): Promise<{ atk: number; def: number; hp: number }> {
+  const { levelTable, hackCrewResearch } = await getCrewArmyBonusPartsForUser(userId);
+  return {
+    atk: levelTable.atk + hackCrewResearch.atk,
+    def: levelTable.def + hackCrewResearch.def,
+    hp: levelTable.hp + hackCrewResearch.hp,
+  };
+}
+
+/** Passive income ($/sec) from crew level table — 0 if not in a crew. */
+export async function getCrewLevelIncomeBonusForUser(
+  userId: mongoose.Types.ObjectId | string
+): Promise<number> {
+  const crewStatus = await CrewStatus.findOne({ userId }).select('isInCrew crewId').lean();
+  if (!crewStatus?.isInCrew || !crewStatus.crewId) {
+    return 0;
+  }
+  const crewDoc = await Crew.findById(crewStatus.crewId).select('level').lean();
+  const crewLevel = crewDoc?.level ?? 1;
+  return getCrewLevelMemberBonuses(crewLevel).incomePerSecond;
 }
 
 /** Apply crew army bonuses on top of Packet Breach / RCH / BBC programming bonuses (same shape for all three bot families). */

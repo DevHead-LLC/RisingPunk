@@ -658,17 +658,17 @@ export const authApi = createApi({
       invalidatesTags: ['User'],
     }),
 
-    searchCrews: builder.query<{ crews: Array<{ id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; memberCount: number; createdAt: string }> }, string>({
+    searchCrews: builder.query<{ crews: Array<{ id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; memberCount: number; level: number; createdAt: string }> }, string>({
       query: (query) => `/api/crew/search?q=${encodeURIComponent(query)}`,
       providesTags: ['User'],
     }),
 
-    getSuggestedCrews: builder.query<{ crews: Array<{ id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; memberCount: number; createdAt: string }> }, void>({
+    getSuggestedCrews: builder.query<{ crews: Array<{ id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; memberCount: number; level: number; createdAt: string }> }, void>({
       query: () => '/api/crew/suggested',
       providesTags: ['User'],
     }),
 
-    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }>; backupRequests?: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean; jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research'; jobKey?: string; categoryId?: string; featureId?: string }> } }, string>({
+    getCrewDetails: builder.query<{ success: boolean; crew: { id: string; crewName: string; crewIdentifier: string; nativeLanguage: string; createdAt: string | null; memberCount: number; level?: number; experience?: { current: number; nextLevel: number; total: number }; levelMemberBonuses?: { strength: number; defense: number; health: number; incomePerSecond: number }; applicants: Array<{ userId: string; handle: string; appliedAt: string }>; crewRules: string[]; internalMessage: string; externalMessage: string; president: { userId: string; handle: string; level: number } | null; executives: Array<{ userId: string; handle: string; level: number }>; members: Array<{ userId: string; handle: string; level: number }>; backupRequests?: Array<{ userId: string; handle: string; requestedAt: string; jobLabel: string; hasCurrentUserHelped: boolean; jobType?: 'researchCenterBuild' | 'rentalBuild' | 'remodel' | 'research'; jobKey?: string; categoryId?: string; featureId?: string }> } }, string>({
       query: (crewId) => `/api/crew/${crewId}`,
       providesTags: ['User', 'Crew'],
       refetchOnMountOrArgChange: true,

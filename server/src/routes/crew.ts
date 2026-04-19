@@ -10,6 +10,17 @@ import { filterBadWords, containsBadWords, containsBadWordsAsSubstring } from '.
 import { getAdminUserIds } from '../config/env';
 import { accrueBalanceFromTo } from '../utils/balanceAccrual';
 import { getActiveJobInfo, applyCrewBackupHelp, applyCrewBackupHelpByRequest, getJobLabel, hasRequestForJob } from '../services/CrewBackupService';
+import { applyUnderstaffClockAfterRosterChange, MIN_CREW_ROSTER } from '../services/CrewRosterUnderstaff';
+import { getCrewLevelMemberBonuses } from '../config/crewLevelMemberBonuses';
+import { sendSystemNotificationDm } from '../services/CrewSystemNotificationService';
+import { disbandCrewById } from '../services/CrewDisbandService';
+
+/**
+ * Bugbot (understaff clock): `applyUnderstaffClockAfterRosterChange` runs on `/create`, `/accept-applicant`,
+ * and `/leave`—the routes here that change total roster size (president + executives + members).
+ * `/promote-member`, `/demote-executive`, `/resign`, `/choose-successor` only reshuffle roles; count is unchanged.
+ * There is no kick/remove-member handler in this file. Account deletion uses the helper in AccountDeletionService.
+ */
 
 const router = express.Router();
 
@@ -183,7 +194,19 @@ router.post('/create', auth, async (req: CreateCrewRequest, res: Response) => {
       executives: []
     });
 
+    applyUnderstaffClockAfterRosterChange(newCrew, 0);
     await newCrew.save();
+
+    try {
+      await sendSystemNotificationDm(
+        String(userId),
+        `Welcome to your crew "${normalizedCrewName}". Crews need at least ${MIN_CREW_ROSTER} people on the roster ` +
+          `(president, executives, and members combined). If your roster stays below ${MIN_CREW_ROSTER} for 7 consecutive days, ` +
+          `this crew will be disbanded. You will receive daily reminders while below ${MIN_CREW_ROSTER} (starting after the first 24 hours).`
+      );
+    } catch (dmErr) {
+      console.error('Error sending crew welcome system DM:', dmErr);
+    }
 
     if (existingStatus) {
       existingStatus.isInCrew = true;
@@ -520,7 +543,7 @@ router.get('/search', auth, async (req: Request, res: Response) => {
         { crewIdentifier: { $regex: regex } }
       ]
     })
-      .select('crewName crewIdentifier nativeLanguage createdAt')
+      .select('crewName crewIdentifier nativeLanguage createdAt level')
       .populate('presidentId', 'handle')
       .limit(5)
       .sort({ createdAt: -1 })
@@ -538,6 +561,7 @@ router.get('/search', auth, async (req: Request, res: Response) => {
           crewIdentifier: crew.crewIdentifier,
           nativeLanguage: crew.nativeLanguage,
           memberCount,
+          level: typeof crew.level === 'number' ? crew.level : 1,
           createdAt: crew.createdAt
         };
       })
@@ -559,7 +583,7 @@ router.get('/suggested', auth, async (req: Request, res: Response) => {
     }
 
     const crews = await Crew.find({})
-      .select('crewName crewIdentifier nativeLanguage createdAt')
+      .select('crewName crewIdentifier nativeLanguage createdAt level')
       .populate('presidentId', 'handle')
       .limit(10)
       .sort({ createdAt: -1 })
@@ -577,6 +601,7 @@ router.get('/suggested', auth, async (req: Request, res: Response) => {
           crewIdentifier: crew.crewIdentifier,
           nativeLanguage: crew.nativeLanguage,
           memberCount,
+          level: typeof crew.level === 'number' ? crew.level : 1,
           createdAt: crew.createdAt
         };
       })
@@ -1720,6 +1745,13 @@ router.get('/:crewId', auth, async (req: Request, res: Response) => {
         nativeLanguage: crew.nativeLanguage,
         createdAt: crew.createdAt ? crew.createdAt.toISOString() : null,
         memberCount: memberCount,
+        level: crew.level ?? 1,
+        experience: {
+          current: crew.experience?.current ?? 0,
+          nextLevel: crew.experience?.nextLevel ?? 0,
+          total: crew.experience?.total ?? 0,
+        },
+        levelMemberBonuses: getCrewLevelMemberBonuses(crew.level ?? 1),
         applicants: crew.applicants || [],
         crewRules: crew.crewRules || [],
         // Note: originalCrewRules, originalInternalMessage, originalExternalMessage are NOT exposed
@@ -1868,11 +1900,13 @@ router.post('/accept-applicant', auth, async (req: AcceptApplicantRequest, res: 
     await applicantStatus.save();
 
     crew.applicants.splice(applicantIndex, 1);
+    const priorRosterCount = 1 + (crew.executives?.length ?? 0) + (crew.members?.length ?? 0);
     if (!crew.members.some((memberId: mongoose.Types.ObjectId) => 
       memberId.toString() === applicantUserId
     )) {
       crew.members.push(applicantObjectId);
     }
+    applyUnderstaffClockAfterRosterChange(crew, priorRosterCount);
     await crew.save();
 
     res.json({
@@ -2017,93 +2051,14 @@ router.post('/disband', auth, async (req: DisbandCrewRequest, res: Response) => 
       return;
     }
 
-    const crewId = crew._id;
+    const crewId = crew._id as mongoose.Types.ObjectId;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    await disbandCrewById(crewId);
 
-    try {
-      // Clear war references from crews that declared war on this crew
-      await Crew.updateMany(
-        { warWithCrewId: crewId },
-        {
-          $set: {
-            warWithCrewId: null,
-            warDeclaredAt: null
-          }
-        },
-        { session }
-      );
-
-      // Clear alliance references from all related crews
-      await Crew.updateMany(
-        { allianceWithCrewIds: crewId },
-        {
-          $pull: {
-            allianceWithCrewIds: crewId
-          }
-        },
-        { session }
-      );
-
-      await Crew.updateMany(
-        { allianceRequestedToCrewIds: crewId },
-        {
-          $pull: {
-            allianceRequestedToCrewIds: crewId
-          }
-        },
-        { session }
-      );
-
-      await Crew.updateMany(
-        { allianceRequestedFromCrewIds: crewId },
-        {
-          $pull: {
-            allianceRequestedFromCrewIds: crewId
-          }
-        },
-        { session }
-      );
-
-      await CrewStatus.updateMany(
-        { crewId: crewId },
-        {
-          $set: {
-            isInCrew: false,
-            crewId: null,
-            crewIdentifier: null,
-            role: null
-          }
-        },
-        { session }
-      );
-
-      await CrewStatus.updateMany(
-        { appliedCrewId: crewId },
-        {
-          $set: {
-            appliedCrewId: null,
-            appliedCrewIdentifier: null
-          }
-        },
-        { session }
-      );
-
-      await Crew.deleteOne({ _id: crewId }, { session });
-
-      await session.commitTransaction();
-      session.endSession();
-
-      res.json({
-        success: true,
-        message: 'Crew disbanded successfully'
-      });
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      throw error;
-    }
+    res.json({
+      success: true,
+      message: 'Crew disbanded successfully'
+    });
   } catch (error) {
     console.error('Error disbanding crew:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -2136,6 +2091,7 @@ router.post('/leave', auth, async (req: Request, res: Response) => {
     }
 
     const userIdObjectId = new mongoose.Types.ObjectId(userId);
+    const priorRosterCount = 1 + (crew.executives?.length ?? 0) + (crew.members?.length ?? 0);
 
     if (crewStatus.role === 'member') {
       crew.members = crew.members.filter(
@@ -2147,6 +2103,7 @@ router.post('/leave', auth, async (req: Request, res: Response) => {
       );
     }
 
+    applyUnderstaffClockAfterRosterChange(crew, priorRosterCount);
     await crew.save();
 
     crewStatus.isInCrew = false;
