@@ -15,6 +15,13 @@ import { getCrewLevelMemberBonuses } from '../config/crewLevelMemberBonuses';
 import { sendSystemNotificationDm } from '../services/CrewSystemNotificationService';
 import { disbandCrewByIdInTransaction } from '../services/CrewDisbandService';
 
+/**
+ * Bugbot (understaff clock): `applyUnderstaffClockAfterRosterChange` runs on `/create`, `/accept-applicant`,
+ * and `/leave`—the routes here that change total roster size (president + executives + members).
+ * `/promote-member`, `/demote-executive`, `/resign`, `/choose-successor` only reshuffle roles; count is unchanged.
+ * There is no kick/remove-member handler in this file. Account deletion uses the helper in AccountDeletionService.
+ */
+
 const router = express.Router();
 
 const BACKUP_REQUEST_SELECT = 'handle _id crewBackupRequestedAt crewBackupHelpApplied crewBackupResearchCategoryId crewBackupResearchFeatureId crewBackupRequestedJobType crewBackupRequests researchCenterLevel rentalHousingLevels activeRemodel rentalHousingBuilds researchCenterBuild';

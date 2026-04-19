@@ -37,6 +37,7 @@ export async function runCrewUnderstaffSweepOnce(): Promise<void> {
       start = new Date(crew.understaffNotifiedAt);
     } else {
       // Bugbot: do not use createdAt — understaffed crews predating this field would else get a deadline in the past and disband on first sweep.
+      // Also backstops any roster mutation that omitted applyUnderstaffClockAfterRosterChange (grace start ≈ this sweep tick; interval often 24h).
       start = new Date();
       await Crew.updateOne({ _id: id }, { $set: { understaffNotifiedAt: start } });
     }
