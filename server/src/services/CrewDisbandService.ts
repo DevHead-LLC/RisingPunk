@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Crew } from '../models/Crew';
 import { CrewStatus } from '../models/CrewStatus';
 import { CrewChatMessage } from '../models/CrewChatMessage';
+import { invalidateCrewLeaderboardCaches } from '../routes/leaderboardRoutes';
 
 /**
  * Disbands a crew: clears war/alliance refs, resets member statuses, deletes crew chat, removes crew document.
@@ -90,6 +91,7 @@ export async function disbandCrewById(crewId: mongoose.Types.ObjectId | string):
   try {
     await disbandCrewByIdInTransaction(id, session);
     await session.commitTransaction();
+    invalidateCrewLeaderboardCaches();
   } catch (e) {
     await session.abortTransaction();
     throw e;

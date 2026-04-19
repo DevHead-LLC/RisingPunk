@@ -13,7 +13,7 @@ import { getActiveJobInfo, applyCrewBackupHelp, applyCrewBackupHelpByRequest, ge
 import { applyUnderstaffClockAfterRosterChange, MIN_CREW_ROSTER } from '../services/CrewRosterUnderstaff';
 import { getCrewLevelMemberBonuses } from '../config/crewLevelMemberBonuses';
 import { sendSystemNotificationDm } from '../services/CrewSystemNotificationService';
-import { disbandCrewByIdInTransaction } from '../services/CrewDisbandService';
+import { disbandCrewById } from '../services/CrewDisbandService';
 
 /**
  * Bugbot (understaff clock): `applyUnderstaffClockAfterRosterChange` runs on `/create`, `/accept-applicant`,
@@ -2053,24 +2053,12 @@ router.post('/disband', auth, async (req: DisbandCrewRequest, res: Response) => 
 
     const crewId = crew._id as mongoose.Types.ObjectId;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    await disbandCrewById(crewId);
 
-    try {
-      await disbandCrewByIdInTransaction(crewId, session);
-
-      await session.commitTransaction();
-      session.endSession();
-
-      res.json({
-        success: true,
-        message: 'Crew disbanded successfully'
-      });
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      throw error;
-    }
+    res.json({
+      success: true,
+      message: 'Crew disbanded successfully'
+    });
   } catch (error) {
     console.error('Error disbanding crew:', error);
     res.status(500).json({ error: 'Internal server error' });

@@ -45,6 +45,28 @@ export async function runCrewUnderstaffSweepOnce(): Promise<void> {
     const deadlineMs = start.getTime() + SEVEN_DAYS_MS;
     if (Date.now() >= deadlineMs) {
       try {
+        // Bugbot: cursor snapshot is stale across await gaps — re-read before disband so a roster
+        // change (e.g. accept-applicant) cannot delete a crew that is now staffed or still inside grace.
+        const fresh = await Crew.findById(id)
+          .select('executives members understaffNotifiedAt')
+          .lean();
+        if (!fresh) {
+          continue;
+        }
+        const freshCount = getCrewRosterCount(fresh);
+        if (freshCount >= MIN_CREW_ROSTER) {
+          continue;
+        }
+        const notifiedMs = fresh.understaffNotifiedAt
+          ? new Date(fresh.understaffNotifiedAt).getTime()
+          : null;
+        if (notifiedMs == null) {
+          continue;
+        }
+        const freshDeadlineMs = notifiedMs + SEVEN_DAYS_MS;
+        if (Date.now() < freshDeadlineMs) {
+          continue;
+        }
         await disbandCrewById(id);
       } catch (e) {
         console.error('[CrewUnderstaffSweep] disband failed', String(id), e);

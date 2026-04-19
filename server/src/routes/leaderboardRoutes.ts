@@ -18,6 +18,12 @@ const getCacheKey = (type: string, metric: string): string => {
   return `leaderboard:${type}:${metric}`;
 };
 
+/** Call when a crew document is removed so cached crew boards do not list stale crews. */
+export function invalidateCrewLeaderboardCaches(): void {
+  cache.delete(getCacheKey('crew', 'botsDestroyed'));
+  cache.delete(getCacheKey('crew', 'netWorth'));
+}
+
 const getNextQuarterHour = (): Date => {
   const now = new Date();
   const minutes = now.getMinutes();
