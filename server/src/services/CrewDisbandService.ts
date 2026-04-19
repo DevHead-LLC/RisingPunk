@@ -91,11 +91,12 @@ export async function disbandCrewById(crewId: mongoose.Types.ObjectId | string):
   try {
     await disbandCrewByIdInTransaction(id, session);
     await session.commitTransaction();
-    invalidateCrewLeaderboardCaches();
   } catch (e) {
     await session.abortTransaction();
     throw e;
   } finally {
     session.endSession();
   }
+  // Bugbot: after commit + endSession — if this threw inside the try, abortTransaction would run on a committed session.
+  invalidateCrewLeaderboardCaches();
 }
