@@ -92,6 +92,42 @@ export function SwarmSessionModal({
     if (fallback) setBotType(fallback);
   }, [availableForSelectedMark, botType]);
 
+  /** Max barracks count for the selected family + Mark (joiner commit cannot exceed this). */
+  const maxAvailableForSelectedType = useMemo(
+    () => Math.max(0, Math.floor(availableForSelectedMark[botType] ?? 0)),
+    [availableForSelectedMark, botType]
+  );
+
+  const handleQuantityChange = React.useCallback(
+    (text: string) => {
+      const digits = text.replace(/[^\d]/g, '');
+      if (digits === '') {
+        setQuantity('');
+        return;
+      }
+      const n = parseInt(digits, 10);
+      if (!Number.isFinite(n)) {
+        setQuantity('');
+        return;
+      }
+      const capped = maxAvailableForSelectedType > 0 ? Math.min(n, maxAvailableForSelectedType) : n;
+      setQuantity(String(capped));
+    },
+    [maxAvailableForSelectedType]
+  );
+
+  // After mark/bot/inventory change, keep quantity within available so UX matches validation (Bugbot / ios-bugs.md).
+  React.useEffect(() => {
+    setQuantity((prev) => {
+      const q = parseInt(prev, 10);
+      if (!Number.isFinite(q)) return maxAvailableForSelectedType > 0 ? '1' : prev;
+      if (maxAvailableForSelectedType <= 0) return prev;
+      if (q > maxAvailableForSelectedType) return String(maxAvailableForSelectedType);
+      if (q < 1) return '1';
+      return prev;
+    });
+  }, [botType, markLevel, maxAvailableForSelectedType]);
+
   const handleCommit = async () => {
     try {
       const slot = selectedSlotIndex;
@@ -114,6 +150,13 @@ export function SwarmSessionModal({
       }
       if ((availableForSelectedMark[botType] ?? 0) <= 0) {
         Alert.alert('Swarm', `No ${markLevel === 2 ? 'Mark II' : 'Mark I'} units available for that bot type.`);
+        return;
+      }
+      if (qty > maxAvailableForSelectedType) {
+        Alert.alert(
+          'Swarm',
+          `Quantity cannot exceed your available ${markLevel === 2 ? 'Mark II' : 'Mark I'} ${botType} bots (${maxAvailableForSelectedType}).`
+        );
         return;
       }
       await onCommit({ slotIndex: slot, quantity: qty, botType, markLevel });
@@ -192,7 +235,14 @@ export function SwarmSessionModal({
                       );
                     })}
                   </View>
-                  <TextInput value={quantity} onChangeText={setQuantity} keyboardType="numeric" style={styles.input} placeholder="Quantity" placeholderTextColor={colors.text.secondary} />
+                  <TextInput
+                    value={quantity}
+                    onChangeText={handleQuantityChange}
+                    keyboardType="numeric"
+                    style={styles.input}
+                    placeholder="Quantity"
+                    placeholderTextColor={colors.text.secondary}
+                  />
                   <View style={styles.row}>
                     {(['guardian', 'breacher', 'phreak'] as const).map((t) => (
                       <TouchableOpacity

@@ -308,25 +308,31 @@ export const BattlePreparationScreen = React.memo(
 
     try {
       if (isSwarmLeadSetup) {
-        const nextAssignments: Record<string, BattalionAssignment> = {
-          ...assignments,
-          [selectedBattalion]: {
-            botType: data.botType,
-            quantity: data.quantity,
-            markLevel: data.markLevel,
-          },
-        };
-        const inv = validateSwarmLeadAssignmentsAgainstInventory(
-          nextAssignments,
-          botCounts,
-          botCountsM2
-        );
-        if (!inv.ok) {
-          Alert.alert('Not enough bots', inv.message);
-          setSelectorVisible(false);
-          return;
+        // Functional updater: `assignments` from closure can be stale across rapid slot updates (Bugbot).
+        let inventoryError: string | null = null;
+        setAssignments((prev) => {
+          const nextAssignments: Record<string, BattalionAssignment> = {
+            ...prev,
+            [selectedBattalion]: {
+              botType: data.botType,
+              quantity: data.quantity,
+              markLevel: data.markLevel,
+            },
+          };
+          const inv = validateSwarmLeadAssignmentsAgainstInventory(
+            nextAssignments,
+            botCounts,
+            botCountsM2
+          );
+          if (!inv.ok) {
+            inventoryError = inv.message;
+            return prev;
+          }
+          return nextAssignments;
+        });
+        if (inventoryError) {
+          Alert.alert('Not enough bots', inventoryError);
         }
-        setAssignments(nextAssignments);
         setSelectorVisible(false);
         return;
       }
@@ -353,14 +359,7 @@ export const BattlePreparationScreen = React.memo(
       throw error;
     }
   },
-    [
-      selectedBattalion,
-      assignToBattalion,
-      isSwarmLeadSetup,
-      assignments,
-      botCounts,
-      botCountsM2,
-    ]
+    [selectedBattalion, assignToBattalion, isSwarmLeadSetup, botCounts, botCountsM2]
   );
 
   /** Serialize preset applies; skip identical successful lineup. Preset uses POST /assign-preset (one request) to avoid per-slot rate limits. */

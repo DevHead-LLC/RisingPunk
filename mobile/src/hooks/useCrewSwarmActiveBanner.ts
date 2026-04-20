@@ -66,13 +66,16 @@ export function useCrewSwarmActiveBanner(token: string | null): {
     }
 
     const prev = lastSwarmIdRef.current;
-    lastSwarmIdRef.current = currentSwarmId;
-    // Any change to a new non-null session (null→id, id→id′), not only first-time id; polling can skip the null beat between swarms.
-    if (currentSwarmId && prev !== currentSwarmId) {
-      setSwarmBanner({
-        message: 'Crew Swarm started — open Hack Map toolbar to join.',
-        type: 'info',
-      });
+    // Bugbot / ios-bugs.md: do not write `lastSwarmIdRef` when the poll yields null. A brief null (RTK/network blip)
+    // then the same `swarmId` again must not look like null→id — that falsely showed "started" for an existing session.
+    if (currentSwarmId != null) {
+      if (currentSwarmId !== prev) {
+        setSwarmBanner({
+          message: 'Crew Swarm started — open Hack Map toolbar to join.',
+          type: 'info',
+        });
+      }
+      lastSwarmIdRef.current = currentSwarmId;
     }
   }, [token, inCrew, activeSwarm?.swarmId, swarmQuerySuccess]);
 
