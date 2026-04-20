@@ -593,8 +593,14 @@ export async function runSwarmPrepSweepOnce(): Promise<void> {
   });
   for (const s of expired) {
     try {
-      if (hasNonLeaderParticipant(s)) {
+      // Bugbot / deploySwarmSession: requires both lead + non-lead commits; joiners-only must not attempt auto-deploy.
+      if (hasNonLeaderParticipant(s) && hasLeaderParticipant(s)) {
         await deploySwarmSession({ swarmId: String(s.swarmId), auto: true });
+      } else if (hasNonLeaderParticipant(s) && !hasLeaderParticipant(s)) {
+        await restoreAllCommitments(s);
+        s.state = 'cancelled';
+        s.cancelReason = 'deadline-no-lead-commit';
+        await s.save();
       } else {
         await restoreAllCommitments(s);
         s.state = 'cancelled';
@@ -814,66 +820,119 @@ export async function settleSwarmBattleIfNeeded(
           NodeOwner.USER
         );
 
-  const cashShares = splitTotalEvenlyAmongParticipants(pvpCashTransferred, participants);
-  const xpShares = splitTotalEvenlyAmongParticipants(xpAttackerTotal, participants);
-
-  // `processPvPBattleMoneyTransfer` credits the full steal to the march attacker (lead). Remove it, then pay each participant their share.
-  if (pvpCashTransferred > 0) {
-    const leader = await User.findById(sessionDoc.leaderUserId);
-    if (leader) {
-      leader.balance.total = Math.max(0, leader.balance.total - pvpCashTransferred);
-      leader.balance.lastUpdated = new Date();
-      await leader.save();
-    }
-  }
-
-  for (const userId of participants) {
-    const cashShare = cashShares.get(userId) ?? 0;
-    const xpShare = xpShares.get(userId) ?? 0;
-    if (cashShare > 0) {
-      const u = await User.findById(userId);
-      if (u) {
-        u.balance.total += cashShare;
-        u.balance.lastUpdated = new Date();
-        await u.save();
+  // `processPvPBattleMoneyTransfer` already credited the full steal to the march attacker (lead). Atomically:
+  // claw back from leader, pay participants, XP, survivor bots, and mark session resolved — or roll back on failure
+  // so the leader does not keep the full pool if redistribution throws (Bugbot: race with non-atomic prior flow).
+  const clientSession = await mongoose.startSession();
+  try {
+    await clientSession.withTransaction(async () => {
+      const locked = await SwarmSession.findOne({ swarmId: String(swarmSessionId) }).session(clientSession);
+      if (!locked) {
+        throw new Error('SWARM_SETTLE_SESSION_MISSING');
       }
-    }
-    if (xpShare > 0) {
-      await LevelingService.applyExperience(userId, xpShare);
-    }
-  }
-
-  if (xpDefenderTotal > 0) {
-    await LevelingService.applyExperience(String(battle.defenderId), xpDefenderTotal);
-  }
-
-  const contributions = buildContributionByUser(sessionDoc);
-  const survivorsByKey = collectSurvivorsByKey(battle);
-  const survivorsAlloc = distributeSurvivors(contributions, survivorsByKey);
-  for (const [uid, byKey] of Object.entries(survivorsAlloc)) {
-    const inc: Record<string, number> = {};
-    for (const [k, v] of Object.entries(byKey)) {
-      if (v > 0) {
-        inc[`bots.${k}`] = v;
+      if (locked.state === 'resolved') {
+        return;
       }
-    }
-    if (Object.keys(inc).length > 0) {
-      await Bot.findOneAndUpdate({ userId: uid }, { $inc: inc }, { new: true });
-    }
+      if (locked.state === 'cancelled' && locked.cancelReason !== 'crew-disbanded') {
+        return;
+      }
+
+      const innerParticipants = [...new Set(locked.commitments.map((c) => String(c.userId)))];
+      if (innerParticipants.length === 0) {
+        return;
+      }
+
+      const cashSharesInner = splitTotalEvenlyAmongParticipants(pvpCashTransferred, innerParticipants);
+      const xpSharesInner = splitTotalEvenlyAmongParticipants(xpAttackerTotal, innerParticipants);
+
+      if (pvpCashTransferred > 0) {
+        const leader = await User.findById(locked.leaderUserId).session(clientSession);
+        if (leader) {
+          leader.balance.total = Math.max(0, leader.balance.total - pvpCashTransferred);
+          leader.balance.lastUpdated = new Date();
+          await leader.save({ session: clientSession });
+        }
+      }
+
+      for (const userId of innerParticipants) {
+        const cashShare = cashSharesInner.get(userId) ?? 0;
+        const xpShare = xpSharesInner.get(userId) ?? 0;
+        if (cashShare > 0) {
+          const u = await User.findById(userId).session(clientSession);
+          if (u) {
+            u.balance.total += cashShare;
+            u.balance.lastUpdated = new Date();
+            await u.save({ session: clientSession });
+          }
+        }
+        if (xpShare > 0) {
+          await LevelingService.applyExperience(userId, xpShare, { session: clientSession });
+        }
+      }
+
+      if (xpDefenderTotal > 0) {
+        await LevelingService.applyExperience(String(battle.defenderId), xpDefenderTotal, {
+          session: clientSession,
+        });
+      }
+
+      const contributions = buildContributionByUser(locked);
+      const survivorsByKey = collectSurvivorsByKey(battle);
+      const survivorsAlloc = distributeSurvivors(contributions, survivorsByKey);
+      for (const [uid, byKey] of Object.entries(survivorsAlloc)) {
+        const inc: Record<string, number> = {};
+        for (const [k, v] of Object.entries(byKey)) {
+          if (v > 0) {
+            inc[`bots.${k}`] = v;
+          }
+        }
+        if (Object.keys(inc).length > 0) {
+          await Bot.findOneAndUpdate({ userId: uid }, { $inc: inc }, { new: true, session: clientSession });
+        }
+      }
+
+      locked.state = 'resolved';
+      locked.resolvedAt = new Date();
+      locked.battleId = String(battle.battleId);
+      locked.participants = innerParticipants;
+      locked.rewardShares = innerParticipants.map((uid) => ({
+        userId: uid,
+        cashShare: cashSharesInner.get(uid) ?? 0,
+        xpShare: xpSharesInner.get(uid) ?? 0,
+      }));
+      await locked.save({ session: clientSession });
+    });
+  } finally {
+    await clientSession.endSession();
   }
 
-  sessionDoc.state = 'resolved';
-  sessionDoc.resolvedAt = new Date();
-  sessionDoc.battleId = String(battle.battleId);
-  sessionDoc.participants = participants;
-  sessionDoc.rewardShares = participants.map((uid) => ({
-    userId: uid,
-    cashShare: cashShares.get(uid) ?? 0,
-    xpShare: xpShares.get(uid) ?? 0,
-  }));
-  await sessionDoc.save();
-
-  await sendSwarmBattleReports(battle, participants, cashShares, xpShares);
+  // Only send DMs after a successful commit (verified from DB — avoids DMs if txn rolled back).
+  const settled = await SwarmSession.findOne({
+    swarmId: String(swarmSessionId),
+    state: 'resolved',
+    battleId: String(battle.battleId),
+  })
+    .select('participants rewardShares')
+    .lean();
+  if (
+    settled?.participants &&
+    settled.participants.length > 0 &&
+    settled.rewardShares &&
+    settled.rewardShares.length > 0
+  ) {
+    const p = settled.participants.map((id) => String(id));
+    const cashMap = new Map<string, number>();
+    const xpMap = new Map<string, number>();
+    for (const r of settled.rewardShares) {
+      cashMap.set(String(r.userId), r.cashShare);
+      xpMap.set(String(r.userId), r.xpShare);
+    }
+    try {
+      await sendSwarmBattleReports(battle, p, cashMap, xpMap);
+    } catch (dmErr) {
+      console.error('[SwarmService] sendSwarmBattleReports failed after swarm settlement', battle.battleId, dmErr);
+    }
+  }
 }
 
 export async function attachSwarmBattleIdIfNeeded(battleId: string): Promise<void> {

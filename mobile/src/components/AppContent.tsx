@@ -24,12 +24,8 @@ import { getAnalytics, setAnalyticsCollectionEnabled, setUserProperty, logEvent 
 import { trackAppReturned, trackFirstOpen, getAccountCreatedThisSession, clearAccountCreatedThisSession } from '../services/analyticsService';
 import { checkAppVersion } from '../services/appVersionService';
 import { UpdateRequiredScreen } from './UpdateRequiredScreen';
-import {
-  MARCH_TRANSITION_BANNER_DURATION_MS,
-  SWARM_ACTIVE_BANNER_DURATION_MS,
-  useAttackMarchTransitionBanners,
-  useCrewSwarmActiveBanner,
-} from '../hooks/useAttackMarchTransitionBanners';
+import { MARCH_TRANSITION_BANNER_DURATION_MS, useAttackMarchTransitionBanners } from '../hooks/useAttackMarchTransitionBanners';
+import { SWARM_ACTIVE_BANNER_DURATION_MS, useCrewSwarmActiveBanner } from '../hooks/useCrewSwarmActiveBanner';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
