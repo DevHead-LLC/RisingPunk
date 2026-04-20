@@ -52,6 +52,7 @@ import { battleApi } from '../store/api/battleApi';
 import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { SIZING } from '../styles/theme';
 import { getPersistedTurfNavState, setPersistedTurfNavState, type TurfScreenName } from '../utils/turfNavStatePersistence';
+import { getHackMapHandoffGlobals } from '../utils/turfHackMapHandoffGlobals';
 import { CrewBackupBanner } from '../components/turf/CrewBackupBanner';
 import { CrewModal } from '../components/hackMap/CrewModal';
 import { ActiveJobsModal } from '../components/turf/ActiveJobsModal';
@@ -864,7 +865,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         setPendingHackMapCell(null);
         setPendingSwarmLeadSetup(null);
         if (options?.mode === 'swarm') {
-          (globalThis as any).openSwarmSessionModalOnMap = true;
+          getHackMapHandoffGlobals().openSwarmSessionModalOnMap = true;
         }
         setOpenMessagesAfterReplayClose(false);
         messagesReplayRestoreScreenRef.current = null;
@@ -1193,18 +1194,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           openMessagesAfterReplayToken={mapOpenMessagesAfterReplayToken}
           onWatchBattle={handleWatchBattleFromMessages}
           onClose={() => {
-            const slug = (globalThis as any).pendingNpcSlug as string | undefined;
-            const defenderUserId = (globalThis as any).pendingDefenderUserId as string | undefined;
-            const swarmTargetUserId = (globalThis as any).pendingSwarmTargetUserId as string | undefined;
+            const handoff = getHackMapHandoffGlobals();
+            const slug = handoff.pendingNpcSlug;
+            const defenderUserId = handoff.pendingDefenderUserId;
+            const swarmTargetUserId = handoff.pendingSwarmTargetUserId;
             
             if (slug) {
               setPendingNpcSlug(slug);
-              const instanceId = (globalThis as any).pendingNpcInstanceId as string | undefined;
+              const instanceId = handoff.pendingNpcInstanceId;
               setPendingNpcInstanceId(instanceId || null);
-              const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
-              (globalThis as any).pendingNpcSlug = undefined;
-              (globalThis as any).pendingNpcInstanceId = undefined;
-              (globalThis as any).pendingMapPan = undefined;
+              const mapPan = handoff.pendingMapPan;
+              handoff.pendingNpcSlug = undefined;
+              handoff.pendingNpcInstanceId = undefined;
+              handoff.pendingMapPan = undefined;
               setPendingHackMapCell(
                 mapPan != null && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
                   ? { x: mapPan.x, y: mapPan.y }
@@ -1216,9 +1218,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             }
 
             if (swarmTargetUserId) {
-              const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
-              (globalThis as any).pendingSwarmTargetUserId = undefined;
-              (globalThis as any).pendingMapPan = undefined;
+              const mapPan = handoff.pendingMapPan;
+              handoff.pendingSwarmTargetUserId = undefined;
+              handoff.pendingMapPan = undefined;
               if (!mapPan || !Number.isFinite(mapPan.x) || !Number.isFinite(mapPan.y)) {
                 navigateToScreen('hackRig');
                 return;
@@ -1236,9 +1238,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             
             if (defenderUserId) {
               setPendingDefenderUserId(defenderUserId);
-              const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
-              (globalThis as any).pendingDefenderUserId = undefined;
-              (globalThis as any).pendingMapPan = undefined;
+              const mapPan = handoff.pendingMapPan;
+              handoff.pendingDefenderUserId = undefined;
+              handoff.pendingMapPan = undefined;
               setPendingHackMapCell(
                 mapPan != null && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
                   ? { x: mapPan.x, y: mapPan.y }
@@ -1961,7 +1963,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         focusInitialCategoryKey={crewModalInitialCategory === 'backup-requests' ? crewModalFocusBackupKey : undefined}
         hasActiveSwarm={Boolean(mySwarmSession)}
         onSwarmPress={() => {
-          (globalThis as any).openSwarmSessionModalOnMap = true;
+          getHackMapHandoffGlobals().openSwarmSessionModalOnMap = true;
           setShowCrewModal(false);
           setCrewModalInitialCategory(null);
           navigateToScreen('map');

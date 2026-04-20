@@ -427,7 +427,9 @@ export class BattleService {
             pvpCashTransferred,
             pvpXpAttacker,
             pvpXpDefender,
-            isSwarmMarchBattle ? { omitAttackerNotification: true } : undefined
+            isSwarmMarchBattle
+              ? { omitAttackerNotification: true, swarmMarchPvp: true }
+              : undefined
           );
         }
       } catch (e) {

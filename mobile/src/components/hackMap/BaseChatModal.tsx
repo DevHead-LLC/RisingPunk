@@ -122,7 +122,10 @@ function normalizeBattleReportBotCounts(raw: unknown): BattleReportBotCounts | n
 
 export interface BattleReportPayload {
   br: 1;
-  /** Crew swarm attack: all PM recipients are on the attacking side (joiners are not `attackerId` but must see attacker-side labels). */
+  /**
+   * Crew swarm attack: `swarm: 1` on fan-out `BTL|` PMs (attacker side and defender).
+   * Joiners are not `attackerId` — `BaseChatModal` uses `viewerMatchesDefender` so defender DMs keep defender-side labels; joiners still resolve as attacker-side.
+   */
   swarm?: 1;
   /** Set for computer/NPC battles (server); client adjusts reward vs PvP wallet copy. */
   npc?: 1;
@@ -144,7 +147,10 @@ export interface BattleReportPayload {
   cash?: number;
   /** NPC / legacy: single XP line. */
   xp?: number;
-  /** PvP: XP from destroying opponent bots (per side). */
+  /**
+   * PvP / swarm: XP from destroying opponent bots (per side). Swarm crew `BTL|` uses `xpAttacker` (share) +
+   * `xpDefender: 0` — same branch as PvP — not legacy `xp`.
+   */
   xpAttacker?: number;
   xpDefender?: number;
   /** Synthetic IP-style hack location (server `hl`); not real map data. */
@@ -226,6 +232,23 @@ function battleReportViewerIsAttacker(
 
   // Non-empty id matches are handled above; remaining '' === '' must not count as attacker (Bugbot).
   return false;
+}
+
+/** Swarm `BTL|`: defender-only DM includes `swarm: 1`; must not use “always attacker labels” for that viewer. */
+function viewerMatchesDefender(
+  report: BattleReportPayload,
+  currentUser: BaseChatModalProps['currentUser']
+): boolean {
+  const uid = normalizeUserId(currentUser?._id ?? currentUser?.id);
+  const did = normalizeUserId(report.defenderId);
+  const ul = uid.toLowerCase();
+  const dl = did.toLowerCase();
+  if (ul && dl && ul === dl) {
+    return true;
+  }
+  const ch = (currentUser?.handle ?? '').trim().toLowerCase();
+  const dh = (report.defenderHandle ?? '').trim().toLowerCase();
+  return Boolean(ch && dh && ch === dh);
 }
 
 function formatFetchErrorMessage(fetchError: unknown): string {
@@ -560,7 +583,9 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               );
                             }
                             const isAttacker =
-                              report.swarm === 1 ? true : battleReportViewerIsAttacker(report, currentUser);
+                              report.swarm === 1
+                                ? !viewerMatchesDefender(report, currentUser)
+                                : battleReportViewerIsAttacker(report, currentUser);
                             // Bugbot: attacker viewer — `user` = attacker side won, `enemy` = defender side won. Defender viewer uses same `winner` (battle-axis; not narrative "enemy").
                             const status =
                               isAttacker
@@ -571,8 +596,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 ? Math.max(0, Math.floor(report.cash))
                                 : 0;
                             // NPC: show wallet only when cash > 0 (server sets cash from processedRewards).
-                            // PvP: always show wallet line when attacker won — even $0 (defender had no remaining balance).
+                            // PvP (non-swarm): always show wallet line when attacker won — even $0 (defender had no remaining balance).
+                            // Swarm: per-recipient `cash` is that viewer’s share; hide wallet row when share is $0 (Bugbot — no misleading "$0 stolen" for joiners).
                             const isPvP = report.npc !== 1;
+                            const isSwarm = report.swarm === 1;
                             const xpLegacy =
                               typeof report.xp === 'number' && Number.isFinite(report.xp)
                                 ? Math.max(0, Math.floor(report.xp))
@@ -591,7 +618,9 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   ? xpAtt
                                   : xpDef
                                 : xpLegacy;
-                            const showWallet = report.winner === 'user' && (isPvP || cash > 0);
+                            const showWallet =
+                              report.winner === 'user' &&
+                              (isSwarm ? cash > 0 : isPvP || cash > 0);
                             const hackLocLine =
                               typeof report.hl === 'string' && report.hl.trim().length > 0
                                 ? report.hl.trim()

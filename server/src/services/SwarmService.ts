@@ -732,6 +732,10 @@ async function sendSwarmBattleReports(
     }
   }
   const docs = participants.flatMap((uid) => {
+    // Swarm `BTL|` PMs go to crew participants (attacking side only). Align with PvP `BattleNotificationService`:
+    // `xpAttacker` / `xpDefender` so BaseChatModal uses the PvP XP line, not legacy `xp`.
+    const xa = Math.max(0, Math.floor(xpByUser.get(uid) ?? 0));
+    const xd = 0;
     const payload: Record<string, unknown> = {
       br: 1,
       swarm: 1,
@@ -746,7 +750,7 @@ async function sendSwarmBattleReports(
       defenderLost,
       winner: battle.winner === NodeOwner.USER ? 'user' : 'enemy',
       cash: cashByUser.get(uid) ?? 0,
-      xp: xpByUser.get(uid) ?? 0,
+      ...(xa > 0 || xd > 0 ? { xpAttacker: xa, xpDefender: xd } : {}),
     };
     if (hl) payload.hl = hl;
     if (hasMapCell) {

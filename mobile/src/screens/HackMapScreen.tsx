@@ -44,6 +44,12 @@ import {
   useDismissSwarmSlotMutation,
   useGetMySwarmQuery,
 } from '../store/api/swarmApi';
+import {
+  getHackMapHandoffGlobals,
+  setBattlePrepHandoffDefender,
+  setBattlePrepHandoffNpc,
+  setBattlePrepHandoffSwarm,
+} from '../utils/turfHackMapHandoffGlobals';
 import { AttackMarchAnimationLayer } from '../components/hackMap/AttackMarchAnimationLayer';
 import { outboundProgressTForAttackMarch } from '../components/hackMap/attackMarchMapFrame';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
@@ -2190,7 +2196,7 @@ export const HackMapScreen: React.FC<Props> = ({
   const [abortSwarmMutation, { isLoading: isAbortingSwarm }] = useAbortSwarmMutation();
 
   useEffect(() => {
-    const g = globalThis as { openSwarmSessionModalOnMap?: boolean };
+    const g = getHackMapHandoffGlobals();
     if (g.openSwarmSessionModalOnMap !== true) {
       return;
     }
@@ -4463,8 +4469,10 @@ export const HackMapScreen: React.FC<Props> = ({
       Alert.alert('Swarm', 'Select an eligible player tile first.');
       return;
     }
-    (globalThis as any).pendingSwarmTargetUserId = String(selectedCell.info.userId);
-    (globalThis as any).pendingMapPan = { x: selectedCell.x, y: selectedCell.y };
+    setBattlePrepHandoffSwarm(getHackMapHandoffGlobals(), String(selectedCell.info.userId), {
+      x: selectedCell.x,
+      y: selectedCell.y,
+    });
     onClose();
   }, [selectedCell, onClose]);
 
@@ -4636,12 +4644,11 @@ export const HackMapScreen: React.FC<Props> = ({
                     <TouchableOpacity
                       style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
                       onPress={() => {
-                        (globalThis as any).pendingNpcSlug = selectedCell.info.npcSlug;
-                        (globalThis as any).pendingNpcInstanceId = selectedCell.info.npcInstanceId;
-                        (globalThis as any).pendingMapPan = {
-                          x: selectedCell.x,
-                          y: selectedCell.y,
-                        };
+                        setBattlePrepHandoffNpc(getHackMapHandoffGlobals(), {
+                          npcSlug: selectedCell.info.npcSlug,
+                          npcInstanceId: selectedCell.info.npcInstanceId,
+                          mapPan: { x: selectedCell.x, y: selectedCell.y },
+                        });
                         onClose();
                       }}
                     >
@@ -4665,11 +4672,11 @@ export const HackMapScreen: React.FC<Props> = ({
                         if (selectedCell.info.isShielded) {
                           return;
                         }
-                        (globalThis as any).pendingDefenderUserId = selectedCell.info.userId;
-                        (globalThis as any).pendingMapPan = {
-                          x: selectedCell.x,
-                          y: selectedCell.y,
-                        };
+                        setBattlePrepHandoffDefender(
+                          getHackMapHandoffGlobals(),
+                          String(selectedCell.info.userId),
+                          { x: selectedCell.x, y: selectedCell.y }
+                        );
                         onClose();
                       }}
                       disabled={selectedCell.info.isShielded}

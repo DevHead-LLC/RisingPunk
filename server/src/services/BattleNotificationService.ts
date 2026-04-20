@@ -219,6 +219,11 @@ export type SendBattleNotificationsOptions = {
    * do not see full-team `xpAttacker` / wallet while joiners see only their share.
    */
   omitAttackerNotification?: boolean;
+  /**
+   * When true (crew Swarm PvP), every `BTL|` payload includes `swarm: 1` so the defender’s DM matches
+   * swarm semantics (Bugbot: omitting this made defender-only PvP look like solo PvP on persisted payloads).
+   */
+  swarmMarchPvp?: boolean;
 };
 
 /**
@@ -237,6 +242,7 @@ export async function sendBattleNotifications(
 ): Promise<void> {
   if (!battle.isUserDefender) return;
   const omitAttacker = options?.omitAttackerNotification === true;
+  const tagSwarmPvp = options?.swarmMarchPvp === true;
 
   const startingBattalions = battle.startingBattalions ?? [];
   const endingBattalions = battle.battalions ?? [];
@@ -273,6 +279,7 @@ export async function sendBattleNotifications(
     typeof xpDefender === 'number' && Number.isFinite(xpDefender) ? Math.max(0, Math.floor(xpDefender)) : 0;
   let payload: Record<string, unknown> = {
     br: 1,
+    ...(tagSwarmPvp ? { swarm: 1 } : {}),
     battleId: battle.battleId,
     attackerId: String(battle.attackerId),
     defenderId: String(battle.defenderId),
