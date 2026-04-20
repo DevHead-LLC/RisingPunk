@@ -197,7 +197,8 @@ export function useCrewSwarmActiveBanner(token: string | null): {
 
     const prev = lastSwarmIdRef.current;
     lastSwarmIdRef.current = currentSwarmId;
-    if (!prev && currentSwarmId) {
+    // Any change to a new non-null session (null→id, id→id′), not only first-time id; polling can skip the null beat between swarms.
+    if (currentSwarmId && prev !== currentSwarmId) {
       setSwarmBanner({
         message: 'Crew Swarm started — open Hack Map toolbar to join.',
         type: 'info',
