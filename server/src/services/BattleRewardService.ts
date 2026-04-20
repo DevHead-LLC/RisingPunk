@@ -6,13 +6,24 @@
 import { User } from '../models/User';
 import { IBattleDocument } from '../models/Battle';
 import { NodeOwner, BotType } from '../types/battle';
-import { getInventoryKey, type BotInventoryKey } from '../utils/botInventoryKeys';
+import { defaultBotsInventory, getInventoryKey, type BotInventoryKey } from '../utils/botInventoryKeys';
+
+/** All keys on `Bot.bots` used for loss accounting / reconciliation. */
+const BOT_INVENTORY_KEYS: BotInventoryKey[] = [
+  'breacher',
+  'guardian',
+  'phreak',
+  'breacherM2',
+  'guardianM2',
+  'phreakM2',
+];
 
 export interface BattleRewardResult {
   success: boolean;
   experienceGained?: number;
   moneyGained?: number;
-  botLosses?: { [key in BotType]: number };
+  /** Per inventory key (Mark I + Mark II); omits zero entries in returned payloads when possible. */
+  botLosses?: Partial<Record<BotInventoryKey, number>>;
   levelUp?: {
     levelsGained: number;
     newLevel: number;
@@ -46,11 +57,7 @@ export class BattleRewardService {
       const userStartingBattalions = battle.startingBattalions?.filter(b => b.owner === NodeOwner.USER) || [];
       const userEndingBattalions = battle.battalions.filter(b => b.owner === NodeOwner.USER);
 
-      const botLosses: { [key in BotType]: number } = {
-        guardian: 0,
-        breacher: 0,
-        phreak: 0
-      };
+      const botLosses: Record<BotInventoryKey, number> = defaultBotsInventory();
 
       userStartingBattalions.forEach(startingBattalion => {
         const endingBattalion = userEndingBattalions.find(b => b.id === startingBattalion.id);
@@ -59,7 +66,13 @@ export class BattleRewardService {
         const losses = startingQuantity - endingQuantity;
 
         if (losses > 0) {
-          botLosses[startingBattalion.type as BotType] += losses;
+          const invKey = getInventoryKey(
+            String(startingBattalion.type),
+            typeof startingBattalion.mark === 'number' && Number.isFinite(startingBattalion.mark)
+              ? startingBattalion.mark
+              : 1
+          );
+          botLosses[invKey] += losses;
         }
       });
 
@@ -150,21 +163,33 @@ export class BattleRewardService {
           }
         }
       } else if (!marchSourced) {
-        // Non-march NPC battle: bots were never committed onto a march; decrement from barracks.
+        // Non-march NPC battle: bots were never committed onto a march; decrement from barracks (Mark I + Mark II keys).
         const botDoc = await Bot.findOne({ userId });
         if (botDoc) {
-          botDoc.bots.guardian = Math.max(0, botDoc.bots.guardian - botLosses.guardian);
-          botDoc.bots.breacher = Math.max(0, botDoc.bots.breacher - botLosses.breacher);
-          botDoc.bots.phreak = Math.max(0, botDoc.bots.phreak - botLosses.phreak);
+          for (const k of BOT_INVENTORY_KEYS) {
+            const lost = botLosses[k];
+            if (lost > 0) {
+              const cur = botDoc.bots[k] ?? 0;
+              botDoc.bots[k] = Math.max(0, cur - lost);
+            }
+          }
           await botDoc.save();
         }
       }
       // marchSourced && swarmSourced: troops left inventory at swarm commit; not this legacy subtract / solo-march $inc.
 
+      const botLossesForPayload: Partial<Record<BotInventoryKey, number>> = {};
+      for (const k of BOT_INVENTORY_KEYS) {
+        const v = botLosses[k];
+        if (typeof v === 'number' && v > 0) {
+          botLossesForPayload[k] = v;
+        }
+      }
+
       (battle as any).processedRewards = {
         experienceGained,
         moneyGained,
-        botLosses,
+        botLosses: botLossesForPayload,
         levelUp,
         lifetimeHighUpdated
       };
@@ -175,7 +200,7 @@ export class BattleRewardService {
         success: true,
         experienceGained,
         moneyGained,
-        botLosses,
+        botLosses: botLossesForPayload,
         levelUp,
         lifetimeHighUpdated
       };

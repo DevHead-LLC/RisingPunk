@@ -89,6 +89,46 @@ type Props = {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+/** Swarm lead prep does not call `assignToBattalion`; totals must not exceed Redux inventory before `commitSwarmSlot` (Bugbot / ios-bugs.md). */
+const SWARM_LEAD_BATTALION_IDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
+
+function validateSwarmLeadAssignmentsAgainstInventory(
+  leadAssignments: Record<string, BattalionAssignment | undefined>,
+  botCounts: Partial<Record<BotType, number>> | null | undefined,
+  botCountsM2: Partial<Record<BotType, number>> | null | undefined
+): { ok: true } | { ok: false; message: string } {
+  const types: BotType[] = ['breacher', 'guardian', 'phreak'];
+  const m1: Record<BotType, number> = { breacher: 0, guardian: 0, phreak: 0 };
+  const m2: Record<BotType, number> = { breacher: 0, guardian: 0, phreak: 0 };
+
+  for (const bid of SWARM_LEAD_BATTALION_IDS) {
+    const a = leadAssignments[bid];
+    if (!a || a.quantity <= 0) continue;
+    const bt = a.botType as BotType;
+    if (!types.includes(bt)) continue;
+    if (a.markLevel === 2) m2[bt] += a.quantity;
+    else m1[bt] += a.quantity;
+  }
+
+  for (const bt of types) {
+    const owned1 = Math.max(0, Math.floor(Number(botCounts?.[bt] ?? 0)));
+    const owned2 = Math.max(0, Math.floor(Number(botCountsM2?.[bt] ?? 0)));
+    if (m1[bt] > owned1) {
+      return {
+        ok: false,
+        message: `Mark I ${bt}: ${m1[bt]} assigned across lead slots but only ${owned1} in barracks.`,
+      };
+    }
+    if (m2[bt] > owned2) {
+      return {
+        ok: false,
+        message: `Mark II ${bt}: ${m2[bt]} assigned across lead slots but only ${owned2} in barracks.`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
 export const BattlePreparationScreen = React.memo(
   ({
     onClose,
@@ -267,26 +307,45 @@ export const BattlePreparationScreen = React.memo(
     }
 
     try {
-      if (!isSwarmLeadSetup) {
-        await assignToBattalion({
-          botType: data.botType,
-          quantity: data.quantity,
-          battalionId: selectedBattalion,
-          markLevel: data.markLevel,
-        }).unwrap();
-      }
-
-      setAssignments(prev => {
-        const newAssignments = {
-          ...prev,
+      if (isSwarmLeadSetup) {
+        const nextAssignments: Record<string, BattalionAssignment> = {
+          ...assignments,
           [selectedBattalion]: {
             botType: data.botType,
             quantity: data.quantity,
             markLevel: data.markLevel,
           },
         };
-        return newAssignments;
-      });
+        const inv = validateSwarmLeadAssignmentsAgainstInventory(
+          nextAssignments,
+          botCounts,
+          botCountsM2
+        );
+        if (!inv.ok) {
+          Alert.alert('Not enough bots', inv.message);
+          setSelectorVisible(false);
+          return;
+        }
+        setAssignments(nextAssignments);
+        setSelectorVisible(false);
+        return;
+      }
+
+      await assignToBattalion({
+        botType: data.botType,
+        quantity: data.quantity,
+        battalionId: selectedBattalion,
+        markLevel: data.markLevel,
+      }).unwrap();
+
+      setAssignments((prev) => ({
+        ...prev,
+        [selectedBattalion]: {
+          botType: data.botType,
+          quantity: data.quantity,
+          markLevel: data.markLevel,
+        },
+      }));
       setSelectorVisible(false);
     } catch (error) {
       console.error('Failed to assign bots:', error);
@@ -294,7 +353,14 @@ export const BattlePreparationScreen = React.memo(
       throw error;
     }
   },
-    [selectedBattalion, assignToBattalion, isSwarmLeadSetup]
+    [
+      selectedBattalion,
+      assignToBattalion,
+      isSwarmLeadSetup,
+      assignments,
+      botCounts,
+      botCountsM2,
+    ]
   );
 
   /** Serialize preset applies; skip identical successful lineup. Preset uses POST /assign-preset (one request) to avoid per-slot rate limits. */
@@ -311,12 +377,22 @@ export const BattlePreparationScreen = React.memo(
         if (lastSuccessfulPresetSigRef.current === sig) {
           return;
         }
-        setAssignments(presetAssignments);
-        try {
-          if (isSwarmLeadSetup) {
-            lastSuccessfulPresetSigRef.current = sig;
+        if (isSwarmLeadSetup) {
+          const inv = validateSwarmLeadAssignmentsAgainstInventory(
+            presetAssignments,
+            botCounts,
+            botCountsM2
+          );
+          if (!inv.ok) {
+            Alert.alert('Not enough bots for this preset', inv.message);
             return;
           }
+          setAssignments(presetAssignments);
+          lastSuccessfulPresetSigRef.current = sig;
+          return;
+        }
+        setAssignments(presetAssignments);
+        try {
           const assignmentList = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((battalionId) => {
             const a = presetAssignments[battalionId];
             if (!a || a.quantity <= 0) return [];
@@ -380,7 +456,7 @@ export const BattlePreparationScreen = React.memo(
       });
       return presetApplyChainRef.current;
     },
-    [assignPresetBattalions, refetchBots, isSwarmLeadSetup]
+    [assignPresetBattalions, refetchBots, isSwarmLeadSetup, botCounts, botCountsM2]
   );
 
   // Convert assignments to battalion data format
@@ -419,6 +495,10 @@ export const BattlePreparationScreen = React.memo(
           message: 'Commit at least one lead battalion (slots A–F) before continuing to the swarm room.',
         };
       }
+      const inv = validateSwarmLeadAssignmentsAgainstInventory(assignments, botCounts, botCountsM2);
+      if (!inv.ok) {
+        return { isValid: false, message: inv.message };
+      }
       return { isValid: true, message: 'Swarm lead payload ready.' };
     }
 
@@ -437,7 +517,7 @@ export const BattlePreparationScreen = React.memo(
         message: 'Please assign at least one battalion before deploying.'
       };
     }
-  }, [isSwarmLeadSetup]);
+  }, [isSwarmLeadSetup, botCounts, botCountsM2]);
 
   const battleStartData = React.useMemo(() => {
     const hasCell =
