@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { User } from '../models/User';
-import { PrivateMessage } from '../models/PrivateMessage';
+import { PrivateMessage, PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH } from '../models/PrivateMessage';
 import { PROBE_REPORT_SENDER_ID, PROBE_REPORT_SENDER_USERNAME } from '../constants/systemSenders';
 import { BattleRewardService } from '../services/BattleRewardService';
 import { NPCService } from '../services/NPCService';
@@ -111,6 +111,9 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<CompleteProbeResu
       b: bots,
     };
     const messageBody = PROBE_REPORT_PREFIX + JSON.stringify(payload);
+    if (messageBody.length > PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH) {
+      return { success: false, statusCode: 400, message: 'Probe report payload too large' };
+    }
 
     const doc = new PrivateMessage({
       senderId: PROBE_REPORT_SENDER_ID,

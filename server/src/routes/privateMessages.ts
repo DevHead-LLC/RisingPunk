@@ -2,7 +2,11 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { User } from '../models/User';
-import { PrivateMessage, ADMIN_BROADCAST_FOOTER } from '../models/PrivateMessage';
+import {
+  PrivateMessage,
+  ADMIN_BROADCAST_FOOTER,
+  PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH,
+} from '../models/PrivateMessage';
 import { filterBadWords } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 import {
@@ -25,10 +29,6 @@ import { listConversationsForUser, dismissThreadForUser, touchInboxThreadOnOpen 
 import '../models/PrivateInboxThread';
 
 const router = express.Router();
-
-/** Stored `message` = filtered body + `\\n\\n` + {@link ADMIN_BROADCAST_FOOTER} (filter preserves length). */
-const ADMIN_BROADCAST_FULL_MESSAGE_MAX_LENGTH =
-  ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH + 2 + ADMIN_BROADCAST_FOOTER.length;
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
@@ -399,7 +399,7 @@ router.post('/admin/send-all', auth, async (req: Request, res: Response) => {
     }
     const filteredBody = filterBadWords(trimmed);
     const fullMessage = `${filteredBody}\n\n${ADMIN_BROADCAST_FOOTER}`;
-    if (fullMessage.length > ADMIN_BROADCAST_FULL_MESSAGE_MAX_LENGTH) {
+    if (fullMessage.length > PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH) {
       res.status(400).json({ error: 'Message too long' });
       return;
     }

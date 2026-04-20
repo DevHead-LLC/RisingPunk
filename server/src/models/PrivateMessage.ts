@@ -19,6 +19,10 @@ export interface IPrivateMessage extends Document {
 export const ADMIN_BROADCAST_FOOTER =
   'Thank you for playing RisingPunk! Please contact support at support@risingpunk.com for help or feedback.';
 
+/** Largest legitimate stored `message` (admin broadcast: body + `\\n\\n` + {@link ADMIN_BROADCAST_FOOTER}). */
+export const PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH =
+  ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH + 2 + ADMIN_BROADCAST_FOOTER.length;
+
 const privateMessageSchema = new Schema({
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -41,6 +45,7 @@ const privateMessageSchema = new Schema({
     type: String,
     required: true,
     trim: true,
+    maxlength: PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH,
   },
   originalMessage: {
     type: String,
