@@ -2176,8 +2176,10 @@ export const HackMapScreen: React.FC<Props> = ({
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
   const { data: swarmFeatures } = useGetUserFeaturesQuery('swarm');
+  const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
   const { data: mySwarmSession, refetch: refetchMySwarmSession } = useGetMySwarmQuery(undefined, {
-    pollingInterval: 5000,
+    skip: !crewStatus?.isInCrew,
+    pollingInterval: crewStatus?.isInCrew ? 5000 : 0,
   });
   const [commitSwarmSlotMutation, { isLoading: isCommittingSwarm }] = useCommitSwarmSlotMutation();
   const [dismissSwarmSlotMutation, { isLoading: isDismissingSwarm }] = useDismissSwarmSlotMutation();
@@ -2262,7 +2264,6 @@ export const HackMapScreen: React.FC<Props> = ({
     [cancelProbeMutation]
   );
 
-  const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
   const [sendMapChatMessage] = useSendMapChatMessageMutation();
   const [sendCrewChatMessage] = useSendCrewChatMessageMutation();
 
