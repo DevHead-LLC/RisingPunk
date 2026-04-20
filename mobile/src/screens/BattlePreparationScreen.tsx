@@ -314,7 +314,6 @@ export const BattlePreparationScreen = React.memo(
         setAssignments(presetAssignments);
         try {
           if (isSwarmLeadSetup) {
-            setAssignments(presetAssignments);
             return;
           }
           const assignmentList = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((battalionId) => {

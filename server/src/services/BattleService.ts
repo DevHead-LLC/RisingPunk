@@ -367,9 +367,23 @@ export class BattleService {
 
       let pvpXpAttacker = 0;
       let pvpXpDefender = 0;
-      const isSwarmMarchBattle =
-        (battle as { marchSourcedAttack?: boolean; sourceMarchId?: string }).marchSourcedAttack === true &&
+      let isSwarmMarchBattle = false;
+      const marchSourcedPvp =
+        (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true &&
         !!(battle as { sourceMarchId?: string }).sourceMarchId;
+      if (marchSourcedPvp) {
+        try {
+          const { AttackMarch } = await import('../models/AttackMarch');
+          const m = await AttackMarch.findOne({
+            marchId: String((battle as { sourceMarchId?: string }).sourceMarchId),
+          })
+            .select('swarmSessionId')
+            .lean();
+          isSwarmMarchBattle = Boolean(m?.swarmSessionId);
+        } catch (swarmDetectErr) {
+          console.error('[BattleService.handleBattleEnd] failed to detect swarm march source:', battleId, swarmDetectErr);
+        }
+      }
       if (isSwarmMarchBattle) {
         try {
           const { computePvpXpFromOpponentLosses } = await import('./PvPBattleExperienceService');
