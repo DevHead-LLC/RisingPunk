@@ -108,9 +108,10 @@ interface PresetBarProps {
   };
   /** presetId + assignments; returns a promise so the bar can debounce UI and await one sync at a time. */
   onApplyPreset: (presetId: string, assignments: Record<string, BattalionAssignment>) => Promise<void>;
+  maxBattalionSizeOverride?: number;
 }
 
-export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, onApplyPreset }: PresetBarProps) => {
+export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, onApplyPreset, maxBattalionSizeOverride }: PresetBarProps) => {
   const colors = useThemeColors();
   const { data: presetsData, refetch: refetchPresets } = useGetBattlePresetsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -123,7 +124,13 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     return normalizeFullInventory(src);
   }, [botsQueryData?.bots, botCounts]);
   const [unlockPreset] = useUnlockPresetMutation();
-  const maxBattalionSize = useBattalionMaxSize();
+  const maxBattalionSizeFromResearch = useBattalionMaxSize();
+  const maxBattalionSize =
+    typeof maxBattalionSizeOverride === 'number' &&
+    Number.isFinite(maxBattalionSizeOverride) &&
+    maxBattalionSizeOverride > 0
+      ? Math.floor(maxBattalionSizeOverride)
+      : maxBattalionSizeFromResearch;
   const [bannerVisible, setBannerVisible] = useState(false);
   const [bannerMessage, setBannerMessage] = useState('');
   /** Sync gate so two taps in the same tick cannot both start onApplyPreset (state updates are async). */
@@ -297,6 +304,7 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
       setPresetApplyBusy(false);
     }
   }, [
+    presetsData,
     presetsData?.userLevel,
     presetsData?.presets,
     userBalance,

@@ -110,6 +110,7 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'reduce-misc-entertainment-15': require('../../assets/images/researchCenter/miscEntExpenseReduction.png'),
   'probe': require('../../assets/images/researchCenter/probeResearch.png'),
   'mark-2-bots': require('../../assets/images/researchCenter/botUpgradeEvolution.png'),
+  'swarm-lead': require('../../assets/images/researchCenter/swarmLead.png'),
 };
 
 const CREW_BONUS_CARD_IMAGE = require('../../assets/images/researchCenter/crewBonus.png');

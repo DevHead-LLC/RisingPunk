@@ -35,6 +35,7 @@ import {
 import { parseMapLocationShareMessage } from '../../../../shared/mapLocationShareMessage';
 import type { ReportContext } from '../../types/reports';
 import { normalizeUserId } from '../../utils/battleUtils';
+import { USER_DM_MAX_MESSAGE_LENGTH } from '../../constants/privateMessageCaps';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
@@ -82,13 +83,16 @@ export interface BattleReportBotCounts {
   guardian: number;
   breacher: number;
   phreak: number;
+  guardianM2: number;
+  breacherM2: number;
+  phreakM2: number;
 }
 
 /** Parse/validate bot count object from BTL JSON; returns null if shape is unusable (Bugbot: matches probe `b` guard). */
 function normalizeBattleReportBotCounts(raw: unknown): BattleReportBotCounts | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
-  const n = (v: unknown): number | null => {
+  const nReq = (v: unknown): number | null => {
     if (typeof v === 'number' && Number.isFinite(v)) {
       return Math.max(0, Math.floor(v));
     }
@@ -98,15 +102,28 @@ function normalizeBattleReportBotCounts(raw: unknown): BattleReportBotCounts | n
     }
     return null;
   };
-  const guardian = n(o.guardian);
-  const breacher = n(o.breacher);
-  const phreak = n(o.phreak);
+  const nOpt = (v: unknown): number => {
+    const x = nReq(v);
+    return x === null ? 0 : x;
+  };
+  const guardian = nReq(o.guardian);
+  const breacher = nReq(o.breacher);
+  const phreak = nReq(o.phreak);
   if (guardian === null || breacher === null || phreak === null) return null;
-  return { guardian, breacher, phreak };
+  return {
+    guardian,
+    breacher,
+    phreak,
+    guardianM2: nOpt(o.guardianM2),
+    breacherM2: nOpt(o.breacherM2),
+    phreakM2: nOpt(o.phreakM2),
+  };
 }
 
 export interface BattleReportPayload {
   br: 1;
+  /** Crew swarm attack: all PM recipients are on the attacking side (joiners are not `attackerId` but must see attacker-side labels). */
+  swarm?: 1;
   /** Set for computer/NPC battles (server); client adjusts reward vs PvP wallet copy. */
   npc?: 1;
   attackerId: string;
@@ -164,8 +181,10 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
     const battleId =
       typeof battleIdRaw === 'string' && battleIdRaw.trim().length > 0 ? battleIdRaw.trim() : undefined;
     const isNpcReport = (payload as { npc?: unknown }).npc === 1;
+    const isSwarmReport = (payload as { swarm?: unknown }).swarm === 1;
     return {
       ...payload,
+      swarm: isSwarmReport ? 1 : undefined,
       npc: isNpcReport ? 1 : undefined,
       attackerStart,
       defenderStart,
@@ -279,7 +298,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportedMessage, setReportedMessage] = useState<ChatMessageForModal | null>(null);
 
-  const maxCharacters = 500;
+  const maxCharacters = USER_DM_MAX_MESSAGE_LENGTH;
   const characterCount = messageInput.length;
 
   const hasScrolledOnOpen = useRef(false);
@@ -540,7 +559,8 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 </FilteredText>
                               );
                             }
-                            const isAttacker = battleReportViewerIsAttacker(report, currentUser);
+                            const isAttacker =
+                              report.swarm === 1 ? true : battleReportViewerIsAttacker(report, currentUser);
                             // Bugbot: attacker viewer — `user` = attacker side won, `enemy` = defender side won. Defender viewer uses same `winner` (battle-axis; not narrative "enemy").
                             const status =
                               isAttacker
@@ -596,26 +616,54 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                             const fmt = (n: number) => n.toLocaleString();
                             const line = (label: string, start: number, lost: number) =>
                               `${label} - ${fmt(start)} > ${fmt(lost)} Lost`;
+                            const sideHasMark2 = (s: BattleReportBotCounts, l: BattleReportBotCounts) =>
+                              s.guardianM2 > 0 ||
+                              s.breacherM2 > 0 ||
+                              s.phreakM2 > 0 ||
+                              l.guardianM2 > 0 ||
+                              l.breacherM2 > 0 ||
+                              l.phreakM2 > 0;
                             const renderSide = (
                               title: string,
                               start: BattleReportBotCounts,
                               lost: BattleReportBotCounts,
-                            ) => (
-                              <>
-                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  {title}
-                                </Text>
-                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  {line('Guardians', start.guardian, lost.guardian)}
-                                </Text>
-                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  {line('Breachers', start.breacher, lost.breacher)}
-                                </Text>
-                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  {line('Phreaks', start.phreak, lost.phreak)}
-                                </Text>
-                              </>
-                            );
+                            ) => {
+                              const m2 = sideHasMark2(start, lost);
+                              /** Mark I = family names; Mark II = distinct bot names (same stats keys in payload). */
+                              const fam = (
+                                mark1Name: string,
+                                mark2Name: string,
+                                s1: number,
+                                l1: number,
+                                s2: number,
+                                l2: number,
+                              ) => (
+                                <>
+                                  <Text
+                                    style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}
+                                  >
+                                    {line(m2 ? `${mark1Name} (Mark I)` : mark1Name, s1, l1)}
+                                  </Text>
+                                  {s2 > 0 || l2 > 0 ? (
+                                    <Text
+                                      style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}
+                                    >
+                                      {line(`${mark2Name} (Mark II)`, s2, l2)}
+                                    </Text>
+                                  ) : null}
+                                </>
+                              );
+                              return (
+                                <>
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    {title}
+                                  </Text>
+                                  {fam('Guardian', 'Worm', start.guardian, lost.guardian, start.guardianM2, lost.guardianM2)}
+                                  {fam('Breacher', 'Exploit', start.breacher, lost.breacher, start.breacherM2, lost.breacherM2)}
+                                  {fam('Phreak', 'Sniffer', start.phreak, lost.phreak, start.phreakM2, lost.phreakM2)}
+                                </>
+                              );
+                            };
                             const hackLocationBlock = hackLocLine ? (
                               <>
                                 <Text

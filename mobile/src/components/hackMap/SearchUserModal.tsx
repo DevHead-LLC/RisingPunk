@@ -21,9 +21,7 @@ import { SIZING } from '../../styles/theme';
 import { useLazyLookupUserByHandleQuery } from '../../store/api/authApi';
 import { useSendAdminMessageToAllMutation } from '../../store/api/privateMessagesApi';
 import { containsBadWordsForHandle } from '../../utils/contentModeration';
-
-/** Max body length so body + "\n\n" (2) + server footer (~104) stays ≤ 600 (schema message maxlength). */
-const ADMIN_MESSAGE_MAX_LENGTH = 494;
+import { ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH } from '../../constants/privateMessageCaps';
 
 const HANDLE_VALID_CHARS = /^[a-zA-Z0-9!&%^*_]*$/;
 const MIN_LENGTH = 5;
@@ -164,7 +162,7 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
                 <View style={styles.adminSection}>
                   <Text style={[styles.adminSectionTitle, { color: colors.text.primary }]}>Message all users</Text>
                   <Text style={[styles.adminSectionHint, { color: colors.text.secondary }]}>
-                    One-way admin message (replies disabled). {ADMIN_MESSAGE_MAX_LENGTH} chars max.
+                    One-way admin message (replies disabled).
                   </Text>
                   <TextInput
                     style={[
@@ -177,17 +175,17 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
                     ]}
                     value={adminMessage}
                     onChangeText={(text) => {
-                      if (text.length <= ADMIN_MESSAGE_MAX_LENGTH) setAdminMessage(text);
+                      if (text.length <= ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH) setAdminMessage(text);
                       setAdminStatus('idle');
                     }}
                     placeholder="Type your message..."
                     placeholderTextColor={colors.text.placeholder}
                     multiline
-                    maxLength={ADMIN_MESSAGE_MAX_LENGTH}
+                    maxLength={ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH}
                     editable={!isSendingToAll}
                   />
                   <Text style={[styles.adminCharCount, { color: colors.text.secondary }]}>
-                    {adminMessage.length} / {ADMIN_MESSAGE_MAX_LENGTH}
+                    {adminMessage.length} / {ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH}
                   </Text>
                   <TouchableOpacity
                     style={[

@@ -106,6 +106,12 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
       await battleService.triggerInitialTargeting(battle.battleId);
       await battleService.getTimerService().runSyntheticTicksToCompletion(battle.battleId);
     }
+    try {
+      const { attachSwarmBattleIdIfNeeded } = await import('./SwarmService');
+      await attachSwarmBattleIdIfNeeded(battle.battleId);
+    } catch (swarmAttachErr) {
+      console.error('[MarchResolution] failed to attach swarm battle id:', battle.battleId, swarmAttachErr);
+    }
   } catch (e) {
     console.error('[MarchResolution] createBattle or headless resolution failed, reverting march:', updated.marchId, e);
     if (battle?.battleId) {

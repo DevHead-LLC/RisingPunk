@@ -7,13 +7,9 @@ import {
 } from '../constants/systemSenders';
 
 const SYSTEM_NOTIFICATION_PREFIX = 'SYS|';
-const MAX_MESSAGE_LENGTH = 600;
 
 export async function sendSystemNotificationDm(recipientId: string, body: string): Promise<void> {
   const messageBody = SYSTEM_NOTIFICATION_PREFIX + JSON.stringify({ m: body });
-  if (messageBody.length > MAX_MESSAGE_LENGTH) {
-    throw new Error('System notification message too long');
-  }
 
   const doc = new PrivateMessage({
     senderId: SYSTEM_NOTIFICATION_SENDER_ID,

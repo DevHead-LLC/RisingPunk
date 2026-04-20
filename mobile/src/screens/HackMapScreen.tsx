@@ -11,6 +11,7 @@ import { CrewModal } from '../components/hackMap/CrewModal';
 import { CrewBackupBanner } from '../components/turf/CrewBackupBanner';
 import { VisitingProfileModal } from '../components/hackMap/VisitingProfileModal';
 import { VisitCrewModal } from '../components/hackMap/VisitCrewModal';
+import { SwarmSessionModal } from '../components/hackMap/SwarmSessionModal';
 import { WorldChatIconButton } from '../components/hackMap/WorldChatIconButton';
 import { WorldChatModal } from '../components/hackMap/WorldChatModal';
 import { MessagesIconButton } from '../components/messages/MessagesIconButton';
@@ -36,6 +37,13 @@ import {
   useMovePropertyMutation,
 } from '../store/api/mapApi';
 import { useGetActiveAttackMarchesQuery, useCancelOutboundAttackMarchMutation } from '../store/api/attackApi';
+import {
+  useAbortSwarmMutation,
+  useCommitSwarmSlotMutation,
+  useDeploySwarmMutation,
+  useDismissSwarmSlotMutation,
+  useGetMySwarmQuery,
+} from '../store/api/swarmApi';
 import { AttackMarchAnimationLayer } from '../components/hackMap/AttackMarchAnimationLayer';
 import { outboundProgressTForAttackMarch } from '../components/hackMap/attackMarchMapFrame';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
@@ -1283,6 +1291,7 @@ export const HackMapScreen: React.FC<Props> = ({
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
+  const [showSwarmModal, setShowSwarmModal] = useState(false);
   const [showJumpToModal, setShowJumpToModal] = useState(false);
   const [showSearchUserModal, setShowSearchUserModal] = useState(false);
   const [showCrewModal, setShowCrewModal] = useState(false);
@@ -2166,6 +2175,27 @@ export const HackMapScreen: React.FC<Props> = ({
   // Get research features data (same as ResearchFeaturesList)
   const { data: researchFeatures } = useGetUserFeaturesQuery('home-defense');
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
+  const { data: swarmFeatures } = useGetUserFeaturesQuery('swarm');
+  const { data: mySwarmSession, refetch: refetchMySwarmSession } = useGetMySwarmQuery(undefined, {
+    pollingInterval: 5000,
+  });
+  const [commitSwarmSlotMutation, { isLoading: isCommittingSwarm }] = useCommitSwarmSlotMutation();
+  const [dismissSwarmSlotMutation, { isLoading: isDismissingSwarm }] = useDismissSwarmSlotMutation();
+  const [deploySwarmMutation, { isLoading: isDeployingSwarm }] = useDeploySwarmMutation();
+  const [abortSwarmMutation, { isLoading: isAbortingSwarm }] = useAbortSwarmMutation();
+
+  useEffect(() => {
+    const shouldOpenFromPrep = (globalThis as any).openSwarmSessionModalOnMap === true;
+    if (!shouldOpenFromPrep) {
+      return;
+    }
+    if (mySwarmSession?.swarmId) {
+      setShowSwarmModal(true);
+      (globalThis as any).openSwarmSessionModalOnMap = false;
+      return;
+    }
+    void refetchMySwarmSession();
+  }, [mySwarmSession?.swarmId, refetchMySwarmSession]);
 
   useEffect(() => {
     followProbeIdRef.current = followProbeId;
@@ -2440,7 +2470,7 @@ export const HackMapScreen: React.FC<Props> = ({
     
     return true;
   }, [selectedCell, currentUserHandle, crewStatus, isLoadingCrewStatus, isLoadingCrewDetails, isLoadingSelectedUserCrewStatus, crewMemberUserIds, isSameCrewMember, selectedUserCrewStatus]);
-  
+
   // Find the antivirus feature from the research features
   const antivirusFeature = researchFeatures?.find(f => f.id === 'antivirus');
   
@@ -2460,6 +2490,24 @@ export const HackMapScreen: React.FC<Props> = ({
   const hackCrewRemaining = Math.max(0, hackCrewResearchCompletesAt - now);
   const isHackCrewUnlocked = hackCrewFeature?.isUnlocked || 
     (hackCrewFeature?.isResearching && hackCrewRemaining === 0);
+  const swarmLeadFeature = swarmFeatures?.find((f) => f.id === 'swarm-lead');
+  const swarmLeadResearchCompletesAt = swarmLeadFeature?.researchCompletesAt
+    ? new Date(swarmLeadFeature.researchCompletesAt).getTime()
+    : 0;
+  const swarmLeadRemaining = Math.max(0, swarmLeadResearchCompletesAt - now);
+  const isSwarmLeadUnlocked = swarmLeadFeature?.isUnlocked ||
+    (swarmLeadFeature?.isResearching && swarmLeadRemaining === 0);
+  const shouldShowSwarmButton = useMemo(() => {
+    if (!isSwarmLeadUnlocked) return false;
+    if (!crewStatus?.isInCrew) return false;
+    if (!selectedCell) return false;
+    if (selectedCell.info.owner !== 'player') return false;
+    if (!selectedCell.info.userId) return false;
+    if (selectedCell.info.name === currentUserHandle) return false;
+    if (selectedCell.info.isShielded) return false;
+    if (isSameCrewMember) return false;
+    return true;
+  }, [isSwarmLeadUnlocked, crewStatus?.isInCrew, selectedCell, currentUserHandle, isSameCrewMember]);
   
   // Debug logging - REMOVED to fix infinite loop
   
@@ -4247,6 +4295,8 @@ export const HackMapScreen: React.FC<Props> = ({
   }, []);
 
   const isInCrew = crewStatus?.isInCrew || false;
+  const hasActiveSwarm = Boolean(mySwarmSession);
+  const shouldShowSwarmToolbarIcon = isInCrew && (isSwarmLeadUnlocked || hasActiveSwarm);
 
   useEffect(() => {
     if (isInCrew && showCrewOnboardingModal) {
@@ -4376,6 +4426,67 @@ export const HackMapScreen: React.FC<Props> = ({
       visitCrewCloseTimeoutRef.current = null;
     }, 300);
   }, []);
+
+  const handleOpenSwarmModal = useCallback(() => {
+    setShowSwarmModal(true);
+  }, []);
+  const handleOpenSwarmFromCrewModal = useCallback(() => {
+    setShowCrewModal(false);
+    setCrewModalInitialCategory(null);
+    setTimeout(() => {
+      setShowSwarmModal(true);
+    }, 0);
+  }, []);
+
+  const handleCreateSwarmForSelectedCell = useCallback(async () => {
+    if (!selectedCell?.info.userId) {
+      Alert.alert('Swarm', 'Select an eligible player tile first.');
+      return;
+    }
+    (globalThis as any).pendingSwarmTargetUserId = String(selectedCell.info.userId);
+    (globalThis as any).pendingMapPan = { x: selectedCell.x, y: selectedCell.y };
+    onClose();
+  }, [selectedCell, onClose]);
+
+  const handleCommitSwarmSlot = useCallback(async (payload: {
+    slotIndex: number;
+    botType: 'guardian' | 'breacher' | 'phreak';
+    quantity: number;
+    markLevel: 1 | 2;
+  }) => {
+    if (!mySwarmSession?.swarmId) {
+      throw new Error('No active swarm session.');
+    }
+    await commitSwarmSlotMutation({
+      swarmId: mySwarmSession.swarmId,
+      ...payload,
+    }).unwrap();
+    await refetchMySwarmSession();
+  }, [mySwarmSession, commitSwarmSlotMutation, refetchMySwarmSession]);
+
+  const handleDismissSwarmSlot = useCallback(async (slotIndex: number) => {
+    if (!mySwarmSession?.swarmId) {
+      throw new Error('No active swarm session.');
+    }
+    await dismissSwarmSlotMutation({ swarmId: mySwarmSession.swarmId, slotIndex }).unwrap();
+    await refetchMySwarmSession();
+  }, [mySwarmSession, dismissSwarmSlotMutation, refetchMySwarmSession]);
+
+  const handleDeploySwarm = useCallback(async () => {
+    if (!mySwarmSession?.swarmId) {
+      throw new Error('No active swarm session.');
+    }
+    await deploySwarmMutation({ swarmId: mySwarmSession.swarmId }).unwrap();
+    await refetchMySwarmSession();
+  }, [mySwarmSession, deploySwarmMutation, refetchMySwarmSession]);
+
+  const handleAbortSwarm = useCallback(async () => {
+    if (!mySwarmSession?.swarmId) {
+      throw new Error('No active swarm session.');
+    }
+    await abortSwarmMutation({ swarmId: mySwarmSession.swarmId }).unwrap();
+    await refetchMySwarmSession();
+  }, [mySwarmSession, abortSwarmMutation, refetchMySwarmSession]);
 
   const renderInfoPanel = useCallback(() => {
     if (!selectedCell) {return null;}
@@ -4551,6 +4662,17 @@ export const HackMapScreen: React.FC<Props> = ({
                       </Text>
                     </TouchableOpacity>
                   )}
+
+                  {shouldShowSwarmButton && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                      onPress={mySwarmSession?.swarmId ? handleOpenSwarmModal : handleCreateSwarmForSelectedCell}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        {mySwarmSession?.swarmId ? 'Open Swarm Room' : 'Start Swarm'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   
                   {selectedCell.info.owner === 'player' && 
                    selectedCell.info.userId && (
@@ -4666,7 +4788,7 @@ export const HackMapScreen: React.FC<Props> = ({
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress]);
+  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -4734,6 +4856,9 @@ export const HackMapScreen: React.FC<Props> = ({
           onHackCrewPress={handleHackCrewPress}
           isHackCrewUnlocked={isHackCrewUnlocked}
           isInCrew={isInCrew}
+          onSwarmPress={handleOpenSwarmModal}
+          isSwarmUnlocked={shouldShowSwarmToolbarIcon}
+          hasActiveSwarm={hasActiveSwarm}
         />
 
       <AntivirusModal
@@ -4747,11 +4872,30 @@ export const HackMapScreen: React.FC<Props> = ({
         initialCategory={crewModalInitialCategory}
         focusInitialCategoryKey={crewModalInitialCategory === 'backup-requests' ? crewModalFocusBackupKey : undefined}
         onNavigateToMapCell={handleCrewChatNavigateToCell}
+        hasActiveSwarm={hasActiveSwarm}
+        onSwarmPress={handleOpenSwarmFromCrewModal}
       />
 
       <CrewOnboardingModal
         visible={showCrewOnboardingModal}
         onClose={handleCrewOnboardingClose}
+      />
+
+      <SwarmSessionModal
+        visible={showSwarmModal}
+        onClose={() => setShowSwarmModal(false)}
+        session={mySwarmSession}
+        currentUserId={currentUserId ? String(currentUserId) : null}
+        onCommit={handleCommitSwarmSlot}
+        onDismiss={handleDismissSwarmSlot}
+        onDeploy={handleDeploySwarm}
+        onAbort={handleAbortSwarm}
+        loading={
+          isCommittingSwarm ||
+          isDismissingSwarm ||
+          isDeployingSwarm ||
+          isAbortingSwarm
+        }
       />
 
       {visitingProfileUserId && (

@@ -280,6 +280,13 @@ export async function isResearchFeatureUnlocked(
   }
 }
 
+/** Swarm Lead — server authority for HackMap Swarm gating (Phase 2+). */
+export const SWARM_LEAD_RESEARCH = { categoryId: 'swarm' as const, featureId: 'swarm-lead' as const };
+
+export function isSwarmLeadResearchUnlocked(userId: string): Promise<boolean> {
+  return isResearchFeatureUnlocked(userId, SWARM_LEAD_RESEARCH.categoryId, SWARM_LEAD_RESEARCH.featureId);
+}
+
 /** Hack-ability battalion-size feature IDs in prereq order (spec 18). Value is the additive increase. */
 const BATTALION_SIZE_FEATURES: { featureId: string; add: number }[] = [
   { featureId: 'battalion-size-250', add: 250 },

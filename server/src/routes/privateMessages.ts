@@ -16,7 +16,7 @@ import {
   applyRetentionAfterAdminSendAll,
   applyRetentionAfterInsert,
 } from '../services/PrivateMessageRetentionService';
-import { MAX_PM_MESSAGES_PER_THREAD } from '../constants/privateMessageCaps';
+import { MAX_PM_MESSAGES_PER_THREAD, USER_DM_MAX_MESSAGE_LENGTH } from '../constants/privateMessageCaps';
 import { listConversationsForUser, dismissThreadForUser, touchInboxThreadOnOpen } from '../services/PrivateInboxService';
 import '../models/PrivateInboxThread';
 
@@ -265,8 +265,10 @@ router.post('/conversations/:recipientId/messages', auth, async (req: Request, r
       res.status(400).json({ error: 'Message cannot be empty' });
       return;
     }
-    if (trimmed.length > 500) {
-      res.status(400).json({ error: 'Message must be 500 characters or less' });
+    if (trimmed.length > USER_DM_MAX_MESSAGE_LENGTH) {
+      res.status(400).json({
+        error: `Message must be ${USER_DM_MAX_MESSAGE_LENGTH} characters or less`,
+      });
       return;
     }
 
@@ -383,13 +385,6 @@ router.post('/admin/send-all', auth, async (req: Request, res: Response) => {
     }
     const filteredBody = filterBadWords(trimmed);
     const fullMessage = `${filteredBody}\n\n${ADMIN_BROADCAST_FOOTER}`;
-    const MESSAGE_MAX_LENGTH = 600; // PrivateMessage schema message maxlength
-    if (fullMessage.length > MESSAGE_MAX_LENGTH) {
-      res.status(400).json({
-        error: `Message with footer must be ${MESSAGE_MAX_LENGTH} characters or less. Please shorten your message.`,
-      });
-      return;
-    }
 
     const sender = await User.findById(userId).select('handle').lean();
     if (!sender) {

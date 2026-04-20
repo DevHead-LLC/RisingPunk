@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Dimensions, AppState, Platform } from 'react-native';
+import { Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserProfileFromPayload } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
@@ -21,13 +21,14 @@ import { AccountSwitchedModal } from './modals/AccountSwitchedModal';
 import { NotificationBanner } from './common/NotificationBanner';
 import { globalErrorHandler } from '../services/GlobalErrorHandler';
 import { getAnalytics, setAnalyticsCollectionEnabled, setUserProperty, logEvent } from '@react-native-firebase/analytics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trackAppReturned, trackFirstOpen, getAccountCreatedThisSession, clearAccountCreatedThisSession } from '../services/analyticsService';
 import { checkAppVersion } from '../services/appVersionService';
 import { UpdateRequiredScreen } from './UpdateRequiredScreen';
 import {
   MARCH_TRANSITION_BANNER_DURATION_MS,
+  SWARM_ACTIVE_BANNER_DURATION_MS,
   useAttackMarchTransitionBanners,
+  useCrewSwarmActiveBanner,
 } from '../hooks/useAttackMarchTransitionBanners';
 
 const AppContent = memo(() => {
@@ -46,6 +47,7 @@ const AppContent = memo(() => {
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
 
   const { marchBanner, dismissMarchBanner } = useAttackMarchTransitionBanners(token);
+  const { swarmBanner, dismissSwarmBanner } = useCrewSwarmActiveBanner(token);
 
   // Function to center the turf view to home/digital barracks position
   const centerTurfView = useCallback(() => {
@@ -137,7 +139,7 @@ const AppContent = memo(() => {
         // Set user property for platform to make filtering easier
         try {
           await setUserProperty(analytics, 'platform', Platform.OS);
-        } catch (error) {
+        } catch {
           // Continue even if this fails
         }
         
@@ -414,6 +416,13 @@ const AppContent = memo(() => {
         type={marchBanner?.type ?? 'info'}
         duration={MARCH_TRANSITION_BANNER_DURATION_MS}
         onClose={dismissMarchBanner}
+      />
+      <NotificationBanner
+        visible={!!swarmBanner && !showEmailVerificationBanner && !marchBanner}
+        message={swarmBanner?.message ?? ''}
+        type={swarmBanner?.type ?? 'info'}
+        duration={SWARM_ACTIVE_BANNER_DURATION_MS}
+        onClose={dismissSwarmBanner}
       />
       <GlobalErrorModal
         visible={showGlobalError && !!token}

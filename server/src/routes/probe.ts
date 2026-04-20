@@ -111,7 +111,6 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<CompleteProbeResu
       b: bots,
     };
     const messageBody = PROBE_REPORT_PREFIX + JSON.stringify(payload);
-    if (messageBody.length > 600) return { success: false, statusCode: 400, message: 'Probe report payload too large' };
 
     const doc = new PrivateMessage({
       senderId: PROBE_REPORT_SENDER_ID,

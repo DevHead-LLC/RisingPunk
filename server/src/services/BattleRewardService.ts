@@ -111,8 +111,20 @@ export class BattleRewardService {
 
       const marchSourced = (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true;
       const Bot = require('../models/Bot');
+      let swarmSourced = false;
+      if (marchSourced && (battle as { sourceMarchId?: string }).sourceMarchId) {
+        try {
+          const { AttackMarch } = await import('../models/AttackMarch');
+          const m = await AttackMarch.findOne({ marchId: String((battle as { sourceMarchId?: string }).sourceMarchId) })
+            .select('swarmSessionId')
+            .lean();
+          swarmSourced = Boolean(m?.swarmSessionId);
+        } catch (swarmDetectErr) {
+          console.error('[BattleRewardService] failed to detect swarm march source:', swarmDetectErr);
+        }
+      }
 
-      if (marchSourced) {
+      if (marchSourced && !swarmSourced) {
         const survivorIncrements: Partial<Record<BotInventoryKey, number>> = {};
         for (const b of userEndingBattalions) {
           if (b.quantity <= 0) continue;

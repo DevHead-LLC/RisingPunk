@@ -4,6 +4,7 @@ import {
   getAttackMarchMinePollingIntervalMs,
   useGetMyAttackMarchesQuery,
 } from '../store/api/attackApi';
+import { useGetMySwarmQuery } from '../store/api/swarmApi';
 import { useAppSelector } from '../store/hooks';
 
 type BannerPayload = { message: string; type: 'info' };
@@ -14,6 +15,7 @@ type BannerPayload = { message: string; type: 'info' };
  * Bugbot: 2000ms is intentional product timing (between prior 1s “too fast to read” and legacy 6s).
  */
 export const MARCH_TRANSITION_BANNER_DURATION_MS = 2000;
+export const SWARM_ACTIVE_BANNER_DURATION_MS = 5000;
 
 /**
  * Shows one-shot in-app banners when the user's own marches change state (GET /api/attack/mine poll).
@@ -63,7 +65,7 @@ export function useAttackMarchTransitionBanners(token: string | null): {
     }
     const delay = Math.max(0, min - Date.now()) + 400;
     const tid = setTimeout(() => {
-      void refetch();
+      refetch().catch(() => {});
     }, delay);
     return () => clearTimeout(tid);
   }, [token, returnScheduleKey, refetch]);
@@ -96,6 +98,14 @@ export function useAttackMarchTransitionBanners(token: string | null): {
     }
 
     let message: string | null = null;
+
+    for (const m of marches) {
+      const prev = prevStatesRef.current.get(m.marchId);
+      if (prev === undefined && m.state === 'outbound' && m.attackType === 'swarm') {
+        message = 'Swarm Initiated';
+        break;
+      }
+    }
 
     const consider = (pred: (prev: string, next: string) => boolean, text: string) => {
       if (message) return;
@@ -136,4 +146,58 @@ export function useAttackMarchTransitionBanners(token: string | null): {
   }, [token, data]);
 
   return { marchBanner, dismissMarchBanner };
+}
+
+/**
+ * Shows a one-shot banner when a crew-active Swarm is visible for this user.
+ * Unlike march transitions, this should also fire on initial load when a Swarm is already active.
+ */
+export function useCrewSwarmActiveBanner(token: string | null): {
+  swarmBanner: BannerPayload | null;
+  dismissSwarmBanner: () => void;
+} {
+  const [swarmBanner, setSwarmBanner] = useState<BannerPayload | null>(null);
+  const seededRef = useRef(false);
+  const lastSwarmIdRef = useRef<string | null>(null);
+  const { data: activeSwarm } = useGetMySwarmQuery(undefined, {
+    skip: !token,
+    pollingInterval: token ? 5000 : 0,
+  });
+
+  const dismissSwarmBanner = useCallback(() => {
+    setSwarmBanner(null);
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      seededRef.current = false;
+      lastSwarmIdRef.current = null;
+      setSwarmBanner(null);
+      return;
+    }
+
+    const currentSwarmId = activeSwarm?.swarmId ?? null;
+    if (!seededRef.current) {
+      seededRef.current = true;
+      lastSwarmIdRef.current = currentSwarmId;
+      if (currentSwarmId) {
+        setSwarmBanner({
+          message: 'Crew Swarm active — open Hack Map toolbar to join.',
+          type: 'info',
+        });
+      }
+      return;
+    }
+
+    const prev = lastSwarmIdRef.current;
+    lastSwarmIdRef.current = currentSwarmId;
+    if (!prev && currentSwarmId) {
+      setSwarmBanner({
+        message: 'Crew Swarm started — open Hack Map toolbar to join.',
+        type: 'info',
+      });
+    }
+  }, [token, activeSwarm?.swarmId]);
+
+  return { swarmBanner, dismissSwarmBanner };
 }

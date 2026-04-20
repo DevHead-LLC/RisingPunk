@@ -39,7 +39,6 @@ const privateMessageSchema = new Schema({
   message: {
     type: String,
     required: true,
-    maxlength: 600,
     trim: true,
   },
   originalMessage: {
