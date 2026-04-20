@@ -488,10 +488,11 @@ export async function abortSwarmSession(params: {
   const arriveMs = new Date(march.arriveAt).getTime();
   const t = clampFinite((nowMs - departMs) / Math.max(1, arriveMs - departMs), 0, 1);
   await cancelOutboundAttackMarch(String(requesterUserId), String(march.marchId), nowMs, t);
+  // Same order as preparing abort: restore commitments before persisting cancelled (avoid losing bots if restore throws).
+  await restoreAllCommitments(sessionDoc);
   sessionDoc.state = 'cancelled';
   sessionDoc.cancelReason = 'lead-abort-outbound';
   await sessionDoc.save();
-  await restoreAllCommitments(sessionDoc);
   return sessionDoc;
 }
 

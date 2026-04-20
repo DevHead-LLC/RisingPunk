@@ -100,6 +100,10 @@ export function SwarmSessionModal({
         Alert.alert('Swarm', 'Slot and quantity must be integers.');
         return;
       }
+      if (qty < 1) {
+        Alert.alert('Swarm', 'Quantity must be at least 1.');
+        return;
+      }
       if (slot < 7 || slot > 18) {
         Alert.alert('Swarm', 'Joiners must use slots 7-18.');
         return;

@@ -2185,17 +2185,23 @@ export const HackMapScreen: React.FC<Props> = ({
   const [abortSwarmMutation, { isLoading: isAbortingSwarm }] = useAbortSwarmMutation();
 
   useEffect(() => {
-    const shouldOpenFromPrep = (globalThis as any).openSwarmSessionModalOnMap === true;
-    if (!shouldOpenFromPrep) {
+    const g = globalThis as { openSwarmSessionModalOnMap?: boolean };
+    if (g.openSwarmSessionModalOnMap !== true) {
       return;
     }
     if (mySwarmSession?.swarmId) {
       setShowSwarmModal(true);
-      (globalThis as any).openSwarmSessionModalOnMap = false;
+      g.openSwarmSessionModalOnMap = false;
       return;
     }
+    // Loaded with no active session (e.g. swarm aborted after Turf set the flag) — clear handoff so a later swarm does not auto-open.
+    if (mySwarmSession === null) {
+      g.openSwarmSessionModalOnMap = false;
+      return;
+    }
+    // Still loading — refresh in case cache is stale after Battle Prep handoff.
     void refetchMySwarmSession();
-  }, [mySwarmSession?.swarmId, refetchMySwarmSession]);
+  }, [mySwarmSession, refetchMySwarmSession]);
 
   useEffect(() => {
     followProbeIdRef.current = followProbeId;
