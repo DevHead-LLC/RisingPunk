@@ -16,11 +16,19 @@ import {
   applyRetentionAfterAdminSendAll,
   applyRetentionAfterInsert,
 } from '../services/PrivateMessageRetentionService';
-import { MAX_PM_MESSAGES_PER_THREAD, USER_DM_MAX_MESSAGE_LENGTH } from '../constants/privateMessageCaps';
+import {
+  ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH,
+  MAX_PM_MESSAGES_PER_THREAD,
+  USER_DM_MAX_MESSAGE_LENGTH,
+} from '../constants/privateMessageCaps';
 import { listConversationsForUser, dismissThreadForUser, touchInboxThreadOnOpen } from '../services/PrivateInboxService';
 import '../models/PrivateInboxThread';
 
 const router = express.Router();
+
+/** Stored `message` = filtered body + `\\n\\n` + {@link ADMIN_BROADCAST_FOOTER} (filter preserves length). */
+const ADMIN_BROADCAST_FULL_MESSAGE_MAX_LENGTH =
+  ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH + 2 + ADMIN_BROADCAST_FOOTER.length;
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
@@ -383,8 +391,18 @@ router.post('/admin/send-all', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Message cannot be empty' });
       return;
     }
+    if (trimmed.length > ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH) {
+      res.status(400).json({
+        error: `Message must be ${ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH} characters or less`,
+      });
+      return;
+    }
     const filteredBody = filterBadWords(trimmed);
     const fullMessage = `${filteredBody}\n\n${ADMIN_BROADCAST_FOOTER}`;
+    if (fullMessage.length > ADMIN_BROADCAST_FULL_MESSAGE_MAX_LENGTH) {
+      res.status(400).json({ error: 'Message too long' });
+      return;
+    }
 
     const sender = await User.findById(userId).select('handle').lean();
     if (!sender) {

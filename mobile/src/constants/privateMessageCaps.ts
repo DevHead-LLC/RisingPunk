@@ -5,6 +5,7 @@
 export const USER_DM_MAX_MESSAGE_LENGTH = 500;
 
 /**
- * Admin "message all" body: server does not cap; this is only a TextInput UX upper bound.
+ * Admin "message all" body — must match `ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH` in
+ * `server/src/constants/privateMessageCaps.ts` (enforced on POST `.../admin/send-all`).
  */
 export const ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH = 100_000;

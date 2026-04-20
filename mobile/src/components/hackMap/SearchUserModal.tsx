@@ -110,9 +110,9 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
   const handleSendToAll = useCallback(async () => {
     const trimmed = adminMessage.trim();
     if (!trimmed || isSendingToAll) return;
-    if (trimmed.length > ADMIN_MESSAGE_MAX_LENGTH) {
+    if (trimmed.length > ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH) {
       setAdminStatus('error');
-      setAdminStatusText(`Message must be ${ADMIN_MESSAGE_MAX_LENGTH} characters or less.`);
+      setAdminStatusText(`Message must be ${ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH} characters or less.`);
       return;
     }
     setAdminStatus('idle');
@@ -132,7 +132,10 @@ export const SearchUserModal: React.FC<SearchUserModalProps> = ({
   const styles = createStyles(colors);
   const validationErr = validateHandle(handle);
   const canSubmit = !validationErr && handle.trim().length >= MIN_LENGTH && !isLoading;
-  const canSendToAll = adminMessage.trim().length > 0 && adminMessage.trim().length <= ADMIN_MESSAGE_MAX_LENGTH && !isSendingToAll;
+  const canSendToAll =
+    adminMessage.trim().length > 0 &&
+    adminMessage.trim().length <= ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH &&
+    !isSendingToAll;
 
   return (
     <Modal

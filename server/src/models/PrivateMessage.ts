@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH } from '../constants/privateMessageCaps';
 
 export interface IPrivateMessage extends Document {
   senderId: mongoose.Types.ObjectId;
@@ -44,7 +45,8 @@ const privateMessageSchema = new Schema({
   originalMessage: {
     type: String,
     required: false,
-    maxlength: 500,
+    /** User ↔ user DMs are capped at the route; admin broadcast body may be long (stored for audit). */
+    maxlength: ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH,
     trim: true,
   },
   readAt: {

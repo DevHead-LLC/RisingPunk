@@ -304,7 +304,6 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
       setPresetApplyBusy(false);
     }
   }, [
-    presetsData,
     presetsData?.userLevel,
     presetsData?.presets,
     userBalance,

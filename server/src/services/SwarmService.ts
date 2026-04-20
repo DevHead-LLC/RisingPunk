@@ -15,8 +15,13 @@ import {
   secondsPerDuFromArmySnapshot,
   totalTravelSeconds,
 } from './MarchTimingService';
-import { scheduleMarchArrival } from './MarchArrivalSchedulerService';
+import { clearMarchArrivalTimer, scheduleMarchArrival } from './MarchArrivalSchedulerService';
 import { cancelOutboundAttackMarch } from './AttackMarchCancelService';
+import {
+  defenderQueueKeyFromMarchDoc,
+  reconcileDefenderQueue,
+  runDefenderQueueSerialized,
+} from './MarchDefenderQueueService';
 import { LevelingService } from './LevelingService';
 import { computePvpXpFromOpponentLosses } from './PvPBattleExperienceService';
 import { defenderHasSurvivingTroops } from './PvPBattleMoneyService';
@@ -496,7 +501,47 @@ export async function cancelCrewSwarmsForDisband(crewId: string): Promise<void> 
     try {
       if (s.state === 'preparing') {
         await restoreAllCommitments(s);
+        s.state = 'cancelled';
+        s.cancelReason = 'crew-disbanded';
+        await s.save();
+        continue;
       }
+
+      // marching — must not mark session cancelled while an outbound march is still flying: battle
+      // would still run and settleSwarmBattleIfNeeded would skip a cancelled session (no XP/bots/reports).
+      const mid = s.marchId ? String(s.marchId).trim() : '';
+      if (!mid) {
+        s.state = 'cancelled';
+        s.cancelReason = 'crew-disbanded';
+        await s.save();
+        continue;
+      }
+
+      clearMarchArrivalTimer(mid);
+      const cancelledOutbound = await AttackMarch.findOneAndUpdate(
+        { marchId: mid, state: 'outbound' },
+        { $set: { state: 'cancelled', resolvedAt: new Date() } },
+        { new: true, lean: true }
+      );
+      if (cancelledOutbound) {
+        // Swarm launches with empty consumedBattalionAssignments; restore from session commitments (same as prep cancel).
+        await restoreAllCommitments(s);
+        try {
+          const qk = defenderQueueKeyFromMarchDoc(
+            cancelledOutbound as { defenderQueueKey?: string; defenderId: string; defenderNpcInstanceId?: string }
+          );
+          void runDefenderQueueSerialized(qk, async () => {
+            await reconcileDefenderQueue(qk);
+            const { tryStartNextMarchResolutionForQueueKey } = await import('./MarchResolutionService');
+            await tryStartNextMarchResolutionForQueueKey(qk);
+          });
+        } catch (queueErr) {
+          console.error('[SwarmService] defender queue reconcile after crew disband march cancel', mid, queueErr);
+        }
+      }
+      // If the march was already past outbound (arrived / queued / resolving), commitments stay in the battle
+      // pipeline; cancelReason crew-disbanded lets settleSwarmBattleIfNeeded run when the battle ends.
+
       s.state = 'cancelled';
       s.cancelReason = 'crew-disbanded';
       await s.save();
@@ -524,6 +569,18 @@ export async function runSwarmPrepSweepOnce(): Promise<void> {
       }
     } catch (e) {
       console.error('[SwarmService] runSwarmPrepSweepOnce failed', s.swarmId, e);
+      try {
+        const fresh = await SwarmSession.findOne({ swarmId: String(s.swarmId), state: 'preparing' });
+        if (!fresh) {
+          continue;
+        }
+        await restoreAllCommitments(fresh);
+        fresh.state = 'cancelled';
+        fresh.cancelReason = 'deadline-auto-deploy-failed';
+        await fresh.save();
+      } catch (recoveryErr) {
+        console.error('[SwarmService] runSwarmPrepSweepOnce recovery failed', s.swarmId, recoveryErr);
+      }
     }
   }
 }
@@ -691,7 +748,9 @@ export async function settleSwarmBattleIfNeeded(battle: IBattleDocument, pvpCash
 
   const sessionDoc = await SwarmSession.findOne({ swarmId: String(swarmSessionId) });
   if (!sessionDoc) return;
-  if (sessionDoc.state === 'resolved' || sessionDoc.state === 'cancelled') return;
+  if (sessionDoc.state === 'resolved') return;
+  // Crew disband can cancel the session while a march is already at target; settlement must still run.
+  if (sessionDoc.state === 'cancelled' && sessionDoc.cancelReason !== 'crew-disbanded') return;
 
   const participants = [...new Set(sessionDoc.commitments.map((c) => String(c.userId)))];
   if (participants.length === 0) return;
