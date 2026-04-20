@@ -149,7 +149,8 @@ export class BattleRewardService {
             );
           }
         }
-      } else {
+      } else if (!marchSourced) {
+        // Non-march NPC battle: bots were never committed onto a march; decrement from barracks.
         const botDoc = await Bot.findOne({ userId });
         if (botDoc) {
           botDoc.bots.guardian = Math.max(0, botDoc.bots.guardian - botLosses.guardian);
@@ -158,6 +159,7 @@ export class BattleRewardService {
           await botDoc.save();
         }
       }
+      // marchSourced && swarmSourced: troops left inventory at swarm commit; not this legacy subtract / solo-march $inc.
 
       (battle as any).processedRewards = {
         experienceGained,

@@ -2177,10 +2177,13 @@ export const HackMapScreen: React.FC<Props> = ({
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew');
   const { data: swarmFeatures } = useGetUserFeaturesQuery('swarm');
   const { data: crewStatus, isLoading: isLoadingCrewStatus } = useGetCrewStatusQuery();
-  const { data: mySwarmSession, refetch: refetchMySwarmSession } = useGetMySwarmQuery(undefined, {
-    skip: !crewStatus?.isInCrew,
-    pollingInterval: crewStatus?.isInCrew ? 5000 : 0,
-  });
+  const { data: mySwarmSession, refetch: refetchMySwarmSession, isFetching, isSuccess } = useGetMySwarmQuery(
+    undefined,
+    {
+      skip: !crewStatus?.isInCrew,
+      pollingInterval: crewStatus?.isInCrew ? 5000 : 0,
+    }
+  );
   const [commitSwarmSlotMutation, { isLoading: isCommittingSwarm }] = useCommitSwarmSlotMutation();
   const [dismissSwarmSlotMutation, { isLoading: isDismissingSwarm }] = useDismissSwarmSlotMutation();
   const [deploySwarmMutation, { isLoading: isDeployingSwarm }] = useDeploySwarmMutation();
@@ -2196,14 +2199,23 @@ export const HackMapScreen: React.FC<Props> = ({
       g.openSwarmSessionModalOnMap = false;
       return;
     }
-    // Loaded with no active session (e.g. swarm aborted after Turf set the flag) — clear handoff so a later swarm does not auto-open.
-    if (mySwarmSession === null) {
+    // Definitively not in a crew — cannot have a swarm session; clear handoff.
+    if (crewStatus !== undefined && !crewStatus.isInCrew) {
       g.openSwarmSessionModalOnMap = false;
       return;
     }
-    // Still loading — refresh in case cache is stale after Battle Prep handoff.
+    // Fulfilled response with no session (not `undefined` while loading — RTK uses null from API).
+    if (isSuccess && mySwarmSession === null) {
+      g.openSwarmSessionModalOnMap = false;
+      return;
+    }
+    // While the query is in flight, do not call refetch again (avoids refetch spam when data is still undefined).
+    if (isFetching) {
+      return;
+    }
+    // Stale cache after Battle Prep handoff: one refetch now that nothing is loading.
     void refetchMySwarmSession();
-  }, [mySwarmSession, refetchMySwarmSession]);
+  }, [mySwarmSession, refetchMySwarmSession, isFetching, isSuccess, crewStatus?.isInCrew]);
 
   useEffect(() => {
     followProbeIdRef.current = followProbeId;
