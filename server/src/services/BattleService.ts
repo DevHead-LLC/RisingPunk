@@ -398,7 +398,10 @@ export class BattleService {
             NodeOwner.USER
           );
           const { settleSwarmBattleIfNeeded } = await import('./SwarmService');
-          await settleSwarmBattleIfNeeded(battle, pvpCashTransferred);
+          await settleSwarmBattleIfNeeded(battle, pvpCashTransferred, {
+            attackerTotal: pvpXpAttacker,
+            defenderTotal: pvpXpDefender,
+          });
         } catch (swarmSettleErr) {
           console.error('Swarm PvP settlement failed for', battleId, swarmSettleErr);
         }

@@ -411,10 +411,11 @@ export const BattlePreparationScreen = React.memo(
     if (isSwarmLeadSetup) {
       const leadSlots = ['A', 'B', 'C', 'D', 'E', 'F'];
       const filled = leadSlots.filter((slot) => (assignments[slot]?.quantity ?? 0) > 0);
-      if (filled.length < leadSlots.length) {
+      // Matches server `hasLeaderParticipant`: at least one lead slot (1–6) — not all six required.
+      if (filled.length < 1) {
         return {
           isValid: false,
-          message: 'Assign all six lead battalions before continuing to the swarm room.',
+          message: 'Commit at least one lead battalion (slots A–F) before continuing to the swarm room.',
         };
       }
       return { isValid: true, message: 'Swarm lead payload ready.' };

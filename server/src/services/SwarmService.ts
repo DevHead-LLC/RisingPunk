@@ -738,7 +738,12 @@ async function sendSwarmBattleReports(
   }
 }
 
-export async function settleSwarmBattleIfNeeded(battle: IBattleDocument, pvpCashTransferred: number): Promise<void> {
+export async function settleSwarmBattleIfNeeded(
+  battle: IBattleDocument,
+  pvpCashTransferred: number,
+  /** When provided (e.g. from `BattleService.handleBattleEnd`), avoids recomputing the same `computePvpXpFromOpponentLosses` totals. */
+  precomputedPvpXp?: { attackerTotal: number; defenderTotal: number }
+): Promise<void> {
   const marchSourced = (battle as any).marchSourcedAttack === true;
   if (!marchSourced || !battle.sourceMarchId) return;
   const sourceMarch = await AttackMarch.findOne({ marchId: String(battle.sourceMarchId) })
@@ -756,16 +761,22 @@ export async function settleSwarmBattleIfNeeded(battle: IBattleDocument, pvpCash
   const participants = [...new Set(sessionDoc.commitments.map((c) => String(c.userId)))];
   if (participants.length === 0) return;
 
-  const xpAttackerTotal = computePvpXpFromOpponentLosses(
-    battle.startingBattalions ?? [],
-    battle.battalions ?? [],
-    NodeOwner.ENEMY
-  );
-  const xpDefenderTotal = computePvpXpFromOpponentLosses(
-    battle.startingBattalions ?? [],
-    battle.battalions ?? [],
-    NodeOwner.USER
-  );
+  const xpAttackerTotal =
+    precomputedPvpXp != null
+      ? precomputedPvpXp.attackerTotal
+      : computePvpXpFromOpponentLosses(
+          battle.startingBattalions ?? [],
+          battle.battalions ?? [],
+          NodeOwner.ENEMY
+        );
+  const xpDefenderTotal =
+    precomputedPvpXp != null
+      ? precomputedPvpXp.defenderTotal
+      : computePvpXpFromOpponentLosses(
+          battle.startingBattalions ?? [],
+          battle.battalions ?? [],
+          NodeOwner.USER
+        );
 
   const cashShares = splitTotalEvenlyAmongParticipants(pvpCashTransferred, participants);
   const xpShares = splitTotalEvenlyAmongParticipants(xpAttackerTotal, participants);

@@ -159,7 +159,7 @@ export function useCrewSwarmActiveBanner(token: string | null): {
   const [swarmBanner, setSwarmBanner] = useState<BannerPayload | null>(null);
   const seededRef = useRef(false);
   const lastSwarmIdRef = useRef<string | null>(null);
-  const { data: activeSwarm } = useGetMySwarmQuery(undefined, {
+  const { data: activeSwarm, isSuccess: swarmQuerySuccess } = useGetMySwarmQuery(undefined, {
     skip: !token,
     pollingInterval: token ? 5000 : 0,
   });
@@ -173,6 +173,12 @@ export function useCrewSwarmActiveBanner(token: string | null): {
       seededRef.current = false;
       lastSwarmIdRef.current = null;
       setSwarmBanner(null);
+      return;
+    }
+
+    // Do not seed while loading: `data` is undefined until the first fulfilled response; otherwise we seed
+    // with null and later treat a pre-existing session as "started" instead of "active."
+    if (!swarmQuerySuccess) {
       return;
     }
 
@@ -197,7 +203,7 @@ export function useCrewSwarmActiveBanner(token: string | null): {
         type: 'info',
       });
     }
-  }, [token, activeSwarm?.swarmId]);
+  }, [token, activeSwarm?.swarmId, swarmQuerySuccess]);
 
   return { swarmBanner, dismissSwarmBanner };
 }
