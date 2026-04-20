@@ -172,6 +172,39 @@ async function restoreAllCommitments(sessionDoc: ISwarmSessionDocument, session?
   }
 }
 
+/**
+ * Called when a Swarm outbound march finishes its cancel return leg (`returningAfterCancel`).
+ * Inventory was held via `SwarmSession.commitments`, not `consumedBattalionAssignments`.
+ */
+export async function restoreSwarmCommitmentsOnMarchCancelReturn(params: {
+  marchId: string;
+  swarmSessionId: string;
+  session: mongoose.ClientSession;
+}): Promise<void> {
+  const { marchId, swarmSessionId, session } = params;
+  const sessionDoc = await SwarmSession.findOne({ swarmId: String(swarmSessionId).trim() })
+    .session(session);
+  if (!sessionDoc) {
+    throw new Error('SWARM_SESSION_MISSING_FOR_CANCEL_RETURN');
+  }
+  if (!sessionDoc.marchId || String(sessionDoc.marchId) !== String(marchId)) {
+    throw new Error('SWARM_SESSION_MARCH_MISMATCH_FOR_CANCEL_RETURN');
+  }
+  const st = sessionDoc.state;
+  const reason = sessionDoc.cancelReason;
+  const canRestore =
+    st === 'marching' || (st === 'cancelled' && reason === 'lead-abort-outbound');
+  if (!canRestore) {
+    throw new Error('SWARM_CANCEL_RETURN_UNEXPECTED_SESSION_STATE');
+  }
+  await restoreAllCommitments(sessionDoc, session);
+  if (st === 'marching') {
+    sessionDoc.state = 'cancelled';
+    sessionDoc.cancelReason = 'outbound-cancel-return-complete';
+    await sessionDoc.save({ session });
+  }
+}
+
 async function ensureCrewMembership(userId: string): Promise<{ crewId: string }> {
   const crewStatus = await CrewStatus.findOne({ userId }).select('isInCrew crewId').lean();
   if (!crewStatus?.isInCrew || !crewStatus.crewId) {
@@ -487,9 +520,9 @@ export async function abortSwarmSession(params: {
   const departMs = new Date(march.departAt).getTime();
   const arriveMs = new Date(march.arriveAt).getTime();
   const t = clampFinite((nowMs - departMs) / Math.max(1, arriveMs - departMs), 0, 1);
+  // Bugbot: Swarm launches with `consumedBattalionAssignments: []` by design; solo-only empty guard is in `AttackMarchCancelService` (`isSwarmMarch`). Return-leg refund: `restoreSwarmCommitmentsOnMarchCancelReturn`.
   await cancelOutboundAttackMarch(String(requesterUserId), String(march.marchId), nowMs, t);
-  // Same order as preparing abort: restore commitments before persisting cancelled (avoid losing bots if restore throws).
-  await restoreAllCommitments(sessionDoc);
+  // Commitments restore when the return leg completes (`restoreSwarmCommitmentsOnMarchCancelReturn`), same as map cancel.
   sessionDoc.state = 'cancelled';
   sessionDoc.cancelReason = 'lead-abort-outbound';
   await sessionDoc.save();

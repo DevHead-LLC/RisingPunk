@@ -173,6 +173,8 @@ export async function processReturnMarchComplete(marchId: string): Promise<void>
       defenderNpcInstanceId?: string;
       defenderQueueKey?: string;
       returningAfterCancel?: boolean;
+      attackType?: string;
+      swarmSessionId?: string;
       consumedBattalionAssignments: unknown;
       armySnapshot: unknown;
     };
@@ -195,28 +197,46 @@ export async function processReturnMarchComplete(marchId: string): Promise<void>
           settled = cur;
 
           if (cur.returningAfterCancel === true) {
+            const armySnap = cur.armySnapshot as AttackMarchArmySnapshot;
+            if (!armySnap?.battalions || !Array.isArray(armySnap.battalions)) {
+              throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
+            }
             const consumed = cur.consumedBattalionAssignments as Array<{
               battalionId: string;
               botType: string;
               quantity: number;
               markLevel?: number;
             }>;
-            if (!Array.isArray(consumed) || consumed.length === 0) {
-              throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
+            const isSwarmMarch =
+              cur.attackType === 'swarm' ||
+              (typeof cur.swarmSessionId === 'string' && cur.swarmSessionId.trim() !== '');
+            const consumedMissing = !Array.isArray(consumed) || consumed.length === 0;
+
+            if (isSwarmMarch && consumedMissing) {
+              const sid = cur.swarmSessionId;
+              if (!sid || String(sid).trim() === '') {
+                throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
+              }
+              const { restoreSwarmCommitmentsOnMarchCancelReturn } = await import('./SwarmService');
+              await restoreSwarmCommitmentsOnMarchCancelReturn({
+                marchId,
+                swarmSessionId: String(sid),
+                session,
+              });
+            } else {
+              if (consumedMissing) {
+                throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
+              }
+              if (!consumedRowsMatchArmySnapshot(consumed, armySnap)) {
+                throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
+              }
+              await restoreCommittedMarchArmyToUserBots({
+                attackerId: String(cur.attackerId),
+                armySnap,
+                consumed,
+                session,
+              });
             }
-            const armySnap = cur.armySnapshot as AttackMarchArmySnapshot;
-            if (!armySnap?.battalions || !Array.isArray(armySnap.battalions)) {
-              throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
-            }
-            if (!consumedRowsMatchArmySnapshot(consumed, armySnap)) {
-              throw new Error('MARCH_CANCEL_RETURN_INTEGRITY');
-            }
-            await restoreCommittedMarchArmyToUserBots({
-              attackerId: String(cur.attackerId),
-              armySnap,
-              consumed,
-              session,
-            });
           }
 
           const r = await AttackMarch.updateOne(
