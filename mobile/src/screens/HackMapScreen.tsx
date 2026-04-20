@@ -2204,13 +2204,14 @@ export const HackMapScreen: React.FC<Props> = ({
       g.openSwarmSessionModalOnMap = false;
       return;
     }
+    // Bugbot / RTK: During tag invalidation after create, `isSuccess` can stay true with stale `data: null`
+    // while `isFetching` is true. Clear handoff only after refetch settles, not on that intermediate state.
+    if (isFetching) {
+      return;
+    }
     // Fulfilled response with no session (not `undefined` while loading — RTK uses null from API).
     if (isSuccess && mySwarmSession === null) {
       g.openSwarmSessionModalOnMap = false;
-      return;
-    }
-    // While the query is in flight, do not call refetch again (avoids refetch spam when data is still undefined).
-    if (isFetching) {
       return;
     }
     // Stale cache after Battle Prep handoff: one refetch now that nothing is loading.

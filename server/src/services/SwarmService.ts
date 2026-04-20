@@ -34,12 +34,12 @@ import {
   battleReportBotsLost,
   sumBattalionBotsByOwnerForReport,
 } from '../utils/battleReportBotCounts';
+import { serializeBattleReportMessage } from './BattleNotificationService';
 
 const Bot = require('../models/Bot');
 
 const SWARM_PREP_WINDOW_MS = 15 * 60 * 1000;
 const SWARM_SWEEP_INTERVAL_MS = 5000;
-const BATTLE_REPORT_PREFIX = 'BTL|';
 type BotFamily = 'guardian' | 'breacher' | 'phreak';
 type MarkLevel = 1 | 2;
 
@@ -748,7 +748,10 @@ async function sendSwarmBattleReports(
       payload.x = Math.floor(bx);
       payload.y = Math.floor(by);
     }
-    const messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
+    const messageBody = serializeBattleReportMessage(
+      payload,
+      `swarm:${String(battle.battleId ?? '')}:${uid}`
+    );
     return [
       {
         senderId: BATTLE_REPORT_SENDER_ID,

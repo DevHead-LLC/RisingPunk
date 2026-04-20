@@ -4,7 +4,7 @@
  */
 
 import { IBattleDocument } from '../models/Battle';
-import { PrivateMessage } from '../models/PrivateMessage';
+import { PrivateMessage, PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH } from '../models/PrivateMessage';
 import { applyRetentionAfterInsert } from './PrivateMessageRetentionService';
 import { User } from '../models/User';
 import { BATTLE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_USERNAME } from '../constants/systemSenders';
@@ -17,6 +17,90 @@ import {
 import { NPCService } from './NPCService';
 
 const BATTLE_REPORT_PREFIX = 'BTL|';
+
+const HANDLE_TRUNC_FOR_OVERFLOW = 20;
+
+/**
+ * Build stored `BTL|` string under {@link PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH} (same cap as admin/system PM bodies).
+ * Prefers full payload; degrades only if needed: short handles → omit map fields → minimal ids/winner → tiny fallback.
+ * User ↔ user chat remains route-capped separately; this path is system battle reports only.
+ */
+export function serializeBattleReportMessage(
+  payload: Record<string, unknown>,
+  logContext: string
+): string {
+  const max = PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH;
+  const serialize = (p: Record<string, unknown>) => BATTLE_REPORT_PREFIX + JSON.stringify(p);
+
+  let body = serialize(payload);
+  if (body.length <= max) {
+    return body;
+  }
+
+  const ah = payload.attackerHandle;
+  const dh = payload.defenderHandle;
+  const withShortHandles: Record<string, unknown> = {
+    ...payload,
+    attackerHandle: typeof ah === 'string' ? ah.slice(0, HANDLE_TRUNC_FOR_OVERFLOW) : ah,
+    defenderHandle: typeof dh === 'string' ? dh.slice(0, HANDLE_TRUNC_FOR_OVERFLOW) : dh,
+  };
+  body = serialize(withShortHandles);
+  if (body.length <= max) {
+    console.warn('[BattleNotificationService] BTL| length trim: truncated handles', logContext, {
+      len: body.length,
+      max,
+    });
+    return body;
+  }
+
+  const withoutLoc = { ...withShortHandles };
+  delete withoutLoc.hl;
+  delete withoutLoc.mapName;
+  delete withoutLoc.x;
+  delete withoutLoc.y;
+  body = serialize(withoutLoc);
+  if (body.length <= max) {
+    console.warn('[BattleNotificationService] BTL| length trim: omitted map fields (hl/mapName/x/y)', logContext);
+    return body;
+  }
+
+  const battleId = payload.battleId;
+  const minimalCore: Record<string, unknown> = {
+    br: typeof payload.br === 'number' ? payload.br : 1,
+    battleId,
+    winner: payload.winner,
+    attackerId: payload.attackerId,
+    defenderId: payload.defenderId,
+    _truncated: 1,
+    _reason: 'schema_message_max',
+  };
+  if (payload.npc === 1) {
+    minimalCore.npc = 1;
+  }
+  if (payload.swarm === 1) {
+    minimalCore.swarm = 1;
+  }
+  body = serialize(minimalCore);
+  if (body.length <= max) {
+    console.error('[BattleNotificationService] BTL| fell back to minimal payload (stats omitted)', logContext, {
+      battleId,
+    });
+    return body;
+  }
+
+  const emergency = BATTLE_REPORT_PREFIX + JSON.stringify({
+    br: 1,
+    battleId: battleId != null ? String(battleId) : '',
+    _truncated: 1,
+    _reason: 'emergency_max',
+  });
+  console.error('[BattleNotificationService] BTL| emergency body (core stats omitted)', logContext, {
+    battleId,
+    len: emergency.length,
+    max,
+  });
+  return emergency;
+}
 
 /**
  * NPC / computer-opponent battle: one `BTL|` to the attacker after rewards (or on reward failure — still report outcome).
@@ -101,7 +185,7 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
     (payload as { mapName?: string; x?: number; y?: number }).y = Math.floor(by);
   }
 
-  const messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
+  const messageBody = serializeBattleReportMessage(payload, `npc:${String(battle.battleId ?? '')}`);
 
   try {
     await PrivateMessage.insertMany([
@@ -220,7 +304,7 @@ export async function sendBattleNotifications(
     (payload as any).x = Math.floor(bx);
     (payload as any).y = Math.floor(by);
   }
-  const messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
+  const messageBody = serializeBattleReportMessage(payload, `pvp:${String(battle.battleId ?? '')}`);
 
   const docs: Array<{
     senderId: typeof BATTLE_REPORT_SENDER_ID;
