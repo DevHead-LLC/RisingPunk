@@ -368,6 +368,8 @@ export class BattleService {
       let pvpXpAttacker = 0;
       let pvpXpDefender = 0;
       let isSwarmMarchBattle = false;
+      /** Only true after `settleSwarmBattleIfNeeded` completes — if false, per-participant `BTL|` were not sent (Bugbot / ios-bugs.md). */
+      let swarmSettlementSucceeded = false;
       const marchSourcedPvp =
         (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true &&
         !!(battle as { sourceMarchId?: string }).sourceMarchId;
@@ -402,6 +404,7 @@ export class BattleService {
             attackerTotal: pvpXpAttacker,
             defenderTotal: pvpXpDefender,
           });
+          swarmSettlementSucceeded = true;
         } catch (swarmSettleErr) {
           console.error('Swarm PvP settlement failed for', battleId, swarmSettleErr);
         }
@@ -422,13 +425,13 @@ export class BattleService {
           console.error('Battle document missing before notifications for', battleId);
         } else {
           // Fresh read so BTL payload uses persisted battalions (in-memory battle can diverge if battle doc is updated between save and send).
-          // Bugbot / ios-bugs.md: When `isSwarmMarchBattle`, `sendSwarmBattleReports` (inside `settleSwarmBattleIfNeeded`) already sent per-participant `BTL|` with split cash/XP. Omit the standard attacker DM and tag defender `BTL|` with `swarm:1` so the lead is not duplicated with full-team totals and `BaseChatModal` parses swarm defender DMs correctly.
+          // Bugbot / ios-bugs.md: Omit attacker + `swarm:1` only when settlement succeeded and per-participant `BTL|` were sent. If settlement threw, fall back to standard attacker+defender DMs so the lead still gets a battle report.
           await sendBattleNotifications(
             battleForNotifications,
             pvpCashTransferred,
             pvpXpAttacker,
             pvpXpDefender,
-            isSwarmMarchBattle
+            isSwarmMarchBattle && swarmSettlementSucceeded
               ? { omitAttackerNotification: true, swarmMarchPvp: true }
               : undefined
           );
