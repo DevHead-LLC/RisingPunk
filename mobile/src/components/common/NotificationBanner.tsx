@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,11 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
 }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
   const colors = useThemeColors();
+  /** Auto-dismiss must not reset when parent passes inline callbacks (Bugbot / ios-bugs.md). */
+  const onCloseRef = useRef(onClose);
+  const onHideAnimationStartRef = useRef(onHideAnimationStart);
+  onCloseRef.current = onClose;
+  onHideAnimationStartRef.current = onHideAnimationStart;
 
   useEffect(() => {
     if (visible) {
@@ -41,19 +46,19 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
 
       // Auto fade out after duration
       const timer = setTimeout(() => {
-        onHideAnimationStart?.();
+        onHideAnimationStartRef.current?.();
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 300,
           useNativeDriver: true,
         }).start(() => {
-          onClose?.();
+          onCloseRef.current?.();
         });
       }, duration);
 
       return () => clearTimeout(timer);
     }
-  }, [visible, fadeAnim, duration, onClose, onHideAnimationStart]);
+  }, [visible, fadeAnim, duration]);
 
   if (!visible) return null;
 

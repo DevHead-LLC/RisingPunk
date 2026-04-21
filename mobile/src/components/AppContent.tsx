@@ -52,6 +52,10 @@ const AppContent = memo(() => {
     }
   }, [marchBanner]);
 
+  const onMarchBannerHideAnimationStart = useCallback(() => {
+    setMarchBannerFadeStarted(true);
+  }, []);
+
   // Function to center the turf view to home/digital barracks position
   const centerTurfView = useCallback(() => {
     const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -418,7 +422,7 @@ const AppContent = memo(() => {
         message={marchBanner?.message ?? ''}
         type={marchBanner?.type ?? 'info'}
         duration={MARCH_TRANSITION_BANNER_DURATION_MS}
-        onHideAnimationStart={() => setMarchBannerFadeStarted(true)}
+        onHideAnimationStart={onMarchBannerHideAnimationStart}
         onClose={dismissMarchBanner}
       />
       <NotificationBanner
