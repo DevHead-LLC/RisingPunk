@@ -250,7 +250,11 @@ export const BattlePreparationScreen = React.memo(
     const m1: Record<BotType, number> = { ...botCounts };
     const m2: Record<BotType, number> = { ...botCountsM2 };
 
-    Object.values(assignments).forEach((assignment) => {
+    Object.entries(assignments).forEach(([battalionId, assignment]) => {
+      // Swarm lead: assignments are client-only; exclude the open slot so its prior bots count toward `available` for QuantitySelector (Bugbot / ios-bugs.md).
+      if (isSwarmLeadSetup && battalionId === selectedBattalion) {
+        return;
+      }
       if (assignment && assignment.quantity > 0) {
         const bt = assignment.botType as BotType;
         const ml = assignment.markLevel === 2 ? 2 : 1;
@@ -268,7 +272,7 @@ export const BattlePreparationScreen = React.memo(
     });
 
     return { availableM1: m1, availableM2: m2 };
-  }, [botCounts, botCountsM2, assignments]);
+  }, [botCounts, botCountsM2, assignments, isSwarmLeadSetup, selectedBattalion]);
 
   useEffect(() => {
     Animated.sequence([
