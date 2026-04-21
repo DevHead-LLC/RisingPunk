@@ -15,6 +15,8 @@ interface NotificationBannerProps {
   type?: 'success' | 'error' | 'info';
   duration?: number;
   onClose?: () => void;
+  /** Auto-dismiss only: fired once when the outro fade begins (before {@link onClose}). AppContent uses this so other toasts are not gated until `onClose` clears parent state (Bugbot / ios-bugs.md). */
+  onHideAnimationStart?: () => void;
 }
 
 export const NotificationBanner: React.FC<NotificationBannerProps> = ({
@@ -23,6 +25,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   type = 'info',
   duration = 5000,
   onClose,
+  onHideAnimationStart,
 }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
   const colors = useThemeColors();
@@ -38,6 +41,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
 
       // Auto fade out after duration
       const timer = setTimeout(() => {
+        onHideAnimationStart?.();
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 300,
@@ -49,7 +53,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
 
       return () => clearTimeout(timer);
     }
-  }, [visible, fadeAnim, duration, onClose]);
+  }, [visible, fadeAnim, duration, onClose, onHideAnimationStart]);
 
   if (!visible) return null;
 

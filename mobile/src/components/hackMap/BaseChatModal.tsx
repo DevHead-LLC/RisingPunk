@@ -36,6 +36,7 @@ import { parseMapLocationShareMessage } from '../../../../shared/mapLocationShar
 import type { ReportContext } from '../../types/reports';
 import { normalizeUserId } from '../../utils/battleUtils';
 import { USER_DM_MAX_MESSAGE_LENGTH } from '../../constants/privateMessageCaps';
+import { M1_UNIT_DISPLAY_NAMES, MARK2_DISPLAY_NAMES } from '../../utils/botInventory';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
@@ -564,7 +565,8 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   {probeHackLocLine}
                                 </Text>
                                 <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  Breacher: {report.b.breacher} · Guardian: {report.b.guardian} · Phreak: {report.b.phreak}
+                                  {M1_UNIT_DISPLAY_NAMES.breacher}: {report.b.breacher} · {M1_UNIT_DISPLAY_NAMES.guardian}:{' '}
+                                  {report.b.guardian} · {M1_UNIT_DISPLAY_NAMES.phreak}: {report.b.phreak}
                                 </Text>
                               </View>
                             );
@@ -658,7 +660,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               lost: BattleReportBotCounts,
                             ) => {
                               const m2 = sideHasMark2(start, lost);
-                              /** Mark I = family names; Mark II = distinct bot names (same stats keys in payload). */
+                              /** Mark I/II labels from `botInventory` display-name maps (same payload keys). */
                               const fam = (
                                 mark1Name: string,
                                 mark2Name: string,
@@ -687,9 +689,30 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
                                     {title}
                                   </Text>
-                                  {fam('Guardian', 'Worm', start.guardian, lost.guardian, start.guardianM2, lost.guardianM2)}
-                                  {fam('Breacher', 'Exploit', start.breacher, lost.breacher, start.breacherM2, lost.breacherM2)}
-                                  {fam('Phreak', 'Sniffer', start.phreak, lost.phreak, start.phreakM2, lost.phreakM2)}
+                                  {fam(
+                                    M1_UNIT_DISPLAY_NAMES.guardian,
+                                    MARK2_DISPLAY_NAMES.guardian,
+                                    start.guardian,
+                                    lost.guardian,
+                                    start.guardianM2,
+                                    lost.guardianM2,
+                                  )}
+                                  {fam(
+                                    M1_UNIT_DISPLAY_NAMES.breacher,
+                                    MARK2_DISPLAY_NAMES.breacher,
+                                    start.breacher,
+                                    lost.breacher,
+                                    start.breacherM2,
+                                    lost.breacherM2,
+                                  )}
+                                  {fam(
+                                    M1_UNIT_DISPLAY_NAMES.phreak,
+                                    MARK2_DISPLAY_NAMES.phreak,
+                                    start.phreak,
+                                    lost.phreak,
+                                    start.phreakM2,
+                                    lost.phreakM2,
+                                  )}
                                 </>
                               );
                             };

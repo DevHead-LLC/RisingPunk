@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useCallback } from 'react';
+import React, { memo, useEffect, useRef, useCallback, useState } from 'react';
 import { Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserProfileFromPayload } from '../store/slices/authSlice';
@@ -44,6 +44,13 @@ const AppContent = memo(() => {
 
   const { marchBanner, dismissMarchBanner } = useAttackMarchTransitionBanners(token);
   const { swarmBanner, dismissSwarmBanner } = useCrewSwarmActiveBanner(token);
+  /** True while march toast is auto-dismissing: parent `marchBanner` stays set until fade ends, but swarm banner can show once outro starts (Bugbot / ios-bugs.md). */
+  const [marchBannerFadeStarted, setMarchBannerFadeStarted] = useState(false);
+  useEffect(() => {
+    if (marchBanner) {
+      setMarchBannerFadeStarted(false);
+    }
+  }, [marchBanner]);
 
   // Function to center the turf view to home/digital barracks position
   const centerTurfView = useCallback(() => {
@@ -411,10 +418,15 @@ const AppContent = memo(() => {
         message={marchBanner?.message ?? ''}
         type={marchBanner?.type ?? 'info'}
         duration={MARCH_TRANSITION_BANNER_DURATION_MS}
+        onHideAnimationStart={() => setMarchBannerFadeStarted(true)}
         onClose={dismissMarchBanner}
       />
       <NotificationBanner
-        visible={!!swarmBanner && !showEmailVerificationBanner && !marchBanner}
+        visible={
+          !!swarmBanner &&
+          !showEmailVerificationBanner &&
+          (!marchBanner || marchBannerFadeStarted)
+        }
         message={swarmBanner?.message ?? ''}
         type={swarmBanner?.type ?? 'info'}
         duration={SWARM_ACTIVE_BANNER_DURATION_MS}
