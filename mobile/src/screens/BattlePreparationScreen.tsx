@@ -332,6 +332,8 @@ export const BattlePreparationScreen = React.memo(
         });
         if (inventoryError) {
           Alert.alert('Not enough bots', inventoryError);
+          // Keep selector open so the user can correct quantity/type (Bugbot / ios-bugs.md).
+          return;
         }
         setSelectorVisible(false);
         return;
