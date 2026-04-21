@@ -588,8 +588,11 @@ export const BattlePreparationScreen = React.memo(
         }
 
         const isShieldActive = (isActuallyUnlocked && shieldData?.isActive) || false;
-        const isDefendingUser = !!defenderId && !defenderNpcSlug;
-        if (!afterShieldDeactivation && isShieldActive && isDefendingUser) {
+        // Map PvP uses `defenderId`; swarm lead prep uses `swarmLeadSetup.targetUserId` only — both require shield off before attacking a player (Bugbot / ios-bugs.md).
+        const isAttackingPlayerTarget =
+          (!!defenderId && !defenderNpcSlug) ||
+          (isSwarmLeadSetup && !!swarmLeadSetup?.targetUserId);
+        if (!afterShieldDeactivation && isShieldActive && isAttackingPlayerTarget) {
           setShieldCheckModalVisible(true);
           return;
         }
