@@ -110,7 +110,9 @@ export function SwarmSessionModal({
         setQuantity('');
         return;
       }
-      const capped = maxAvailableForSelectedType > 0 ? Math.min(n, maxAvailableForSelectedType) : n;
+      // When no stock for this type/mark, never show an arbitrary large typed value (Bugbot / ios-bugs.md).
+      const capped =
+        maxAvailableForSelectedType > 0 ? Math.min(n, maxAvailableForSelectedType) : 0;
       setQuantity(String(capped));
     },
     [maxAvailableForSelectedType]
@@ -119,9 +121,11 @@ export function SwarmSessionModal({
   // After mark/bot/inventory change, keep quantity within available so UX matches validation (Bugbot / ios-bugs.md).
   React.useEffect(() => {
     setQuantity((prev) => {
+      if (maxAvailableForSelectedType <= 0) {
+        return '0';
+      }
       const q = parseInt(prev, 10);
-      if (!Number.isFinite(q)) return maxAvailableForSelectedType > 0 ? '1' : prev;
-      if (maxAvailableForSelectedType <= 0) return prev;
+      if (!Number.isFinite(q)) return '1';
       if (q > maxAvailableForSelectedType) return String(maxAvailableForSelectedType);
       if (q < 1) return '1';
       return prev;
