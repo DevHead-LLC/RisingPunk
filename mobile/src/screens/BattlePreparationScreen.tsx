@@ -572,7 +572,9 @@ export const BattlePreparationScreen = React.memo(
           marchMetaForBlock =
             marchesRefetch.data !== undefined ? marchesRefetch.data : attackMarchMeta;
         }
+        // Swarm lead prep only creates/refreshes a session + commits slots; march deploy happens later in Swarm Room (Bugbot / ios-bugs.md).
         if (
+          !isSwarmLeadSetup &&
           marchMetaForBlock?.asyncMarchesEnabled === true &&
           (marchMetaForBlock?.marches?.length ?? 0) > 0
         ) {
@@ -784,7 +786,8 @@ export const BattlePreparationScreen = React.memo(
   ), []);
 
   const deploymentReady = validateDeployment(assignments).isValid;
-  const deployDisabled = !deploymentReady || isStartingBattle || hasBlockingMarch;
+  const deployDisabled =
+    !deploymentReady || isStartingBattle || (hasBlockingMarch && !isSwarmLeadSetup);
   const deployBusyLabel = isSwarmLeadSetup ? 'BUILDING SWARM...' : wantsMarchLaunch ? 'DISPATCHING...' : 'STARTING...';
 
   return (
@@ -943,7 +946,7 @@ export const BattlePreparationScreen = React.memo(
               {isStartingBattle ? deployBusyLabel : isSwarmLeadSetup ? 'CONTINUE TO SWARM ROOM' : 'DEPLOY PURGE'}
             </Text>
           </TouchableOpacity>
-          {hasBlockingMarch ? (
+          {hasBlockingMarch && !isSwarmLeadSetup ? (
             <Text style={[styles.marchBlockHint, { color: colors.text.secondary }]}>
               You already have a hack expedition in progress. Committed bots stay out of Digital Barracks and full
               home defense until your army returns home (including a cancel recall leg on the Hack Map).
