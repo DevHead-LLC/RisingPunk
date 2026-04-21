@@ -3,6 +3,7 @@ import { Crew } from '../models/Crew';
 import { CrewStatus } from '../models/CrewStatus';
 import { CrewChatMessage } from '../models/CrewChatMessage';
 import { invalidateCrewLeaderboardCaches } from '../routes/leaderboardRoutes';
+import { cancelCrewSwarmsForDisband } from './SwarmService';
 
 /**
  * Disbands a crew: clears war/alliance refs, resets member statuses, deletes crew chat, removes crew document.
@@ -97,6 +98,7 @@ export async function disbandCrewById(crewId: mongoose.Types.ObjectId | string):
   } finally {
     session.endSession();
   }
+  await cancelCrewSwarmsForDisband(String(id));
   // Bugbot: after commit + endSession — if this threw inside the try, abortTransaction would run on a committed session.
   invalidateCrewLeaderboardCaches();
 }

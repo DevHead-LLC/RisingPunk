@@ -1023,20 +1023,20 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
     if (!data) return null;
     const mark2Base = mark2BotsResearchUnlocked && data.mark2 ? data.mark2.base : null;
     const mark2Total = mark2BotsResearchUnlocked && data.mark2 ? data.mark2.total : null;
-    // Bugbot: Mark III/IV placeholder rows are intentional UI for future content; not scaffolding.
-    const rows: { label: string; values: StatRow | null }[] = [
+    // Mark III/IV rows are future tiers (not loaded from API yet); show em dash, not ??? (which reads like a bug).
+    const rows: { label: string; values: StatRow | null; isFutureTier?: boolean }[] = [
       { label: markOneUnitName, values: data.base },
       { label: markTwoRowLabel, values: mark2Base },
-      { label: 'Mark III', values: null },
-      { label: 'Mark IV', values: null },
+      { label: 'Mark III', values: null, isFutureTier: true },
+      { label: 'Mark IV', values: null, isFutureTier: true },
       { label: '+User Level', values: data.levelBonus },
       { label: '+Programming', values: data.programmingBonus },
       { label: '+Research', values: data.crewResearchBonus },
       { label: '+Crew Benefits', values: data.crewLevelBonus },
       { label: `${markOneUnitName} Total`, values: data.total },
       { label: markTwoTotalLabel, values: mark2Total },
-      { label: 'Mark III Total', values: null },
-      { label: 'Mark IV Total', values: null },
+      { label: 'Mark III Total', values: null, isFutureTier: true },
+      { label: 'Mark IV Total', values: null, isFutureTier: true },
     ];
     return (
       <View key={title} style={styles.statsChartCard}>
@@ -1061,7 +1061,11 @@ export function ProfileScreen({ onClose }: { onClose: () => void }): React.JSX.E
               {COLUMNS.map((col) => (
                 <View key={col.key} style={styles.statsChartCell}>
                   <Text style={styles.statsChartCellText}>
-                    {row.values ? formatStat(row.values[col.key], col.isDefense) : '???'}
+                    {row.values
+                      ? formatStat(row.values[col.key], col.isDefense)
+                      : row.isFutureTier
+                        ? '—'
+                        : '???'}
                   </Text>
                 </View>
               ))}

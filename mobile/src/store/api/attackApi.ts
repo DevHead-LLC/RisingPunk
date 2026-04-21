@@ -30,6 +30,7 @@ export type AttackMarchListItem = {
   resolvedAt?: string;
   totalTravelSeconds?: number;
   battleId?: string;
+  attackType?: 'solo' | 'swarm';
   [key: string]: unknown;
 };
 

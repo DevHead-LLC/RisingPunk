@@ -22,12 +22,12 @@ import {
   useGetMyAttackMarchesQuery,
   useLaunchAttackMarchMutation,
 } from '../store/api/attackApi';
+import { useAbortSwarmMutation, useCommitSwarmSlotMutation, useCreateSwarmMutation } from '../store/api/swarmApi';
 import { useGetMyMapPositionQuery } from '../store/api/mapApi';
 import { trackFirstBattle } from '../services/analyticsService';
 import { useGetShieldStatusQuery, useDeactivateShieldMutation } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useBattalionSlotUnlocks } from '../hooks/useBattalionSlotUnlocks';
-import { API_URL } from '../config';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { PresetBar } from '../components/battle/PresetBar';
@@ -77,18 +77,68 @@ const DeployPurgeHighlightBorder = React.memo(({ colors }: { colors: any }) => {
 type Props = {
   onClose: () => void;
   /** `mode: 'march'` when async map deploy created a march (navigate to map, no live battle yet). */
-  onBattleStart: (id?: string, options?: { mode?: 'live' | 'march' }) => void;
+  onBattleStart: (id?: string, options?: { mode?: 'live' | 'march' | 'swarm' }) => void;
   defenderId?: string;
   defenderNpcSlug?: string;
   defenderNpcInstanceId?: string;
   /** Set when battle was initiated from Hack Map (target cell). */
   hackMapCell?: { x: number; y: number };
+  /** Optional lead-only setup mode for swarm creation from Hack Map. */
+  swarmLeadSetup?: { targetUserId: string; targetX: number; targetY: number };
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+/** Swarm lead prep does not call `assignToBattalion`; totals must not exceed Redux inventory before `commitSwarmSlot` (Bugbot / ios-bugs.md). */
+const SWARM_LEAD_BATTALION_IDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
+
+function validateSwarmLeadAssignmentsAgainstInventory(
+  leadAssignments: Record<string, BattalionAssignment | undefined>,
+  botCounts: Partial<Record<BotType, number>> | null | undefined,
+  botCountsM2: Partial<Record<BotType, number>> | null | undefined
+): { ok: true } | { ok: false; message: string } {
+  const types: BotType[] = ['breacher', 'guardian', 'phreak'];
+  const m1: Record<BotType, number> = { breacher: 0, guardian: 0, phreak: 0 };
+  const m2: Record<BotType, number> = { breacher: 0, guardian: 0, phreak: 0 };
+
+  for (const bid of SWARM_LEAD_BATTALION_IDS) {
+    const a = leadAssignments[bid];
+    if (!a || a.quantity <= 0) continue;
+    const bt = a.botType as BotType;
+    if (!types.includes(bt)) continue;
+    if (a.markLevel === 2) m2[bt] += a.quantity;
+    else m1[bt] += a.quantity;
+  }
+
+  for (const bt of types) {
+    const owned1 = Math.max(0, Math.floor(Number(botCounts?.[bt] ?? 0)));
+    const owned2 = Math.max(0, Math.floor(Number(botCountsM2?.[bt] ?? 0)));
+    if (m1[bt] > owned1) {
+      return {
+        ok: false,
+        message: `Mark I ${bt}: ${m1[bt]} assigned across lead slots but only ${owned1} in barracks.`,
+      };
+    }
+    if (m2[bt] > owned2) {
+      return {
+        ok: false,
+        message: `Mark II ${bt}: ${m2[bt]} assigned across lead slots but only ${owned2} in barracks.`,
+      };
+    }
+  }
+  return { ok: true };
+}
+
 export const BattlePreparationScreen = React.memo(
-  ({ onClose, onBattleStart, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell }: Props) => {
+  ({
+    onClose,
+    onBattleStart,
+    defenderId,
+    defenderNpcSlug,
+    defenderNpcInstanceId,
+    hackMapCell,
+    swarmLeadSetup,
+  }: Props) => {
   const colors = useThemeColors();
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const [selectorVisible, setSelectorVisible] = useState(false);
@@ -112,6 +162,9 @@ export const BattlePreparationScreen = React.memo(
   const { refetch: refetchBots } = useFetchBotsQuery(undefined, { skip: !token });
   const [startBattle] = useStartBattleMutation();
   const [launchAttackMarch] = useLaunchAttackMarchMutation();
+  const [createSwarmSession] = useCreateSwarmMutation();
+  const [commitSwarmSlot] = useCommitSwarmSlotMutation();
+  const [abortSwarmSession] = useAbortSwarmMutation();
   const mineCached = useAppSelector((s) => attackApi.endpoints.getMyAttackMarches.select(undefined)(s));
   const attackMarchPollMs = getAttackMarchMinePollingIntervalMs(
     mineCached.data?.asyncMarchesEnabled,
@@ -128,9 +181,11 @@ export const BattlePreparationScreen = React.memo(
   const [deactivateShield] = useDeactivateShieldMutation();
   /** Single source for hack-rig vs map/NPC target (Bugbot: do not duplicate in `battleStartData` useMemo). */
   const isHackRigBattle = !defenderId && !defenderNpcSlug;
+  const isSwarmLeadSetup = swarmLeadSetup != null;
   const wantsMarchLaunch =
     asyncMarchesEnabled &&
     !isHackRigBattle &&
+    !isSwarmLeadSetup &&
     hackMapCell != null &&
     Number.isFinite(hackMapCell.x) &&
     Number.isFinite(hackMapCell.y);
@@ -168,6 +223,22 @@ export const BattlePreparationScreen = React.memo(
 
   // Battalion C/D/E/F unlock state (shared logic with server isBattalionSlotUnlocked)
   const { isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked } = useBattalionSlotUnlocks();
+  const effectiveSlotUnlocks = useMemo(() => {
+    if (isSwarmLeadSetup) {
+      return {
+        isBattalionCUnlocked: true,
+        isBattalionDUnlocked: true,
+        isBattalionEUnlocked: true,
+        isBattalionFUnlocked: true,
+      };
+    }
+    return {
+      isBattalionCUnlocked,
+      isBattalionDUnlocked,
+      isBattalionEUnlocked,
+      isBattalionFUnlocked,
+    };
+  }, [isSwarmLeadSetup, isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked]);
 
   // Memoize available battalions array (A and B always available)
   const availableBattalions = useMemo(() => {
@@ -236,6 +307,36 @@ export const BattlePreparationScreen = React.memo(
     }
 
     try {
+      if (isSwarmLeadSetup) {
+        // Functional updater: `assignments` from closure can be stale across rapid slot updates (Bugbot).
+        let inventoryError: string | null = null;
+        setAssignments((prev) => {
+          const nextAssignments: Record<string, BattalionAssignment> = {
+            ...prev,
+            [selectedBattalion]: {
+              botType: data.botType,
+              quantity: data.quantity,
+              markLevel: data.markLevel,
+            },
+          };
+          const inv = validateSwarmLeadAssignmentsAgainstInventory(
+            nextAssignments,
+            botCounts,
+            botCountsM2
+          );
+          if (!inv.ok) {
+            inventoryError = inv.message;
+            return prev;
+          }
+          return nextAssignments;
+        });
+        if (inventoryError) {
+          Alert.alert('Not enough bots', inventoryError);
+        }
+        setSelectorVisible(false);
+        return;
+      }
+
       await assignToBattalion({
         botType: data.botType,
         quantity: data.quantity,
@@ -243,17 +344,14 @@ export const BattlePreparationScreen = React.memo(
         markLevel: data.markLevel,
       }).unwrap();
 
-      setAssignments(prev => {
-        const newAssignments = {
-          ...prev,
-          [selectedBattalion]: {
-            botType: data.botType,
-            quantity: data.quantity,
-            markLevel: data.markLevel,
-          },
-        };
-        return newAssignments;
-      });
+      setAssignments((prev) => ({
+        ...prev,
+        [selectedBattalion]: {
+          botType: data.botType,
+          quantity: data.quantity,
+          markLevel: data.markLevel,
+        },
+      }));
       setSelectorVisible(false);
     } catch (error) {
       console.error('Failed to assign bots:', error);
@@ -261,7 +359,7 @@ export const BattlePreparationScreen = React.memo(
       throw error;
     }
   },
-    [selectedBattalion, assignToBattalion]
+    [selectedBattalion, assignToBattalion, isSwarmLeadSetup, botCounts, botCountsM2]
   );
 
   /** Serialize preset applies; skip identical successful lineup. Preset uses POST /assign-preset (one request) to avoid per-slot rate limits. */
@@ -276,6 +374,20 @@ export const BattlePreparationScreen = React.memo(
 
       const task = async () => {
         if (lastSuccessfulPresetSigRef.current === sig) {
+          return;
+        }
+        if (isSwarmLeadSetup) {
+          const inv = validateSwarmLeadAssignmentsAgainstInventory(
+            presetAssignments,
+            botCounts,
+            botCountsM2
+          );
+          if (!inv.ok) {
+            Alert.alert('Not enough bots for this preset', inv.message);
+            return;
+          }
+          setAssignments(presetAssignments);
+          lastSuccessfulPresetSigRef.current = sig;
           return;
         }
         setAssignments(presetAssignments);
@@ -343,7 +455,7 @@ export const BattlePreparationScreen = React.memo(
       });
       return presetApplyChainRef.current;
     },
-    [assignPresetBattalions, refetchBots]
+    [assignPresetBattalions, refetchBots, isSwarmLeadSetup, botCounts, botCountsM2]
   );
 
   // Convert assignments to battalion data format
@@ -372,6 +484,23 @@ export const BattlePreparationScreen = React.memo(
 
   // Validate deployment - require at least one battalion with bots assigned
   const validateDeployment = React.useCallback((assignments: Record<string, BattalionAssignment>): { isValid: boolean; message: string } => {
+    if (isSwarmLeadSetup) {
+      const leadSlots = ['A', 'B', 'C', 'D', 'E', 'F'];
+      const filled = leadSlots.filter((slot) => (assignments[slot]?.quantity ?? 0) > 0);
+      // Matches server `hasLeaderParticipant`: at least one lead slot (1–6) — not all six required.
+      if (filled.length < 1) {
+        return {
+          isValid: false,
+          message: 'Commit at least one lead battalion (slots A–F) before continuing to the swarm room.',
+        };
+      }
+      const inv = validateSwarmLeadAssignmentsAgainstInventory(assignments, botCounts, botCountsM2);
+      if (!inv.ok) {
+        return { isValid: false, message: inv.message };
+      }
+      return { isValid: true, message: 'Swarm lead payload ready.' };
+    }
+
     const hasValidAssignment = Object.values(assignments).some(
       assignment => assignment && assignment.quantity > 0
     );
@@ -387,7 +516,7 @@ export const BattlePreparationScreen = React.memo(
         message: 'Please assign at least one battalion before deploying.'
       };
     }
-  }, []);
+  }, [isSwarmLeadSetup, botCounts, botCountsM2]);
 
   const battleStartData = React.useMemo(() => {
     const hasCell =
@@ -404,7 +533,7 @@ export const BattlePreparationScreen = React.memo(
       defenderNpcInstanceId,
       ...(hasCell ? { hackMapCellX: hackMapCell!.x, hackMapCellY: hackMapCell!.y } : {}),
     };
-  }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell]);
+  }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell, isHackRigBattle]);
 
   const { clearHighlight } = useTaskGuideHighlight();
 
@@ -443,7 +572,9 @@ export const BattlePreparationScreen = React.memo(
           marchMetaForBlock =
             marchesRefetch.data !== undefined ? marchesRefetch.data : attackMarchMeta;
         }
+        // Swarm lead prep only creates/refreshes a session + commits slots; march deploy happens later in Swarm Room (Bugbot / ios-bugs.md).
         if (
+          !isSwarmLeadSetup &&
           marchMetaForBlock?.asyncMarchesEnabled === true &&
           (marchMetaForBlock?.marches?.length ?? 0) > 0
         ) {
@@ -468,7 +599,44 @@ export const BattlePreparationScreen = React.memo(
           isStartingBattleRef.current = true;
           // Bugbot: every exit from inner try runs inner finally — isStartingBattle + ref cleared.
           try {
-            if (wantsMarchLaunch && hackMapCell) {
+            if (isSwarmLeadSetup && swarmLeadSetup) {
+              const slotByBattalion: Record<string, number> = { A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
+              const created = await createSwarmSession({
+                targetUserId: swarmLeadSetup.targetUserId,
+                targetX: swarmLeadSetup.targetX,
+                targetY: swarmLeadSetup.targetY,
+              }).unwrap();
+              const swarmId = created?.swarmId;
+              if (!swarmId) {
+                Alert.alert('Swarm', 'Failed to create swarm session.');
+                return;
+              }
+
+              try {
+                for (const battalionId of ['A', 'B', 'C', 'D', 'E', 'F']) {
+                  const assignment = assignments[battalionId];
+                  if (!assignment || assignment.quantity <= 0) {
+                    continue;
+                  }
+                  await commitSwarmSlot({
+                    swarmId,
+                    slotIndex: slotByBattalion[battalionId],
+                    botType: assignment.botType as 'breacher' | 'guardian' | 'phreak',
+                    quantity: assignment.quantity,
+                    markLevel: assignment.markLevel === 2 ? 2 : 1,
+                  }).unwrap();
+                }
+              } catch (commitError) {
+                try {
+                  await abortSwarmSession({ swarmId }).unwrap();
+                } catch (abortError) {
+                  console.error('Failed to rollback swarm after setup error:', abortError);
+                }
+                throw commitError;
+              }
+
+              onBattleStart(undefined, { mode: 'swarm' });
+            } else if (wantsMarchLaunch && hackMapCell) {
               if (
                 myMapPos == null ||
                 !Number.isFinite(myMapPos.x) ||
@@ -541,14 +709,18 @@ export const BattlePreparationScreen = React.memo(
     [
       assignments,
       attackMarchMeta,
+      abortSwarmSession,
       battleStartData,
+      commitSwarmSlot,
       clearHighlight,
+      createSwarmSession,
       defenderId,
       defenderNpcInstanceId,
       defenderNpcSlug,
       hackMapCell,
       isActuallyUnlocked,
       isDeployPurgeHighlight,
+      isSwarmLeadSetup,
       launchAttackMarch,
       myMapPos,
       onBattleStart,
@@ -556,6 +728,7 @@ export const BattlePreparationScreen = React.memo(
       refetchMyMarches,
       shieldData?.isActive,
       startBattle,
+      swarmLeadSetup,
       userId,
       validateDeployment,
       wantsMarchLaunch,
@@ -613,8 +786,9 @@ export const BattlePreparationScreen = React.memo(
   ), []);
 
   const deploymentReady = validateDeployment(assignments).isValid;
-  const deployDisabled = !deploymentReady || isStartingBattle || hasBlockingMarch;
-  const deployBusyLabel = wantsMarchLaunch ? 'DISPATCHING...' : 'STARTING...';
+  const deployDisabled =
+    !deploymentReady || isStartingBattle || (hasBlockingMarch && !isSwarmLeadSetup);
+  const deployBusyLabel = isSwarmLeadSetup ? 'BUILDING SWARM...' : wantsMarchLaunch ? 'DISPATCHING...' : 'STARTING...';
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -629,7 +803,9 @@ export const BattlePreparationScreen = React.memo(
       </View>
 
       <View style={styles.fixedHeader}>
-        <Text style={[styles.title, { color: colors.secondary }]}>BATTLE PREPARATION</Text>
+        <Text style={[styles.title, { color: colors.secondary }]}>
+          {isSwarmLeadSetup ? 'SWARM PREPARATION' : 'BATTLE PREPARATION'}
+        </Text>
       </View>
 
       <View style={[styles.mainContainer, isBattalionAHighlight && { zIndex: 1000, elevation: 1000 }]}>
@@ -657,7 +833,7 @@ export const BattlePreparationScreen = React.memo(
               keyboardShouldPersistTaps="handled"
             >
               <View style={[styles.battalionsContainer, isBattalionAHighlight && { zIndex: 1001, elevation: 1001 }]}>
-                {!isBattalionEUnlocked ? (
+                {!effectiveSlotUnlocks.isBattalionEUnlocked ? (
                   renderBattalionSlots(['E', 'F'], false, true)
                 ) : (
                   <View style={styles.battalionColumn}>
@@ -673,15 +849,15 @@ export const BattlePreparationScreen = React.memo(
                     <BattalionSlot
                       name="F"
                       isEnemy={false}
-                      isLocked={!isBattalionFUnlocked}
-                      onPress={isBattalionFUnlocked ? () => handleBattalionPress('F') : undefined}
-                      assignment={isBattalionFUnlocked ? assignments['F'] : undefined}
+                      isLocked={!effectiveSlotUnlocks.isBattalionFUnlocked}
+                      onPress={effectiveSlotUnlocks.isBattalionFUnlocked ? () => handleBattalionPress('F') : undefined}
+                      assignment={effectiveSlotUnlocks.isBattalionFUnlocked ? assignments['F'] : undefined}
                       isHighlighted={false}
                       disabled={isBattalionAHighlight}
                     />
                   </View>
                 )}
-                {!isBattalionCUnlocked ? (
+                {!effectiveSlotUnlocks.isBattalionCUnlocked ? (
                   renderBattalionSlots(['C', 'D'], false, true)
                 ) : (
                   <View style={styles.battalionColumn}>
@@ -697,9 +873,9 @@ export const BattlePreparationScreen = React.memo(
                     <BattalionSlot
                       name="D"
                       isEnemy={false}
-                      isLocked={!isBattalionDUnlocked}
-                      onPress={isBattalionDUnlocked ? () => handleBattalionPress('D') : undefined}
-                      assignment={isBattalionDUnlocked ? assignments['D'] : undefined}
+                      isLocked={!effectiveSlotUnlocks.isBattalionDUnlocked}
+                      onPress={effectiveSlotUnlocks.isBattalionDUnlocked ? () => handleBattalionPress('D') : undefined}
+                      assignment={effectiveSlotUnlocks.isBattalionDUnlocked ? assignments['D'] : undefined}
                       isHighlighted={false}
                       disabled={isBattalionAHighlight}
                     />
@@ -737,8 +913,9 @@ export const BattlePreparationScreen = React.memo(
           <PresetBar
             botCounts={botCounts}
             userBalance={userBalance}
-            unlockedSlots={{ isBattalionCUnlocked, isBattalionDUnlocked, isBattalionEUnlocked, isBattalionFUnlocked }}
+            unlockedSlots={effectiveSlotUnlocks}
             onApplyPreset={handleApplyPreset}
+            maxBattalionSizeOverride={isSwarmLeadSetup ? 5000 : undefined}
           />
           <TouchableOpacity
             style={[
@@ -766,10 +943,10 @@ export const BattlePreparationScreen = React.memo(
                 color: colors.neutral,
               }
             ]}>
-              {isStartingBattle ? deployBusyLabel : 'DEPLOY PURGE'}
+              {isStartingBattle ? deployBusyLabel : isSwarmLeadSetup ? 'CONTINUE TO SWARM ROOM' : 'DEPLOY PURGE'}
             </Text>
           </TouchableOpacity>
-          {hasBlockingMarch ? (
+          {hasBlockingMarch && !isSwarmLeadSetup ? (
             <Text style={[styles.marchBlockHint, { color: colors.text.secondary }]}>
               You already have a hack expedition in progress. Committed bots stay out of Digital Barracks and full
               home defense until your army returns home (including a cancel recall leg on the Hack Map).
@@ -823,7 +1000,7 @@ export const BattlePreparationScreen = React.memo(
                   color: colors.neutral,
                 }
               ]}>
-                {isStartingBattle ? deployBusyLabel : 'DEPLOY PURGE'}
+                {isStartingBattle ? deployBusyLabel : isSwarmLeadSetup ? 'CONTINUE TO SWARM ROOM' : 'DEPLOY PURGE'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -837,6 +1014,7 @@ export const BattlePreparationScreen = React.memo(
         availableM1={availableM1}
         availableM2={availableM2}
         mark2Unlocked={mark2Unlocked}
+        maxQuantityOverride={isSwarmLeadSetup ? 5000 : undefined}
       />
 
       <ShieldCheckModal

@@ -10,6 +10,7 @@ import './scriptEnv';
 import mongoose from 'mongoose';
 import { getDatabaseName } from './scriptEnv';
 import { ResearchFeatureDefinition } from '../src/models/ResearchFeatureDefinition';
+import { Research } from '../src/models/Research';
 import { getCrewArmyBonusSeedRows } from '../src/config/crewArmyBonusResearch';
 
 type FeatureRow = {
@@ -596,6 +597,18 @@ const FEATURES: FeatureRow[] = [
     researchCenterLevelRequirement: 4,
     effect: { type: 'unlock', value: 'mark-2-bots', target: 'battle-bots' },
   },
+  {
+    categoryId: 'swarm',
+    id: 'swarm-lead',
+    name: 'Swarm Lead',
+    description: 'Lead coordinated Swarm attacks with your crew on the HackMap.',
+    unlockCost: 26500000,
+    levelRequirement: 70,
+    researchTimeHours: 40,
+    requiredFeatureRefs: [],
+    researchCenterLevelRequirement: 14,
+    effect: { type: 'unlock', value: 'swarm-lead', target: 'hack-map-swarm' },
+  },
   ...getCrewArmyBonusSeedRows(),
 ];
 
@@ -624,6 +637,26 @@ async function run(): Promise<void> {
   if (removed.deletedCount) {
     console.log('  Removed obsolete hack-crew/crew-strength-increase');
   }
+
+  await Research.updateOne(
+    { categoryId: 'swarm' },
+    {
+      $set: {
+        categoryId: 'swarm',
+        name: 'Swarm',
+        levelRequirement: 70,
+        balanceRequirement: 25000000,
+        unlockCost: 25000000,
+        dependencies: ['investments'],
+        requiredFeatureRefs: [{ categoryId: 'hack-ability', featureId: 'battalion-size-5000-i' }],
+        image: 'swarm.png',
+        description: 'Unlock swarm research — coordinated crew attacks on the HackMap.',
+        features: [],
+      },
+    },
+    { upsert: true }
+  );
+  console.log('  research category swarm (upserted)');
 
   console.log('\nDone. Upserted', upserted, 'research feature definitions.');
   await mongoose.disconnect();
