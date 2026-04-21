@@ -422,6 +422,7 @@ export class BattleService {
           console.error('Battle document missing before notifications for', battleId);
         } else {
           // Fresh read so BTL payload uses persisted battalions (in-memory battle can diverge if battle doc is updated between save and send).
+          // Bugbot / ios-bugs.md: When `isSwarmMarchBattle`, `sendSwarmBattleReports` (inside `settleSwarmBattleIfNeeded`) already sent per-participant `BTL|` with split cash/XP. Omit the standard attacker DM and tag defender `BTL|` with `swarm:1` so the lead is not duplicated with full-team totals and `BaseChatModal` parses swarm defender DMs correctly.
           await sendBattleNotifications(
             battleForNotifications,
             pvpCashTransferred,
