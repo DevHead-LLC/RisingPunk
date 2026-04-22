@@ -86,14 +86,6 @@ function buildParticipants(session: ISwarmSessionDocument): string[] {
   return [...userIds];
 }
 
-async function ensureUserBotInventory(userId: string): Promise<any> {
-  const bot = await Bot.findOne({ userId });
-  if (!bot) {
-    throw new SwarmError(400, 'Bot inventory not found');
-  }
-  return bot;
-}
-
 function clampFinite(v: number, min: number, max: number): number {
   if (!Number.isFinite(v)) return min;
   return Math.min(max, Math.max(min, v));
@@ -154,16 +146,21 @@ async function addInventory(userId: string, botType: BotFamily, markLevel: MarkL
 async function removeInventory(userId: string, botType: BotFamily, markLevel: MarkLevel, quantity: number, session?: mongoose.ClientSession): Promise<void> {
   if (quantity <= 0) return;
   const key = getInventoryKey(botType, markLevel);
-  const bot = await ensureUserBotInventory(userId);
-  const owned = Number((bot.bots as Record<string, number>)[key] ?? 0);
-  if (owned < quantity) {
-    throw new SwarmError(400, 'Insufficient Bots Available');
-  }
-  await Bot.findOneAndUpdate(
-    { userId },
+  // Atomic sufficiency + deduction: concurrent updates cannot both pass a read-then-write race (Bugbot / ios-bugs.md).
+  const upd = await Bot.findOneAndUpdate(
+    { userId, [`bots.${key}`]: { $gte: quantity } },
     { $inc: { [`bots.${key}`]: -quantity } },
     { new: true, ...(session ? { session } : {}) }
   );
+  if (upd) {
+    return;
+  }
+  const existsQuery = Bot.findOne({ userId }).select('_id');
+  const exists = session ? await existsQuery.session(session).lean() : await existsQuery.lean();
+  if (!exists) {
+    throw new SwarmError(400, 'Bot inventory not found');
+  }
+  throw new SwarmError(400, 'Insufficient Bots Available');
 }
 
 async function restoreAllCommitments(sessionDoc: ISwarmSessionDocument, session?: mongoose.ClientSession): Promise<void> {
@@ -205,8 +202,9 @@ export async function restoreSwarmCommitmentsOnMarchCancelReturn(params: {
   }
 }
 
-async function ensureCrewMembership(userId: string): Promise<{ crewId: string }> {
-  const crewStatus = await CrewStatus.findOne({ userId }).select('isInCrew crewId').lean();
+async function ensureCrewMembership(userId: string, session?: mongoose.ClientSession): Promise<{ crewId: string }> {
+  const q = CrewStatus.findOne({ userId }).select('isInCrew crewId');
+  const crewStatus = session ? await q.session(session).lean() : await q.lean();
   if (!crewStatus?.isInCrew || !crewStatus.crewId) {
     throw new SwarmError(403, 'You must be in a crew to use Swarm');
   }
@@ -289,6 +287,36 @@ export async function getSwarmSessionForUser(userId: string): Promise<ISwarmSess
   }).sort({ createdAt: -1 });
 }
 
+async function throwIfCommitSwarmSlotCannotClaim(params: {
+  swarmIdTrim: string;
+  slotIndex: number;
+  requesterUserId: string;
+  isLeader: boolean;
+  session: mongoose.ClientSession;
+}): Promise<void> {
+  const { swarmIdTrim, slotIndex, requesterUserId, isLeader, session } = params;
+  const cur = await SwarmSession.findOne({ swarmId: swarmIdTrim }).session(session);
+  if (!cur) {
+    throw new SwarmError(404, 'Swarm session not found');
+  }
+  if (cur.state !== 'preparing') {
+    throw new SwarmError(409, 'Swarm is no longer in preparation');
+  }
+  if (cur.commitments.some((c) => c.slotIndex === slotIndex)) {
+    throw new SwarmError(409, `Slot ${slotIndex} is already committed`);
+  }
+  if (isLeader) {
+    if (String(cur.leaderUserId) !== String(requesterUserId)) {
+      throw new SwarmError(403, 'Only the Swarm lead can use lead battalion slots');
+    }
+    return;
+  }
+  const requesterCrew = await ensureCrewMembership(requesterUserId, session);
+  if (requesterCrew.crewId !== String(cur.crewId)) {
+    throw new SwarmError(403, 'Only crew members can join this Swarm');
+  }
+}
+
 export async function commitSwarmSlot(params: {
   requesterUserId: string;
   swarmId: string;
@@ -308,43 +336,87 @@ export async function commitSwarmSlot(params: {
     throw new SwarmError(400, 'quantity must be an integer between 1 and 5000');
   }
 
-  const sessionDoc = await SwarmSession.findOne({ swarmId: String(swarmId).trim() });
-  if (!sessionDoc) throw new SwarmError(404, 'Swarm session not found');
-  if (sessionDoc.state !== 'preparing') throw new SwarmError(409, 'Swarm is no longer in preparation');
+  const swarmIdTrim = String(swarmId).trim();
+  const clientSession = await mongoose.startSession();
+  let committed: ISwarmSessionDocument;
+  try {
+    await clientSession.withTransaction(async () => {
+      const snap = await SwarmSession.findOne({ swarmId: swarmIdTrim })
+        .select('leaderUserId crewId state')
+        .session(clientSession)
+        .lean();
+      if (!snap) {
+        throw new SwarmError(404, 'Swarm session not found');
+      }
+      if (snap.state !== 'preparing') {
+        throw new SwarmError(409, 'Swarm is no longer in preparation');
+      }
 
-  const isLeader = String(sessionDoc.leaderUserId) === String(requesterUserId);
-  ensureSlotForUser(isLeader, slotIndex);
+      const isLeader = String(snap.leaderUserId) === String(requesterUserId);
+      ensureSlotForUser(isLeader, slotIndex);
 
-  if (!isLeader) {
-    const requesterCrew = await ensureCrewMembership(requesterUserId);
-    if (requesterCrew.crewId !== String(sessionDoc.crewId)) {
-      throw new SwarmError(403, 'Only crew members can join this Swarm');
-    }
+      if (!isLeader) {
+        const requesterCrew = await ensureCrewMembership(requesterUserId, clientSession);
+        if (requesterCrew.crewId !== String(snap.crewId)) {
+          throw new SwarmError(403, 'Only crew members can join this Swarm');
+        }
+      }
+
+      const requester = await User.findById(requesterUserId).select('handle').session(clientSession).lean();
+      if (!requester?.handle) {
+        throw new SwarmError(400, 'User handle is required to commit a Swarm slot');
+      }
+
+      const commitmentDoc = {
+        slotIndex,
+        userId: String(requesterUserId),
+        userHandle: String(requester.handle),
+        botType,
+        markLevel,
+        quantity,
+        committedAt: new Date(),
+      };
+
+      // Single atomic claim: concurrent commits to the same slot cannot both succeed (Bugbot / ios-bugs.md).
+      const baseFilter: Record<string, unknown> = {
+        swarmId: swarmIdTrim,
+        state: 'preparing',
+        crewId: String(snap.crewId),
+        commitments: { $not: { $elemMatch: { slotIndex } } },
+      };
+      const slotClaimFilter = isLeader
+        ? { ...baseFilter, leaderUserId: String(requesterUserId) }
+        : baseFilter;
+
+      const claimed = await SwarmSession.findOneAndUpdate(
+        slotClaimFilter,
+        {
+          $push: { commitments: commitmentDoc },
+          $addToSet: { participants: String(requesterUserId) },
+        },
+        { new: true, session: clientSession }
+      );
+
+      if (!claimed) {
+        await throwIfCommitSwarmSlotCannotClaim({
+          swarmIdTrim,
+          slotIndex,
+          requesterUserId,
+          isLeader,
+          session: clientSession,
+        });
+        throw new SwarmError(409, 'Could not commit Swarm slot');
+      }
+
+      // Transaction abort on throw rolls back the slot claim and `removeInventory` bot write — no manual $pull (Bugbot / ios-bugs.md).
+      await removeInventory(requesterUserId, botType, markLevel, quantity, clientSession);
+
+      committed = claimed;
+    });
+  } finally {
+    await clientSession.endSession();
   }
-
-  if (sessionDoc.commitments.some((c) => c.slotIndex === slotIndex)) {
-    throw new SwarmError(409, `Slot ${slotIndex} is already committed`);
-  }
-
-  const requester = await User.findById(requesterUserId).select('handle').lean();
-  if (!requester?.handle) {
-    throw new SwarmError(400, 'User handle is required to commit a Swarm slot');
-  }
-
-  await removeInventory(requesterUserId, botType, markLevel, quantity);
-
-  sessionDoc.commitments.push({
-    slotIndex,
-    userId: String(requesterUserId),
-    userHandle: String(requester.handle),
-    botType,
-    markLevel,
-    quantity,
-    committedAt: new Date(),
-  });
-  sessionDoc.participants = buildParticipants(sessionDoc);
-  await sessionDoc.save();
-  return sessionDoc;
+  return committed!;
 }
 
 export async function dismissSwarmSlot(params: {
