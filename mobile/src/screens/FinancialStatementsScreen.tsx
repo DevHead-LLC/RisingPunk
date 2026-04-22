@@ -4,7 +4,8 @@ import { SIZING } from '../styles/theme';
 import { CloseButton } from '../components/common/CloseButton';
 import { useAppSelector } from '../store/hooks';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
-import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery } from '../store/api/userFinanceApi';
+import { useFetchFinanceTemplatesQuery, useFetchUserFinanceTiersQuery, useFetchIncomeRateBreakdownQuery } from '../store/api/userFinanceApi';
+import { IncomeRateBreakdownPanel } from '../components/finance/IncomeRateBreakdownPanel';
 import { useGetRentalHousingIncomeQuery } from '../store/api/rentalHousingApi';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
 import { useGetExpenseModifiersQuery } from '../store/api/researchFeaturesApi';
@@ -17,7 +18,7 @@ type Props = {
   onClose: () => void;
 };
 
-type TabKey = 'income' | 'balance' | 'cashflow';
+type TabKey = 'income' | 'balance' | 'cashflow' | 'rates';
 
 /** Cumulative property value from server (cumulativeBuildValueByLevel). Clamps level to array bounds. */
 function getPropertyCumulativeValue(level: number, cumulativeBuildValueByLevel: number[] | undefined): number {
@@ -39,6 +40,11 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
   const { data: userTiersData } = useFetchUserFinanceTiersQuery();
   const { data: rentalHousingData, error: rentalHousingError, isLoading: rentalHousingLoading } = useGetRentalHousingIncomeQuery();
   const { data: balanceData } = useFetchBalanceQuery(undefined, { refetchOnFocus: true });
+  const {
+    data: incomeRateBreakdown,
+    isLoading: incomeBreakdownLoading,
+    isError: incomeBreakdownError,
+  } = useFetchIncomeRateBreakdownQuery(undefined, { refetchOnFocus: true });
   const { data: expenseModifiers } = useGetExpenseModifiersQuery(undefined, { refetchOnFocus: true });
   const currentCash = useAppSelector(getCurrentBalance);
   const ratePerSecondFromState = useAppSelector(state => state.balance.ratePerSecond);
@@ -354,6 +360,7 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
           <TabButton label="Income Statement" tab="income" />
           <TabButton label="Balance Sheet" tab="balance" />
           <TabButton label="Cash Flows" tab="cashflow" />
+          <TabButton label="Rate breakdown" tab="rates" />
         </View>
 
         <View style={styles.mainPanel}>
@@ -499,6 +506,16 @@ export function FinancialStatementsScreen({ onClose }: Props): React.JSX.Element
                   <Text style={styles.placeholderSubtitle}>Loading...</Text>
                 )}
               </ScrollView>
+            </View>
+          )}
+          {activeTab === 'rates' && (
+            <View style={styles.placeholderBox}>
+              <IncomeRateBreakdownPanel
+                data={incomeRateBreakdown}
+                isLoading={incomeBreakdownLoading}
+                hasError={incomeBreakdownError}
+                walletRatePerSecond={ratePerSecond}
+              />
             </View>
           )}
           {activeTab === 'cashflow' && (

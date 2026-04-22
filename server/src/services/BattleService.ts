@@ -367,12 +367,55 @@ export class BattleService {
 
       let pvpXpAttacker = 0;
       let pvpXpDefender = 0;
-      try {
-        const xpResult = await processPvPBattleExperienceReward(battleId);
-        pvpXpAttacker = xpResult.attackerXp;
-        pvpXpDefender = xpResult.defenderXp;
-      } catch (e) {
-        console.error('PvP battle experience reward failed for', battleId, e);
+      let isSwarmMarchBattle = false;
+      /** Only true after `settleSwarmBattleIfNeeded` completes — if false, per-participant `BTL|` were not sent (Bugbot / ios-bugs.md). */
+      let swarmSettlementSucceeded = false;
+      const marchSourcedPvp =
+        (battle as { marchSourcedAttack?: boolean }).marchSourcedAttack === true &&
+        !!(battle as { sourceMarchId?: string }).sourceMarchId;
+      if (marchSourcedPvp) {
+        try {
+          const { AttackMarch } = await import('../models/AttackMarch');
+          const m = await AttackMarch.findOne({
+            marchId: String((battle as { sourceMarchId?: string }).sourceMarchId),
+          })
+            .select('swarmSessionId')
+            .lean();
+          isSwarmMarchBattle = Boolean(m?.swarmSessionId);
+        } catch (swarmDetectErr) {
+          console.error('[BattleService.handleBattleEnd] failed to detect swarm march source:', battleId, swarmDetectErr);
+        }
+      }
+      if (isSwarmMarchBattle) {
+        try {
+          const { computePvpXpFromOpponentLosses } = await import('./PvPBattleExperienceService');
+          pvpXpAttacker = computePvpXpFromOpponentLosses(
+            battle.startingBattalions ?? [],
+            battle.battalions ?? [],
+            NodeOwner.ENEMY
+          );
+          pvpXpDefender = computePvpXpFromOpponentLosses(
+            battle.startingBattalions ?? [],
+            battle.battalions ?? [],
+            NodeOwner.USER
+          );
+          const { settleSwarmBattleIfNeeded } = await import('./SwarmService');
+          await settleSwarmBattleIfNeeded(battle, pvpCashTransferred, {
+            attackerTotal: pvpXpAttacker,
+            defenderTotal: pvpXpDefender,
+          });
+          swarmSettlementSucceeded = true;
+        } catch (swarmSettleErr) {
+          console.error('Swarm PvP settlement failed for', battleId, swarmSettleErr);
+        }
+      } else {
+        try {
+          const xpResult = await processPvPBattleExperienceReward(battleId);
+          pvpXpAttacker = xpResult.attackerXp;
+          pvpXpDefender = xpResult.defenderXp;
+        } catch (e) {
+          console.error('PvP battle experience reward failed for', battleId, e);
+        }
       }
 
       // Send battle result DMs to attacker and defender (same pattern as Probe Report)
@@ -382,7 +425,16 @@ export class BattleService {
           console.error('Battle document missing before notifications for', battleId);
         } else {
           // Fresh read so BTL payload uses persisted battalions (in-memory battle can diverge if battle doc is updated between save and send).
-          await sendBattleNotifications(battleForNotifications, pvpCashTransferred, pvpXpAttacker, pvpXpDefender);
+          // Bugbot / ios-bugs.md: Omit attacker + `swarm:1` only when settlement succeeded and per-participant `BTL|` were sent. If settlement threw, fall back to standard attacker+defender DMs so the lead still gets a battle report.
+          await sendBattleNotifications(
+            battleForNotifications,
+            pvpCashTransferred,
+            pvpXpAttacker,
+            pvpXpDefender,
+            isSwarmMarchBattle && swarmSettlementSucceeded
+              ? { omitAttackerNotification: true, swarmMarchPvp: true }
+              : undefined
+          );
         }
       } catch (e) {
         console.error('Battle notifications failed for', battleId, e);

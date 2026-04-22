@@ -52,10 +52,12 @@ import { battleApi } from '../store/api/battleApi';
 import { VISITING_PROFILE_CLOSE_DELAY_MS } from '../constants/visitingProfileTiming';
 import { SIZING } from '../styles/theme';
 import { getPersistedTurfNavState, setPersistedTurfNavState, type TurfScreenName } from '../utils/turfNavStatePersistence';
+import { getHackMapHandoffGlobals } from '../utils/turfHackMapHandoffGlobals';
 import { CrewBackupBanner } from '../components/turf/CrewBackupBanner';
 import { CrewModal } from '../components/hackMap/CrewModal';
 import { ActiveJobsModal } from '../components/turf/ActiveJobsModal';
 import { useGetCrewStatusQuery } from '../store/api/authApi';
+import { useGetMySwarmQuery } from '../store/api/swarmApi';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any, useAnimatedReaction: any;
@@ -203,6 +205,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   const [pendingNpcInstanceId, setPendingNpcInstanceId] = useState<string | null>(null);
   const [pendingDefenderUserId, setPendingDefenderUserId] = useState<string | null>(null);
   const [pendingHackMapCell, setPendingHackMapCell] = useState<{ x: number; y: number } | null>(null);
+  const [pendingSwarmLeadSetup, setPendingSwarmLeadSetup] = useState<{
+    targetUserId: string;
+    targetX: number;
+    targetY: number;
+  } | null>(null);
   const [previousScreen, setPreviousScreen] = useState<TurfScreenName>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
   const [packetBreachLevelId, setPacketBreachLevelId] = useState<string | null>(null);
@@ -241,6 +248,10 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   }, []);
 
   const { data: crewStatus } = useGetCrewStatusQuery();
+  const { data: mySwarmSession } = useGetMySwarmQuery(undefined, {
+    skip: !crewStatus?.isInCrew,
+    pollingInterval: crewStatus?.isInCrew ? 5000 : 0,
+  });
 
   // Restore persisted nav state on mount (Phase 2: refresh — stay on current screen and position).
   // State is per-user so a new guest does not see the previous account's screen (e.g. HackMap/onboarding).
@@ -370,48 +381,54 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     }
   }, [user, showOnboarding, showTurfIntro, showEmailVerification, emailVerificationPromptedUserId, dispatch]);
 
-  // Android-specific bounds calculation (only for Android)
-  useEffect(() => {
-    if (Platform.OS === 'android' && computePanBounds) {
-      const WINDOW_WIDTH = Dimensions.get('window').width;
-      const WINDOW_HEIGHT = Dimensions.get('window').height;
-      const SCREEN_WIDTH = Dimensions.get('screen').width;
-      const SCREEN_HEIGHT = Dimensions.get('screen').height;
-      const CONTENT_SIZE = 2000;
-      const MARGIN_SIZE = 0; // No margin for turf screen
-      
-      // Hybrid approach: window for top/bottom, screen for left/right
-      const ADJUSTED_WIDTH = SCREEN_WIDTH;  // Use screen width for left/right
-      const ADJUSTED_HEIGHT = WINDOW_HEIGHT; // Use window height for top/bottom
+  // Android-specific bounds: recompute when dimensions change or app resumes (stale metrics caused turf to slide off-screen until reboot — bug-fixes-and-updates § Android black screen).
+  const applyAndroidPanBounds = useCallback(() => {
+    if (Platform.OS !== 'android' || !computePanBounds) return;
+    const WINDOW_HEIGHT = Dimensions.get('window').height;
+    const SCREEN_WIDTH = Dimensions.get('screen').width;
+    const CONTENT_SIZE = 2000;
+    const MARGIN_SIZE = 0;
 
-      const bounds = computePanBounds({
-        totalSize: CONTENT_SIZE,
-        containerWidth: ADJUSTED_WIDTH,
-        containerHeight: ADJUSTED_HEIGHT,
-        marginSize: MARGIN_SIZE,
-      });
+    const ADJUSTED_WIDTH = SCREEN_WIDTH;
+    const ADJUSTED_HEIGHT = WINDOW_HEIGHT;
 
-      // Calculate Android header/toolbar height for landscape mode
-      // Status bar is hidden, but we need to account for the space it would take
-      // In landscape mode, navigation bar is 24dp
-      // Since status bar is hidden, we only need to account for navigation bar
-      const ANDROID_NAVIGATION_BAR_HEIGHT = 24; // 24dp in landscape mode
-      const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT; // Total hidden header height
-      
-      // Adjust only the bottom boundary to allow scroll past bottom by header height
-      // This allows the bottom border to be visible when user scrolls past the normal bottom
-      const adjustedBounds = {
-        ...bounds,
-        minY: bounds.minY - ANDROID_HEADER_HEIGHT // Allow scroll past bottom by header height
-      };
+    const bounds = computePanBounds({
+      totalSize: CONTENT_SIZE,
+      containerWidth: ADJUSTED_WIDTH,
+      containerHeight: ADJUSTED_HEIGHT,
+      marginSize: MARGIN_SIZE,
+    });
 
-      minX.value = adjustedBounds.minX;
-      maxX.value = adjustedBounds.maxX;
-      minY.value = adjustedBounds.minY;
-      maxY.value = adjustedBounds.maxY;
-      boundsReady.value = true;
-    }
+    const ANDROID_NAVIGATION_BAR_HEIGHT = 24;
+    const ANDROID_HEADER_HEIGHT = ANDROID_NAVIGATION_BAR_HEIGHT;
+
+    const adjustedBounds = {
+      ...bounds,
+      minY: bounds.minY - ANDROID_HEADER_HEIGHT,
+    };
+
+    minX.value = adjustedBounds.minX;
+    maxX.value = adjustedBounds.maxX;
+    minY.value = adjustedBounds.minY;
+    maxY.value = adjustedBounds.maxY;
+    boundsReady.value = true;
   }, [minX, maxX, minY, maxY, boundsReady, computePanBounds]);
+
+  useEffect(() => {
+    applyAndroidPanBounds();
+  }, [applyAndroidPanBounds]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const dimSub = Dimensions.addEventListener('change', applyAndroidPanBounds);
+    const appSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') applyAndroidPanBounds();
+    });
+    return () => {
+      dimSub.remove();
+      appSub.remove();
+    };
+  }, [applyAndroidPanBounds]);
 
   // Expose horizontalScrollRef, centerAndroidView, and pan method to parent component
   useImperativeHandle(ref, () => ({
@@ -853,12 +870,16 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
   /** Map-hack async: march launch returns to map (no live battle yet). Live path unchanged. */
   const handleBattlePrepDeployComplete = useCallback(
-    (id?: string, options?: { mode?: 'live' | 'march' }) => {
-      if (options?.mode === 'march') {
+    (id?: string, options?: { mode?: 'live' | 'march' | 'swarm' }) => {
+      if (options?.mode === 'march' || options?.mode === 'swarm') {
         setPendingDefenderUserId(null);
         setPendingNpcSlug(null);
         setPendingNpcInstanceId(null);
         setPendingHackMapCell(null);
+        setPendingSwarmLeadSetup(null);
+        if (options?.mode === 'swarm') {
+          getHackMapHandoffGlobals().openSwarmSessionModalOnMap = true;
+        }
         setOpenMessagesAfterReplayClose(false);
         messagesReplayRestoreScreenRef.current = null;
         navigateToScreen('map');
@@ -947,6 +968,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       setPendingNpcSlug(null);
       setPendingNpcInstanceId(null);
       setPendingHackMapCell(null);
+      setPendingSwarmLeadSetup(null);
     }
   }, [currentScreen]);
 
@@ -1185,17 +1207,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           openMessagesAfterReplayToken={mapOpenMessagesAfterReplayToken}
           onWatchBattle={handleWatchBattleFromMessages}
           onClose={() => {
-            const slug = (globalThis as any).pendingNpcSlug as string | undefined;
-            const defenderUserId = (globalThis as any).pendingDefenderUserId as string | undefined;
+            const handoff = getHackMapHandoffGlobals();
+            const slug = handoff.pendingNpcSlug;
+            const defenderUserId = handoff.pendingDefenderUserId;
+            const swarmTargetUserId = handoff.pendingSwarmTargetUserId;
             
             if (slug) {
               setPendingNpcSlug(slug);
-              const instanceId = (globalThis as any).pendingNpcInstanceId as string | undefined;
+              const instanceId = handoff.pendingNpcInstanceId;
               setPendingNpcInstanceId(instanceId || null);
-              const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
-              (globalThis as any).pendingNpcSlug = undefined;
-              (globalThis as any).pendingNpcInstanceId = undefined;
-              (globalThis as any).pendingMapPan = undefined;
+              const mapPan = handoff.pendingMapPan;
+              handoff.pendingNpcSlug = undefined;
+              handoff.pendingNpcInstanceId = undefined;
+              handoff.pendingMapPan = undefined;
               setPendingHackMapCell(
                 mapPan != null && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
                   ? { x: mapPan.x, y: mapPan.y }
@@ -1205,12 +1229,31 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               navigateToScreen('battlePrep');
               return;
             }
+
+            if (swarmTargetUserId) {
+              const mapPan = handoff.pendingMapPan;
+              handoff.pendingSwarmTargetUserId = undefined;
+              handoff.pendingMapPan = undefined;
+              if (!mapPan || !Number.isFinite(mapPan.x) || !Number.isFinite(mapPan.y)) {
+                navigateToScreen('hackRig');
+                return;
+              }
+              setPendingSwarmLeadSetup({
+                targetUserId: String(swarmTargetUserId),
+                targetX: mapPan.x,
+                targetY: mapPan.y,
+              });
+              setPendingHackMapCell({ x: mapPan.x, y: mapPan.y });
+              setReturnContext({ origin: 'map', mapPan });
+              navigateToScreen('battlePrep');
+              return;
+            }
             
             if (defenderUserId) {
               setPendingDefenderUserId(defenderUserId);
-              const mapPan = (globalThis as any).pendingMapPan as { x: number; y: number } | undefined;
-              (globalThis as any).pendingDefenderUserId = undefined;
-              (globalThis as any).pendingMapPan = undefined;
+              const mapPan = handoff.pendingMapPan;
+              handoff.pendingDefenderUserId = undefined;
+              handoff.pendingMapPan = undefined;
               setPendingHackMapCell(
                 mapPan != null && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
                   ? { x: mapPan.x, y: mapPan.y }
@@ -1244,6 +1287,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           defenderNpcSlug={pendingNpcSlug || undefined}
           defenderNpcInstanceId={pendingNpcInstanceId || undefined}
           hackMapCell={pendingHackMapCell ?? undefined}
+          swarmLeadSetup={pendingSwarmLeadSetup ?? undefined}
         />;
       case 'battle':
         if (!battleId) {
@@ -1928,6 +1972,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         }}
         initialCategory={crewModalInitialCategory}
         focusInitialCategoryKey={crewModalInitialCategory === 'backup-requests' ? crewModalFocusBackupKey : undefined}
+        hasActiveSwarm={Boolean(mySwarmSession)}
+        onSwarmPress={() => {
+          getHackMapHandoffGlobals().openSwarmSessionModalOnMap = true;
+          setShowCrewModal(false);
+          setCrewModalInitialCategory(null);
+          navigateToScreen('map');
+        }}
       />
       {showOnboarding && (
         <OnboardingSlides

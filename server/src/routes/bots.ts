@@ -8,6 +8,7 @@ import {
   getNextBattalionSizeResearchHint,
   isBattalionSlotUnlocked,
   getCrewArmyBonusTotalsForUser,
+  getCrewArmyBonusPartsForUser,
   mergeCrewArmyIntoArmyBonus,
 } from '../utils/researchFeatureUtils';
 import {
@@ -123,8 +124,9 @@ interface StatRow {
   range: number;
 }
 
-// Get bot stats breakdown for profile charts (base, +level, +programming, total)
+// Get bot stats breakdown for profile charts (base, +level, +programming, +crew research, +crew level, total)
 // Total row comes from BotService.getUserBotStats (same as /stats and battles) so one source of truth.
+// Crew level table vs Hack Crew research army bonuses are split for UI; sum matches battle merge.
 // Range bot type (Phreaks): programming bonus from Binary Bank Crack (Attack/Health/Defense/Speed), same pattern as PB → Infantry (breacher), RCH → Cavalry (guardian).
 router.get('/stats-breakdown', auth, async (req, res) => {
   try {
@@ -133,10 +135,25 @@ router.get('/stats-breakdown', auth, async (req, res) => {
     await BotStatsService.loadConfigs();
     const { userLevel, armyBonusForStats, guardianBonusForStats, phreakBonusForStats } =
       await syncAndResolveUserBotProgrammingBonuses(req.user._id);
-    const crewArmy = await getCrewArmyBonusTotalsForUser(req.user._id);
+    const crewParts = await getCrewArmyBonusPartsForUser(req.user._id);
+    const crewArmy = {
+      atk: crewParts.levelTable.atk + crewParts.hackCrewResearch.atk,
+      def: crewParts.levelTable.def + crewParts.hackCrewResearch.def,
+      hp: crewParts.levelTable.hp + crewParts.hackCrewResearch.hp,
+    };
     const armyMerged = mergeCrewArmyIntoArmyBonus(armyBonusForStats, crewArmy);
     const guardianMerged = mergeCrewArmyIntoArmyBonus(guardianBonusForStats, crewArmy);
     const phreakMerged = mergeCrewArmyIntoArmyBonus(phreakBonusForStats, crewArmy);
+
+    const crewPartToStatRow = (c: { atk: number; def: number; hp: number }): StatRow => ({
+      health: c.hp,
+      offense: c.atk,
+      defense: c.def,
+      speed: 0,
+      range: 0,
+    });
+    const crewLevelBonusGlobal = crewPartToStatRow(crewParts.levelTable);
+    const crewResearchBonusGlobal = crewPartToStatRow(crewParts.hackCrewResearch);
 
     const zeroRow = (): StatRow => ({ health: 0, offense: 0, defense: 0, speed: 0, range: 0 });
     const breakdown: Record<
@@ -145,7 +162,10 @@ router.get('/stats-breakdown', auth, async (req, res) => {
         base: StatRow;
         levelBonus: StatRow;
         programmingBonus: StatRow;
-        researchBonus: StatRow;
+        /** Hack Crew research unlocks (category hack-crew army chain), not crew level. */
+        crewResearchBonus: StatRow;
+        /** Crew level member bonus table (army Str/Def/Health totals). */
+        crewLevelBonus: StatRow;
         total: StatRow;
         mark2: { base: StatRow; levelBonus: StatRow; total: StatRow };
       }
@@ -187,13 +207,8 @@ router.get('/stats-breakdown', auth, async (req, res) => {
                   range: (phreakBonusForStats as { range?: number }).range ?? 0,
                 }
               : zeroRow();
-      const researchBonus: StatRow = {
-        health: crewArmy.hp,
-        offense: crewArmy.atk,
-        defense: crewArmy.def,
-        speed: 0,
-        range: 0,
-      };
+      const crewResearchBonus: StatRow = { ...crewResearchBonusGlobal };
+      const crewLevelBonus: StatRow = { ...crewLevelBonusGlobal };
       const finalConfig = await BotService.getUserBotStats(
         botType,
         userLevel,
@@ -223,7 +238,8 @@ router.get('/stats-breakdown', auth, async (req, res) => {
         base,
         levelBonus,
         programmingBonus,
-        researchBonus,
+        crewResearchBonus,
+        crewLevelBonus,
         total,
         mark2: {
           base: baseM2,

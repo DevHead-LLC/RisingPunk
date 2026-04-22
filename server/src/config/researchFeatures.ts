@@ -9,6 +9,7 @@ const DB_BACKED_CATEGORIES: Record<string, IResearchFeature[]> = {
   'hack-crew': [],
   'investments': [],
   'npc': [],
+  'swarm': [],
 };
 
 export const RESEARCH_FEATURES: Record<string, IResearchFeature[]> = {
@@ -418,7 +419,7 @@ export async function getResearchFeaturesAsync(categoryId: string): Promise<IRes
       merged.push(toResearchFeature(d as any));
     }
   }
-  if (categoryId === 'cash-flow' || categoryId === 'hack-ability') {
+  if (categoryId === 'cash-flow' || categoryId === 'hack-ability' || categoryId === 'swarm') {
     merged.sort((a, b) => {
       const la = a.levelRequirement ?? 0;
       const lb = b.levelRequirement ?? 0;

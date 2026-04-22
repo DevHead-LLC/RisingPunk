@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ interface NotificationBannerProps {
   type?: 'success' | 'error' | 'info';
   duration?: number;
   onClose?: () => void;
+  /** Auto-dismiss only: fired once when the outro fade begins (before {@link onClose}). AppContent uses this so other toasts are not gated until `onClose` clears parent state (Bugbot / ios-bugs.md). */
+  onHideAnimationStart?: () => void;
 }
 
 export const NotificationBanner: React.FC<NotificationBannerProps> = ({
@@ -23,9 +25,15 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   type = 'info',
   duration = 5000,
   onClose,
+  onHideAnimationStart,
 }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
   const colors = useThemeColors();
+  /** Auto-dismiss must not reset when parent passes inline callbacks (Bugbot / ios-bugs.md). */
+  const onCloseRef = useRef(onClose);
+  const onHideAnimationStartRef = useRef(onHideAnimationStart);
+  onCloseRef.current = onClose;
+  onHideAnimationStartRef.current = onHideAnimationStart;
 
   useEffect(() => {
     if (visible) {
@@ -38,18 +46,19 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
 
       // Auto fade out after duration
       const timer = setTimeout(() => {
+        onHideAnimationStartRef.current?.();
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 300,
           useNativeDriver: true,
         }).start(() => {
-          onClose?.();
+          onCloseRef.current?.();
         });
       }, duration);
 
       return () => clearTimeout(timer);
     }
-  }, [visible, fadeAnim, duration, onClose]);
+  }, [visible, fadeAnim, duration]);
 
   if (!visible) return null;
 

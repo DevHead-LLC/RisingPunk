@@ -41,6 +41,8 @@ interface CrewModalProps {
   focusInitialCategoryKey?: number;
   /** From crew chat: tap shared map location (closes crew chat overlay, then parent pans map). */
   onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
+  hasActiveSwarm?: boolean;
+  onSwarmPress?: () => void;
 }
 
 type CrewCategory = 
@@ -75,6 +77,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   initialCategory = null,
   focusInitialCategoryKey,
   onNavigateToMapCell,
+  hasActiveSwarm = false,
+  onSwarmPress,
 }) => {
   const colors = useThemeColors();
   const [currentCategory, setCurrentCategory] = useState<CrewCategory>(null);
@@ -681,8 +685,24 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 <Image source={require('../../assets/images/crew/backup.png')} style={styles.backupIconImage} resizeMode="contain" />
               </TouchableOpacity>
             )}
+            {hasActiveSwarm && (
+              <TouchableOpacity
+                style={styles.swarmIconButton}
+                onPress={onSwarmPress}
+                activeOpacity={0.7}
+              >
+                <Image source={require('../../assets/images/hackMap/swarmIcon.png')} style={styles.swarmIconImage} resizeMode="contain" />
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={styles.title}>{title}</Text>
+          <View style={styles.headerTitleBlock}>
+            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
+            {activeCrewDetails?.crew ? (
+              <Text style={[styles.crewHeaderMeta, { color: colors.text.secondary }]} numberOfLines={1} ellipsizeMode="tail">
+                Crew Lv {activeCrewDetails.crew.level ?? 1} • {activeCrewDetails.crew.memberCount} members
+              </Text>
+            ) : null}
+          </View>
           <TouchableOpacity
             style={styles.closeButton}
             onPress={handleClose}
@@ -1153,6 +1173,15 @@ export const CrewModal: React.FC<CrewModalProps> = ({
             </Text>
             <Text style={[styles.infoValue, { color: colors.text.primary }]}>
               {crew.nativeLanguage}
+            </Text>
+          </View>
+
+          <View style={[styles.infoItem, { borderColor: colors.secondary, backgroundColor: colors.surface }]}>
+            <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>
+              Crew Level
+            </Text>
+            <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+              {crew.level ?? 1}
             </Text>
           </View>
 
@@ -2160,6 +2189,17 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  headerTitleBlock: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  crewHeaderMeta: {
+    fontSize: SIZING.font.small,
+    marginTop: 4,
+    textAlign: 'center',
+  },
   chatIconButton: {
     width: 44,
     height: 44,
@@ -2199,16 +2239,30 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     marginRight: SIZING.spacing.sm,
   },
+  swarmIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    borderColor: colors.secondary,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SIZING.spacing.sm,
+  },
   // Bugbot: 54×54 image overflows 44×44 backupIconButton by design; intentional for visibility/emphasis (not an oversight).
   backupIconImage: {
     width: 54,
     height: 54,
   },
+  swarmIconImage: {
+    width: 30,
+    height: 30,
+  },
   title: {
     color: colors.text.primary,
     fontSize: SIZING.font.h2,
     fontWeight: 'bold',
-    flex: 1,
     textAlign: 'center',
   },
   closeButton: {

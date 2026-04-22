@@ -11,6 +11,7 @@ import {
   getRentalProfitBonusPerRoom,
   getRentalProfitBonusPerRoomAsOf,
   getResearchFeaturesForBonusSync,
+  getCrewLevelIncomeBonusForUser,
   type BonusPrefetch,
 } from '../utils/researchFeatureUtils';
 
@@ -224,7 +225,8 @@ export class RentalHousingSyncService {
     const rentalBonusPerRoom = await getRentalProfitBonusPerRoom(userId, bonusPrefetch);
     const rentalIncome = await RentalHousingIncomeService.calculateRentalHousingIncome(user, { rentalProfitBonusPerRoom: rentalBonusPerRoom });
     const rentalIncomePerSecond = rentalIncome.totalIncomePerSecond;
-    const totalEffectiveRate = baseRate + rentalIncomePerSecond;
+    const crewLevelIncomeBonus = await getCrewLevelIncomeBonusForUser(userId);
+    const totalEffectiveRate = baseRate + rentalIncomePerSecond + crewLevelIncomeBonus;
     
     if (totalEffectiveRate < 0) {
       console.error('[INCOME RATE] Invalid totalEffectiveRate calculated:', totalEffectiveRate);

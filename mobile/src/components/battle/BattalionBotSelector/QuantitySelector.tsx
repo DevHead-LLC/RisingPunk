@@ -15,9 +15,10 @@ type Props = {
   available: number;
   onChangeQuantity: (value: number) => void;
   disabled?: boolean;
+  maxQuantityOverride?: number;
 };
 
-export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity, disabled = false }: Props) => {
+export const QuantitySelector = React.memo(({ quantity, available, onChangeQuantity, disabled = false, maxQuantityOverride }: Props) => {
   const colors = useThemeColors();
   const { themeMode } = useTheme();
   const { data } = useGetUserFeaturesQuery('hack-ability');
@@ -28,7 +29,11 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
     () => computeBattalionMaxSizeFromFeatures(features, researchNowMs),
     [features, researchNowMs]
   );
-  const maxQuantity = Math.min(available, MAX_BATTALION_SIZE);
+  const effectiveMaxBattalionSize =
+    typeof maxQuantityOverride === 'number' && Number.isFinite(maxQuantityOverride) && maxQuantityOverride > 0
+      ? Math.floor(maxQuantityOverride)
+      : MAX_BATTALION_SIZE;
+  const maxQuantity = Math.min(available, effectiveMaxBattalionSize);
 
   const adjustQuantity = React.useCallback((adjustment: number) => {
     const newValue = Math.min(Math.max(0, quantity + adjustment), maxQuantity);
@@ -46,14 +51,14 @@ export const QuantitySelector = React.memo(({ quantity, available, onChangeQuant
       typeof maxQuantity !== 'number' ||
       !Number.isFinite(maxQuantity) ||
       maxQuantity < 0 ||
-      maxQuantity > MAX_BATTALION_SIZE
+      maxQuantity > effectiveMaxBattalionSize
     ) {
       return;
     }
     
-    const safeValue = Math.min(Math.max(0, maxQuantity), MAX_BATTALION_SIZE);
+    const safeValue = Math.min(Math.max(0, maxQuantity), effectiveMaxBattalionSize);
     onChangeQuantity(safeValue);
-  }, [maxQuantity, onChangeQuantity, MAX_BATTALION_SIZE]);
+  }, [maxQuantity, onChangeQuantity, effectiveMaxBattalionSize]);
 
   return (
     <View style={styles.container}>
