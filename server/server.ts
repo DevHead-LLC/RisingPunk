@@ -39,6 +39,7 @@ import packetBreachRoutes from './src/routes/packetBreach';
 import raceConditionHeistRoutes from './src/routes/raceConditionHeist';
 import binaryBankCrackRoutes from './src/routes/binaryBankCrack';
 import battlePresetsRoutes from './src/routes/battlePresets';
+import swarmRoutes from './src/routes/swarm';
 
 declare global {
   namespace Express {
@@ -191,6 +192,14 @@ mongoose.connect(process.env.MONGODB_URI, {
     startAttackMarchDueSweepWatchdog();
   } catch (dueSweepErr: unknown) {
     console.warn('Attack march due-date sweep watchdog failed to start (non-fatal):', dueSweepErr);
+  }
+
+  try {
+    const { runSwarmPrepSweepOnce, startSwarmPrepSweepWatchdog } = require('./src/services/SwarmService');
+    await runSwarmPrepSweepOnce();
+    startSwarmPrepSweepWatchdog();
+  } catch (swarmSweepErr: unknown) {
+    console.warn('Swarm prep sweep watchdog failed to start (non-fatal):', swarmSweepErr);
   }
 
   try {
@@ -700,6 +709,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/private-messages', privateMessagesRoutes);
 app.use('/api/probe', probeRoutes);
 app.use('/api/attack', attackRoutes);
+app.use('/api/swarm', swarmRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/daily-haul', dailyHaulRoutes);
 app.use('/api/packet-breach', packetBreachRoutes);

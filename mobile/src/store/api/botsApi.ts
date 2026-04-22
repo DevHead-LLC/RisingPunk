@@ -17,6 +17,83 @@ export interface StatRow {
   range: number;
 }
 
+const EMPTY_STAT_ROW: StatRow = {
+  health: 0,
+  offense: 0,
+  defense: 0,
+  speed: 0,
+  range: 0,
+};
+
+function coerceStatRow(input: unknown): StatRow {
+  if (!input || typeof input !== 'object') {
+    return { ...EMPTY_STAT_ROW };
+  }
+  const r = input as Record<string, unknown>;
+  const n = (v: unknown): number =>
+    typeof v === 'number' && Number.isFinite(v) ? v : 0;
+  return {
+    health: n(r.health),
+    offense: n(r.offense),
+    defense: n(r.defense),
+    speed: n(r.speed),
+    range: n(r.range),
+  };
+}
+
+export type BotStatsBreakdownPayload = {
+  userLevel: number;
+  breakdown: Record<
+    string,
+    {
+      base: StatRow;
+      levelBonus: StatRow;
+      programmingBonus: StatRow;
+      crewResearchBonus: StatRow;
+      crewLevelBonus: StatRow;
+      total: StatRow;
+      mark2: { base: StatRow; levelBonus: StatRow; total: StatRow };
+    }
+  >;
+};
+
+/**
+ * Normalize stats-breakdown entries so `crewResearchBonus` / `crewLevelBonus` are always StatRows:
+ * missing keys, snake_case, null, or non-object values would otherwise make Profile/Digital Barracks misbehave.
+ */
+function normalizeBotStatsBreakdownResponse(data: unknown): BotStatsBreakdownPayload {
+  if (!data || typeof data !== 'object') {
+    return { userLevel: 0, breakdown: {} };
+  }
+  const d = data as Record<string, unknown>;
+  const raw = d.breakdown;
+  if (!raw || typeof raw !== 'object') {
+    return {
+      userLevel: typeof d.userLevel === 'number' ? d.userLevel : 0,
+      breakdown: {},
+    };
+  }
+  const breakdown: BotStatsBreakdownPayload['breakdown'] = {};
+  for (const key of Object.keys(raw)) {
+    const b = (raw as Record<string, unknown>)[key];
+    if (!b || typeof b !== 'object') continue;
+    const entry = { ...(b as Record<string, unknown>) };
+    const crRaw =
+      entry.crewResearchBonus ??
+      entry.crew_research_bonus;
+    const clRaw =
+      entry.crewLevelBonus ??
+      entry.crew_level_bonus;
+    entry.crewResearchBonus = coerceStatRow(crRaw);
+    entry.crewLevelBonus = coerceStatRow(clRaw);
+    breakdown[key] = entry as BotStatsBreakdownPayload['breakdown'][string];
+  }
+  return {
+    userLevel: typeof d.userLevel === 'number' ? d.userLevel : 0,
+    breakdown,
+  };
+}
+
 // Custom base query with error handling for botsApi
 const botsBaseQuery = async (args: any, api: any, extraOptions: any) => {
   const result = await fetchBaseQuery({
@@ -75,27 +152,9 @@ export const botsApi = createApi({
       query: () => '/api/bots/stats',
       providesTags: ['Bots'],
     }),
-    fetchBotStatsBreakdown: builder.query<
-      {
-        userLevel: number;
-        breakdown: Record<
-          string,
-          {
-            base: StatRow;
-            levelBonus: StatRow;
-            programmingBonus: StatRow;
-            /** Hack Crew research army unlocks (not crew level). */
-            crewResearchBonus: StatRow;
-            /** Crew level member bonus table (army-wide). */
-            crewLevelBonus: StatRow;
-            total: StatRow;
-            mark2: { base: StatRow; levelBonus: StatRow; total: StatRow };
-          }
-        >;
-      },
-      void
-    >({
+    fetchBotStatsBreakdown: builder.query<BotStatsBreakdownPayload, void>({
       query: () => '/api/bots/stats-breakdown',
+      transformResponse: (response: unknown) => normalizeBotStatsBreakdownResponse(response),
       providesTags: ['Bots'],
     }),
     startBuild: builder.mutation<any, { type: BotType; quantity: number; totalCost: number; markLevel: 1 | 2 }>({

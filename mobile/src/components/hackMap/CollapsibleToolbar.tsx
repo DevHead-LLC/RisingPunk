@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
-import { CloseButton } from '../common/CloseButton';
 import { useGetShieldStatusQuery } from '../../store/api/antivirusApi';
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 interface CollapsibleToolbarProps {
   onAntivirusPress: () => void;
@@ -13,6 +10,9 @@ interface CollapsibleToolbarProps {
   onHackCrewPress?: () => void;
   isHackCrewUnlocked?: boolean;
   isInCrew?: boolean;
+  onSwarmPress?: () => void;
+  isSwarmUnlocked?: boolean;
+  hasActiveSwarm?: boolean;
 }
 
 export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
@@ -21,6 +21,9 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
   onHackCrewPress,
   isHackCrewUnlocked = false,
   isInCrew = false,
+  onSwarmPress,
+  isSwarmUnlocked = false,
+  hasActiveSwarm = false,
 }) => {
   const colors = useThemeColors();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -35,12 +38,12 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
   };
 
   // Don't render the toolbar at all if neither feature is unlocked
-  if (!isAntivirusUnlocked && !isHackCrewUnlocked) {
+  if (!isAntivirusUnlocked && !isHackCrewUnlocked && !isSwarmUnlocked) {
     return null;
   }
 
   // Calculate number of unlocked icons
-  const iconCount = (isAntivirusUnlocked ? 1 : 0) + (isHackCrewUnlocked ? 1 : 0);
+  const iconCount = (isAntivirusUnlocked ? 1 : 0) + (isHackCrewUnlocked ? 1 : 0) + (isSwarmUnlocked ? 1 : 0);
   const iconWidth = 36;
   const horizontalPadding = SIZING.spacing.md;
   const toolbarWidth = (iconWidth * iconCount) + (horizontalPadding * 2);
@@ -92,6 +95,20 @@ export const CollapsibleToolbar: React.FC<CollapsibleToolbarProps> = ({
                   : require('../../assets/images/hackMap/hackCrew.png')
                 }
                 style={styles.toolIcon}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          )}
+
+          {isSwarmUnlocked && (
+            <TouchableOpacity
+              style={styles.toolButton}
+              onPress={onSwarmPress}
+              activeOpacity={0.7}
+            >
+              <Image
+                source={require('../../assets/images/hackMap/swarmIcon.png')}
+                style={[styles.toolIcon, !hasActiveSwarm && styles.inactiveSwarmIcon]}
                 resizeMode="contain"
               />
             </TouchableOpacity>
@@ -164,6 +181,9 @@ const createStyles = (colors: any, toolbarWidth: number) => StyleSheet.create({
   toolIcon: {
     width: 32,
     height: 32,
+  },
+  inactiveSwarmIcon: {
+    opacity: 0.65,
   },
 });
 

@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH } from '../constants/privateMessageCaps';
 
 export interface IPrivateMessage extends Document {
   senderId: mongoose.Types.ObjectId;
@@ -17,6 +18,10 @@ export interface IPrivateMessage extends Document {
 /** Appended to every admin broadcast message (one-way, no reply). */
 export const ADMIN_BROADCAST_FOOTER =
   'Thank you for playing RisingPunk! Please contact support at support@risingpunk.com for help or feedback.';
+
+/** Largest legitimate stored `message` (admin broadcast: body + `\\n\\n` + {@link ADMIN_BROADCAST_FOOTER}). */
+export const PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH =
+  ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH + 2 + ADMIN_BROADCAST_FOOTER.length;
 
 const privateMessageSchema = new Schema({
   senderId: {
@@ -39,13 +44,14 @@ const privateMessageSchema = new Schema({
   message: {
     type: String,
     required: true,
-    maxlength: 600,
     trim: true,
+    maxlength: PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH,
   },
   originalMessage: {
     type: String,
     required: false,
-    maxlength: 500,
+    /** User ↔ user DMs are capped at the route; admin broadcast body may be long (stored for audit). */
+    maxlength: ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH,
     trim: true,
   },
   readAt: {

@@ -76,21 +76,36 @@ export async function cancelOutboundAttackMarch(
     throw new AttackMarchCancelError(400, 'Only outbound marches can be cancelled');
   }
 
-  const consumed = march.consumedBattalionAssignments as BattalionAssignmentRow[] | undefined;
-  if (!Array.isArray(consumed) || consumed.length === 0) {
-    throw new AttackMarchCancelError(
-      409,
-      'March is missing consumed assignment data; cannot restore barracks safely'
-    );
-  }
-
   const armySnap = march.armySnapshot as AttackMarchArmySnapshot;
   if (!armySnap?.battalions || !Array.isArray(armySnap.battalions)) {
     throw new AttackMarchCancelError(500, 'March army snapshot is invalid');
   }
 
-  if (!consumedRowsMatchArmySnapshot(consumed, armySnap)) {
-    throw new AttackMarchCancelError(500, 'March data integrity error (assignments vs army snapshot)');
+  const consumed = march.consumedBattalionAssignments as BattalionAssignmentRow[] | undefined;
+  /** Swarm deploy uses session commitments (not digital barracks consumed rows). */
+  const isSwarmMarch =
+    march.attackType === 'swarm' ||
+    (typeof march.swarmSessionId === 'string' && march.swarmSessionId.trim() !== '');
+
+  if (isSwarmMarch) {
+    if (!march.swarmSessionId || String(march.swarmSessionId).trim() === '') {
+      throw new AttackMarchCancelError(500, 'Swarm march is missing swarmSessionId');
+    }
+    if (Array.isArray(consumed) && consumed.length > 0) {
+      if (!consumedRowsMatchArmySnapshot(consumed, armySnap)) {
+        throw new AttackMarchCancelError(500, 'March data integrity error (assignments vs army snapshot)');
+      }
+    }
+  } else {
+    if (!Array.isArray(consumed) || consumed.length === 0) {
+      throw new AttackMarchCancelError(
+        409,
+        'March is missing consumed assignment data; cannot restore barracks safely'
+      );
+    }
+    if (!consumedRowsMatchArmySnapshot(consumed, armySnap)) {
+      throw new AttackMarchCancelError(500, 'March data integrity error (assignments vs army snapshot)');
+    }
   }
 
   const mid = marchId.trim();
