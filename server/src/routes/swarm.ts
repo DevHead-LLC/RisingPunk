@@ -125,10 +125,19 @@ router.post('/:swarmId/commit', auth, async (req: Request, res: Response): Promi
 router.post('/:swarmId/dismiss', auth, async (req: Request, res: Response): Promise<void> => {
   try {
     const requesterUserId = String((req as any).user._id);
+    const { slotIndex } = req.body ?? {};
+    const si = Number(slotIndex);
+    if (!Number.isInteger(si) || si < 7 || si > 18) {
+      res.status(400).json({
+        success: false,
+        error: 'slotIndex must be an integer between 7 and 18 (joiner slots only)',
+      });
+      return;
+    }
     const sessionDoc = await dismissSwarmSlot({
       requesterUserId,
       swarmId: req.params.swarmId,
-      slotIndex: Number(req.body?.slotIndex),
+      slotIndex: si,
     });
     res.json({ success: true, data: sessionDoc });
   } catch (e) {
