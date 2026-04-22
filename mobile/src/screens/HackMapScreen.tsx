@@ -2582,7 +2582,7 @@ export const HackMapScreen: React.FC<Props> = ({
   const hackCrewRemaining = Math.max(0, hackCrewResearchCompletesAt - now);
   const isHackCrewUnlocked = hackCrewFeature?.isUnlocked || 
     (hackCrewFeature?.isResearching && hackCrewRemaining === 0);
-  const swarmLeadFeature = swarmFeatures?.find((f) => f.id === 'swarm-lead');
+  const swarmLeadFeature = swarmFeatures?.features?.find((f) => f.id === 'swarm-lead');
   const swarmLeadResearchCompletesAt = swarmLeadFeature?.researchCompletesAt
     ? new Date(swarmLeadFeature.researchCompletesAt).getTime()
     : 0;
