@@ -48,6 +48,10 @@ export interface IAttackMarchDocument extends Document {
   /** True only for user-cancelled outbound marches; inventory refunds when return leg completes. */
   returningAfterCancel?: boolean;
   battleId?: string;
+  /** Set for Swarm marches to link settlement/report fan-out to the session. */
+  swarmSessionId?: string;
+  /** Solo (default) vs swarm launch. */
+  attackType?: 'solo' | 'swarm';
   hackMapCellX: number;
   hackMapCellY: number;
   createdAt: Date;
@@ -85,6 +89,8 @@ const attackMarchSchema = new Schema<IAttackMarchDocument>(
     returnLegStartY: { type: Number, required: false },
     returningAfterCancel: { type: Boolean, required: false },
     battleId: { type: String, required: false },
+    swarmSessionId: { type: String, required: false },
+    attackType: { type: String, required: false, enum: ['solo', 'swarm'], default: 'solo' },
     hackMapCellX: { type: Number, required: true },
     hackMapCellY: { type: Number, required: true },
     createdAt: { type: Date, required: true },
@@ -101,5 +107,6 @@ attackMarchSchema.index({ defenderQueueKey: 1, state: 1 });
 attackMarchSchema.index({ state: 1, resolvingSince: 1 });
 attackMarchSchema.index({ state: 1, atTargetSince: 1 });
 attackMarchSchema.index({ state: 1, createdAt: 1 });
+attackMarchSchema.index({ swarmSessionId: 1 }, { sparse: true });
 
 export const AttackMarch = mongoose.model<IAttackMarchDocument>('AttackMarch', attackMarchSchema);

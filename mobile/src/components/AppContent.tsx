@@ -1,5 +1,5 @@
-import React, { memo, useEffect, useRef, useCallback } from 'react';
-import { View, Text, Dimensions, AppState, Platform } from 'react-native';
+import React, { memo, useEffect, useRef, useCallback, useState } from 'react';
+import { Dimensions, AppState, Platform } from 'react-native';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import { loadStoredAuth, updateHandle, setShowEmailVerification, setShowEmailVerificationBanner, refreshUserData, logoutUser, setShowAccountSwitched, setShowAccountSwitchedBanner, setUserProfileFromPayload } from '../store/slices/authSlice';
 import { updateBalance, triggerUpdate } from '../store/slices/balanceSlice';
@@ -21,14 +21,11 @@ import { AccountSwitchedModal } from './modals/AccountSwitchedModal';
 import { NotificationBanner } from './common/NotificationBanner';
 import { globalErrorHandler } from '../services/GlobalErrorHandler';
 import { getAnalytics, setAnalyticsCollectionEnabled, setUserProperty, logEvent } from '@react-native-firebase/analytics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { trackAppReturned, trackFirstOpen, getAccountCreatedThisSession, clearAccountCreatedThisSession } from '../services/analyticsService';
 import { checkAppVersion } from '../services/appVersionService';
 import { UpdateRequiredScreen } from './UpdateRequiredScreen';
-import {
-  MARCH_TRANSITION_BANNER_DURATION_MS,
-  useAttackMarchTransitionBanners,
-} from '../hooks/useAttackMarchTransitionBanners';
+import { MARCH_TRANSITION_BANNER_DURATION_MS, useAttackMarchTransitionBanners } from '../hooks/useAttackMarchTransitionBanners';
+import { SWARM_ACTIVE_BANNER_DURATION_MS, useCrewSwarmActiveBanner } from '../hooks/useCrewSwarmActiveBanner';
 
 const AppContent = memo(() => {
   const dispatch = useAppDispatch();
@@ -46,6 +43,18 @@ const AppContent = memo(() => {
   const { isConnected, isInternetReachable } = useNetworkConnectivity();
 
   const { marchBanner, dismissMarchBanner } = useAttackMarchTransitionBanners(token);
+  const { swarmBanner, dismissSwarmBanner } = useCrewSwarmActiveBanner(token);
+  /** True while march toast is auto-dismissing: parent `marchBanner` stays set until fade ends, but swarm banner can show once outro starts (Bugbot / ios-bugs.md). */
+  const [marchBannerFadeStarted, setMarchBannerFadeStarted] = useState(false);
+  useEffect(() => {
+    if (marchBanner) {
+      setMarchBannerFadeStarted(false);
+    }
+  }, [marchBanner]);
+
+  const onMarchBannerHideAnimationStart = useCallback(() => {
+    setMarchBannerFadeStarted(true);
+  }, []);
 
   // Function to center the turf view to home/digital barracks position
   const centerTurfView = useCallback(() => {
@@ -137,7 +146,7 @@ const AppContent = memo(() => {
         // Set user property for platform to make filtering easier
         try {
           await setUserProperty(analytics, 'platform', Platform.OS);
-        } catch (error) {
+        } catch {
           // Continue even if this fails
         }
         
@@ -413,7 +422,19 @@ const AppContent = memo(() => {
         message={marchBanner?.message ?? ''}
         type={marchBanner?.type ?? 'info'}
         duration={MARCH_TRANSITION_BANNER_DURATION_MS}
+        onHideAnimationStart={onMarchBannerHideAnimationStart}
         onClose={dismissMarchBanner}
+      />
+      <NotificationBanner
+        visible={
+          !!swarmBanner &&
+          !showEmailVerificationBanner &&
+          (!marchBanner || marchBannerFadeStarted)
+        }
+        message={swarmBanner?.message ?? ''}
+        type={swarmBanner?.type ?? 'info'}
+        duration={SWARM_ACTIVE_BANNER_DURATION_MS}
+        onClose={dismissSwarmBanner}
       />
       <GlobalErrorModal
         visible={showGlobalError && !!token}

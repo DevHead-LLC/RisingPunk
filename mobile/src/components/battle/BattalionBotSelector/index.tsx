@@ -20,7 +20,6 @@ import { useTaskGuideHighlight } from '../../../contexts/TaskGuideHighlightConte
 import {
   BOT_FAMILY_ORDER,
   M1_UNIT_DISPLAY_NAMES,
-  MARK2_DISPLAY_NAMES,
   RPS_TYPE_LABELS,
   battalionModalDropdownSummary,
   battalionModalOptionLine,
@@ -79,6 +78,7 @@ type Props = {
   availableM1: Record<BotType, number>;
   availableM2: Record<BotType, number>;
   mark2Unlocked: boolean;
+  maxQuantityOverride?: number;
 };
 
 export const BattalionBotSelector = React.memo(
@@ -90,6 +90,7 @@ export const BattalionBotSelector = React.memo(
     availableM1,
     availableM2,
     mark2Unlocked,
+    maxQuantityOverride,
   }: Props) => {
     const colors = useThemeColors();
     const { themeMode } = useTheme();
@@ -332,6 +333,7 @@ export const BattalionBotSelector = React.memo(
                   available={availableForSelected}
                   onChangeQuantity={setQuantity}
                   disabled={isAssignBotsHighlight}
+                  maxQuantityOverride={maxQuantityOverride}
                 />
               </View>
             )}

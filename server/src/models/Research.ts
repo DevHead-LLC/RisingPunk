@@ -128,7 +128,8 @@ const researchSchema = new Schema({
       'construction',
       'battle-mechanics',
       'gear',
-      'investments'
+      'investments',
+      'swarm'
     ]
   },
   name: {
@@ -157,7 +158,8 @@ const researchSchema = new Schema({
       'construction',
       'battle-mechanics',
       'gear',
-      'investments'
+      'investments',
+      'swarm'
     ]
   }],
   image: {

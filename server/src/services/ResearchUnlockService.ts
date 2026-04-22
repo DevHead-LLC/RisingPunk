@@ -32,7 +32,9 @@ export class ResearchUnlockService {
     'construction': 50000,
     'battle-mechanics': 150000,
     'gear': 400000,
-    'investments': 75000
+    'investments': 75000,
+    /** Matches `research` category doc / seed when `unlockCost` is absent. */
+    'swarm': 25000000
   };
 
   static async validateUnlockRequirements(
