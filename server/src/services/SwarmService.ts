@@ -425,23 +425,40 @@ export async function dismissSwarmSlot(params: {
   slotIndex: number;
 }): Promise<ISwarmSessionDocument> {
   const { requesterUserId, swarmId, slotIndex } = params;
-  const sessionDoc = await SwarmSession.findOne({ swarmId: String(swarmId).trim() });
-  if (!sessionDoc) throw new SwarmError(404, 'Swarm session not found');
-  if (sessionDoc.state !== 'preparing') throw new SwarmError(409, 'Only preparing Swarms can dismiss slots');
-  if (String(sessionDoc.leaderUserId) !== String(requesterUserId)) {
-    throw new SwarmError(403, 'Only the Swarm lead can dismiss committed slots');
-  }
   if (!Number.isInteger(slotIndex) || slotIndex < 7 || slotIndex > 18) {
     throw new SwarmError(400, 'Lead can only dismiss joiner slots (7-18)');
   }
-  const idx = sessionDoc.commitments.findIndex((c) => c.slotIndex === slotIndex);
-  if (idx === -1) throw new SwarmError(404, 'Slot not committed');
-  const commitment = sessionDoc.commitments[idx];
-  sessionDoc.commitments.splice(idx, 1);
-  sessionDoc.participants = buildParticipants(sessionDoc);
-  await sessionDoc.save();
-  await addInventory(String(commitment.userId), commitment.botType, commitment.markLevel, commitment.quantity);
-  return sessionDoc;
+  const swarmIdTrim = String(swarmId).trim();
+  const clientSession = await mongoose.startSession();
+  let updated: ISwarmSessionDocument;
+  try {
+    await clientSession.withTransaction(async () => {
+      const sessionDoc = await SwarmSession.findOne({ swarmId: swarmIdTrim }).session(clientSession);
+      if (!sessionDoc) {
+        throw new SwarmError(404, 'Swarm session not found');
+      }
+      if (sessionDoc.state !== 'preparing') {
+        throw new SwarmError(409, 'Only preparing Swarms can dismiss slots');
+      }
+      if (String(sessionDoc.leaderUserId) !== String(requesterUserId)) {
+        throw new SwarmError(403, 'Only the Swarm lead can dismiss committed slots');
+      }
+      const idx = sessionDoc.commitments.findIndex((c) => c.slotIndex === slotIndex);
+      if (idx === -1) {
+        throw new SwarmError(404, 'Slot not committed');
+      }
+      const commitment = sessionDoc.commitments[idx];
+      sessionDoc.commitments.splice(idx, 1);
+      sessionDoc.participants = buildParticipants(sessionDoc);
+      await sessionDoc.save({ session: clientSession });
+      // Same txn as session write: if restore fails, commitment removal rolls back (Bugbot / ios-bugs.md).
+      await addInventory(String(commitment.userId), commitment.botType, commitment.markLevel, commitment.quantity, clientSession);
+      updated = sessionDoc;
+    });
+  } finally {
+    await clientSession.endSession();
+  }
+  return updated!;
 }
 
 async function launchSwarmMarch(sessionDoc: ISwarmSessionDocument): Promise<{ marchId: string; arriveAt: Date }> {
