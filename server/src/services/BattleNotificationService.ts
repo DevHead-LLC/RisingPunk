@@ -4,27 +4,102 @@
  */
 
 import { IBattleDocument } from '../models/Battle';
-import { PrivateMessage } from '../models/PrivateMessage';
+import { PrivateMessage, PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH } from '../models/PrivateMessage';
 import { applyRetentionAfterInsert } from './PrivateMessageRetentionService';
 import { User } from '../models/User';
 import { BATTLE_REPORT_SENDER_ID, BATTLE_REPORT_SENDER_USERNAME } from '../constants/systemSenders';
-import { NodeOwner, IBattalion } from '../types/battle';
+import { NodeOwner } from '../types/battle';
 import { formatHackLocationDisplay } from '../utils/battleHackLocation';
+import {
+  battleReportBotsLost,
+  sumBattalionBotsByOwnerForReport,
+} from '../utils/battleReportBotCounts';
 import { NPCService } from './NPCService';
 
 const BATTLE_REPORT_PREFIX = 'BTL|';
-const MAX_MESSAGE_LENGTH = 600;
 
-type BotCounts = { guardian: number; breacher: number; phreak: number };
+const HANDLE_TRUNC_FOR_OVERFLOW = 20;
 
-function sumByOwnerAndType(battalions: IBattalion[], owner: NodeOwner): BotCounts {
-  const out: BotCounts = { guardian: 0, breacher: 0, phreak: 0 };
-  for (const b of battalions) {
-    if (b.owner !== owner) continue;
-    const t = b.type as keyof BotCounts;
-    if (out[t] !== undefined) out[t] += b.quantity ?? 0;
+/**
+ * Build stored `BTL|` string under {@link PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH} (same cap as admin/system PM bodies).
+ * Prefers full payload; degrades only if needed: short handles → omit map fields → minimal ids/winner → tiny fallback.
+ * User ↔ user chat remains route-capped separately; this path is system battle reports only.
+ */
+export function serializeBattleReportMessage(
+  payload: Record<string, unknown>,
+  logContext: string
+): string {
+  const max = PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH;
+  const serialize = (p: Record<string, unknown>) => BATTLE_REPORT_PREFIX + JSON.stringify(p);
+
+  let body = serialize(payload);
+  if (body.length <= max) {
+    return body;
   }
-  return out;
+
+  const ah = payload.attackerHandle;
+  const dh = payload.defenderHandle;
+  const withShortHandles: Record<string, unknown> = {
+    ...payload,
+    attackerHandle: typeof ah === 'string' ? ah.slice(0, HANDLE_TRUNC_FOR_OVERFLOW) : ah,
+    defenderHandle: typeof dh === 'string' ? dh.slice(0, HANDLE_TRUNC_FOR_OVERFLOW) : dh,
+  };
+  body = serialize(withShortHandles);
+  if (body.length <= max) {
+    console.warn('[BattleNotificationService] BTL| length trim: truncated handles', logContext, {
+      len: body.length,
+      max,
+    });
+    return body;
+  }
+
+  const withoutLoc = { ...withShortHandles };
+  delete withoutLoc.hl;
+  delete withoutLoc.mapName;
+  delete withoutLoc.x;
+  delete withoutLoc.y;
+  body = serialize(withoutLoc);
+  if (body.length <= max) {
+    console.warn('[BattleNotificationService] BTL| length trim: omitted map fields (hl/mapName/x/y)', logContext);
+    return body;
+  }
+
+  const battleId = payload.battleId;
+  const minimalCore: Record<string, unknown> = {
+    br: typeof payload.br === 'number' ? payload.br : 1,
+    battleId,
+    winner: payload.winner,
+    attackerId: payload.attackerId,
+    defenderId: payload.defenderId,
+    _truncated: 1,
+    _reason: 'schema_message_max',
+  };
+  if (payload.npc === 1) {
+    minimalCore.npc = 1;
+  }
+  if (payload.swarm === 1) {
+    minimalCore.swarm = 1;
+  }
+  body = serialize(minimalCore);
+  if (body.length <= max) {
+    console.error('[BattleNotificationService] BTL| fell back to minimal payload (stats omitted)', logContext, {
+      battleId,
+    });
+    return body;
+  }
+
+  const emergency = BATTLE_REPORT_PREFIX + JSON.stringify({
+    br: 1,
+    battleId: battleId != null ? String(battleId) : '',
+    _truncated: 1,
+    _reason: 'emergency_max',
+  });
+  console.error('[BattleNotificationService] BTL| emergency body (core stats omitted)', logContext, {
+    battleId,
+    len: emergency.length,
+    max,
+  });
+  return emergency;
 }
 
 /**
@@ -43,21 +118,13 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
   const startingBattalions = battle.startingBattalions ?? [];
   const endingBattalions = battle.battalions ?? [];
 
-  const attackerStart = sumByOwnerAndType(startingBattalions, NodeOwner.USER);
-  const defenderStart = sumByOwnerAndType(startingBattalions, NodeOwner.ENEMY);
-  const attackerEnd = sumByOwnerAndType(endingBattalions, NodeOwner.USER);
-  const defenderEnd = sumByOwnerAndType(endingBattalions, NodeOwner.ENEMY);
+  const attackerStart = sumBattalionBotsByOwnerForReport(startingBattalions, NodeOwner.USER);
+  const defenderStart = sumBattalionBotsByOwnerForReport(startingBattalions, NodeOwner.ENEMY);
+  const attackerEnd = sumBattalionBotsByOwnerForReport(endingBattalions, NodeOwner.USER);
+  const defenderEnd = sumBattalionBotsByOwnerForReport(endingBattalions, NodeOwner.ENEMY);
 
-  const attackerLost: BotCounts = {
-    guardian: Math.max(0, attackerStart.guardian - attackerEnd.guardian),
-    breacher: Math.max(0, attackerStart.breacher - attackerEnd.breacher),
-    phreak: Math.max(0, attackerStart.phreak - attackerEnd.phreak),
-  };
-  const defenderLost: BotCounts = {
-    guardian: Math.max(0, defenderStart.guardian - defenderEnd.guardian),
-    breacher: Math.max(0, defenderStart.breacher - defenderEnd.breacher),
-    phreak: Math.max(0, defenderStart.phreak - defenderEnd.phreak),
-  };
+  const attackerLost = battleReportBotsLost(attackerStart, attackerEnd);
+  const defenderLost = battleReportBotsLost(defenderStart, defenderEnd);
 
   let attackerHandle = 'Unknown';
   let defenderHandle = 'NPC';
@@ -118,16 +185,7 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
     (payload as { mapName?: string; x?: number; y?: number }).y = Math.floor(by);
   }
 
-  let messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
-  if (messageBody.length > MAX_MESSAGE_LENGTH) {
-    payload.attackerHandle = String(attackerHandle).slice(0, 20);
-    payload.defenderHandle = String(defenderHandle).slice(0, 20);
-    messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
-    if (messageBody.length > MAX_MESSAGE_LENGTH) {
-      console.error('BattleNotificationService: NPC payload too long, skipping send');
-      return;
-    }
-  }
+  const messageBody = serializeBattleReportMessage(payload, `npc:${String(battle.battleId ?? '')}`);
 
   try {
     await PrivateMessage.insertMany([
@@ -154,6 +212,20 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
   }
 }
 
+export type SendBattleNotificationsOptions = {
+  /**
+   * Swarm march PvP: wallet + attacker XP are split in `settleSwarmBattleIfNeeded` and `sendSwarmBattleReports`
+   * sends per-participant `BTL|`. Skip the duplicate standard PvP DM to the march attacker (lead) so they
+   * do not see full-team `xpAttacker` / wallet while joiners see only their share.
+   */
+  omitAttackerNotification?: boolean;
+  /**
+   * When true (crew Swarm PvP), every `BTL|` payload includes `swarm: 1` so the defender’s DM matches
+   * swarm semantics (Bugbot: omitting this made defender-only PvP look like solo PvP on persisted payloads).
+   */
+  swarmMarchPvp?: boolean;
+};
+
 /**
  * PvP: insert `BTL|` for attacker and defender (same payload JSON; client applies reader-relative labels).
  * @param cashTransferred dollars moved defender → attacker when attacker won (0 if none).
@@ -165,28 +237,23 @@ export async function sendBattleNotifications(
   battle: IBattleDocument,
   cashTransferred: number = 0,
   xpAttacker: number = 0,
-  xpDefender: number = 0
+  xpDefender: number = 0,
+  options?: SendBattleNotificationsOptions
 ): Promise<void> {
   if (!battle.isUserDefender) return;
+  const omitAttacker = options?.omitAttackerNotification === true;
+  const tagSwarmPvp = options?.swarmMarchPvp === true;
 
   const startingBattalions = battle.startingBattalions ?? [];
   const endingBattalions = battle.battalions ?? [];
 
-  const attackerStart = sumByOwnerAndType(startingBattalions, NodeOwner.USER);
-  const defenderStart = sumByOwnerAndType(startingBattalions, NodeOwner.ENEMY);
-  const attackerEnd = sumByOwnerAndType(endingBattalions, NodeOwner.USER);
-  const defenderEnd = sumByOwnerAndType(endingBattalions, NodeOwner.ENEMY);
+  const attackerStart = sumBattalionBotsByOwnerForReport(startingBattalions, NodeOwner.USER);
+  const defenderStart = sumBattalionBotsByOwnerForReport(startingBattalions, NodeOwner.ENEMY);
+  const attackerEnd = sumBattalionBotsByOwnerForReport(endingBattalions, NodeOwner.USER);
+  const defenderEnd = sumBattalionBotsByOwnerForReport(endingBattalions, NodeOwner.ENEMY);
 
-  const attackerLost: BotCounts = {
-    guardian: Math.max(0, attackerStart.guardian - attackerEnd.guardian),
-    breacher: Math.max(0, attackerStart.breacher - attackerEnd.breacher),
-    phreak: Math.max(0, attackerStart.phreak - attackerEnd.phreak),
-  };
-  const defenderLost: BotCounts = {
-    guardian: Math.max(0, defenderStart.guardian - defenderEnd.guardian),
-    breacher: Math.max(0, defenderStart.breacher - defenderEnd.breacher),
-    phreak: Math.max(0, defenderStart.phreak - defenderEnd.phreak),
-  };
+  const attackerLost = battleReportBotsLost(attackerStart, attackerEnd);
+  const defenderLost = battleReportBotsLost(defenderStart, defenderEnd);
 
   let attackerHandle = 'Unknown';
   let defenderHandle = 'Unknown';
@@ -212,6 +279,7 @@ export async function sendBattleNotifications(
     typeof xpDefender === 'number' && Number.isFinite(xpDefender) ? Math.max(0, Math.floor(xpDefender)) : 0;
   let payload: Record<string, unknown> = {
     br: 1,
+    ...(tagSwarmPvp ? { swarm: 1 } : {}),
     battleId: battle.battleId,
     attackerId: String(battle.attackerId),
     defenderId: String(battle.defenderId),
@@ -243,41 +311,49 @@ export async function sendBattleNotifications(
     (payload as any).x = Math.floor(bx);
     (payload as any).y = Math.floor(by);
   }
-  let messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
-  if (messageBody.length > MAX_MESSAGE_LENGTH) {
-    payload.attackerHandle = String(attackerHandle).slice(0, 20);
-    payload.defenderHandle = String(defenderHandle).slice(0, 20);
-    messageBody = BATTLE_REPORT_PREFIX + JSON.stringify(payload);
-    if (messageBody.length > MAX_MESSAGE_LENGTH) {
-      console.error('BattleNotificationService: payload too long, skipping send');
-      return;
-    }
-  }
+  const messageBody = serializeBattleReportMessage(payload, `pvp:${String(battle.battleId ?? '')}`);
+
+  const docs: Array<{
+    senderId: typeof BATTLE_REPORT_SENDER_ID;
+    recipientId: unknown;
+    senderUsername: string;
+    message: string;
+    readAt: null;
+    isFromAdmin: boolean;
+  }> = [
+    ...(omitAttacker
+      ? []
+      : [
+          {
+            senderId: BATTLE_REPORT_SENDER_ID,
+            recipientId: battle.attackerId,
+            senderUsername: BATTLE_REPORT_SENDER_USERNAME,
+            message: messageBody,
+            readAt: null,
+            isFromAdmin: false,
+          },
+        ]),
+    {
+      senderId: BATTLE_REPORT_SENDER_ID,
+      recipientId: battle.defenderId,
+      senderUsername: BATTLE_REPORT_SENDER_USERNAME,
+      message: messageBody,
+      readAt: null,
+      isFromAdmin: false,
+    },
+  ];
 
   try {
-    await PrivateMessage.insertMany([
-      {
-        senderId: BATTLE_REPORT_SENDER_ID,
-        recipientId: battle.attackerId,
-        senderUsername: BATTLE_REPORT_SENDER_USERNAME,
-        message: messageBody,
-        readAt: null,
-        isFromAdmin: false,
-      },
-      {
-        senderId: BATTLE_REPORT_SENDER_ID,
-        recipientId: battle.defenderId,
-        senderUsername: BATTLE_REPORT_SENDER_USERNAME,
-        message: messageBody,
-        readAt: null,
-        isFromAdmin: false,
-      },
-    ]);
+    if (docs.length > 0) {
+      await PrivateMessage.insertMany(docs);
+    }
     try {
-      await applyRetentionAfterInsert({
-        senderId: BATTLE_REPORT_SENDER_ID,
-        recipientId: battle.attackerId,
-      });
+      if (!omitAttacker) {
+        await applyRetentionAfterInsert({
+          senderId: BATTLE_REPORT_SENDER_ID,
+          recipientId: battle.attackerId,
+        });
+      }
       await applyRetentionAfterInsert({
         senderId: BATTLE_REPORT_SENDER_ID,
         recipientId: battle.defenderId,

@@ -27,6 +27,7 @@ import { raceConditionHeistApi } from './api/raceConditionHeistApi';
 import { binaryBankCrackApi } from './api/binaryBankCrackApi';
 import { battlePresetsApi } from './api/battlePresetsApi';
 import { attackApi } from './api/attackApi';
+import { swarmApi } from './api/swarmApi';
 
 export const store = configureStore({
   reducer: {
@@ -57,6 +58,7 @@ export const store = configureStore({
     [binaryBankCrackApi.reducerPath]: binaryBankCrackApi.reducer,
     [battlePresetsApi.reducerPath]: battlePresetsApi.reducer,
     [attackApi.reducerPath]: attackApi.reducer,
+    [swarmApi.reducerPath]: swarmApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -83,7 +85,8 @@ export const store = configureStore({
     .concat(raceConditionHeistApi.middleware)
     .concat(binaryBankCrackApi.middleware)
     .concat(battlePresetsApi.middleware)
-    .concat(attackApi.middleware),
+    .concat(attackApi.middleware)
+    .concat(swarmApi.middleware),
   devTools: __DEV__,
 });
 

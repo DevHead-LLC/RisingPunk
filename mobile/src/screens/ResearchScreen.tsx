@@ -33,10 +33,11 @@ const ALL_RESEARCH_CARDS: ResearchCard[] = [
   { id: 'gear', name: 'Gear', image: require('../assets/images/hackerGearResearch.png') },
   { id: 'investments', name: 'Investments', image: require('../assets/images/investmentResearch.png') },
   { id: 'cash-flow', name: 'Cash Flow', image: require('../assets/images/cashFlowResearch.png') },
+  { id: 'swarm', name: 'Swarm', image: require('../assets/images/researchCenter/swarm.png') },
 ];
 
-// Display order: Home Defense → Cash Flow → Hack Ability → Hack Crew → Investments (matches category-structure.md)
-const RESEARCH_CARD_IDS = ['home-defense', 'cash-flow', 'hack-ability', 'hack-crew', 'investments'] as const;
+// Display order: Home Defense → Cash Flow → Hack Ability → Hack Crew → Investments → Swarm (matches category-structure.md)
+const RESEARCH_CARD_IDS = ['home-defense', 'cash-flow', 'hack-ability', 'hack-crew', 'investments', 'swarm'] as const;
 const RESEARCH_CARDS: ResearchCard[] = RESEARCH_CARD_IDS.map(id => ALL_RESEARCH_CARDS.find(card => card.id === id)).filter((c): c is ResearchCard => c != null);
 
 const { width: screenWidth } = Dimensions.get('window');

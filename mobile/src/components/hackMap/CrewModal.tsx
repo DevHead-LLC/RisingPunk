@@ -41,6 +41,8 @@ interface CrewModalProps {
   focusInitialCategoryKey?: number;
   /** From crew chat: tap shared map location (closes crew chat overlay, then parent pans map). */
   onNavigateToMapCell?: (target: { mapName: string; x: number; y: number }) => void;
+  hasActiveSwarm?: boolean;
+  onSwarmPress?: () => void;
 }
 
 type CrewCategory = 
@@ -75,6 +77,8 @@ export const CrewModal: React.FC<CrewModalProps> = ({
   initialCategory = null,
   focusInitialCategoryKey,
   onNavigateToMapCell,
+  hasActiveSwarm = false,
+  onSwarmPress,
 }) => {
   const colors = useThemeColors();
   const [currentCategory, setCurrentCategory] = useState<CrewCategory>(null);
@@ -681,11 +685,20 @@ export const CrewModal: React.FC<CrewModalProps> = ({
                 <Image source={require('../../assets/images/crew/backup.png')} style={styles.backupIconImage} resizeMode="contain" />
               </TouchableOpacity>
             )}
+            {hasActiveSwarm && (
+              <TouchableOpacity
+                style={styles.swarmIconButton}
+                onPress={onSwarmPress}
+                activeOpacity={0.7}
+              >
+                <Image source={require('../../assets/images/hackMap/swarmIcon.png')} style={styles.swarmIconImage} resizeMode="contain" />
+              </TouchableOpacity>
+            )}
           </View>
           <View style={styles.headerTitleBlock}>
-            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{title}</Text>
             {activeCrewDetails?.crew ? (
-              <Text style={[styles.crewHeaderMeta, { color: colors.text.secondary }]}>
+              <Text style={[styles.crewHeaderMeta, { color: colors.text.secondary }]} numberOfLines={1} ellipsizeMode="tail">
                 Crew Lv {activeCrewDetails.crew.level ?? 1} • {activeCrewDetails.crew.memberCount} members
               </Text>
             ) : null}
@@ -2172,6 +2185,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   headerTitleBlock: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2219,10 +2233,25 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
     marginRight: SIZING.spacing.sm,
   },
+  swarmIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    borderColor: colors.secondary,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SIZING.spacing.sm,
+  },
   // Bugbot: 54×54 image overflows 44×44 backupIconButton by design; intentional for visibility/emphasis (not an oversight).
   backupIconImage: {
     width: 54,
     height: 54,
+  },
+  swarmIconImage: {
+    width: 30,
+    height: 30,
   },
   title: {
     color: colors.text.primary,

@@ -35,6 +35,8 @@ import {
 import { parseMapLocationShareMessage } from '../../../../shared/mapLocationShareMessage';
 import type { ReportContext } from '../../types/reports';
 import { normalizeUserId } from '../../utils/battleUtils';
+import { USER_DM_MAX_MESSAGE_LENGTH } from '../../constants/privateMessageCaps';
+import { M1_UNIT_DISPLAY_NAMES, MARK2_DISPLAY_NAMES } from '../../utils/botInventory';
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
@@ -82,13 +84,16 @@ export interface BattleReportBotCounts {
   guardian: number;
   breacher: number;
   phreak: number;
+  guardianM2: number;
+  breacherM2: number;
+  phreakM2: number;
 }
 
 /** Parse/validate bot count object from BTL JSON; returns null if shape is unusable (Bugbot: matches probe `b` guard). */
 function normalizeBattleReportBotCounts(raw: unknown): BattleReportBotCounts | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as Record<string, unknown>;
-  const n = (v: unknown): number | null => {
+  const nReq = (v: unknown): number | null => {
     if (typeof v === 'number' && Number.isFinite(v)) {
       return Math.max(0, Math.floor(v));
     }
@@ -98,15 +103,31 @@ function normalizeBattleReportBotCounts(raw: unknown): BattleReportBotCounts | n
     }
     return null;
   };
-  const guardian = n(o.guardian);
-  const breacher = n(o.breacher);
-  const phreak = n(o.phreak);
+  const nOpt = (v: unknown): number => {
+    const x = nReq(v);
+    return x === null ? 0 : x;
+  };
+  const guardian = nReq(o.guardian);
+  const breacher = nReq(o.breacher);
+  const phreak = nReq(o.phreak);
   if (guardian === null || breacher === null || phreak === null) return null;
-  return { guardian, breacher, phreak };
+  return {
+    guardian,
+    breacher,
+    phreak,
+    guardianM2: nOpt(o.guardianM2),
+    breacherM2: nOpt(o.breacherM2),
+    phreakM2: nOpt(o.phreakM2),
+  };
 }
 
 export interface BattleReportPayload {
   br: 1;
+  /**
+   * Crew swarm attack: `swarm: 1` on fan-out `BTL|` PMs (attacker side and defender).
+   * Joiners are not `attackerId` — `BaseChatModal` uses `viewerMatchesDefender` so defender DMs keep defender-side labels; joiners still resolve as attacker-side.
+   */
+  swarm?: 1;
   /** Set for computer/NPC battles (server); client adjusts reward vs PvP wallet copy. */
   npc?: 1;
   attackerId: string;
@@ -127,7 +148,10 @@ export interface BattleReportPayload {
   cash?: number;
   /** NPC / legacy: single XP line. */
   xp?: number;
-  /** PvP: XP from destroying opponent bots (per side). */
+  /**
+   * PvP / swarm: XP from destroying opponent bots (per side). Swarm crew `BTL|` uses `xpAttacker` (share) +
+   * `xpDefender: 0` — same branch as PvP — not legacy `xp`.
+   */
   xpAttacker?: number;
   xpDefender?: number;
   /** Synthetic IP-style hack location (server `hl`); not real map data. */
@@ -164,8 +188,10 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
     const battleId =
       typeof battleIdRaw === 'string' && battleIdRaw.trim().length > 0 ? battleIdRaw.trim() : undefined;
     const isNpcReport = (payload as { npc?: unknown }).npc === 1;
+    const isSwarmReport = (payload as { swarm?: unknown }).swarm === 1;
     return {
       ...payload,
+      swarm: isSwarmReport ? 1 : undefined,
       npc: isNpcReport ? 1 : undefined,
       attackerStart,
       defenderStart,
@@ -207,6 +233,23 @@ function battleReportViewerIsAttacker(
 
   // Non-empty id matches are handled above; remaining '' === '' must not count as attacker (Bugbot).
   return false;
+}
+
+/** Swarm `BTL|`: defender-only DM includes `swarm: 1`; must not use “always attacker labels” for that viewer. */
+function viewerMatchesDefender(
+  report: BattleReportPayload,
+  currentUser: BaseChatModalProps['currentUser']
+): boolean {
+  const uid = normalizeUserId(currentUser?._id ?? currentUser?.id);
+  const did = normalizeUserId(report.defenderId);
+  const ul = uid.toLowerCase();
+  const dl = did.toLowerCase();
+  if (ul && dl && ul === dl) {
+    return true;
+  }
+  const ch = (currentUser?.handle ?? '').trim().toLowerCase();
+  const dh = (report.defenderHandle ?? '').trim().toLowerCase();
+  return Boolean(ch && dh && ch === dh);
 }
 
 function formatFetchErrorMessage(fetchError: unknown): string {
@@ -279,7 +322,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportedMessage, setReportedMessage] = useState<ChatMessageForModal | null>(null);
 
-  const maxCharacters = 500;
+  const maxCharacters = USER_DM_MAX_MESSAGE_LENGTH;
   const characterCount = messageInput.length;
 
   const hasScrolledOnOpen = useRef(false);
@@ -522,7 +565,8 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   {probeHackLocLine}
                                 </Text>
                                 <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  Breacher: {report.b.breacher} · Guardian: {report.b.guardian} · Phreak: {report.b.phreak}
+                                  {M1_UNIT_DISPLAY_NAMES.breacher}: {report.b.breacher} · {M1_UNIT_DISPLAY_NAMES.guardian}:{' '}
+                                  {report.b.guardian} · {M1_UNIT_DISPLAY_NAMES.phreak}: {report.b.phreak}
                                 </Text>
                               </View>
                             );
@@ -540,7 +584,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 </FilteredText>
                               );
                             }
-                            const isAttacker = battleReportViewerIsAttacker(report, currentUser);
+                            const isAttacker =
+                              report.swarm === 1
+                                ? !viewerMatchesDefender(report, currentUser)
+                                : battleReportViewerIsAttacker(report, currentUser);
                             // Bugbot: attacker viewer — `user` = attacker side won, `enemy` = defender side won. Defender viewer uses same `winner` (battle-axis; not narrative "enemy").
                             const status =
                               isAttacker
@@ -551,8 +598,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 ? Math.max(0, Math.floor(report.cash))
                                 : 0;
                             // NPC: show wallet only when cash > 0 (server sets cash from processedRewards).
-                            // PvP: always show wallet line when attacker won — even $0 (defender had no remaining balance).
+                            // PvP (non-swarm): always show wallet line when attacker won — even $0 (defender had no remaining balance).
+                            // Swarm: per-recipient `cash` is that viewer’s share; hide wallet row when share is $0 (Bugbot — no misleading "$0 stolen" for joiners).
                             const isPvP = report.npc !== 1;
+                            const isSwarm = report.swarm === 1;
                             const xpLegacy =
                               typeof report.xp === 'number' && Number.isFinite(report.xp)
                                 ? Math.max(0, Math.floor(report.xp))
@@ -571,7 +620,9 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   ? xpAtt
                                   : xpDef
                                 : xpLegacy;
-                            const showWallet = report.winner === 'user' && (isPvP || cash > 0);
+                            const showWallet =
+                              report.winner === 'user' &&
+                              (isSwarm ? cash > 0 : isPvP || cash > 0);
                             const hackLocLine =
                               typeof report.hl === 'string' && report.hl.trim().length > 0
                                 ? report.hl.trim()
@@ -596,26 +647,75 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                             const fmt = (n: number) => n.toLocaleString();
                             const line = (label: string, start: number, lost: number) =>
                               `${label} - ${fmt(start)} > ${fmt(lost)} Lost`;
+                            const sideHasMark2 = (s: BattleReportBotCounts, l: BattleReportBotCounts) =>
+                              s.guardianM2 > 0 ||
+                              s.breacherM2 > 0 ||
+                              s.phreakM2 > 0 ||
+                              l.guardianM2 > 0 ||
+                              l.breacherM2 > 0 ||
+                              l.phreakM2 > 0;
                             const renderSide = (
                               title: string,
                               start: BattleReportBotCounts,
                               lost: BattleReportBotCounts,
-                            ) => (
-                              <>
-                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  {title}
-                                </Text>
-                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  {line('Guardians', start.guardian, lost.guardian)}
-                                </Text>
-                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  {line('Breachers', start.breacher, lost.breacher)}
-                                </Text>
-                                <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
-                                  {line('Phreaks', start.phreak, lost.phreak)}
-                                </Text>
-                              </>
-                            );
+                            ) => {
+                              const m2 = sideHasMark2(start, lost);
+                              /** Mark I/II labels from `botInventory` display-name maps (same payload keys). */
+                              const fam = (
+                                mark1Name: string,
+                                mark2Name: string,
+                                s1: number,
+                                l1: number,
+                                s2: number,
+                                l2: number,
+                              ) => (
+                                <>
+                                  <Text
+                                    style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}
+                                  >
+                                    {line(m2 ? `${mark1Name} (Mark I)` : mark1Name, s1, l1)}
+                                  </Text>
+                                  {s2 > 0 || l2 > 0 ? (
+                                    <Text
+                                      style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}
+                                    >
+                                      {line(`${mark2Name} (Mark II)`, s2, l2)}
+                                    </Text>
+                                  ) : null}
+                                </>
+                              );
+                              return (
+                                <>
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    {title}
+                                  </Text>
+                                  {fam(
+                                    M1_UNIT_DISPLAY_NAMES.guardian,
+                                    MARK2_DISPLAY_NAMES.guardian,
+                                    start.guardian,
+                                    lost.guardian,
+                                    start.guardianM2,
+                                    lost.guardianM2,
+                                  )}
+                                  {fam(
+                                    M1_UNIT_DISPLAY_NAMES.breacher,
+                                    MARK2_DISPLAY_NAMES.breacher,
+                                    start.breacher,
+                                    lost.breacher,
+                                    start.breacherM2,
+                                    lost.breacherM2,
+                                  )}
+                                  {fam(
+                                    M1_UNIT_DISPLAY_NAMES.phreak,
+                                    MARK2_DISPLAY_NAMES.phreak,
+                                    start.phreak,
+                                    lost.phreak,
+                                    start.phreakM2,
+                                    lost.phreakM2,
+                                  )}
+                                </>
+                              );
+                            };
                             const hackLocationBlock = hackLocLine ? (
                               <>
                                 <Text
