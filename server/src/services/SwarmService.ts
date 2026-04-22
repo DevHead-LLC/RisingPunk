@@ -408,28 +408,8 @@ export async function commitSwarmSlot(params: {
         throw new SwarmError(409, 'Could not commit Swarm slot');
       }
 
-      try {
-        await removeInventory(requesterUserId, botType, markLevel, quantity, clientSession);
-      } catch (invErr) {
-        await SwarmSession.updateOne(
-          { swarmId: swarmIdTrim, state: 'preparing' },
-          {
-            $pull: {
-              commitments: {
-                slotIndex,
-                userId: String(requesterUserId),
-              },
-            },
-          },
-          { session: clientSession }
-        );
-        const repaired = await SwarmSession.findOne({ swarmId: swarmIdTrim }).session(clientSession);
-        if (repaired) {
-          repaired.participants = buildParticipants(repaired);
-          await repaired.save({ session: clientSession });
-        }
-        throw invErr;
-      }
+      // Transaction abort on throw rolls back the slot claim and `removeInventory` bot write — no manual $pull (Bugbot / ios-bugs.md).
+      await removeInventory(requesterUserId, botType, markLevel, quantity, clientSession);
 
       committed = claimed;
     });
