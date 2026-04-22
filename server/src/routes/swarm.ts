@@ -9,8 +9,13 @@ import {
   dismissSwarmSlot,
   getSwarmSessionForUser,
 } from '../services/SwarmService';
+import { BOT_FAMILY_TYPES, type BotFamily } from '../utils/botInventoryKeys';
 
 const router = express.Router();
+
+function isSwarmCommitBotFamily(v: unknown): v is BotFamily {
+  return typeof v === 'string' && (BOT_FAMILY_TYPES as readonly string[]).includes(v);
+}
 
 router.get('/mine', auth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -58,13 +63,53 @@ router.post('/:swarmId/commit', auth, async (req: Request, res: Response): Promi
   try {
     const requesterUserId = String((req as any).user._id);
     const { slotIndex, botType, quantity, markLevel } = req.body ?? {};
+
+    if (!isSwarmCommitBotFamily(botType)) {
+      res.status(400).json({
+        success: false,
+        error: `botType must be one of: ${BOT_FAMILY_TYPES.join(', ')}`,
+      });
+      return;
+    }
+
+    const si = Number(slotIndex);
+    if (!Number.isInteger(si) || si < 1 || si > 18) {
+      res.status(400).json({
+        success: false,
+        error: 'slotIndex must be an integer between 1 and 18',
+      });
+      return;
+    }
+
+    const qty = Number(quantity);
+    if (!Number.isInteger(qty) || qty < 1 || qty > 5000) {
+      res.status(400).json({
+        success: false,
+        error: 'quantity must be an integer between 1 and 5000',
+      });
+      return;
+    }
+
+    let resolvedMarkLevel: 1 | 2 = 1;
+    if (markLevel !== undefined && markLevel !== null && markLevel !== '') {
+      const ml = Number(markLevel);
+      if (!Number.isInteger(ml) || (ml !== 1 && ml !== 2)) {
+        res.status(400).json({
+          success: false,
+          error: 'markLevel must be 1 or 2',
+        });
+        return;
+      }
+      resolvedMarkLevel = ml as 1 | 2;
+    }
+
     const sessionDoc = await commitSwarmSlot({
       requesterUserId,
       swarmId: req.params.swarmId,
-      slotIndex: Number(slotIndex),
+      slotIndex: si,
       botType,
-      quantity: Number(quantity),
-      markLevel: Number(markLevel) >= 2 ? 2 : 1,
+      quantity: qty,
+      markLevel: resolvedMarkLevel,
     });
     res.json({ success: true, data: sessionDoc });
   } catch (e) {
