@@ -2,7 +2,11 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import auth from '../middleware/auth';
 import { User } from '../models/User';
-import { PrivateMessage, ADMIN_BROADCAST_FOOTER } from '../models/PrivateMessage';
+import {
+  PrivateMessage,
+  ADMIN_BROADCAST_FOOTER,
+  PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH,
+} from '../models/PrivateMessage';
 import { filterBadWords } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 import {
@@ -10,12 +14,17 @@ import {
   PROBE_REPORT_SENDER_USERNAME,
   BATTLE_REPORT_SENDER_ID,
   BATTLE_REPORT_SENDER_USERNAME,
+  SYSTEM_NOTIFICATION_SENDER_ID,
 } from '../constants/systemSenders';
 import {
   applyRetentionAfterAdminSendAll,
   applyRetentionAfterInsert,
 } from '../services/PrivateMessageRetentionService';
-import { MAX_PM_MESSAGES_PER_THREAD } from '../constants/privateMessageCaps';
+import {
+  ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH,
+  MAX_PM_MESSAGES_PER_THREAD,
+  USER_DM_MAX_MESSAGE_LENGTH,
+} from '../constants/privateMessageCaps';
 import { listConversationsForUser, dismissThreadForUser, touchInboxThreadOnOpen } from '../services/PrivateInboxService';
 import '../models/PrivateInboxThread';
 
@@ -23,6 +32,7 @@ const router = express.Router();
 
 const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
+const SYSTEM_NOTIFICATION_PREFIX = 'SYS|';
 
 /** Return a human-readable inbox preview for probe report messages; otherwise return the raw message. */
 function conversationListLastMessagePreview(raw: string | undefined, isProbeReport: boolean): string {
@@ -58,6 +68,21 @@ function getBattleReportPreview(raw: string | undefined, currentUserId: string):
     // ignore
   }
   return 'Battle Report';
+}
+
+function getSystemNotificationPreview(raw: string | undefined): string {
+  if (typeof raw !== 'string' || !raw.startsWith(SYSTEM_NOTIFICATION_PREFIX)) {
+    return raw ?? '';
+  }
+  try {
+    const payload = JSON.parse(raw.slice(SYSTEM_NOTIFICATION_PREFIX.length)) as { m?: string };
+    if (payload?.m != null && typeof payload.m === 'string') {
+      return payload.m.length > 120 ? `${payload.m.slice(0, 117)}…` : payload.m;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return 'System Notification';
 }
 
 const PM_RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -97,8 +122,10 @@ router.get('/conversations', auth, async (req: Request, res: Response) => {
       adminIdSet,
       probeReportSenderIdStr: PROBE_REPORT_SENDER_ID.toString(),
       battleReportSenderIdStr: BATTLE_REPORT_SENDER_ID.toString(),
+      systemNotificationSenderIdStr: SYSTEM_NOTIFICATION_SENDER_ID.toString(),
       conversationListLastMessagePreview,
       getBattleReportPreview,
+      getSystemNotificationPreview,
     });
 
     const conversations = rows.map((row) => ({
@@ -246,8 +273,10 @@ router.post('/conversations/:recipientId/messages', auth, async (req: Request, r
       res.status(400).json({ error: 'Message cannot be empty' });
       return;
     }
-    if (trimmed.length > 500) {
-      res.status(400).json({ error: 'Message must be 500 characters or less' });
+    if (trimmed.length > USER_DM_MAX_MESSAGE_LENGTH) {
+      res.status(400).json({
+        error: `Message must be ${USER_DM_MAX_MESSAGE_LENGTH} characters or less`,
+      });
       return;
     }
 
@@ -362,13 +391,16 @@ router.post('/admin/send-all', auth, async (req: Request, res: Response) => {
       res.status(400).json({ error: 'Message cannot be empty' });
       return;
     }
+    if (trimmed.length > ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH) {
+      res.status(400).json({
+        error: `Message must be ${ADMIN_BROADCAST_BODY_MAX_INPUT_LENGTH} characters or less`,
+      });
+      return;
+    }
     const filteredBody = filterBadWords(trimmed);
     const fullMessage = `${filteredBody}\n\n${ADMIN_BROADCAST_FOOTER}`;
-    const MESSAGE_MAX_LENGTH = 600; // PrivateMessage schema message maxlength
-    if (fullMessage.length > MESSAGE_MAX_LENGTH) {
-      res.status(400).json({
-        error: `Message with footer must be ${MESSAGE_MAX_LENGTH} characters or less. Please shorten your message.`,
-      });
+    if (fullMessage.length > PRIVATE_MESSAGE_MESSAGE_MAX_LENGTH) {
+      res.status(400).json({ error: 'Message too long' });
       return;
     }
 

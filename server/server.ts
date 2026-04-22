@@ -39,6 +39,7 @@ import packetBreachRoutes from './src/routes/packetBreach';
 import raceConditionHeistRoutes from './src/routes/raceConditionHeist';
 import binaryBankCrackRoutes from './src/routes/binaryBankCrack';
 import battlePresetsRoutes from './src/routes/battlePresets';
+import swarmRoutes from './src/routes/swarm';
 
 declare global {
   namespace Express {
@@ -194,6 +195,14 @@ mongoose.connect(process.env.MONGODB_URI, {
   }
 
   try {
+    const { runSwarmPrepSweepOnce, startSwarmPrepSweepWatchdog } = require('./src/services/SwarmService');
+    await runSwarmPrepSweepOnce();
+    startSwarmPrepSweepWatchdog();
+  } catch (swarmSweepErr: unknown) {
+    console.warn('Swarm prep sweep watchdog failed to start (non-fatal):', swarmSweepErr);
+  }
+
+  try {
     const { runStuckAtTargetRecoveryOnce } = require('./src/services/AttackMarchStuckAtTargetRecoveryService');
     await runStuckAtTargetRecoveryOnce();
   } catch (stuckAtTargetErr: unknown) {
@@ -255,6 +264,13 @@ mongoose.connect(process.env.MONGODB_URI, {
     
     // Start data cleanup service for privacy policy compliance
     DataCleanupService.startScheduledCleanup();
+
+    try {
+      const { startCrewUnderstaffSweepWatchdog } = require('./src/services/CrewUnderstaffSweepService');
+      startCrewUnderstaffSweepWatchdog();
+    } catch (crewSweepErr: unknown) {
+      console.warn('Crew understaff sweep watchdog failed to start (non-fatal):', crewSweepErr);
+    }
 
     const { startBattleDataRetentionWatchdog } = require('./src/services/BattleDataRetentionService');
     startBattleDataRetentionWatchdog();
@@ -693,6 +709,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/private-messages', privateMessagesRoutes);
 app.use('/api/probe', probeRoutes);
 app.use('/api/attack', attackRoutes);
+app.use('/api/swarm', swarmRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/daily-haul', dailyHaulRoutes);
 app.use('/api/packet-breach', packetBreachRoutes);

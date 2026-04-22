@@ -283,7 +283,10 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
             </View>
             <View style={styles.userInfoContainer}>
               <Text style={styles.handleText}>{crew.crewName || ''}</Text>
-              <Text style={styles.levelText}>{crew.crewIdentifier || 'N/A'} • {crew.memberCount != null ? crew.memberCount : 0} members</Text>
+              <Text style={styles.levelText}>
+                {crew.crewIdentifier || 'N/A'} • Crew Lv {crew.level != null ? crew.level : '—'} •{' '}
+                {crew.memberCount != null ? crew.memberCount : 0} members
+              </Text>
             </View>
             <View style={styles.statContainer}>
               <Text style={styles.statValue}>{(crew.botsDestroyed != null ? crew.botsDestroyed.toLocaleString() : '0')}</Text>
@@ -338,7 +341,10 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
             </View>
             <View style={styles.userInfoContainer}>
               <Text style={styles.handleText}>{crew.crewName || ''}</Text>
-              <Text style={styles.levelText}>{crew.crewIdentifier || 'N/A'} • {crew.memberCount != null ? crew.memberCount : 0} members</Text>
+              <Text style={styles.levelText}>
+                {crew.crewIdentifier || 'N/A'} • Crew Lv {crew.level != null ? crew.level : '—'} •{' '}
+                {crew.memberCount != null ? crew.memberCount : 0} members
+              </Text>
             </View>
             <View style={styles.statContainer}>
               <Text style={styles.statValue}>${(crew.netWorth != null ? crew.netWorth.toLocaleString() : '0')}</Text>

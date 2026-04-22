@@ -63,7 +63,7 @@ export function useAttackMarchTransitionBanners(token: string | null): {
     }
     const delay = Math.max(0, min - Date.now()) + 400;
     const tid = setTimeout(() => {
-      void refetch();
+      refetch().catch(() => {});
     }, delay);
     return () => clearTimeout(tid);
   }, [token, returnScheduleKey, refetch]);
@@ -96,6 +96,14 @@ export function useAttackMarchTransitionBanners(token: string | null): {
     }
 
     let message: string | null = null;
+
+    for (const m of marches) {
+      const prev = prevStatesRef.current.get(m.marchId);
+      if (prev === undefined && m.state === 'outbound' && m.attackType === 'swarm') {
+        message = 'Swarm Initiated';
+        break;
+      }
+    }
 
     const consider = (pred: (prev: string, next: string) => boolean, text: string) => {
       if (message) return;
