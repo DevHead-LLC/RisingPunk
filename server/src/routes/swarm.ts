@@ -9,14 +9,12 @@ import {
   dismissSwarmSlot,
   getSwarmSessionForUser,
 } from '../services/SwarmService';
+import { BOT_FAMILY_TYPES, type BotFamily } from '../utils/botInventoryKeys';
 
 const router = express.Router();
 
-const SWARM_COMMIT_BOT_TYPES = ['guardian', 'breacher', 'phreak'] as const;
-type SwarmCommitBotType = (typeof SWARM_COMMIT_BOT_TYPES)[number];
-
-function isSwarmCommitBotType(v: unknown): v is SwarmCommitBotType {
-  return typeof v === 'string' && (SWARM_COMMIT_BOT_TYPES as readonly string[]).includes(v);
+function isSwarmCommitBotFamily(v: unknown): v is BotFamily {
+  return typeof v === 'string' && (BOT_FAMILY_TYPES as readonly string[]).includes(v);
 }
 
 router.get('/mine', auth, async (req: Request, res: Response): Promise<void> => {
@@ -66,10 +64,10 @@ router.post('/:swarmId/commit', auth, async (req: Request, res: Response): Promi
     const requesterUserId = String((req as any).user._id);
     const { slotIndex, botType, quantity, markLevel } = req.body ?? {};
 
-    if (!isSwarmCommitBotType(botType)) {
+    if (!isSwarmCommitBotFamily(botType)) {
       res.status(400).json({
         success: false,
-        error: 'botType must be one of: guardian, breacher, phreak',
+        error: `botType must be one of: ${BOT_FAMILY_TYPES.join(', ')}`,
       });
       return;
     }
