@@ -47,6 +47,15 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
   const isBuildButtonHighlight = isBuildGuardians && highlightStep === 'build-button';
   const isSpeedupButtonHighlight = isBuildGuardians && highlightStep === 'speedup-button';
 
+  const [buildUiTick, setBuildUiTick] = useState(0);
+  useEffect(() => {
+    if (!bots.buildQueue?.completesAt) {
+      return;
+    }
+    const id = setInterval(() => setBuildUiTick((n) => n + 1), 250);
+    return () => clearInterval(id);
+  }, [bots.buildQueue?.completesAt]);
+
   const handleBuild = useCallback(() => {
     if (!bots.selectedType) {
       return;
@@ -131,6 +140,38 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
 
   const botCost = costPerBotForMark(effectiveMark);
 
+  const displayBotCounts = useMemo(() => {
+    const m1 = { ...bots.botCounts };
+    const m2 = { ...bots.botCountsM2 };
+    const queue = bots.buildQueue;
+    if (!queue?.completesAt || !queue?.type) {
+      return { m1, m2 };
+    }
+    const queueQuantity = Math.max(0, Math.floor(Number(queue.quantity ?? 0)));
+    if (queueQuantity <= 0) {
+      return { m1, m2 };
+    }
+    const serverBuilt = Math.max(0, Math.floor(Number(queue.botsBuilt ?? 0)));
+    const markLevel = Number(queue.markLevel ?? 1) >= 2 ? 2 : 1;
+    const msPerUnit = markLevel >= 2 ? 4000 : 1000;
+    const remainingMs = Math.max(0, new Date(queue.completesAt).getTime() - Date.now());
+    const expectedBuiltFromClock = Math.max(0, queueQuantity - Math.ceil(remainingMs / msPerUnit));
+    const projectedBuilt = Math.max(
+      0,
+      Math.min(queueQuantity, Math.max(serverBuilt, expectedBuiltFromClock))
+    );
+    const projectedDelta = Math.max(0, projectedBuilt - serverBuilt);
+    if (projectedDelta <= 0) {
+      return { m1, m2 };
+    }
+    if (markLevel >= 2) {
+      m2[queue.type] = Math.max(0, Math.floor(Number(m2[queue.type] ?? 0)) + projectedDelta);
+    } else {
+      m1[queue.type] = Math.max(0, Math.floor(Number(m1[queue.type] ?? 0)) + projectedDelta);
+    }
+    return { m1, m2 };
+  }, [bots.botCounts, bots.botCountsM2, bots.buildQueue, buildUiTick]);
+
   const levelSections = useMemo(
     () =>
       LEVELS.map((level) => (
@@ -139,7 +180,13 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
           markColumnLevel={level}
           selectedType={bots.selectedType}
           selectedMarkLevel={bots.selectedMarkLevel}
-          botCounts={level === 2 ? bots.botCountsM2 : level === 1 ? bots.botCounts : ZERO_BOT_COUNTS}
+          botCounts={
+            level === 2
+              ? displayBotCounts.m2
+              : level === 1
+                ? displayBotCounts.m1
+                : ZERO_BOT_COUNTS
+          }
           onSelectBotType={handleSelectBotType}
           highlightGuardian={isGuardianSelectionHighlight && level === 1}
           mark2ResearchUnlocked={mark2ResearchUnlocked}

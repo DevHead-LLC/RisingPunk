@@ -109,6 +109,24 @@ export const BuildSection = React.memo(function BuildSection({
     return Math.min(100, ((now - start) / (end - start)) * 100);
   }, [buildQueue, buildingProgress, buildUiTick]);
 
+  const projectedBuiltCount = useMemo(() => {
+    if (!buildQueue) {
+      return undefined;
+    }
+    const queueQuantity = Math.max(0, Math.floor(Number(buildQueue.quantity ?? 0)));
+    if (queueQuantity <= 0) {
+      return 0;
+    }
+    const serverBuilt = Math.max(0, Math.floor(Number(buildQueue.botsBuilt ?? 0)));
+    const markLevel = Number(buildQueue.markLevel ?? 1) >= 2 ? 2 : 1;
+    const msPerUnit = markLevel >= 2 ? 4000 : 1000;
+    const expectedBuiltFromClock = Math.max(0, queueQuantity - Math.ceil(timeRemainingMs / msPerUnit));
+    return Math.max(
+      0,
+      Math.min(queueQuantity, Math.max(serverBuilt, expectedBuiltFromClock))
+    );
+  }, [buildQueue, timeRemainingMs]);
+
   const completionRefetchFired = useRef(false);
   useEffect(() => {
     completionRefetchFired.current = false;
@@ -212,6 +230,7 @@ export const BuildSection = React.memo(function BuildSection({
             progress={smoothBuildProgress}
             timeRemainingMs={timeRemainingMs}
             totalBuildQuantity={totalBuildQuantity}
+            botsBuilt={projectedBuiltCount}
           />
           <BuildProgressBar progress={smoothBuildProgress} />
         </>
@@ -224,6 +243,10 @@ export const BuildSection = React.memo(function BuildSection({
           currentBalance={numericBalance || 0}
           itemType="build"
           onSpeedup={handleSpeedup}
+          storageSpeedupDomain="bot_assembly"
+          onStorageSpeedupApplied={async () => {
+            await refetchBuildState();
+          }}
           onClose={() => setShowSpeedupModal(false)}
         />
       )}

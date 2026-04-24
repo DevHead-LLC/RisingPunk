@@ -60,6 +60,81 @@ function getOutboundDurationSec(entry: ActiveProbe): number {
   return Math.max(2, distance * 2);
 }
 
+export type ReduceProbeTravelResult = {
+  probeId: string;
+  phase: 'outbound' | 'returning';
+  travelSpeedPercentApplied: number;
+  remainingMs: number;
+  returnEndAt?: number;
+};
+
+/**
+ * Reduce travel time for an in-flight probe by % of current remaining time.
+ * Applies to both outbound and returning phases for the probe owner.
+ */
+export function reduceProbeTravelTime(params: {
+  probeId: string;
+  userId: string;
+  travelSpeedPercent: number;
+}): ReduceProbeTravelResult {
+  const probeId = String(params.probeId ?? '').trim();
+  const userId = String(params.userId ?? '').trim();
+  const travelSpeedPercent = Math.max(1, Math.floor(Number(params.travelSpeedPercent ?? 0)));
+  if (probeId === '') {
+    throw new Error('probeId is required to apply a travel speedup');
+  }
+  if (userId === '') {
+    throw new Error('userId is required to apply a travel speedup');
+  }
+  if (!Number.isFinite(travelSpeedPercent) || travelSpeedPercent <= 0) {
+    throw new Error('travelSpeedPercent must be a positive integer');
+  }
+
+  pruneStaleProbes();
+  const entry = activeProbesStore.get(probeId);
+  if (!entry || String(entry.sentByUserId) !== userId) {
+    throw new Error('No active owned probe found for this travel speedup');
+  }
+
+  const nowMs = Date.now();
+  if (entry.phase === 'returning') {
+    const currentReturnEndAtMs = Number(entry.returnEndAt ?? NaN);
+    if (!Number.isFinite(currentReturnEndAtMs)) {
+      throw new Error('The selected probe return leg has invalid timing data');
+    }
+    const remainingMs = Math.max(0, currentReturnEndAtMs - nowMs);
+    if (remainingMs <= 0) {
+      throw new Error('The selected probe has already completed its return');
+    }
+    const reducedRemainingMs = Math.max(1000, Math.ceil(remainingMs * (1 - travelSpeedPercent / 100)));
+    entry.returnEndAt = nowMs + reducedRemainingMs;
+    entry.returnDurationSec = Math.max(1, Math.ceil(reducedRemainingMs / 1000));
+    return {
+      probeId,
+      phase: 'returning',
+      travelSpeedPercentApplied: travelSpeedPercent,
+      remainingMs: reducedRemainingMs,
+      returnEndAt: entry.returnEndAt,
+    };
+  }
+
+  const outboundDurationMs = Math.ceil(getOutboundDurationSec(entry) * 1000);
+  const elapsedMs = Math.max(0, nowMs - Number(entry.launchedAt ?? nowMs));
+  const remainingMs = Math.max(0, outboundDurationMs - elapsedMs);
+  if (remainingMs <= 0) {
+    throw new Error('The selected probe has already reached its target');
+  }
+  const reducedRemainingMs = Math.max(1000, Math.ceil(remainingMs * (1 - travelSpeedPercent / 100)));
+  const newElapsedMs = Math.max(0, outboundDurationMs - reducedRemainingMs);
+  entry.launchedAt = nowMs - newElapsedMs;
+  return {
+    probeId,
+    phase: 'outbound',
+    travelSpeedPercentApplied: travelSpeedPercent,
+    remainingMs: reducedRemainingMs,
+  };
+}
+
 /** Result of completeProbeEntry: success with doc, client error (4xx) with statusCode/message, or null for server error. */
 type CompleteProbeResult =
   | { success: true; doc: InstanceType<typeof PrivateMessage> }

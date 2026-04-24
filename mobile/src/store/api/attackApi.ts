@@ -4,6 +4,7 @@ import type { RootState } from '../index';
 import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
 import { userGuideApi } from './userGuideApi';
+import { bugHuntApi } from './bugHuntApi';
 
 /** Lean march row (no `armySnapshot`) from GET /api/attack/mine or /active. */
 export type AttackMarchListItem = {
@@ -30,7 +31,12 @@ export type AttackMarchListItem = {
   resolvedAt?: string;
   totalTravelSeconds?: number;
   battleId?: string;
-  attackType?: 'solo' | 'swarm';
+  attackType?: 'solo' | 'swarm' | 'bug_hunt';
+  bugInstanceId?: string;
+  hunterRosterId?: string;
+  hunterVisualKey?: string;
+  bugHuntItemDrops?: string[];
+  bugHuntHunterXpGranted?: number;
   [key: string]: unknown;
 };
 
@@ -68,7 +74,7 @@ export type GetActiveAttackMarchesResponse = {
 };
 
 export type LaunchAttackMarchRequest = {
-  userBattalions: Array<{
+  userBattalions?: Array<{
     type: 'guardian' | 'breacher' | 'phreak';
     quantity: number;
     markLevel?: 1 | 2;
@@ -82,6 +88,10 @@ export type LaunchAttackMarchRequest = {
   defenderId?: string;
   defenderNpcSlug?: string;
   defenderNpcInstanceId?: string;
+  attackType?: 'solo' | 'swarm' | 'bug_hunt';
+  bugInstanceId?: string;
+  hunterRosterId?: 'kaito_glitch';
+  hunterVisualKey?: 'kaito_glitch_sprint';
 };
 
 export type LaunchAttackMarchResponse = {
@@ -144,6 +154,7 @@ export const attackApi = createApi({
         try {
           await queryFulfilled;
           dispatch(userGuideApi.util.invalidateTags(['UserTaskProgress']));
+          dispatch(bugHuntApi.util.invalidateTags(['BugHuntTokens']));
         } catch {
           // Error handling is done by the mutation itself
         }

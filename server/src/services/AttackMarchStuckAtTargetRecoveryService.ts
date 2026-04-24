@@ -76,10 +76,8 @@ export async function runStuckAtTargetRecoveryOnce(): Promise<void> {
 
         const refund = await systemRefundAttackMarchInState(m.marchId, String(m.attackerId), 'resolving');
         if (!refund.refunded) {
-          console.warn('[MarchStuckAtTarget] resolving refund not applied:', m.marchId, refund);
           continue;
         }
-        console.error('[MarchStuckAtTarget] RECOVERED (resolving):', m.marchId);
       } else if (state === 'arrived' || state === 'queued') {
         const refund = await systemRefundAttackMarchInState(
           m.marchId,
@@ -87,10 +85,8 @@ export async function runStuckAtTargetRecoveryOnce(): Promise<void> {
           state
         );
         if (!refund.refunded) {
-          console.warn('[MarchStuckAtTarget] arrived/queued refund not applied:', m.marchId, refund);
           continue;
         }
-        console.error('[MarchStuckAtTarget] RECOVERED (arrived or queued):', m.marchId, state);
       } else {
         continue;
       }

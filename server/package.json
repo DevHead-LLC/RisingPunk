@@ -11,6 +11,8 @@
     "test": "jest",
     "seed:map": "node scripts/seedMap.js",
     "seed:database": "node scripts/seedDatabase.js",
+    "seed:ant-world-phase2": "ts-node scripts/seedAntWorldPhase2.ts",
+    "seed:ant-world-once": "ts-node scripts/seedAntWorldOnce.ts",
     "backup:guide": "node scripts/backupRestore.js",
     "update:npc": "ts-node scripts/updateNPCs.ts",
     "update:npc-spreadsheet": "ts-node scripts/updateNpcCollectionFromSpreadsheet.ts",
