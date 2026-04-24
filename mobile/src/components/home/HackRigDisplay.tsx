@@ -3,7 +3,6 @@ import {View, StyleSheet, TouchableOpacity, Image, Text, Animated} from 'react-n
 import { SIZING } from '../../styles/theme';
 import { useAppSelector } from '../../store/hooks';
 import { useThemeColors } from '../../hooks/useThemeColors';
-import { API_URL } from '../../config';
 import { SystemBreachModal } from './SystemBreachModal';
 
 type Props = {
@@ -16,9 +15,7 @@ type Props = {
 export const HackRigDisplay = ({ onPress, onNavigateToBattle, isHighlighted = false, onHighlightPress }: Props) => {
   const colors = useThemeColors();
   const user = useAppSelector((state) => state.auth.user);
-  const token = useAppSelector((state) => state.auth.token);
-  const [isLocked, setIsLocked] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
+  const isLocked = user?.unlockedFeatures?.hackRig !== true;
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [showSystemBreachModal, setShowSystemBreachModal] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -26,35 +23,6 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle, isHighlighted = fa
   const animatedBorderColor = useRef(new Animated.Value(0)).current;
   
   const highlightColors = [colors.primary, colors.secondary, colors.matrix];
-
-  // Fetch hack rig status from database on component mount
-  useEffect(() => {
-    const fetchHackRigStatus = async () => {
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_URL}/api/users/profile`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          setIsLocked(!userData.unlockedFeatures?.hackRig);
-        }
-      } catch (error) {
-        console.error('Failed to fetch hack rig status:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchHackRigStatus();
-  }, [token]);
 
   const startPulseAnimation = () => {
     Animated.loop(
@@ -119,35 +87,6 @@ export const HackRigDisplay = ({ onPress, onNavigateToBattle, isHighlighted = fa
     inputRange: [0, 1, 2],
     outputRange: highlightColors,
   });
-
-  // Show loading state while fetching
-  if (isLoading) {
-    return (
-      <View style={[styles.moduleContainer, styles.moduleDisabled, { 
-        backgroundColor: colors.accent + 'E6',
-        borderColor: colors.secondary 
-      }]}>
-        <View style={styles.touchable}>
-          <View style={[styles.imageContainer, { 
-            backgroundColor: colors.inputBg + '4D',
-            borderColor: colors.matrix 
-          }]}>
-            <Image
-              source={require('../../assets/images/hacker-rig.png')}
-              style={styles.moduleImage}
-            />
-            <View style={styles.lockOverlay}>
-              <Text style={styles.lockText}>🔒</Text>
-            </View>
-          </View>
-          <View style={styles.moduleTextContainer}>
-            <Text style={[styles.moduleTitle, { color: colors.primary }]}>HACK RIG</Text>
-            <Text style={[styles.moduleDescription, { color: colors.text.secondary }]}>Loading...</Text>
-          </View>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <Animated.View

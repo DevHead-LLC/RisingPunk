@@ -281,15 +281,13 @@ export class BattleService {
     battle.winner = winner;
     await battle.save();
 
-    // Unlock hack rig if user wins by elimination (only if flagged)
-    if (winner === NodeOwner.USER && endCondition === 'elimination' && (battle as any).unlockHackRigOnWin) {
+    // Unlock hack rig on the first successful flagged hack-rig battle win.
+    if (winner === NodeOwner.USER && (battle as any).unlockHackRigOnWin) {
       try {
-        const user = await User.findById(battle.attackerId);
-        if (user && !user.unlockedFeatures?.hackRig) {
-          user.unlockedFeatures = user.unlockedFeatures || {};
-          user.unlockedFeatures.hackRig = true;
-          await user.save();
-        }
+        await User.updateOne(
+          { _id: battle.attackerId, 'unlockedFeatures.hackRig': { $ne: true } },
+          { $set: { 'unlockedFeatures.hackRig': true } }
+        );
       } catch (error) {
         console.error('Failed to unlock hack rig for user', battle.attackerId, error);
       }
