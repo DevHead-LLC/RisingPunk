@@ -1177,8 +1177,8 @@ export const HackMapScreen: React.FC<Props> = ({
     if (!token) return;
     const EventSourceCtor = (globalThis as any).EventSource;
     if (!EventSourceCtor) return;
-    const streamUrl = `${API_URL}/api/bug-hunt/bugs/stream?accessToken=${encodeURIComponent(token)}`;
-    const source = new EventSourceCtor(streamUrl);
+    let isClosed = false;
+    let source: any = null;
     const onMessage = (evt: { data?: string }) => {
       if (!evt?.data) return;
       try {
@@ -1222,10 +1222,35 @@ export const HackMapScreen: React.FC<Props> = ({
         // Ignore malformed push payloads to keep map stable.
       }
     };
-    source.onmessage = onMessage;
-    return () => {
+    const open = async () => {
       try {
-        source.close?.();
+        const resp = await fetch(`${API_URL}/api/bug-hunt/bugs/stream-token`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = resp.ok ? await resp.json() : null;
+        const streamToken =
+          json && typeof json.streamToken === 'string' && json.streamToken.trim() !== ''
+            ? json.streamToken
+            : null;
+        const streamUrl = streamToken
+          ? `${API_URL}/api/bug-hunt/bugs/stream?streamToken=${encodeURIComponent(streamToken)}`
+          : `${API_URL}/api/bug-hunt/bugs/stream?accessToken=${encodeURIComponent(token)}`;
+        if (isClosed) return;
+        source = new EventSourceCtor(streamUrl);
+        source.onmessage = onMessage;
+      } catch {
+        // If token fetch fails, fall back to legacy query token so stream still works.
+        const streamUrl = `${API_URL}/api/bug-hunt/bugs/stream?accessToken=${encodeURIComponent(token)}`;
+        if (isClosed) return;
+        source = new EventSourceCtor(streamUrl);
+        source.onmessage = onMessage;
+      }
+    };
+    void open();
+    return () => {
+      isClosed = true;
+      try {
+        source?.close?.();
       } catch {
         // no-op
       }

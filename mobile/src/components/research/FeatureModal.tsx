@@ -621,6 +621,9 @@ export function FeatureModal({
                   Use Speedup Item ({researchStorageSpeedupItems.length} type{researchStorageSpeedupItems.length === 1 ? '' : 's'})
                 </Text>
               </TouchableOpacity>
+              <Text style={[styles.researchStorageSpeedupEmptyText, { color: isLightMode ? '#374151' : '#94A3B8' }]}>
+                {researchSpeedupSummary}
+              </Text>
               {researchStorageSpeedupItems.length > 0 ? (
                 <>
                   <View style={styles.researchStorageSpeedupList}>
@@ -706,11 +709,7 @@ export function FeatureModal({
                     </View>
                   ) : null}
                 </>
-              ) : (
-                <Text style={[styles.researchStorageSpeedupEmptyText, { color: isLightMode ? '#374151' : '#94A3B8' }]}>
-                  {researchSpeedupSummary}
-                </Text>
-              )}
+              ) : null}
               <TouchableOpacity
                 style={[
                   styles.speedupButton,

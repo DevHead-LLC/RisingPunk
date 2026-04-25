@@ -120,15 +120,29 @@ type ConstructionSpeedupTarget =
   | 'property-build-4';
 
 async function authenticateSseRequest(req: Request): Promise<{ userId: string } | null> {
-  const tokenRaw = req.query.accessToken;
-  if (typeof tokenRaw !== 'string' || tokenRaw.trim() === '') {
+  const accessTokenRaw = req.query.accessToken;
+  const streamTokenRaw = req.query.streamToken;
+  const tokenRaw =
+    typeof streamTokenRaw === 'string' && streamTokenRaw.trim() !== ''
+      ? streamTokenRaw
+      : typeof accessTokenRaw === 'string' && accessTokenRaw.trim() !== ''
+        ? accessTokenRaw
+        : null;
+  if (!tokenRaw) {
     return null;
   }
   try {
     const decoded = jwt.verify(tokenRaw, JWT_SECRET || 'defaultsecret') as {
       userId?: string;
       sessionId?: string;
+      scope?: string;
     };
+    // If the caller used the new short-lived stream token, require the SSE scope.
+    if (typeof streamTokenRaw === 'string' && streamTokenRaw.trim() !== '') {
+      if (decoded.scope !== 'bug-hunt-bugs-sse') {
+        return null;
+      }
+    }
     const userId = String(decoded.userId ?? '').trim();
     if (userId === '') {
       return null;
@@ -155,6 +169,27 @@ router.get('/world-state', auth, async (_req: Request, res: Response): Promise<v
     serverTimeMs: Date.now(),
     updatedAtUtc: world.updatedAt.toISOString(),
   });
+});
+
+/**
+ * EventSource cannot attach auth headers; use a short-lived scoped token to reduce bearer token exposure in logs.
+ * Still accepts legacy `accessToken` for backwards compatibility.
+ */
+router.get('/bugs/stream-token', auth, async (req: Request, res: Response): Promise<void> => {
+  const userId = String(req.user?._id ?? '').trim();
+  if (!userId) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  const sessionId = String((req.user as any)?.currentTokenId ?? '').trim();
+  const secret = JWT_SECRET || 'defaultsecret';
+  const streamToken = jwt.sign(
+    { userId, sessionId, scope: 'bug-hunt-bugs-sse' },
+    secret,
+    // Small window so a leaked query param is less valuable than the full bearer token.
+    { expiresIn: '2m' }
+  );
+  res.json({ streamToken, serverTimeMs: Date.now() });
 });
 
 router.get('/tokens', auth, async (req: Request, res: Response): Promise<void> => {
