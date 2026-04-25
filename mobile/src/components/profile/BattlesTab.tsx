@@ -246,7 +246,7 @@ const PresetEditor = React.memo(
         <View style={styles.hunterSlotRow}>
           <CircleSlot
             isEnemy={false}
-            isEnabled={true}
+            isEnabled={hasKaitoHunter}
             isFilled={hunterSlots['1'] === BUG_HUNT_ROSTER_ID_KAITO}
             label={hasKaitoHunter ? 'SLOT 1' : 'LOCKED'}
             filledLabel="KAITO"
