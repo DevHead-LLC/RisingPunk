@@ -4,6 +4,10 @@ import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../../store/api/bugHuntApi';
 import type { BugHuntConstructionSpeedupTarget } from '../../store/api/bugHuntApi';
+import {
+  formatStorageSpeedupButtonDuration,
+  getMaxStorageSpeedupUsableQuantity,
+} from '../../utils/storageSpeedupUi';
 
 interface SpeedupModalProps {
   visible: boolean;
@@ -143,19 +147,6 @@ export const SpeedupModal: React.FC<SpeedupModalProps> = ({
     }
   };
 
-  const formatDurationForButton = (durationSeconds: number): string => {
-    const seconds = Math.max(0, Math.floor(durationSeconds));
-    if (seconds % 3600 === 0 && seconds >= 3600) {
-      const hours = seconds / 3600;
-      return `${hours}h`;
-    }
-    if (seconds % 60 === 0 && seconds >= 60) {
-      const minutes = seconds / 60;
-      return `${minutes}m`;
-    }
-    return `${seconds}s`;
-  };
-
   const handleSpeedup = async () => {
     if (!canSpeedup) {
       return;
@@ -173,13 +164,6 @@ export const SpeedupModal: React.FC<SpeedupModalProps> = ({
     }
   };
 
-  const getMaxUsableQuantity = (durationSeconds: number, ownedQuantity: number): number => {
-    const duration = Math.max(1, Math.floor(durationSeconds));
-    const remainingSeconds = Math.max(0, Math.ceil(localSecondsRemaining / 1000));
-    const maxByTime = Math.max(1, Math.ceil(remainingSeconds / duration));
-    return Math.max(1, Math.min(Math.floor(ownedQuantity), maxByTime));
-  };
-
   const selectedStorageItem =
     selectedStorageItemKey == null
       ? null
@@ -187,7 +171,11 @@ export const SpeedupModal: React.FC<SpeedupModalProps> = ({
 
   const selectedMaxQuantity =
     selectedStorageItem && Number.isFinite(selectedStorageItem.durationSeconds)
-      ? getMaxUsableQuantity(selectedStorageItem.durationSeconds ?? 0, selectedStorageItem.quantity)
+      ? getMaxStorageSpeedupUsableQuantity(
+          selectedStorageItem.durationSeconds ?? 0,
+          selectedStorageItem.quantity,
+          localSecondsRemaining
+        )
       : 1;
 
   useEffect(() => {
@@ -300,10 +288,14 @@ export const SpeedupModal: React.FC<SpeedupModalProps> = ({
                 >
                   {storageSpeedupItems.map((item) => {
                     const durationLabel = Number.isFinite(item.durationSeconds)
-                      ? formatDurationForButton(item.durationSeconds ?? 0)
+                      ? formatStorageSpeedupButtonDuration(item.durationSeconds ?? 0)
                       : item.label;
                     const maxUsable = Number.isFinite(item.durationSeconds)
-                      ? getMaxUsableQuantity(item.durationSeconds ?? 0, item.quantity)
+                      ? getMaxStorageSpeedupUsableQuantity(
+                        item.durationSeconds ?? 0,
+                        item.quantity,
+                        localSecondsRemaining
+                      )
                       : item.quantity;
                     const isSelected = selectedStorageItemKey === item.itemKey;
                     return (

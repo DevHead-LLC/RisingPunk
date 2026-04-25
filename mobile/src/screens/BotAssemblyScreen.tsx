@@ -195,8 +195,7 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
     [
       bots.selectedType,
       bots.selectedMarkLevel,
-      bots.botCounts,
-      bots.botCountsM2,
+      displayBotCounts,
       handleSelectBotType,
       isGuardianSelectionHighlight,
       mark2ResearchUnlocked,
