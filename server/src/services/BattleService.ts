@@ -8,7 +8,6 @@ import { ScreenDimensionService } from './ScreenDimensionService';
 import { PointTrackingService } from './PointTrackingService';
 import { CombatService } from './CombatService';
 import { User } from '../models/User';
-import mongoose from 'mongoose';
 import { NPCRespawnService } from './NPCRespawnService';
 import { NPCService } from './NPCService';
 import { BattleRewardService } from './BattleRewardService';
@@ -281,15 +280,13 @@ export class BattleService {
     battle.winner = winner;
     await battle.save();
 
-    // Unlock hack rig if user wins by elimination (only if flagged)
-    if (winner === NodeOwner.USER && endCondition === 'elimination' && (battle as any).unlockHackRigOnWin) {
+    // Unlock hack rig on the first successful flagged hack-rig battle win.
+    if (winner === NodeOwner.USER && (battle as any).unlockHackRigOnWin) {
       try {
-        const user = await User.findById(battle.attackerId);
-        if (user && !user.unlockedFeatures?.hackRig) {
-          user.unlockedFeatures = user.unlockedFeatures || {};
-          user.unlockedFeatures.hackRig = true;
-          await user.save();
-        }
+        await User.updateOne(
+          { _id: battle.attackerId, 'unlockedFeatures.hackRig': { $ne: true } },
+          { $set: { 'unlockedFeatures.hackRig': true } }
+        );
       } catch (error) {
         console.error('Failed to unlock hack rig for user', battle.attackerId, error);
       }
@@ -525,27 +522,6 @@ export class BattleService {
     battle.winner = NodeOwner.ENEMY;
     battle.endTime = new Date();
     await battle.save();
-  }
-
-  private async unlockHackRigForUser(userId: string): Promise<void> {
-    try {
-      // Convert string ID to ObjectId for MongoDB query
-      const objectId = new mongoose.Types.ObjectId(userId);
-      const user = await User.findById(objectId);
-      
-      if (!user) {
-        return;
-      }
-
-      // Only unlock if not already unlocked
-      if (!user.unlockedFeatures?.hackRig) {
-        user.unlockedFeatures = user.unlockedFeatures || {};
-        user.unlockedFeatures.hackRig = true;
-        await user.save();
-      }
-    } catch (error) {
-      console.error('Failed to unlock hack rig for user', userId, error);
-    }
   }
 
   async checkBattleEndConditions(battleId: string): Promise<{ shouldEnd: boolean; winner?: NodeOwner; endCondition?: 'timer' | 'elimination' }> {
