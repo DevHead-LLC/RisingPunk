@@ -100,7 +100,11 @@ export function useAttackMarchTransitionBanners(token: string | null): {
 
     for (const m of marches) {
       const prev = prevStatesRef.current.get(m.marchId);
-      if (prev === undefined && m.state === 'outbound' && m.attackType === 'swarm') {
+      if (
+        prev === undefined &&
+        m.state === 'outbound' &&
+        m.attackType === 'swarm'
+      ) {
         message = 'Swarm Initiated';
         break;
       }
