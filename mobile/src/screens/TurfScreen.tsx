@@ -1241,15 +1241,23 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
 
             if (bugInstanceId) {
               const mapPan = handoff.pendingMapPan;
+              const bugCell = handoff.pendingBugCell;
               const bugHpPercent = Number(handoff.pendingBugHpPercent ?? 100);
               handoff.pendingBugInstanceId = undefined;
               handoff.pendingBugHpPercent = undefined;
+              handoff.pendingBugCell = undefined;
               handoff.pendingMapPan = undefined;
-              if (mapPan && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)) {
+              const resolvedBugCell =
+                bugCell && Number.isFinite(bugCell.x) && Number.isFinite(bugCell.y)
+                  ? { x: bugCell.x, y: bugCell.y }
+                  : mapPan && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
+                    ? { x: mapPan.x, y: mapPan.y }
+                    : null;
+              if (resolvedBugCell) {
                 setPendingBugSelection({
                   bugInstanceId: String(bugInstanceId),
                   bugHpPercent: Number.isFinite(bugHpPercent) ? bugHpPercent : 100,
-                  bugCell: { x: mapPan.x, y: mapPan.y },
+                  bugCell: resolvedBugCell,
                 });
                 setReturnContext({ origin: 'map', mapPan });
                 navigateToScreen('bugHuntHunterSelection');

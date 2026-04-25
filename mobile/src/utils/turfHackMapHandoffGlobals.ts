@@ -18,6 +18,7 @@ export type HackMapHandoffGlobals = {
   pendingDefenderUserId?: string;
   pendingBugInstanceId?: string;
   pendingBugHpPercent?: number;
+  pendingBugCell?: { x: number; y: number };
   pendingMapPan?: { x: number; y: number };
 };
 
@@ -41,6 +42,9 @@ export function setBattlePrepHandoffSwarm(
   h.pendingNpcSlug = undefined;
   h.pendingNpcInstanceId = undefined;
   h.pendingDefenderUserId = undefined;
+  h.pendingBugInstanceId = undefined;
+  h.pendingBugHpPercent = undefined;
+  h.pendingBugCell = undefined;
   h.pendingSwarmTargetUserId = targetUserId;
   h.pendingMapPan = mapPan;
 }
@@ -51,6 +55,9 @@ export function setBattlePrepHandoffNpc(
 ): void {
   h.pendingSwarmTargetUserId = undefined;
   h.pendingDefenderUserId = undefined;
+  h.pendingBugInstanceId = undefined;
+  h.pendingBugHpPercent = undefined;
+  h.pendingBugCell = undefined;
   h.pendingNpcSlug = args.npcSlug;
   h.pendingNpcInstanceId = args.npcInstanceId;
   h.pendingMapPan = args.mapPan;
@@ -64,13 +71,21 @@ export function setBattlePrepHandoffDefender(
   h.pendingNpcSlug = undefined;
   h.pendingNpcInstanceId = undefined;
   h.pendingSwarmTargetUserId = undefined;
+  h.pendingBugInstanceId = undefined;
+  h.pendingBugHpPercent = undefined;
+  h.pendingBugCell = undefined;
   h.pendingDefenderUserId = defenderUserId;
   h.pendingMapPan = mapPan;
 }
 
 export function setBugHuntSelectionHandoff(
   h: HackMapHandoffGlobals,
-  args: { bugInstanceId: string; bugHpPercent: number; mapPan: { x: number; y: number } }
+  args: {
+    bugInstanceId: string;
+    bugHpPercent: number;
+    bugCell: { x: number; y: number };
+    mapPan: { x: number; y: number };
+  }
 ): void {
   h.pendingNpcSlug = undefined;
   h.pendingNpcInstanceId = undefined;
@@ -78,5 +93,6 @@ export function setBugHuntSelectionHandoff(
   h.pendingDefenderUserId = undefined;
   h.pendingBugInstanceId = args.bugInstanceId;
   h.pendingBugHpPercent = args.bugHpPercent;
+  h.pendingBugCell = args.bugCell;
   h.pendingMapPan = args.mapPan;
 }
