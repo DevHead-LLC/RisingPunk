@@ -168,7 +168,8 @@ export const BattleBattalion = React.memo(({
     animatedPosition.setValue(smoothPosition);
     setDisplayPosition(smoothPosition);
   }, [
-    smoothPosition,
+    smoothPosition.x,
+    smoothPosition.y,
     animatedPosition,
     hasReplayVirtualClock,
     replaySnapshotFrameIndex,
