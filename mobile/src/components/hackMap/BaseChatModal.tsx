@@ -463,7 +463,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
       const atBottom =
         contentOffset.y + layoutMeasurement.height >= contentSize.height - SCROLL_BOTTOM_THRESHOLD;
       isAtBottomRef.current = atBottom;
-            } catch {
+    } catch {
       // ignore
     }
   }, []);
@@ -479,7 +479,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 50);
-            } catch {
+    } catch {
       // Caller's onSendMessage may throw; mutation exposes error state if needed
     }
   };
