@@ -189,12 +189,16 @@ export const SpeedupModal: React.FC<SpeedupModalProps> = ({
       }).unwrap();
       await refetchStorage();
       await onStorageSpeedupApplied?.();
-      const appliedQuantity =
-        typeof result.quantityUsed === 'number' && Number.isFinite(result.quantityUsed)
-          ? Math.max(1, Math.floor(result.quantityUsed))
-          : Math.max(1, quantityToUse);
-      const durationMs = Math.max(1, Math.floor(durationSeconds)) * 1000 * appliedQuantity;
-      setLocalSecondsRemaining((prev) => Math.max(0, prev - durationMs));
+      // Parent callbacks refetch and pass updated `secondsRemaining`; avoid local double-subtract.
+      // Fallback for callers without callback: keep optimistic local decrement.
+      if (!onStorageSpeedupApplied) {
+        const appliedQuantity =
+          typeof result.quantityUsed === 'number' && Number.isFinite(result.quantityUsed)
+            ? Math.max(1, Math.floor(result.quantityUsed))
+            : Math.max(1, quantityToUse);
+        const durationMs = Math.max(1, Math.floor(durationSeconds)) * 1000 * appliedQuantity;
+        setLocalSecondsRemaining((prev) => Math.max(0, prev - durationMs));
+      }
     } catch (error: unknown) {
       const dataErr =
         error && typeof error === 'object' && 'data' in error
