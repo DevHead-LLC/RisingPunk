@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert } from 'react-native';
-import { Image, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { Dimensions, Image, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { useThemeColors } from '../hooks/useThemeColors';
 import {
@@ -97,14 +97,15 @@ export const BugHuntHunterSelectionScreen: React.FC<Props> = ({
       return;
     }
     try {
+      const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
       const result = await launchAttackMarch({
         attackType: 'bug_hunt',
         bugInstanceId,
         hunterRosterId: slotOneHunterRosterId,
         hunterVisualKey: BUG_HUNT_VISUAL_KEY_KAITO_SPRINT,
         userBattalions: [],
-        screenWidth: 844,
-        screenHeight: 390,
+        screenWidth,
+        screenHeight,
         originX: Math.floor(myMapPos.x),
         originY: Math.floor(myMapPos.y),
         hackMapCellX: bugCell.x,

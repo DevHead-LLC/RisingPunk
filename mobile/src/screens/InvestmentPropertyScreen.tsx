@@ -20,7 +20,10 @@ import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
 import { usePanGesture } from '../hooks/usePanGesture';
 import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../store/api/bugHuntApi';
-import { formatStorageSpeedupButtonDuration } from '../utils/storageSpeedupUi';
+import {
+  compareStorageSpeedupItemsByDurationDesc,
+  formatStorageSpeedupButtonDuration,
+} from '../utils/storageSpeedupUi';
 
 let GestureDetector: any, Animated: any, useAnimatedStyle: any;
 
@@ -207,14 +210,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
         Number.isFinite(item.durationSeconds) &&
         Number(item.quantity) > 0
     )
-    .sort((a, b) => {
-      const durationA = Math.max(0, Math.floor(a.durationSeconds ?? 0));
-      const durationB = Math.max(0, Math.floor(b.durationSeconds ?? 0));
-      if (durationA !== durationB) {
-        return durationB - durationA;
-      }
-      return a.label.localeCompare(b.label);
-    });
+    .sort(compareStorageSpeedupItemsByDurationDesc);
 
   const propertyBuildCompletesAt = status?.buildStatus?.completesAt ?? null;
   const [propertyBuildCountdownNow, setPropertyBuildCountdownNow] = useState(() => Date.now());

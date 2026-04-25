@@ -18,6 +18,7 @@ import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { trackFirstResearch } from '../../services/analyticsService';
 import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../../store/api/bugHuntApi';
 import {
+  compareStorageSpeedupItemsByDurationDesc,
   formatStorageSpeedupButtonDuration,
   getMaxStorageSpeedupUsableQuantity,
 } from '../../utils/storageSpeedupUi';
@@ -310,14 +311,7 @@ export function FeatureModal({
           Number.isFinite(item.durationSeconds) &&
           Number(item.quantity) > 0
       )
-      .sort((a, b) => {
-        const durationA = Math.max(0, Math.floor(a.durationSeconds ?? 0));
-        const durationB = Math.max(0, Math.floor(b.durationSeconds ?? 0));
-        if (durationA !== durationB) {
-          return durationA - durationB;
-        }
-        return a.label.localeCompare(b.label);
-      });
+      .sort(compareStorageSpeedupItemsByDurationDesc);
   }, [storageInventory?.items]);
 
   const researchSpeedupSummary = useMemo(() => {

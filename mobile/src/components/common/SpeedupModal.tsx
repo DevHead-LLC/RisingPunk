@@ -5,6 +5,7 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../../store/api/bugHuntApi';
 import type { BugHuntConstructionSpeedupTarget } from '../../store/api/bugHuntApi';
 import {
+  compareStorageSpeedupItemsByDurationDesc,
   formatStorageSpeedupButtonDuration,
   getMaxStorageSpeedupUsableQuantity,
 } from '../../utils/storageSpeedupUi';
@@ -99,14 +100,7 @@ export const SpeedupModal: React.FC<SpeedupModalProps> = ({
           Number.isFinite(item.durationSeconds) &&
           Number(item.quantity) > 0
       )
-      .sort((a, b) => {
-        const durationA = Math.max(0, Math.floor(a.durationSeconds ?? 0));
-        const durationB = Math.max(0, Math.floor(b.durationSeconds ?? 0));
-        if (durationA !== durationB) {
-          return durationB - durationA;
-        }
-        return a.label.localeCompare(b.label);
-      });
+      .sort(compareStorageSpeedupItemsByDurationDesc);
   }, [storageData?.items, storageSpeedupDomain]);
 
   const formatCost = (amount: number) => {
