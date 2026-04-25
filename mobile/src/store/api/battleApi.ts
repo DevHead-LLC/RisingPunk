@@ -29,6 +29,8 @@ export interface StartBattleRequest {
   /** Hack Map cell when attack started from map (optional; both or neither). */
   hackMapCellX?: number;
   hackMapCellY?: number;
+  hunterRosterId?: 'kaito_glitch';
+  hunterVisualKey?: 'kaito_glitch_sprint';
 }
 
 const battleBaseQuery = async (args: any, api: any, extraOptions: any) => {

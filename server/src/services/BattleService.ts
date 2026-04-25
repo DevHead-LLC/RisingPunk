@@ -55,7 +55,8 @@ export class BattleService {
     defenderNpcInstanceId?: string,
     hackMapCellX?: number,
     hackMapCellY?: number,
-    marchMeta?: { marchSourcedAttack: boolean; sourceMarchId: string }
+    marchMeta?: { marchSourcedAttack: boolean; sourceMarchId: string },
+    hunterBattleContract?: { hunterRosterId: string; hunterVisualKey: string }
   ): Promise<IBattleDocument> {
     try {
       const battle = await BattleSetupService.createBattle(
@@ -69,7 +70,8 @@ export class BattleService {
         defenderNpcInstanceId,
         hackMapCellX,
         hackMapCellY,
-        marchMeta
+        marchMeta,
+        hunterBattleContract
       );
       
       ScreenDimensionService.setBattleScreenDimensions(battle.battleId, screenWidth, screenHeight);

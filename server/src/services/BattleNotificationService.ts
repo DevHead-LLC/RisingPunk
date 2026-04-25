@@ -15,8 +15,11 @@ import {
   sumBattalionBotsByOwnerForReport,
 } from '../utils/battleReportBotCounts';
 import { NPCService } from './NPCService';
+import { HUNTER_ROSTER_KAITO_GLITCH } from '../types/bugHunt';
 
 const BATTLE_REPORT_PREFIX = 'BTL|';
+const KAITO_HUNTER_BATTALION_ID_PREFIX = 'hunter-kaito-';
+const KAITO_HUNTER_DISPLAY_NAME = 'Kaito Glitch';
 
 const HANDLE_TRUNC_FOR_OVERFLOW = 20;
 
@@ -102,6 +105,23 @@ export function serializeBattleReportMessage(
   return emergency;
 }
 
+function extractAttackerHunterCounts(
+  startingBattalions: IBattleDocument['startingBattalions'],
+  endingBattalions: IBattleDocument['battalions']
+): { start: number; end: number; lost: number } {
+  const start = (startingBattalions ?? []).reduce((sum, battalion) => {
+    if (battalion.owner !== NodeOwner.USER) return sum;
+    if (!String(battalion.id ?? '').startsWith(KAITO_HUNTER_BATTALION_ID_PREFIX)) return sum;
+    return sum + Math.max(0, Math.floor(Number(battalion.quantity ?? 0)));
+  }, 0);
+  const end = (endingBattalions ?? []).reduce((sum, battalion) => {
+    if (battalion.owner !== NodeOwner.USER) return sum;
+    if (!String(battalion.id ?? '').startsWith(KAITO_HUNTER_BATTALION_ID_PREFIX)) return sum;
+    return sum + Math.max(0, Math.floor(Number(battalion.quantity ?? 0)));
+  }, 0);
+  return { start, end, lost: Math.max(0, start - end) };
+}
+
 /**
  * NPC / computer-opponent battle: one `BTL|` to the attacker after rewards (or on reward failure — still report outcome).
  * Caller should pass a fresh `getBattle` read so `processedRewards` / battalions match DB.
@@ -123,6 +143,11 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
   const attackerEnd = sumBattalionBotsByOwnerForReport(endingBattalions, NodeOwner.USER);
   const defenderEnd = sumBattalionBotsByOwnerForReport(endingBattalions, NodeOwner.ENEMY);
 
+  const attackerHunter = extractAttackerHunterCounts(startingBattalions, endingBattalions);
+  if (attackerHunter.start > 0 || attackerHunter.end > 0) {
+    attackerStart.guardian = Math.max(0, attackerStart.guardian - attackerHunter.start);
+    attackerEnd.guardian = Math.max(0, attackerEnd.guardian - attackerHunter.end);
+  }
   const attackerLost = battleReportBotsLost(attackerStart, attackerEnd);
   const defenderLost = battleReportBotsLost(defenderStart, defenderEnd);
 
@@ -163,6 +188,14 @@ export async function sendNpcBattleNotification(battle: IBattleDocument): Promis
     defenderStart,
     attackerLost,
     defenderLost,
+    ...(attackerHunter.start > 0 || attackerHunter.lost > 0
+      ? {
+          attackerHunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+          attackerHunterName: KAITO_HUNTER_DISPLAY_NAME,
+          attackerHunterStart: attackerHunter.start,
+          attackerHunterLost: attackerHunter.lost,
+        }
+      : {}),
     winner,
     cash,
     ...(xp > 0 ? { xp } : {}),
@@ -252,6 +285,11 @@ export async function sendBattleNotifications(
   const attackerEnd = sumBattalionBotsByOwnerForReport(endingBattalions, NodeOwner.USER);
   const defenderEnd = sumBattalionBotsByOwnerForReport(endingBattalions, NodeOwner.ENEMY);
 
+  const attackerHunter = extractAttackerHunterCounts(startingBattalions, endingBattalions);
+  if (attackerHunter.start > 0 || attackerHunter.end > 0) {
+    attackerStart.guardian = Math.max(0, attackerStart.guardian - attackerHunter.start);
+    attackerEnd.guardian = Math.max(0, attackerEnd.guardian - attackerHunter.end);
+  }
   const attackerLost = battleReportBotsLost(attackerStart, attackerEnd);
   const defenderLost = battleReportBotsLost(defenderStart, defenderEnd);
 
@@ -289,6 +327,14 @@ export async function sendBattleNotifications(
     defenderStart,
     attackerLost,
     defenderLost,
+    ...(attackerHunter.start > 0 || attackerHunter.lost > 0
+      ? {
+          attackerHunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+          attackerHunterName: KAITO_HUNTER_DISPLAY_NAME,
+          attackerHunterStart: attackerHunter.start,
+          attackerHunterLost: attackerHunter.lost,
+        }
+      : {}),
     winner,
     cash,
     ...(xa > 0 || xd > 0 ? { xpAttacker: xa, xpDefender: xd } : {}),

@@ -147,6 +147,10 @@ export interface ExecuteAttackMarchLaunchParams {
     hunterRosterId: string;
     hunterVisualKey: string;
   };
+  hunterBattleContract?: {
+    hunterRosterId: string;
+    hunterVisualKey: string;
+  };
 }
 
 export interface ExecuteAttackMarchLaunchResult {
@@ -171,6 +175,7 @@ export async function executeAttackMarchLaunch(
     target,
     attackType,
     bugHuntContract,
+    hunterBattleContract,
   } = params;
   const isBugHuntLaunch = attackType === 'bug_hunt';
 
@@ -345,6 +350,11 @@ export async function executeAttackMarchLaunch(
                     hunterRosterId: bugHuntContract.hunterRosterId,
                     hunterVisualKey: bugHuntContract.hunterVisualKey,
                   }
+                : hunterBattleContract != null
+                  ? {
+                      hunterRosterId: hunterBattleContract.hunterRosterId,
+                      hunterVisualKey: hunterBattleContract.hunterVisualKey,
+                    }
                 : {}),
               state: 'outbound',
               departAt,

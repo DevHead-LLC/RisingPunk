@@ -22,6 +22,7 @@ import { BotAssemblyHeader } from '../components/botAssembly/BotAssemblyHeader';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { HackExpeditionCommitmentBanner } from '../components/common/HackExpeditionCommitmentBanner';
+import { projectBuildQueueProgress } from '../utils/botBuildProjection';
 
 const LEVELS = [1, 2, 3, 4];
 
@@ -147,27 +148,19 @@ export function BotAssemblyScreen({ onClose }: { onClose: () => void }): React.J
     if (!queue?.completesAt || !queue?.type) {
       return { m1, m2 };
     }
-    const queueQuantity = Math.max(0, Math.floor(Number(queue.quantity ?? 0)));
-    if (queueQuantity <= 0) {
+    const remainingMs = Math.max(0, new Date(queue.completesAt).getTime() - Date.now());
+    const projected = projectBuildQueueProgress(queue, remainingMs);
+    if (!projected) {
       return { m1, m2 };
     }
-    const serverBuilt = Math.max(0, Math.floor(Number(queue.botsBuilt ?? 0)));
-    const markLevel = Number(queue.markLevel ?? 1) >= 2 ? 2 : 1;
-    const msPerUnit = markLevel >= 2 ? 4000 : 1000;
-    const remainingMs = Math.max(0, new Date(queue.completesAt).getTime() - Date.now());
-    const expectedBuiltFromClock = Math.max(0, queueQuantity - Math.ceil(remainingMs / msPerUnit));
-    const projectedBuilt = Math.max(
-      0,
-      Math.min(queueQuantity, Math.max(serverBuilt, expectedBuiltFromClock))
-    );
-    const projectedDelta = Math.max(0, projectedBuilt - serverBuilt);
+    const { projectedDelta, markLevel, type } = projected;
     if (projectedDelta <= 0) {
       return { m1, m2 };
     }
     if (markLevel >= 2) {
-      m2[queue.type] = Math.max(0, Math.floor(Number(m2[queue.type] ?? 0)) + projectedDelta);
+      m2[type] = Math.max(0, Math.floor(Number(m2[type] ?? 0)) + projectedDelta);
     } else {
-      m1[queue.type] = Math.max(0, Math.floor(Number(m1[queue.type] ?? 0)) + projectedDelta);
+      m1[type] = Math.max(0, Math.floor(Number(m1[type] ?? 0)) + projectedDelta);
     }
     return { m1, m2 };
   }, [bots.botCounts, bots.botCountsM2, bots.buildQueue, buildUiTick]);

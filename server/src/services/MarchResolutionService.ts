@@ -147,7 +147,13 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
         updated.defenderNpcInstanceId,
         updated.hackMapCellX,
         updated.hackMapCellY,
-        marchMeta
+        marchMeta,
+        updated.hunterRosterId && updated.hunterVisualKey
+          ? {
+              hunterRosterId: String(updated.hunterRosterId),
+              hunterVisualKey: String(updated.hunterVisualKey),
+            }
+          : undefined
       );
     } else {
       const defenderUserId = String(updated.defenderId).trim();
@@ -165,7 +171,13 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
         undefined,
         updated.hackMapCellX,
         updated.hackMapCellY,
-        marchMeta
+        marchMeta,
+        updated.hunterRosterId && updated.hunterVisualKey
+          ? {
+              hunterRosterId: String(updated.hunterRosterId),
+              hunterVisualKey: String(updated.hunterVisualKey),
+            }
+          : undefined
       );
     }
 

@@ -4,7 +4,11 @@ import { ActivityIndicator, Image, SafeAreaView, ScrollView, StyleSheet, Text, T
 import { CloseButton } from '../components/common/CloseButton';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { SIZING } from '../styles/theme';
-import { BUG_HUNT_ROSTER_ID_KAITO, KAITO_GLITCH_SPRINT_IMAGE } from '../constants/hackMapBugHuntVisuals';
+import {
+  BUG_HUNT_ROSTER_ID_KAITO,
+  KAITO_GLITCH_HEADSHOT_IMAGE,
+  KAITO_GLITCH_SPRINT_IMAGE,
+} from '../constants/hackMapBugHuntVisuals';
 import {
   useFetchHunterStatsQuery,
   useFetchMyHuntersQuery,
@@ -19,7 +23,8 @@ type HunterCard = {
   rosterId: typeof BUG_HUNT_ROSTER_ID_KAITO;
   name: string;
   typeLabel: string;
-  image: number;
+  listImage: number;
+  detailImage: number;
   baseStats: {
     health: number;
     offense: number;
@@ -28,13 +33,19 @@ type HunterCard = {
     range: number;
   };
   backstory: string;
+  hackBoost: {
+    name: string;
+    summary: string;
+    effects: string[];
+  };
 };
 
 const KAITO_CARD: HunterCard = {
   rosterId: BUG_HUNT_ROSTER_ID_KAITO,
   name: 'Kaito Glitch',
   typeLabel: 'SPRINT',
-  image: KAITO_GLITCH_SPRINT_IMAGE,
+  listImage: KAITO_GLITCH_HEADSHOT_IMAGE,
+  detailImage: KAITO_GLITCH_SPRINT_IMAGE,
   baseStats: {
     health: 115000,
     offense: 20000,
@@ -49,6 +60,11 @@ const KAITO_CARD: HunterCard = {
     'He fights fast, changes angles constantly, and closes distance before enemies finish their first response pattern.\n\n' +
     'In bug hunts, Kaito is the first responder you trust when pressure spikes. ' +
     'He does not win fights by standing still - he wins by turning every second into momentum.',
+  hackBoost: {
+    name: 'Zero-Day Edge',
+    summary: 'Battle-start Sprint protocol that sharpens every Sprint unit in the lineup.',
+    effects: ['Sprint attack +5% (ATK x1.05)', 'Sprint speed +1 (whole stat point)'],
+  },
 };
 
 export const HunterFacilityScreen: React.FC<Props> = ({ onClose }) => {
@@ -83,7 +99,7 @@ export const HunterFacilityScreen: React.FC<Props> = ({ onClose }) => {
       },
       next: null as null,
     };
-  }, [selectedHunter, hasKaito, kaitoStatsData?.stats.current, kaitoStatsData?.stats.next]);
+  }, [selectedHunter, hasKaito, kaitoStatsData]);
 
   const handleUnlockKaito = useCallback(async () => {
     const safeRefreshAfterUnlock = async () => {
@@ -172,7 +188,7 @@ export const HunterFacilityScreen: React.FC<Props> = ({ onClose }) => {
                 activeOpacity={0.92}
                 onPress={() => setSelectedRosterId(BUG_HUNT_ROSTER_ID_KAITO)}
               >
-                <Image source={KAITO_CARD.image} style={styles.hunterCardImage} resizeMode="contain" />
+                <Image source={KAITO_CARD.listImage} style={styles.hunterCardImage} resizeMode="contain" />
                 <View style={styles.hunterCardMeta}>
                   <Text style={[styles.hunterCardTitle, { color: colors.text.primary }]} numberOfLines={1}>
                     {KAITO_CARD.name}
@@ -198,7 +214,7 @@ export const HunterFacilityScreen: React.FC<Props> = ({ onClose }) => {
             <View style={[styles.detailPanel, { borderColor: colors.matrix, backgroundColor: `${colors.background}D9` }]}>
               <View style={styles.detailBody}>
                 <View style={[styles.detailImagePane, { borderColor: `${colors.matrix}60` }]}>
-                  <Image source={selectedHunter.image} style={styles.detailImage} resizeMode="contain" />
+                  <Image source={selectedHunter.detailImage} style={styles.detailImage} resizeMode="contain" />
                 <Text style={[styles.imageTypeChip, { color: colors.background, backgroundColor: colors.matrix }]}>
                   {selectedHunter.typeLabel}
                 </Text>
@@ -249,8 +265,18 @@ export const HunterFacilityScreen: React.FC<Props> = ({ onClose }) => {
                   </View>
 
                   <View style={[styles.backstoryCard, { borderColor: colors.matrix, backgroundColor: `${colors.background}C7` }]}>
-                    <Text style={[styles.backstoryTitle, { color: colors.text.primary }]}>Backstory</Text>
+                    <Text style={[styles.backstoryTitle, { color: colors.text.primary }]}>Backstory and Boost</Text>
                     <ScrollView style={styles.backstoryScroll} contentContainerStyle={styles.backstoryScrollContent}>
+                      <Text style={[styles.backstoryBoostName, { color: colors.text.primary }]}>{selectedHunter.hackBoost.name}</Text>
+                      <Text style={[styles.hackBoostSummary, { color: colors.text.secondary }]}>
+                        {selectedHunter.hackBoost.summary}
+                      </Text>
+                      {selectedHunter.hackBoost.effects.map((effect) => (
+                        <Text key={effect} style={[styles.hackBoostEffect, { color: colors.text.primary }]}>
+                          - {effect}
+                        </Text>
+                      ))}
+                      <Text style={[styles.backstoryDivider, { color: colors.text.secondary }]}>---</Text>
                       <Text style={[styles.backstoryText, { color: colors.text.primary }]}>{selectedHunter.backstory}</Text>
                     </ScrollView>
                   </View>
@@ -517,6 +543,25 @@ const styles = StyleSheet.create({
     fontSize: SIZING.font.body,
     fontWeight: '700',
     marginBottom: SIZING.spacing.xs,
+  },
+  backstoryBoostName: {
+    fontSize: SIZING.font.body,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  hackBoostSummary: {
+    fontSize: SIZING.font.small,
+    lineHeight: 20,
+    marginBottom: SIZING.spacing.xs,
+  },
+  hackBoostEffect: {
+    fontSize: SIZING.font.small,
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  backstoryDivider: {
+    marginVertical: SIZING.spacing.xs,
+    fontWeight: '700',
   },
   backstoryScroll: {
     flex: 1,

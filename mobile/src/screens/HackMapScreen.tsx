@@ -4972,6 +4972,7 @@ export const HackMapScreen: React.FC<Props> = ({
                       setBugHuntSelectionHandoff(getHackMapHandoffGlobals(), {
                         bugInstanceId: selectedBugMarker.bugInstanceId,
                         bugHpPercent: selectedBugMarker.hpPercent,
+                        bugCell: { x: selectedCell.x, y: selectedCell.y },
                         mapPan: { x: selectedCell.x, y: selectedCell.y },
                       });
                       onClose();

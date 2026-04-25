@@ -20,6 +20,7 @@ export interface PresetData {
   unlocked: boolean;
   unlockedAt: string | null;
   battalions: Record<string, PresetBattalionConfig> | null;
+  hunterSlots: Partial<Record<'1' | '2' | '3', 'kaito_glitch'>> | null;
 }
 
 export interface BattlePresetsResponse {
@@ -93,11 +94,18 @@ export const battlePresetsApi = createApi({
       },
       invalidatesTags: ['BattlePresets'],
     }),
-    saveBattlePreset: builder.mutation<SavePresetResponse, { presetId: string; battalions: Record<string, PresetBattalionConfig> }>({
-      query: ({ presetId, battalions }) => ({
+    saveBattlePreset: builder.mutation<
+      SavePresetResponse,
+      {
+        presetId: string;
+        battalions: Record<string, PresetBattalionConfig>;
+        hunterSlots?: Partial<Record<'1' | '2' | '3', 'kaito_glitch'>>;
+      }
+    >({
+      query: ({ presetId, battalions, hunterSlots }) => ({
         url: `/api/battle-presets/${presetId}`,
         method: 'PUT',
-        body: { battalions },
+        body: { battalions, hunterSlots },
       }),
       invalidatesTags: ['BattlePresets'],
     }),

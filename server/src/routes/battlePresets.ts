@@ -9,10 +9,14 @@ import {
 } from '../config/battlePresetsConfig';
 import { accrueBalanceToTime } from '../utils/balanceAccrual';
 import { userHasMark2BotsUnlocked } from '../utils/userHasMark2BotsUnlocked';
+import { HUNTER_ROSTER_KAITO_GLITCH } from '../types/bugHunt';
 
 const router = express.Router();
 
 type PresetKey = 'preset1' | 'preset2' | 'preset3';
+const VALID_HUNTER_SLOT_IDS = ['1', '2', '3'] as const;
+
+type HunterSlotId = (typeof VALID_HUNTER_SLOT_IDS)[number];
 
 function presetKey(id: string): PresetKey {
   return `preset${id}` as PresetKey;
@@ -64,6 +68,28 @@ function normalizeBattalionsFromRaw(
   return Object.keys(out).length > 0 ? out : null;
 }
 
+function normalizeHunterSlotsFromRaw(
+  raw: unknown
+): Record<HunterSlotId, typeof HUNTER_ROSTER_KAITO_GLITCH> | null {
+  if (raw == null) return null;
+  let obj: Record<string, unknown>;
+  if (raw instanceof Map) {
+    obj = Object.fromEntries(raw);
+  } else if (typeof raw === 'object' && !Array.isArray(raw)) {
+    obj = raw as Record<string, unknown>;
+  } else {
+    return null;
+  }
+  const out: Partial<Record<HunterSlotId, typeof HUNTER_ROSTER_KAITO_GLITCH>> = {};
+  for (const slotId of VALID_HUNTER_SLOT_IDS) {
+    const value = obj[slotId] ?? obj[`slot${slotId}`];
+    if (value === HUNTER_ROSTER_KAITO_GLITCH) {
+      out[slotId] = HUNTER_ROSTER_KAITO_GLITCH;
+    }
+  }
+  return Object.keys(out).length > 0 ? (out as Record<HunterSlotId, typeof HUNTER_ROSTER_KAITO_GLITCH>) : null;
+}
+
 function buildPresetsResponse(user: any) {
   const presets: Record<string, any> = {};
   for (const id of VALID_PRESET_IDS) {
@@ -77,6 +103,7 @@ function buildPresetsResponse(user: any) {
       unlocked: isUnlocked,
       unlockedAt: isUnlocked ? data.unlockedAt : null,
       battalions: isUnlocked ? normalizeBattalionsFromRaw(data?.battalions) : null,
+      hunterSlots: isUnlocked ? normalizeHunterSlotsFromRaw(data?.hunterSlots) : null,
     };
   }
   return presets;
@@ -219,7 +246,7 @@ router.post('/:presetId/unlock', auth, async (req: Request, res: Response): Prom
 router.put('/:presetId', auth, async (req: Request, res: Response): Promise<void> => {
   try {
     const { presetId } = req.params;
-    const { battalions } = req.body;
+    const { battalions, hunterSlots } = req.body;
 
     if (!VALID_PRESET_IDS.includes(presetId as any)) {
       res.status(400).json({ error: 'Invalid preset ID. Must be 1, 2, or 3.' });
@@ -289,9 +316,49 @@ router.put('/:presetId', auth, async (req: Request, res: Response): Promise<void
       validatedBattalions[battalionId] = { botType: cfg.botType, quantity: cfg.quantity, markLevel };
     }
 
+    const hasHunterSlotsField = Object.prototype.hasOwnProperty.call(req.body ?? {}, 'hunterSlots');
+    let validatedHunterSlots: Record<HunterSlotId, typeof HUNTER_ROSTER_KAITO_GLITCH> | null = null;
+    if (hasHunterSlotsField && hunterSlots != null) {
+      if (typeof hunterSlots !== 'object' || Array.isArray(hunterSlots)) {
+        res.status(400).json({ error: 'hunterSlots must be an object when provided.' });
+        return;
+      }
+      const hs = hunterSlots as Record<string, unknown>;
+      const normalized: Partial<Record<HunterSlotId, typeof HUNTER_ROSTER_KAITO_GLITCH>> = {};
+      for (const [slotIdRaw, value] of Object.entries(hs)) {
+        const slotId = String(slotIdRaw).trim();
+        if (!VALID_HUNTER_SLOT_IDS.includes(slotId as HunterSlotId)) {
+          res.status(400).json({ error: `Invalid hunter slot ID: ${slotIdRaw}. Must be 1, 2, or 3.` });
+          return;
+        }
+        if (value !== HUNTER_ROSTER_KAITO_GLITCH) {
+          res.status(400).json({
+            error: `Invalid hunter for slot ${slotId}. Supported value is '${HUNTER_ROSTER_KAITO_GLITCH}'.`,
+          });
+          return;
+        }
+        if (slotId !== '1') {
+          res.status(400).json({ error: `Hunter slot ${slotId} is locked. Only slot 1 can be set right now.` });
+          return;
+        }
+        normalized[slotId as HunterSlotId] = HUNTER_ROSTER_KAITO_GLITCH;
+      }
+      validatedHunterSlots =
+        Object.keys(normalized).length > 0
+          ? (normalized as Record<HunterSlotId, typeof HUNTER_ROSTER_KAITO_GLITCH>)
+          : null;
+    }
+
+    const setUpdate: Record<string, unknown> = {
+      [`battlePresets.${key}.battalions`]: validatedBattalions,
+    };
+    if (hasHunterSlotsField) {
+      setUpdate[`battlePresets.${key}.hunterSlots`] = validatedHunterSlots;
+    }
+
     const updateResult = await User.findOneAndUpdate(
       { _id: req.user._id },
-      { $set: { [`battlePresets.${key}.battalions`]: validatedBattalions } },
+      { $set: setUpdate },
       { new: true }
     );
 
