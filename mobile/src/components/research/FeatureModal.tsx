@@ -315,9 +315,6 @@ export function FeatureModal({
   }, [storageInventory?.items]);
 
   const researchSpeedupSummary = useMemo(() => {
-    if (researchStorageSpeedupItems.length === 0) {
-      return 'No speedup items available';
-    }
     return researchStorageSpeedupItems
       .slice(0, 3)
       .map((item) => `${item.label} x${item.quantity}`)
@@ -610,22 +607,22 @@ export function FeatureModal({
                   Insufficient funds
                 </Text>
               )}
-              <TouchableOpacity
-                style={[
-                  styles.researchStorageSpeedupHeader,
-                  { borderColor: '#8B5CF6', backgroundColor: '#8B5CF622' },
-                ]}
-                activeOpacity={1}
-              >
-                <Text style={[styles.researchStorageSpeedupHeaderText, { color: '#8B5CF6' }]}>
-                  Use Speedup Item ({researchStorageSpeedupItems.length} type{researchStorageSpeedupItems.length === 1 ? '' : 's'})
-                </Text>
-              </TouchableOpacity>
-              <Text style={[styles.researchStorageSpeedupEmptyText, { color: isLightMode ? '#374151' : '#94A3B8' }]}>
-                {researchSpeedupSummary}
-              </Text>
               {researchStorageSpeedupItems.length > 0 ? (
                 <>
+                  <TouchableOpacity
+                    style={[
+                      styles.researchStorageSpeedupHeader,
+                      { borderColor: '#8B5CF6', backgroundColor: '#8B5CF622' },
+                    ]}
+                    activeOpacity={1}
+                  >
+                    <Text style={[styles.researchStorageSpeedupHeaderText, { color: '#8B5CF6' }]}>
+                      Use Speedup Item ({researchStorageSpeedupItems.length} type{researchStorageSpeedupItems.length === 1 ? '' : 's'})
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.researchStorageSpeedupEmptyText, { color: isLightMode ? '#374151' : '#94A3B8' }]}>
+                    {researchSpeedupSummary}
+                  </Text>
                   <View style={styles.researchStorageSpeedupList}>
                     {researchStorageSpeedupItems.map((item) => {
                       const maxUsable = Number.isFinite(item.durationSeconds)
@@ -709,7 +706,11 @@ export function FeatureModal({
                     </View>
                   ) : null}
                 </>
-              ) : null}
+              ) : (
+                <Text style={[styles.researchStorageSpeedupEmptyText, { color: isLightMode ? '#374151' : '#94A3B8' }]}>
+                  No speedup items available
+                </Text>
+              )}
               <TouchableOpacity
                 style={[
                   styles.speedupButton,

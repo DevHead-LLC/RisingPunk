@@ -180,6 +180,8 @@ export const SpeedupModal: React.FC<SpeedupModalProps> = ({
 
   const handleUseStorageSpeedup = async (itemKey: string, quantityToUse: number, durationSeconds: number) => {
     try {
+      // Bugbot: `bot_assembly` storage speedups intentionally do not send a target field.
+      // Server resolves target from item definition domain and applies to active `Bot.buildQueue`.
       const result = await useStorageItem({
         itemKey,
         speedupTarget: storageSpeedupDomain === 'construction' ? storageSpeedupTarget : undefined,

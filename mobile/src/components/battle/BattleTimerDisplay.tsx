@@ -21,21 +21,15 @@ export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVis
 
   // battleTime now represents time remaining (45s down to 0s)
   // Keep bar motion smooth by using finite raw seconds while the label remains whole seconds.
-  const progressFillStyle = React.useMemo(() => {
-    const widthPct =
-      safeMaxBattleTime > 0
-        ? Math.min(100, (safeBattleTime / safeMaxBattleTime) * 100)
-        : 0;
-    return [
-      styles.progressFill,
-      { width: `${widthPct}%` as any, backgroundColor: colors.secondary },
-    ];
-  }, [safeBattleTime, safeMaxBattleTime, colors.secondary]);
-
-  // Display time remaining directly
-  const timerText = React.useMemo(() =>
-    `${wholeSecondsRemaining}s`
-  , [wholeSecondsRemaining]);
+  const widthPct =
+    safeMaxBattleTime > 0
+      ? Math.min(100, (safeBattleTime / safeMaxBattleTime) * 100)
+      : 0;
+  const progressFillStyle = [
+    styles.progressFill,
+    { width: `${widthPct}%` as any, backgroundColor: colors.secondary },
+  ];
+  const timerText = `${wholeSecondsRemaining}s`;
 
   return (
     <View style={styles.container}>
