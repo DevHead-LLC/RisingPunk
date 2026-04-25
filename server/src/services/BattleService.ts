@@ -8,7 +8,6 @@ import { ScreenDimensionService } from './ScreenDimensionService';
 import { PointTrackingService } from './PointTrackingService';
 import { CombatService } from './CombatService';
 import { User } from '../models/User';
-import mongoose from 'mongoose';
 import { NPCRespawnService } from './NPCRespawnService';
 import { NPCService } from './NPCService';
 import { BattleRewardService } from './BattleRewardService';
@@ -523,27 +522,6 @@ export class BattleService {
     battle.winner = NodeOwner.ENEMY;
     battle.endTime = new Date();
     await battle.save();
-  }
-
-  private async unlockHackRigForUser(userId: string): Promise<void> {
-    try {
-      // Convert string ID to ObjectId for MongoDB query
-      const objectId = new mongoose.Types.ObjectId(userId);
-      const user = await User.findById(objectId);
-      
-      if (!user) {
-        return;
-      }
-
-      // Only unlock if not already unlocked
-      if (!user.unlockedFeatures?.hackRig) {
-        user.unlockedFeatures = user.unlockedFeatures || {};
-        user.unlockedFeatures.hackRig = true;
-        await user.save();
-      }
-    } catch (error) {
-      console.error('Failed to unlock hack rig for user', userId, error);
-    }
   }
 
   async checkBattleEndConditions(battleId: string): Promise<{ shouldEnd: boolean; winner?: NodeOwner; endCondition?: 'timer' | 'elimination' }> {
