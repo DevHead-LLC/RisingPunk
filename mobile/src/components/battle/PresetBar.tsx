@@ -318,6 +318,7 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
       setPresetApplyBusy(false);
     }
   }, [
+    // Bugbot: `unlockPreset` is intentionally included here; no stale mutation reference.
     presetsData,
     userBalance,
     unlockPreset,
