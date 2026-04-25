@@ -420,6 +420,11 @@ export const ResearchCenterLocation = memo(function ResearchCenterLocation({ onP
           currentBalance={numericBalance || 0}
           itemType="construction"
           onSpeedup={handleSpeedup}
+          storageSpeedupDomain="construction"
+          storageSpeedupTarget="research-center"
+          onStorageSpeedupApplied={async () => {
+            await refetchBuildStatus();
+          }}
           onClose={() => setShowSpeedupModal(false)}
         />
       )}

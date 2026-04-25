@@ -1,6 +1,8 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import type {
   AttackMarchArmySnapshot,
+  AttackMarchBugHuntContract,
+  AttackMarchType,
   AttackMarchState,
   ConsumedBattalionAssignmentRow,
 } from '../types/attackMarch';
@@ -15,7 +17,7 @@ const consumedBattalionAssignmentSchema = new Schema(
   { _id: false }
 );
 
-export interface IAttackMarchDocument extends Document {
+export interface IAttackMarchDocument extends Document, AttackMarchBugHuntContract {
   marchId: string;
   attackerId: string;
   defenderId: string;
@@ -51,7 +53,16 @@ export interface IAttackMarchDocument extends Document {
   /** Set for Swarm marches to link settlement/report fan-out to the session. */
   swarmSessionId?: string;
   /** Solo (default) vs swarm launch. */
-  attackType?: 'solo' | 'swarm';
+  attackType?: AttackMarchType;
+  bugInstanceId?: string;
+  hunterRosterId?: string;
+  hunterVisualKey?: string;
+  bugHuntItemDrops?: string[];
+  bugHuntHunterXpGranted?: number;
+  bugHuntEndReason?: 'bug-death' | 'hunter-death' | 'timeout' | 'canceled';
+  bugHuntRemainingHpPercent?: number;
+  bugHuntBattleDurationSeconds?: number;
+  bugHuntTokenRefundedAt?: Date;
   hackMapCellX: number;
   hackMapCellY: number;
   createdAt: Date;
@@ -90,7 +101,20 @@ const attackMarchSchema = new Schema<IAttackMarchDocument>(
     returningAfterCancel: { type: Boolean, required: false },
     battleId: { type: String, required: false },
     swarmSessionId: { type: String, required: false },
-    attackType: { type: String, required: false, enum: ['solo', 'swarm'], default: 'solo' },
+    attackType: { type: String, required: false, enum: ['solo', 'swarm', 'bug_hunt'], default: 'solo' },
+    bugInstanceId: { type: String, required: false },
+    hunterRosterId: { type: String, required: false },
+    hunterVisualKey: { type: String, required: false },
+    bugHuntItemDrops: { type: [String], required: false },
+    bugHuntHunterXpGranted: { type: Number, required: false, min: 0 },
+    bugHuntEndReason: {
+      type: String,
+      required: false,
+      enum: ['bug-death', 'hunter-death', 'timeout', 'canceled'],
+    },
+    bugHuntRemainingHpPercent: { type: Number, required: false, min: 0, max: 100 },
+    bugHuntBattleDurationSeconds: { type: Number, required: false, min: 0 },
+    bugHuntTokenRefundedAt: { type: Date, required: false },
     hackMapCellX: { type: Number, required: true },
     hackMapCellY: { type: Number, required: true },
     createdAt: { type: Date, required: true },
@@ -108,5 +132,6 @@ attackMarchSchema.index({ state: 1, resolvingSince: 1 });
 attackMarchSchema.index({ state: 1, atTargetSince: 1 });
 attackMarchSchema.index({ state: 1, createdAt: 1 });
 attackMarchSchema.index({ swarmSessionId: 1 }, { sparse: true });
+attackMarchSchema.index({ bugInstanceId: 1, state: 1 }, { sparse: true });
 
 export const AttackMarch = mongoose.model<IAttackMarchDocument>('AttackMarch', attackMarchSchema);

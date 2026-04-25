@@ -48,6 +48,7 @@ import {
   getHackMapHandoffGlobals,
   setBattlePrepHandoffDefender,
   setBattlePrepHandoffNpc,
+  setBugHuntSelectionHandoff,
   setBattlePrepHandoffSwarm,
 } from '../utils/turfHackMapHandoffGlobals';
 import { AttackMarchAnimationLayer } from '../components/hackMap/AttackMarchAnimationLayer';
@@ -66,6 +67,17 @@ import { trackHackmapVisited } from '../services/analyticsService';
 import { buildMapLocationShareMessage } from '../../../shared/mapLocationShareMessage';
 import { MOVE_PROPERTY_COST } from '../../../shared/movePropertyCost';
 import { getCurrentBalance } from '../store/slices/balanceSlice';
+import { formatBalance } from '../components/common/Balance';
+import {
+  useFetchBugInstancesQuery,
+  useFetchBugHuntTokenStateQuery,
+  useFetchStorageInventoryQuery,
+  useFetchBugWorldStateQuery,
+  useFetchMyHuntersQuery,
+  useUseStorageItemMutation,
+} from '../store/api/bugHuntApi';
+import { ANT_BUG_IMAGE } from '../constants/hackMapBugHuntVisuals';
+import { AntWorldReseedCountdownText } from '../components/hackMap/AntWorldReseedCountdownText';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
@@ -107,10 +119,25 @@ type ProbeEntry = ProbeTarget & {
   returnDurationSec?: number;
 };
 
+type BugMarker = {
+  bugInstanceId: string;
+  mapCellX: number;
+  mapCellY: number;
+  hpPercent: number;
+  seq: number;
+};
+
+type TravelSpeedupInventoryRow = {
+  itemKey: string;
+  travelSpeedPercent: number;
+  quantity: number;
+};
+
 // Constants for viewport fetching and panning
 const VIEWPORT_FETCH_THRESHOLD = 1; // Cells to move before triggering viewport fetch (1 = request as soon as we leave last fetch)
 const PAN_BUFFER = 12; // Buffer in cells for window range (larger = prefetch more so next pan is often cached)
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
+
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
 /** Max press duration (ms) to count as a tap; longer presses are ignored. See tile-tap-reliability.md. */
@@ -494,6 +521,7 @@ const tileMemoComparison = <T extends {
   displayName?: string | undefined;
   displayShielded?: boolean;
   tapHandledByGesture?: boolean;
+  bugMarker?: BugMarker;
 }>(prevProps: T, nextProps: T): boolean => {
   if (prevProps.cell === nextProps.cell) {
     return (
@@ -509,7 +537,10 @@ const tileMemoComparison = <T extends {
       nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded &&
       prevProps.displayName === nextProps.displayName &&
       prevProps.displayShielded === nextProps.displayShielded &&
-      prevProps.tapHandledByGesture === nextProps.tapHandledByGesture
+      prevProps.tapHandledByGesture === nextProps.tapHandledByGesture &&
+      prevProps.bugMarker?.bugInstanceId === nextProps.bugMarker?.bugInstanceId &&
+      prevProps.bugMarker?.hpPercent === nextProps.bugMarker?.hpPercent &&
+      prevProps.bugMarker?.seq === nextProps.bugMarker?.seq
     );
   }
   return (
@@ -534,7 +565,10 @@ const tileMemoComparison = <T extends {
     nextProps.dynamicEntityData[`${nextProps.x},${nextProps.y}`]?.isShielded &&
     prevProps.displayName === nextProps.displayName &&
     prevProps.displayShielded === nextProps.displayShielded &&
-    prevProps.tapHandledByGesture === nextProps.tapHandledByGesture
+    prevProps.tapHandledByGesture === nextProps.tapHandledByGesture &&
+    prevProps.bugMarker?.bugInstanceId === nextProps.bugMarker?.bugInstanceId &&
+    prevProps.bugMarker?.hpPercent === nextProps.bugMarker?.hpPercent &&
+    prevProps.bugMarker?.seq === nextProps.bugMarker?.seq
   );
 };
 
@@ -554,6 +588,7 @@ const panningTileMemoComparison = <T extends {
   };
   currentUserId?: string | null;
   isShieldActive: boolean;
+  bugMarker?: BugMarker;
 }>(prevProps: T, nextProps: T): boolean => {
   return (
     prevProps.x === nextProps.x &&
@@ -565,7 +600,10 @@ const panningTileMemoComparison = <T extends {
     prevProps.entityImage?.npcSlug === nextProps.entityImage?.npcSlug &&
     prevProps.entityImage?.npcLevel === nextProps.entityImage?.npcLevel &&
     prevProps.currentUserId === nextProps.currentUserId &&
-    prevProps.isShieldActive === nextProps.isShieldActive
+    prevProps.isShieldActive === nextProps.isShieldActive &&
+    prevProps.bugMarker?.bugInstanceId === nextProps.bugMarker?.bugInstanceId &&
+    prevProps.bugMarker?.hpPercent === nextProps.bugMarker?.hpPercent &&
+    prevProps.bugMarker?.seq === nextProps.bugMarker?.seq
   );
 };
 
@@ -743,9 +781,27 @@ const ProbeAnimationLayer: React.FC<ProbeAnimationLayerProps> = ({
         probeDataRef.current.set(probe.id, data);
       } else if (probe.phase === 'returning' && probe.returnEndAt != null && probe.returnDurationSec != null) {
         const data = probeDataRef.current.get(probe.id);
-        if (data && data.returnStartTime == null) {
-          data.returnStartTime = probe.returnEndAt - probe.returnDurationSec * 1000;
-          data.returnDuration = probe.returnDurationSec;
+        if (data) {
+          const expectedReturnStartTime = probe.returnEndAt - probe.returnDurationSec * 1000;
+          const shouldUpdateReturnTiming =
+            data.returnStartTime == null ||
+            !Number.isFinite(data.returnStartTime) ||
+            !Number.isFinite(data.returnDuration) ||
+            Math.abs((data.returnStartTime ?? 0) - expectedReturnStartTime) > 200 ||
+            Math.abs((data.returnDuration ?? 0) - probe.returnDurationSec) > 0.001;
+          if (shouldUpdateReturnTiming) {
+            data.returnStartTime = expectedReturnStartTime;
+            data.returnDuration = probe.returnDurationSec;
+          }
+        }
+      } else if (probe.phase === 'outbound' && isServerProbe) {
+        const data = probeDataRef.current.get(probe.id);
+        if (data && Number.isFinite(probe.launchedAt)) {
+          const shouldUpdateOutboundTiming =
+            !Number.isFinite(data.startTime) || Math.abs(data.startTime - Number(probe.launchedAt)) > 200;
+          if (shouldUpdateOutboundTiming) {
+            data.startTime = Number(probe.launchedAt);
+          }
         }
       }
     });
@@ -1041,6 +1097,26 @@ export const HackMapScreen: React.FC<Props> = ({
   const hackRigUnlocked = useAppSelector((state) => state.auth.user?.unlockedFeatures?.hackRig === true);
   const colors = useThemeColors();
   const { themeMode } = useTheme();
+  const { data: bugInstancesData, refetch: refetchBugInstances } = useFetchBugInstancesQuery(
+    { bugType: 'ant', lifecycleState: 'alive' },
+    { skip: !token, pollingInterval: 5000 }
+  );
+  const { data: bugWorldStateData, refetch: refetchBugWorldState } = useFetchBugWorldStateQuery(undefined, {
+    skip: !token,
+    pollingInterval: 90000,
+  });
+  const { data: bugHuntTokenStateData } = useFetchBugHuntTokenStateQuery(undefined, {
+    skip: !token,
+    pollingInterval: 60000,
+  });
+  const { data: myHuntersData, refetch: refetchMyHunters } = useFetchMyHuntersQuery(undefined, {
+    skip: !token,
+    pollingInterval: 30000,
+  });
+  const hasUnlockedHunter = (myHuntersData?.hunters ?? []).length > 0;
+  const [liveBugsById, setLiveBugsById] = useState<Record<string, BugMarker>>({});
+  const [serverSkewMs, setServerSkewMs] = useState(0);
+  const pendingBugRefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track first visit to HackMap
   useEffect(() => {
@@ -1053,6 +1129,133 @@ export const HackMapScreen: React.FC<Props> = ({
   useEffect(() => {
     dispatch(refreshUserDataSilent());
   }, [dispatch]);
+
+  useEffect(() => {
+    setLiveBugsById((prev) => {
+      const nextMap: Record<string, BugMarker> = {};
+      for (const bug of bugInstancesData?.bugs ?? []) {
+        const incoming: BugMarker = {
+          bugInstanceId: bug.bugInstanceId,
+          mapCellX: bug.mapCellX,
+          mapCellY: bug.mapCellY,
+          hpPercent: bug.hpPercent,
+          seq: bug.seq,
+        };
+        const current = prev[bug.bugInstanceId];
+        // Never let a stale poll response overwrite a newer stream event.
+        nextMap[bug.bugInstanceId] = current && current.seq > incoming.seq ? current : incoming;
+      }
+      return nextMap;
+    });
+  }, [bugInstancesData?.bugs]);
+
+  const scheduleBugRefetch = useCallback(() => {
+    if (pendingBugRefetchTimerRef.current != null) {
+      return;
+    }
+    pendingBugRefetchTimerRef.current = setTimeout(() => {
+      pendingBugRefetchTimerRef.current = null;
+      void refetchBugInstances();
+    }, 1200);
+  }, [refetchBugInstances]);
+
+  useEffect(() => {
+    return () => {
+      if (pendingBugRefetchTimerRef.current != null) {
+        clearTimeout(pendingBugRefetchTimerRef.current);
+        pendingBugRefetchTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!bugWorldStateData?.serverTimeMs) return;
+    setServerSkewMs(bugWorldStateData.serverTimeMs - Date.now());
+  }, [bugWorldStateData?.serverTimeMs]);
+
+  useEffect(() => {
+    if (!token) return;
+    const EventSourceCtor = (globalThis as any).EventSource;
+    if (!EventSourceCtor) return;
+    let isClosed = false;
+    let source: any = null;
+    const onMessage = (evt: { data?: string }) => {
+      if (!evt?.data) return;
+      try {
+        const payload = JSON.parse(evt.data) as {
+          type?: string;
+          bugInstanceId?: string;
+          hpPercent?: number;
+          seq?: number;
+          serverTimeMs?: number;
+        };
+        if (Number.isFinite(payload.serverTimeMs)) {
+          setServerSkewMs(Number(payload.serverTimeMs) - Date.now());
+        }
+        if (payload.type !== 'bug-hp-update') return;
+        if (!payload.bugInstanceId || !Number.isFinite(payload.hpPercent) || !Number.isInteger(payload.seq)) {
+          return;
+        }
+        setLiveBugsById((prev) => {
+          const current = prev[payload.bugInstanceId as string];
+          if (current && payload.seq <= current.seq) {
+            return prev;
+          }
+          if (!current) {
+            // Pull authoritative bug coordinates if this instance is not yet in local map.
+            scheduleBugRefetch();
+            return prev;
+          }
+          return {
+            ...prev,
+            [payload.bugInstanceId as string]: {
+              bugInstanceId: payload.bugInstanceId as string,
+              mapCellX: current.mapCellX,
+              mapCellY: current.mapCellY,
+              hpPercent: Number(payload.hpPercent),
+              seq: Number(payload.seq),
+            },
+          };
+        });
+        scheduleBugRefetch();
+      } catch {
+        // Ignore malformed push payloads to keep map stable.
+      }
+    };
+    const open = async () => {
+      try {
+        const resp = await fetch(`${API_URL}/api/bug-hunt/bugs/stream-token`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = resp.ok ? await resp.json() : null;
+        const streamToken =
+          json && typeof json.streamToken === 'string' && json.streamToken.trim() !== ''
+            ? json.streamToken
+            : null;
+        const streamUrl = streamToken
+          ? `${API_URL}/api/bug-hunt/bugs/stream?streamToken=${encodeURIComponent(streamToken)}`
+          : `${API_URL}/api/bug-hunt/bugs/stream?accessToken=${encodeURIComponent(token)}`;
+        if (isClosed) return;
+        source = new EventSourceCtor(streamUrl);
+        source.onmessage = onMessage;
+      } catch {
+        // If token fetch fails, fall back to legacy query token so stream still works.
+        const streamUrl = `${API_URL}/api/bug-hunt/bugs/stream?accessToken=${encodeURIComponent(token)}`;
+        if (isClosed) return;
+        source = new EventSourceCtor(streamUrl);
+        source.onmessage = onMessage;
+      }
+    };
+    void open();
+    return () => {
+      isClosed = true;
+      try {
+        source?.close?.();
+      } catch {
+        // no-op
+      }
+    };
+  }, [token, scheduleBugRefetch]);
 
   // Memoize the styles object to prevent unnecessary re-renders
   const memoizedStyles = useMemo(() => getStyles(colors, themeMode), [colors, themeMode]);
@@ -1096,7 +1299,7 @@ export const HackMapScreen: React.FC<Props> = ({
     }
   };
 
-  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded, tapHandledByGesture }) => {
+  const Tile: React.FC<TileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded, tapHandledByGesture, bugMarker }) => {
     const key = `${x},${y}`;
     const dynamicEntity = dynamicEntityData[key];
     const isShielded = displayShielded ?? dynamicEntity?.isShielded ?? (cell as any).isShielded;
@@ -1129,6 +1332,12 @@ export const HackMapScreen: React.FC<Props> = ({
 
     const cellContent = (
       <View style={[styles.cellContent, terrainStyleMap[cell.terrain], houseBgStyle]}>
+        {bugMarker && (
+          <View style={styles.bugMarkerWrap} pointerEvents="none">
+            <Image source={ANT_BUG_IMAGE} style={styles.bugMarkerImage} resizeMode="contain" />
+            <Text style={styles.bugMarkerHpText}>{Math.round(bugMarker.hpPercent)}%</Text>
+          </View>
+        )}
         {cell.entity !== 'house' && getTerrainIcon(cell.terrain)}
         {cell.entity === 'house' && (
           <>
@@ -1211,9 +1420,10 @@ export const HackMapScreen: React.FC<Props> = ({
     currentUserId?: string | null;
     isShieldActive: boolean;
     styles: any;
+    bugMarker?: BugMarker;
   };
 
-  const PanningTile: React.FC<PanningTileProps> = React.memo(({ x, y, terrain, entityImage, xStyle, terrainStyleMap, currentUserId, isShieldActive, styles }) => {
+  const PanningTile: React.FC<PanningTileProps> = React.memo(({ x, y, terrain, entityImage, xStyle, terrainStyleMap, currentUserId, isShieldActive, styles, bugMarker }) => {
     const houseBgStyle = entityImage?.entity === 'house'
       ? (entityImage.owner === 'player'
           ? (entityImage.userId && entityImage.userId === currentUserId ? styles.userHouseBg : styles.otherUserHouseBg)
@@ -1233,6 +1443,11 @@ export const HackMapScreen: React.FC<Props> = ({
         pointerEvents="none"
       >
         <View style={[styles.cellContent, terrainStyleMap[terrain], houseBgStyle]}>
+          {bugMarker && (
+            <View style={styles.bugMarkerWrap} pointerEvents="none">
+              <Image source={ANT_BUG_IMAGE} style={styles.bugMarkerImage} resizeMode="contain" />
+            </View>
+          )}
           {entityImage?.entity !== 'house' && getTerrainIcon(terrain)}
           {entityImage?.entity === 'house' && (
             <>
@@ -1277,25 +1492,39 @@ export const HackMapScreen: React.FC<Props> = ({
     currentUserId?: string | null;
     isShieldActive: boolean;
     styles: any;
+    bugMarker?: BugMarker;
   };
 
-  const PanningPoolTile: React.FC<PanningPoolTileProps> = React.memo(({ x, y, terrain, entityImage, xStyle, yStyle, terrainStyleMap, currentUserId, isShieldActive, styles }) => {
+  const PanningPoolTile: React.FC<PanningPoolTileProps> = React.memo(({ x, y, terrain, entityImage, xStyle, yStyle, terrainStyleMap, currentUserId, isShieldActive, styles, bugMarker }) => {
     return (
       <View style={[yStyle]}>
-        <PanningTile x={x} y={y} terrain={terrain} entityImage={entityImage} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserId={currentUserId} isShieldActive={isShieldActive} styles={styles} />
+        <PanningTile x={x} y={y} terrain={terrain} entityImage={entityImage} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserId={currentUserId} isShieldActive={isShieldActive} styles={styles} bugMarker={bugMarker} />
       </View>
     );
   }, panningTileMemoComparison);
 
-  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded }) => {
+  const PoolTile: React.FC<PoolTileProps> = React.memo(({ x, y, cell, selected, onPress, xStyle, yStyle, terrainStyleMap, currentUserHandle, colors, themeMode, styles, dynamicEntityData, isShieldActive, isCrewMember, isWarCrewMember, isAllianceCrewMember, displayName, displayShielded, bugMarker }) => {
     return (
       <View style={[yStyle]}>
-        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} displayName={displayName} displayShielded={displayShielded} tapHandledByGesture />
+        <Tile x={x} y={y} cell={cell} selected={selected} onPress={onPress} xStyle={xStyle} terrainStyleMap={terrainStyleMap} currentUserHandle={currentUserHandle} colors={colors} themeMode={themeMode} styles={styles} dynamicEntityData={dynamicEntityData} isShieldActive={isShieldActive} isCrewMember={isCrewMember} isWarCrewMember={isWarCrewMember} isAllianceCrewMember={isAllianceCrewMember} displayName={displayName} displayShielded={displayShielded} tapHandledByGesture bugMarker={bugMarker} />
       </View>
     );
   }, tileMemoComparison);
 
   const [selectedCell, setSelectedCell] = useState<{x: number, y: number, info: CellData} | null>(null);
+  const bugMarkers = useMemo(() => Object.values(liveBugsById), [liveBugsById]);
+  const bugMarkerByCellKey = useMemo(() => {
+    const out: Record<string, BugMarker> = {};
+    for (const bug of bugMarkers) {
+      if (bug.mapCellX < 0 || bug.mapCellY < 0) continue;
+      out[`${bug.mapCellX},${bug.mapCellY}`] = bug;
+    }
+    return out;
+  }, [bugMarkers]);
+  const selectedBugMarker = useMemo(
+    () => (selectedCell ? bugMarkerByCellKey[`${selectedCell.x},${selectedCell.y}`] : undefined),
+    [selectedCell, bugMarkerByCellKey]
+  );
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
   const [showSwarmModal, setShowSwarmModal] = useState(false);
   const [showJumpToModal, setShowJumpToModal] = useState(false);
@@ -1350,12 +1579,46 @@ export const HackMapScreen: React.FC<Props> = ({
   const { data: activeProbesData } = useGetActiveProbesQuery(undefined, {
     pollingInterval: 3000,
   });
-  const { data: activeAttackMarchesData } = useGetActiveAttackMarchesQuery(undefined, {
+  const {
+    data: activeAttackMarchesData,
+    refetch: refetchActiveAttackMarches,
+  } = useGetActiveAttackMarchesQuery(undefined, {
     skip: !token,
     pollingInterval: 3000,
   });
   const [cancelOutboundAttackMarch, { isLoading: isCancellingOutboundMarch }] =
     useCancelOutboundAttackMarchMutation();
+  const shouldLoadTravelSpeedupInventory =
+    token != null && (marchOwnerModalId != null || (showProbeFollowModal && followProbeId != null));
+  const {
+    data: storageInventoryData,
+    isFetching: isFetchingTravelSpeedupInventory,
+    refetch: refetchTravelSpeedupInventory,
+  } = useFetchStorageInventoryQuery(undefined, {
+    skip: !shouldLoadTravelSpeedupInventory,
+    pollingInterval: shouldLoadTravelSpeedupInventory ? 3000 : 0,
+  });
+  const [useStorageItem, { isLoading: isApplyingTravelSpeedup }] = useUseStorageItemMutation();
+  const availableTravelSpeedups = useMemo<TravelSpeedupInventoryRow[]>(() => {
+    const out: TravelSpeedupInventoryRow[] = [];
+    for (const item of storageInventoryData?.items ?? []) {
+      if (item.category !== 'travel') {
+        continue;
+      }
+      const quantity = Math.max(0, Math.floor(Number(item.quantity ?? 0)));
+      const travelSpeedPercent = Math.max(0, Math.floor(Number(item.travelSpeedPercent ?? 0)));
+      if (quantity <= 0 || travelSpeedPercent <= 0) {
+        continue;
+      }
+      out.push({
+        itemKey: item.itemKey,
+        travelSpeedPercent,
+        quantity,
+      });
+    }
+    out.sort((a, b) => a.travelSpeedPercent - b.travelSpeedPercent);
+    return out;
+  }, [storageInventoryData?.items]);
   /** Prior `/api/attack/active` snapshot — detect resolving→returning / NPC march removal → invalidate Map (ghost NPC fix). */
   const prevActiveAttackMarchesForMapInvRef = useRef<
     Array<{ marchId: string; state: string; defenderNpcInstanceId?: string }>
@@ -1574,6 +1837,98 @@ export const HackMapScreen: React.FC<Props> = ({
       Alert.alert('Cancel failed', body != null ? String(body) : 'Unknown error');
     }
   }, [marchOwnerModalId, cancelOutboundAttackMarch, activeAttackMarchesData?.marches]);
+
+  const handleApplyTravelSpeedupToMarch = useCallback(
+    async (params: { itemKey: string; travelSpeedPercent: number }) => {
+      if (!marchOwnerModalId) {
+        return;
+      }
+      try {
+        await useStorageItem({
+          itemKey: params.itemKey,
+          attackMarchId: marchOwnerModalId,
+          quantity: 1,
+        }).unwrap();
+        void refetchTravelSpeedupInventory();
+        void refetchActiveAttackMarches();
+      } catch (e: unknown) {
+        const body = (e as { data?: { error?: string } })?.data?.error;
+        const fallback = `Could not apply ${params.travelSpeedPercent}% travel reduction right now.`;
+        Alert.alert('Travel speedup failed', body != null ? String(body) : fallback);
+      }
+    },
+    [marchOwnerModalId, useStorageItem, refetchTravelSpeedupInventory, refetchActiveAttackMarches]
+  );
+
+  const handleApplyTravelSpeedupToProbe = useCallback(
+    async (params: { itemKey: string; travelSpeedPercent: number }) => {
+      if (!followProbeId) {
+        return;
+      }
+      try {
+        const result = await useStorageItem({
+          itemKey: params.itemKey,
+          probeId: followProbeId,
+          quantity: 1,
+        }).unwrap();
+        const targetProbeId = String(result.probeId ?? followProbeId).trim();
+        const resultPhase = result.phase;
+        const remainingMs = Number(result.probeRemainingMs ?? NaN);
+        const nowMs = Date.now();
+        if (targetProbeId !== '' && Number.isFinite(remainingMs) && remainingMs > 0) {
+          setProbes((prev) =>
+            prev.map((probe) => {
+              if (probe.id !== targetProbeId) {
+                return probe;
+              }
+              if (resultPhase === 'returning') {
+                const parsedReturnEndMs =
+                  typeof result.probeReturnEndAt === 'string' ? Date.parse(result.probeReturnEndAt) : NaN;
+                const returnEndMs =
+                  Number.isFinite(parsedReturnEndMs) ? parsedReturnEndMs : nowMs + Math.max(1000, Math.ceil(remainingMs));
+                const returnDurationSec = Math.max(1, Math.ceil(remainingMs / 1000));
+                return {
+                  ...probe,
+                  phase: 'returning',
+                  returnEndAt: returnEndMs,
+                  returnDurationSec,
+                  remainingSec: Math.max(0, remainingMs / 1000),
+                };
+              }
+              const fromX = Number(probe.fromX ?? NaN);
+              const fromY = Number(probe.fromY ?? NaN);
+              const toX = Number(probe.targetX ?? NaN);
+              const toY = Number(probe.targetY ?? NaN);
+              if (!Number.isFinite(fromX) || !Number.isFinite(fromY) || !Number.isFinite(toX) || !Number.isFinite(toY)) {
+                return {
+                  ...probe,
+                  phase: 'outbound',
+                  remainingSec: Math.max(0, remainingMs / 1000),
+                };
+              }
+              const distanceTiles = Math.sqrt((toX - fromX) ** 2 + (toY - fromY) ** 2);
+              const durationSec = Math.max(2, distanceTiles * 2);
+              const durationMs = durationSec * 1000;
+              const clampedRemainingMs = Math.max(1000, Math.min(durationMs, Math.ceil(remainingMs)));
+              const newLaunchedAt = nowMs - (durationMs - clampedRemainingMs);
+              return {
+                ...probe,
+                phase: 'outbound',
+                launchedAt: newLaunchedAt,
+                remainingSec: clampedRemainingMs / 1000,
+              };
+            })
+          );
+        }
+        void refetchTravelSpeedupInventory();
+      } catch (e: unknown) {
+        const body = (e as { data?: { error?: string } })?.data?.error;
+        const fallback = `Could not apply ${params.travelSpeedPercent}% probe travel reduction right now.`;
+        Alert.alert('Travel speedup failed', body != null ? String(body) : fallback);
+      }
+    },
+    [followProbeId, useStorageItem, refetchTravelSpeedupInventory]
+  );
 
   const offsetX = useSharedValue(0);
   const offsetY = useSharedValue(0);
@@ -2115,12 +2470,23 @@ export const HackMapScreen: React.FC<Props> = ({
     const sub = AppState.addEventListener('change', (nextState) => {
       const wasBackgroundOrInactive = appStateRef.current.match(/inactive|background/);
       appStateRef.current = nextState;
-      if (wasBackgroundOrInactive && nextState === 'active' && shouldFetchMyPosition) {
-        triggerGetMyMapPosition();
+      if (wasBackgroundOrInactive && nextState === 'active') {
+        if (shouldFetchMyPosition) {
+          triggerGetMyMapPosition();
+        }
+        void refetchBugInstances();
+        void refetchBugWorldState();
+        void refetchMyHunters();
       }
     });
     return () => sub?.remove();
-  }, [shouldFetchMyPosition, triggerGetMyMapPosition]);
+  }, [
+    shouldFetchMyPosition,
+    triggerGetMyMapPosition,
+    refetchBugInstances,
+    refetchBugWorldState,
+    refetchMyHunters,
+  ]);
 
   // Phase 6: Viewport fetching during panning with minimal data
   // Track the last viewport we fetched to avoid duplicate requests
@@ -4566,7 +4932,76 @@ export const HackMapScreen: React.FC<Props> = ({
               </Text>
             </View>
 
+            {selectedBugMarker && (
+              <>
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Bug:</Text>
+                  <Text style={[styles.infoValue, { color: colors.error }]}>ANT</Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>Bug HP:</Text>
+                  <Text style={[styles.infoValue, { color: colors.text.primary }]}>
+                    {selectedBugMarker.hpPercent.toFixed(2)}%
+                  </Text>
+                </View>
+                <View style={styles.infoRow}>
+                  <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>World refresh:</Text>
+                  <AntWorldReseedCountdownText
+                    style={[styles.infoValue, { color: colors.text.primary }]}
+                    reseedInProgress={!!bugWorldStateData?.reseedInProgress}
+                    nextAntWorldReseedAtUtc={bugWorldStateData?.nextAntWorldReseedAtUtc}
+                    serverSkewMs={serverSkewMs}
+                  />
+                </View>
+                <View style={styles.buttonContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      {
+                        backgroundColor:
+                          hasUnlockedHunter && !bugWorldStateData?.reseedInProgress
+                            ? colors.matrix
+                            : colors.buttonDisabled,
+                        borderColor: colors.matrix,
+                        opacity: hasUnlockedHunter && !bugWorldStateData?.reseedInProgress ? 1 : 0.7,
+                      },
+                    ]}
+                    disabled={!hasUnlockedHunter || !!bugWorldStateData?.reseedInProgress}
+                    onPress={() => {
+                      if (!selectedBugMarker) return;
+                      setBugHuntSelectionHandoff(getHackMapHandoffGlobals(), {
+                        bugInstanceId: selectedBugMarker.bugInstanceId,
+                        bugHpPercent: selectedBugMarker.hpPercent,
+                        bugCell: { x: selectedCell.x, y: selectedCell.y },
+                        mapPan: { x: selectedCell.x, y: selectedCell.y },
+                      });
+                      onClose();
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        {
+                          color:
+                            hasUnlockedHunter && !bugWorldStateData?.reseedInProgress
+                              ? colors.background
+                              : colors.text.secondary,
+                        },
+                      ]}
+                    >
+                      {bugWorldStateData?.reseedInProgress
+                        ? 'World Refreshing...'
+                        : hasUnlockedHunter
+                          ? 'Hunt Bug'
+                          : 'Build/Unlock Hunter on Turf'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
             {selectedCell.info.entity === 'empty' &&
+              !selectedBugMarker &&
               effectiveMyPosition &&
               selectedCell.info.terrain !== 'water' &&
               selectedCell.info.terrain !== 'mountain' &&
@@ -4815,7 +5250,7 @@ export const HackMapScreen: React.FC<Props> = ({
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress]);
+  }, [selectedCell, selectedBugMarker, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress, hasUnlockedHunter, bugWorldStateData?.reseedInProgress, bugWorldStateData?.nextAntWorldReseedAtUtc, serverSkewMs]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -4832,6 +5267,14 @@ export const HackMapScreen: React.FC<Props> = ({
         }}
       />
       <CloseButton onPress={onClose} />
+      {bugHuntTokenStateData && (
+        <View style={[styles.huntTokensStrip, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+          <Text style={[styles.balanceStripLabel, { color: colors.text.secondary }]}>Tokens:</Text>
+          <Text style={[styles.balanceStripValue, { color: colors.matrix }]}>
+            {formatBalance(bugHuntTokenStateData.currentTokens)}/{formatBalance(bugHuntTokenStateData.maxTokens)}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
         {hackRigUnlocked && (
@@ -4994,6 +5437,7 @@ export const HackMapScreen: React.FC<Props> = ({
                     currentUserId={currentUserId}
                     isShieldActive={isShieldActive}
                     styles={styles}
+                    bugMarker={bugMarkerByCellKey[`${x},${y}`]}
                   />
                 );
               }
@@ -5019,6 +5463,7 @@ export const HackMapScreen: React.FC<Props> = ({
                   isAllianceCrewMember={isAllianceCrewMember}
                   displayName={cell.name}
                   displayShielded={cell.isShielded}
+                  bugMarker={bugMarkerByCellKey[`${x},${y}`]}
                 />
               );
             })}
@@ -5096,6 +5541,48 @@ export const HackMapScreen: React.FC<Props> = ({
                   <Text style={[styles.npcLevelModalText, { color: colors.secondary, marginTop: 6, fontSize: 13 }]}>
                     {display.phase === 'returning' ? 'Time to base' : 'Time to target'}: {Math.ceil(display.remainingSec)}s
                   </Text>
+                  <View style={{ marginTop: 10, gap: 6 }}>
+                    <Text style={[styles.npcLevelModalText, { color: colors.text.primary, fontSize: 12, fontWeight: '700' }]}>
+                      Reduce Travel Time
+                    </Text>
+                    {isFetchingTravelSpeedupInventory && availableTravelSpeedups.length === 0 ? (
+                      <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, fontSize: 11 }]}>
+                        Loading speedups...
+                      </Text>
+                    ) : availableTravelSpeedups.length > 0 ? (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {availableTravelSpeedups.map((item) => (
+                          <TouchableOpacity
+                            key={item.itemKey}
+                            style={[
+                              styles.actionButton,
+                              {
+                                paddingVertical: 6,
+                                paddingHorizontal: 8,
+                                backgroundColor: colors.matrix,
+                                opacity: isApplyingTravelSpeedup ? 0.65 : 1,
+                              },
+                            ]}
+                            onPress={() =>
+                              handleApplyTravelSpeedupToProbe({
+                                itemKey: item.itemKey,
+                                travelSpeedPercent: item.travelSpeedPercent,
+                              })
+                            }
+                            disabled={isApplyingTravelSpeedup}
+                          >
+                            <Text style={[styles.actionButtonText, { color: colors.background, fontSize: 12 }]}>
+                              {item.travelSpeedPercent}% ({item.quantity})
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ) : (
+                      <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, fontSize: 11 }]}>
+                        No travel speedups in storage.
+                      </Text>
+                    )}
+                  </View>
                   {display.phase === 'outbound' && (
                     <TouchableOpacity style={[styles.actionButton, { marginTop: 8, paddingVertical: 6, backgroundColor: colors.error ?? '#c00' }]} onPress={() => cancelProbeRef.current?.()}>
                       <Text style={[styles.actionButtonText, { color: colors.background, fontSize: 13 }]}>Cancel</Text>
@@ -5134,12 +5621,18 @@ export const HackMapScreen: React.FC<Props> = ({
               ? Math.max(0, (retEndMs - Date.now()) / 1000)
               : null;
           const showCancel = phase === 'outbound';
+          const isBugHuntMarch = followedMarch.attackType === 'bug_hunt';
+          const showTravelSpeedupSection = phase === 'outbound' || phase === 'returning';
           const title =
             phase === 'returning'
               ? 'Returning home'
               : phase === 'outbound'
-                ? 'Hack expedition en route'
-                : 'Hack expedition';
+                ? isBugHuntMarch
+                  ? 'Bug hunt en route'
+                  : 'Hack expedition en route'
+                : isBugHuntMarch
+                  ? 'Bug hunt'
+                  : 'Hack expedition';
           return (
             <Modal
               visible
@@ -5178,8 +5671,9 @@ export const HackMapScreen: React.FC<Props> = ({
                         </Text>
                       ) : (
                         <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, marginTop: 6, fontSize: 12 }]}>
-                          Cancel orders your army to march home from its current position at the same pace
-                          as the outbound leg. Bots return to barracks when the army arrives.
+                          {isBugHuntMarch
+                            ? 'Cancel orders your hunter to march home from its current position at the same pace as the outbound leg.'
+                            : 'Cancel orders your army to march home from its current position at the same pace as the outbound leg. Bots return to barracks when the army arrives.'}
                         </Text>
                       )
                     ) : phase === 'returning' ? (
@@ -5194,8 +5688,9 @@ export const HackMapScreen: React.FC<Props> = ({
                           </Text>
                         )}
                         <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, marginTop: 8, fontSize: 11 }]}>
-                          Committed bots stay out of Digital Barracks and full home defense until this return
-                          finishes. You cannot start another hack expedition until then.
+                          {isBugHuntMarch
+                            ? 'Your hunter remains committed until this return finishes. You cannot start another expedition until then.'
+                            : 'Committed bots stay out of Digital Barracks and full home defense until this return finishes. You cannot start another hack expedition until then.'}
                         </Text>
                       </>
                     ) : (
@@ -5203,6 +5698,50 @@ export const HackMapScreen: React.FC<Props> = ({
                         Expedition status updated — close to continue.
                       </Text>
                     )}
+                    {showTravelSpeedupSection ? (
+                      <View style={{ marginTop: 10, gap: 6 }}>
+                        <Text style={[styles.npcLevelModalText, { color: colors.text.primary, fontSize: 12, fontWeight: '700' }]}>
+                          Reduce Travel Time
+                        </Text>
+                        {isFetchingTravelSpeedupInventory && availableTravelSpeedups.length === 0 ? (
+                          <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, fontSize: 11 }]}>
+                            Loading speedups...
+                          </Text>
+                        ) : availableTravelSpeedups.length > 0 ? (
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                            {availableTravelSpeedups.map((item) => (
+                              <TouchableOpacity
+                                key={item.itemKey}
+                                style={[
+                                  styles.actionButton,
+                                  {
+                                    paddingVertical: 6,
+                                    paddingHorizontal: 8,
+                                    backgroundColor: colors.matrix,
+                                    opacity: isApplyingTravelSpeedup ? 0.65 : 1,
+                                  },
+                                ]}
+                                onPress={() =>
+                                  handleApplyTravelSpeedupToMarch({
+                                    itemKey: item.itemKey,
+                                    travelSpeedPercent: item.travelSpeedPercent,
+                                  })
+                                }
+                                disabled={isApplyingTravelSpeedup}
+                              >
+                                <Text style={[styles.actionButtonText, { color: colors.background, fontSize: 12 }]}>
+                                  {item.travelSpeedPercent}% ({item.quantity})
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        ) : (
+                          <Text style={[styles.npcLevelModalText, { color: colors.text.secondary, fontSize: 11 }]}>
+                            No travel speedups in storage.
+                          </Text>
+                        )}
+                      </View>
+                    ) : null}
                     {showCancel ? (
                       <TouchableOpacity
                         style={[
@@ -5259,6 +5798,7 @@ type TileProps = {
   displayShielded?: boolean;
   /** When true, tap is handled by parent Gesture.Tap (map); no Pressable so no dual handlers (Bugbot). */
   tapHandledByGesture?: boolean;
+  bugMarker?: BugMarker;
 };
 
 type PoolTileProps = {
@@ -5281,6 +5821,7 @@ type PoolTileProps = {
   isAllianceCrewMember?: boolean;
   displayName?: string | undefined;
   displayShielded?: boolean;
+  bugMarker?: BugMarker;
 };
 
 const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light' | 'dark') => StyleSheet.create({
@@ -5456,6 +5997,28 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
   playerHomeIcon: {
     width: CELL_SIZE - 10,
     height: CELL_SIZE - 10,
+  },
+  bugMarkerWrap: {
+    position: 'absolute',
+    top: 2,
+    left: 2,
+    right: 2,
+    alignItems: 'center',
+    zIndex: 4,
+  },
+  bugMarkerImage: {
+    width: CELL_SIZE - 26,
+    height: CELL_SIZE - 26,
+  },
+  bugMarkerHpText: {
+    marginTop: -4,
+    paddingHorizontal: 4,
+    borderRadius: 6,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
   },
   entityLabelContainer: {
     position: 'absolute',
@@ -5690,6 +6253,26 @@ const getStyles = (colors: ReturnType<typeof useThemeColors>, themeMode: 'light'
     flexDirection: 'row',
     gap: 8,
     zIndex: 1,
+  },
+  huntTokensStrip: {
+    position: 'absolute',
+    top: SIZING.spacing.lg,
+    left: SIZING.spacing.lg,
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: SIZING.spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  balanceStripLabel: {
+    fontSize: SIZING.font.small,
+    marginRight: SIZING.spacing.xs,
+  },
+  balanceStripValue: {
+    fontSize: SIZING.font.small,
+    fontWeight: '700',
   },
   navigationButton: {
     width: 40,

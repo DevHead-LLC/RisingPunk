@@ -11,12 +11,14 @@ import Animated from 'react-native-reanimated';
 import type { AttackMarchListItem } from '../../store/api/attackApi';
 import type { useThemeColors } from '../../hooks/useThemeColors';
 import { computeMarchFrame } from './attackMarchMapFrame';
+import { KAITO_GLITCH_SPRINT_IMAGE } from '../../constants/hackMapBugHuntVisuals';
 
 /** Reanimated typing mismatch with RN types (same pattern as HackMapScreen probe layer). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reanimated View vs RN JSX types
 const ReanimatedView = Animated.View as any;
 
 const MARCH_ICON_SIZE = 72;
+const DEFAULT_MARCH_ICON = require('../../assets/images/hackMap/botArmyMarch.png');
 
 type ThemeColors = ReturnType<typeof useThemeColors>;
 
@@ -159,7 +161,11 @@ export const AttackMarchAnimationLayer: React.FC<AttackMarchAnimationLayerProps>
 
         const iconInner = (
           <Image
-            source={require('../../assets/images/hackMap/botArmyMarch.png')}
+            source={
+              m.attackType === 'bug_hunt' && m.hunterVisualKey === 'kaito_glitch_sprint'
+                ? KAITO_GLITCH_SPRINT_IMAGE
+                : DEFAULT_MARCH_ICON
+            }
             style={{ width: MARCH_ICON_SIZE, height: MARCH_ICON_SIZE }}
             resizeMode="contain"
           />

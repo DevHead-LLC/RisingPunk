@@ -173,15 +173,18 @@ export interface IUser extends Document {
   battlePresets?: {
     preset1?: {
       unlockedAt: Date;
-      battalions: Record<string, { botType: string; quantity: number }>;
+      battalions: Record<string, { botType: string; quantity: number; markLevel?: 1 | 2 }>;
+      hunterSlots?: Partial<Record<'1' | '2' | '3', 'kaito_glitch'>>;
     };
     preset2?: {
       unlockedAt: Date;
-      battalions: Record<string, { botType: string; quantity: number }>;
+      battalions: Record<string, { botType: string; quantity: number; markLevel?: 1 | 2 }>;
+      hunterSlots?: Partial<Record<'1' | '2' | '3', 'kaito_glitch'>>;
     };
     preset3?: {
       unlockedAt: Date;
-      battalions: Record<string, { botType: string; quantity: number }>;
+      battalions: Record<string, { botType: string; quantity: number; markLevel?: 1 | 2 }>;
+      hunterSlots?: Partial<Record<'1' | '2' | '3', 'kaito_glitch'>>;
     };
   };
   /** User IDs this user has blocked; affects PM, world chat, and crew chat visibility. */
@@ -613,14 +616,17 @@ const userSchema = new Schema({
     preset1: {
       unlockedAt: { type: Date, default: null },
       battalions: { type: Schema.Types.Mixed, default: undefined },
+      hunterSlots: { type: Schema.Types.Mixed, default: undefined },
     },
     preset2: {
       unlockedAt: { type: Date, default: null },
       battalions: { type: Schema.Types.Mixed, default: undefined },
+      hunterSlots: { type: Schema.Types.Mixed, default: undefined },
     },
     preset3: {
       unlockedAt: { type: Date, default: null },
       battalions: { type: Schema.Types.Mixed, default: undefined },
+      hunterSlots: { type: Schema.Types.Mixed, default: undefined },
     },
   },
 }, { 

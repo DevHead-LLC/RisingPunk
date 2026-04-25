@@ -88,13 +88,15 @@ function collectPresetSlotNeeds(preset: PresetData): Array<{ botType: BotType; m
 }
 
 function presetHasConfiguredSlots(preset: PresetData): boolean {
+  const hasHunterConfigured = preset.hunterSlots?.['1'] === 'kaito_glitch';
   const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
-  if (!preset.battalions) return false;
+  if (!preset.battalions) return hasHunterConfigured;
   const rec = preset.battalions as Record<string, { botType: string; quantity: number; markLevel?: number }>;
-  return fillOrder.some((id) => {
+  const hasBattalionConfigured = fillOrder.some((id) => {
     const c = rec[id] ?? rec[id.toLowerCase()];
     return c != null && c.quantity > 0 && normalizePresetBotType(c.botType) != null;
   });
+  return hasBattalionConfigured || hasHunterConfigured;
 }
 
 interface PresetBarProps {
@@ -107,7 +109,11 @@ interface PresetBarProps {
     isBattalionFUnlocked: boolean;
   };
   /** presetId + assignments; returns a promise so the bar can debounce UI and await one sync at a time. */
-  onApplyPreset: (presetId: string, assignments: Record<string, BattalionAssignment>) => Promise<void>;
+  onApplyPreset: (
+    presetId: string,
+    assignments: Record<string, BattalionAssignment>,
+    options?: { hunterSlotOneRosterId?: 'kaito_glitch' }
+  ) => Promise<void>;
   maxBattalionSizeOverride?: number;
 }
 
@@ -163,12 +169,16 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
   const buildAssignmentsForPreset = useCallback(
     (preset: PresetData, inventory: Record<string, number>): Record<string, BattalionAssignment> | null => {
       const fillOrder = ['A', 'B', 'C', 'D', 'E', 'F'];
-      const hasConfigured = fillOrder.some((id) => {
+      const hasHunterConfigured = preset.hunterSlots?.['1'] === 'kaito_glitch';
+      const hasBattalionConfigured = fillOrder.some((id) => {
         const c = getSlotConfig(preset.battalions, id);
         return c != null && c.quantity > 0 && normalizePresetBotType(c.botType) != null;
       });
-      if (!hasConfigured) {
+      if (!hasBattalionConfigured && !hasHunterConfigured) {
         return null;
+      }
+      if (!hasBattalionConfigured && hasHunterConfigured) {
+        return {};
       }
 
       const remaining: Record<string, number> = { ...inventory };
@@ -263,6 +273,8 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     }
 
     const built = buildAssignmentsForPreset(presetFromCache, effectiveFullInventory);
+    // Bugbot: hunter-only presets intentionally produce `{}` from `buildAssignmentsForPreset`;
+    // this guard is only for `null` (cannot build / not configured), not empty assignment objects.
     if (!built) {
       if (!presetHasConfiguredSlots(presetFromCache)) {
         showBanner('Set up this preset in Profile > Battles.');
@@ -296,7 +308,9 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     presetApplyGateRef.current = true;
     setPresetApplyBusy(true);
     try {
-      await onApplyPreset(preset.id, built);
+      const hunterSlotOneRosterId =
+        presetFromCache.hunterSlots?.['1'] === 'kaito_glitch' ? 'kaito_glitch' : undefined;
+      await onApplyPreset(preset.id, built, { hunterSlotOneRosterId });
     } catch {
       // Parent handles alert; applies are serialized in BattlePreparationScreen.
     } finally {
@@ -304,8 +318,7 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
       setPresetApplyBusy(false);
     }
   }, [
-    presetsData?.userLevel,
-    presetsData?.presets,
+    presetsData,
     userBalance,
     unlockPreset,
     buildAssignmentsForPreset,
