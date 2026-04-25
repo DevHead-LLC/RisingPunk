@@ -121,10 +121,6 @@ const PresetEditor = React.memo(
     () => JSON.stringify(preset.battalions ?? {}),
     [preset.battalions]
   );
-  const serverHunterSlotsSig = useMemo(
-    () => JSON.stringify(preset.hunterSlots ?? {}),
-    [preset.hunterSlots]
-  );
 
   const [battalions, setBattalions] = useState(() =>
     buildInitialBattalions(preset.battalions, choiceOptions)
@@ -142,7 +138,7 @@ const PresetEditor = React.memo(
       '2': null,
       '3': null,
     });
-  }, [preset.id, preset.hunterSlots, serverBattalionsSig, serverHunterSlotsSig, choiceOptions]);
+  }, [preset.id, preset.hunterSlots, serverBattalionsSig, choiceOptions]);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [openBotPickerForRow, setOpenBotPickerForRow] = useState<string | null>(null);
 
