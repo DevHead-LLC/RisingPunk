@@ -17,6 +17,10 @@ import { updateBalance } from '../../store/slices/balanceSlice';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { trackFirstResearch } from '../../services/analyticsService';
 import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../../store/api/bugHuntApi';
+import {
+  formatStorageSpeedupButtonDuration,
+  getMaxStorageSpeedupUsableQuantity,
+} from '../../utils/storageSpeedupUi';
 
 const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   'home-defense': 'Home Defense',
@@ -326,13 +330,6 @@ export function FeatureModal({
       .join('   |   ');
   }, [researchStorageSpeedupItems]);
 
-  const getMaxResearchStorageSpeedupQuantity = (durationSeconds: number, ownedQuantity: number): number => {
-    const duration = Math.max(1, Math.floor(durationSeconds));
-    const remainingSeconds = Math.max(0, Math.ceil(researchTimeRemaining / 1000));
-    const maxByTime = Math.max(1, Math.ceil(remainingSeconds / duration));
-    return Math.max(1, Math.min(Math.floor(ownedQuantity), maxByTime));
-  };
-
   const selectedResearchStorageSpeedupItem =
     selectedResearchSpeedupKey == null
       ? null
@@ -340,9 +337,10 @@ export function FeatureModal({
 
   const selectedResearchStorageSpeedupMaxQuantity =
     selectedResearchStorageSpeedupItem && Number.isFinite(selectedResearchStorageSpeedupItem.durationSeconds)
-      ? getMaxResearchStorageSpeedupQuantity(
+      ? getMaxStorageSpeedupUsableQuantity(
           selectedResearchStorageSpeedupItem.durationSeconds ?? 0,
-          selectedResearchStorageSpeedupItem.quantity
+          selectedResearchStorageSpeedupItem.quantity,
+          researchTimeRemaining
         )
       : 1;
 
@@ -351,17 +349,6 @@ export function FeatureModal({
       setSelectedResearchSpeedupQuantity(selectedResearchStorageSpeedupMaxQuantity);
     }
   }, [selectedResearchSpeedupQuantity, selectedResearchStorageSpeedupMaxQuantity]);
-
-  const formatSpeedupButtonDuration = (durationSeconds: number): string => {
-    const seconds = Math.max(0, Math.floor(durationSeconds));
-    if (seconds % 3600 === 0 && seconds >= 3600) {
-      return `${seconds / 3600}h`;
-    }
-    if (seconds % 60 === 0 && seconds >= 60) {
-      return `${seconds / 60}m`;
-    }
-    return `${seconds}s`;
-  };
 
   const handleUseResearchStorageSpeedup = async () => {
     if (
@@ -645,7 +632,11 @@ export function FeatureModal({
                   <View style={styles.researchStorageSpeedupList}>
                     {researchStorageSpeedupItems.map((item) => {
                       const maxUsable = Number.isFinite(item.durationSeconds)
-                        ? getMaxResearchStorageSpeedupQuantity(item.durationSeconds ?? 0, item.quantity)
+                        ? getMaxStorageSpeedupUsableQuantity(
+                            item.durationSeconds ?? 0,
+                            item.quantity,
+                            researchTimeRemaining
+                          )
                         : item.quantity;
                       const isSelected = selectedResearchSpeedupKey === item.itemKey;
                       return (
@@ -666,7 +657,7 @@ export function FeatureModal({
                           }}
                         >
                           <Text style={[styles.researchStorageSpeedupItemButtonText, { color: isLightMode ? '#374151' : '#E2E8F0' }]}>
-                            {formatSpeedupButtonDuration(item.durationSeconds ?? 0)} x{item.quantity} (max {maxUsable})
+                            {formatStorageSpeedupButtonDuration(item.durationSeconds ?? 0)} x{item.quantity} (max {maxUsable})
                           </Text>
                         </TouchableOpacity>
                       );

@@ -20,6 +20,7 @@ import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
 import { usePanGesture } from '../hooks/usePanGesture';
 import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../store/api/bugHuntApi';
+import { formatStorageSpeedupButtonDuration } from '../utils/storageSpeedupUi';
 
 let GestureDetector: any, Animated: any, useAnimatedStyle: any;
 
@@ -214,17 +215,6 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
       }
       return a.label.localeCompare(b.label);
     });
-
-  const formatSpeedupDuration = (durationSeconds: number): string => {
-    const seconds = Math.max(0, Math.floor(durationSeconds));
-    if (seconds % 3600 === 0 && seconds >= 3600) {
-      return `${seconds / 3600}h`;
-    }
-    if (seconds % 60 === 0 && seconds >= 60) {
-      return `${seconds / 60}m`;
-    }
-    return `${seconds}s`;
-  };
 
   const propertyBuildCompletesAt = status?.buildStatus?.completesAt ?? null;
   const [propertyBuildCountdownNow, setPropertyBuildCountdownNow] = useState(() => Date.now());
@@ -494,7 +484,7 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                           >
                             {constructionStorageSpeedups.map((item) => {
                               const durationLabel = Number.isFinite(item.durationSeconds)
-                                ? formatSpeedupDuration(item.durationSeconds ?? 0)
+                                ? formatStorageSpeedupButtonDuration(item.durationSeconds ?? 0)
                                 : item.label;
                               return (
                                 <TouchableOpacity
