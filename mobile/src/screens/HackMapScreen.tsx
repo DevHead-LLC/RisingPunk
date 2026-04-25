@@ -77,6 +77,7 @@ import {
   useUseStorageItemMutation,
 } from '../store/api/bugHuntApi';
 import { ANT_BUG_IMAGE } from '../constants/hackMapBugHuntVisuals';
+import { AntWorldReseedCountdownText } from '../components/hackMap/AntWorldReseedCountdownText';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
@@ -137,13 +138,6 @@ const VIEWPORT_FETCH_THRESHOLD = 1; // Cells to move before triggering viewport 
 const PAN_BUFFER = 12; // Buffer in cells for window range (larger = prefetch more so next pan is often cached)
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
 
-function formatDurationHms(totalSeconds: number): string {
-  const clampedSeconds = Math.max(0, Math.floor(totalSeconds));
-  const hours = Math.floor(clampedSeconds / 3600);
-  const minutes = Math.floor((clampedSeconds % 3600) / 60);
-  const seconds = clampedSeconds % 60;
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
 /** Max press duration (ms) to count as a tap; longer presses are ignored. See tile-tap-reliability.md. */
@@ -1506,15 +1500,6 @@ export const HackMapScreen: React.FC<Props> = ({
     () => (selectedCell ? bugMarkerByCellKey[`${selectedCell.x},${selectedCell.y}`] : undefined),
     [selectedCell, bugMarkerByCellKey]
   );
-  const estimatedServerNowMs = Date.now() + serverSkewMs;
-  const nextAntReseedAtMs = bugWorldStateData?.nextAntWorldReseedAtUtc
-    ? Date.parse(bugWorldStateData.nextAntWorldReseedAtUtc)
-    : NaN;
-  const antWorldCountdownSec =
-    Number.isFinite(nextAntReseedAtMs) && !bugWorldStateData?.reseedInProgress
-      ? Math.max(0, Math.ceil((nextAntReseedAtMs - estimatedServerNowMs) / 1000))
-      : null;
-  const antWorldCountdownLabel = antWorldCountdownSec == null ? null : formatDurationHms(antWorldCountdownSec);
   const [showAntivirusModal, setShowAntivirusModal] = useState(false);
   const [showSwarmModal, setShowSwarmModal] = useState(false);
   const [showJumpToModal, setShowJumpToModal] = useState(false);
@@ -1556,7 +1541,6 @@ export const HackMapScreen: React.FC<Props> = ({
   const [marchOwnerModalId, setMarchOwnerModalId] = useState<string | null>(null);
   const [marchModalTimeTick, setMarchModalTimeTick] = useState(0);
   const [showProbeFollowModal, setShowProbeFollowModal] = useState(false);
-  const [, setCountdownTick] = useState(0);
   /** Live remainingSec/phase for the followed probe (updated by ProbeAnimationLayer each tick when modal open). */
   const [followProbeDisplay, setFollowProbeDisplay] = useState<{ remainingSec: number; phase: 'outbound' | 'returning' } | null>(null);
   const probeFollowModeRef = useRef<boolean>(false);
@@ -1685,10 +1669,6 @@ export const HackMapScreen: React.FC<Props> = ({
   const [failedProbeIds, setFailedProbeIds] = useState<Set<string>>(() => new Set());
   /** Probe ids we removed from local state because return finished; server may still have them for one poll cycle. Exclude from displayProbes so ghost doesn't render or count toward MAX_PROBES. */
   const [returnCompletedProbeIds, setReturnCompletedProbeIds] = useState<Set<string>>(() => new Set());
-  useEffect(() => {
-    const id = setInterval(() => setCountdownTick((v) => v + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
   /** Prune failedProbeIds and returnCompletedProbeIds when server no longer has those probes (single effect, single serverIds). */
   useEffect(() => {
     const serverIds = new Set((activeProbesData?.probes ?? []).map((p) => p.id));
@@ -4941,13 +4921,12 @@ export const HackMapScreen: React.FC<Props> = ({
                 </View>
                 <View style={styles.infoRow}>
                   <Text style={[styles.infoLabel, { color: colors.text.secondary }]}>World refresh:</Text>
-                  <Text style={[styles.infoValue, { color: colors.text.primary }]}>
-                    {bugWorldStateData?.reseedInProgress
-                      ? 'Refreshing'
-                      : antWorldCountdownLabel == null
-                        ? 'Unavailable'
-                        : antWorldCountdownLabel}
-                  </Text>
+                  <AntWorldReseedCountdownText
+                    style={[styles.infoValue, { color: colors.text.primary }]}
+                    reseedInProgress={!!bugWorldStateData?.reseedInProgress}
+                    nextAntWorldReseedAtUtc={bugWorldStateData?.nextAntWorldReseedAtUtc}
+                    serverSkewMs={serverSkewMs}
+                  />
                 </View>
                 <View style={styles.buttonContainer}>
                   <TouchableOpacity
@@ -5245,7 +5224,7 @@ export const HackMapScreen: React.FC<Props> = ({
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, selectedBugMarker, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress, hasUnlockedHunter, bugWorldStateData?.reseedInProgress, antWorldCountdownSec]);
+  }, [selectedCell, selectedBugMarker, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress, hasUnlockedHunter, bugWorldStateData?.reseedInProgress, bugWorldStateData?.nextAntWorldReseedAtUtc, serverSkewMs]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;

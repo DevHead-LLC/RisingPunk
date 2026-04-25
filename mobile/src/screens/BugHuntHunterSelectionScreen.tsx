@@ -85,7 +85,8 @@ export const BugHuntHunterSelectionScreen: React.FC<Props> = ({
   }, []);
 
   const handleLaunch = React.useCallback(async () => {
-    if (!canLaunch || slotOneHunterRosterId !== BUG_HUNT_ROSTER_ID_KAITO) {
+    // Inline canLaunch primitives (not only `canLaunch`) so deps and guard cannot drift (Bugbot: stale closure).
+    if (!hasEnoughTokens || !slotOneAssigned || isLaunching || slotOneHunterRosterId !== BUG_HUNT_ROSTER_ID_KAITO) {
       return;
     }
     if (!myMapPos || !Number.isFinite(myMapPos.x) || !Number.isFinite(myMapPos.y)) {
@@ -128,7 +129,9 @@ export const BugHuntHunterSelectionScreen: React.FC<Props> = ({
       Alert.alert('Launch failed', message);
     }
   }, [
-    canLaunch,
+    hasEnoughTokens,
+    slotOneAssigned,
+    isLaunching,
     slotOneHunterRosterId,
     myMapPos,
     launchAttackMarch,
