@@ -153,6 +153,8 @@ export const BattlePreparationScreen = React.memo(
   const [shieldCheckModalVisible, setShieldCheckModalVisible] = useState(false);
   const [isStartingBattle, setIsStartingBattle] = useState(false);
   const [hunterSlotOneAssigned, setHunterSlotOneAssigned] = useState(false);
+  /** Mirrors hunter slot selection for queued preset tasks to avoid stale closure reads (Bugbot). */
+  const hunterSlotOneAssignedRef = useRef(false);
   /** Mirrors {@link isStartingBattle} synchronously for deploy guards (Bugbot: avoid stale useCallback closure vs async setState). */
   const isStartingBattleRef = useRef(false);
   /** Held only for the actual startBattle / launchAttackMarch phase — not during shield-only prep (Bugbot: shield return must not block continue). */
@@ -408,7 +410,7 @@ export const BattlePreparationScreen = React.memo(
       const task = async () => {
         if (lastSuccessfulPresetSigRef.current === sig) {
           const wantsHunterSlotOne = options?.hunterSlotOneRosterId === BUG_HUNT_ROSTER_ID_KAITO;
-          if (!wantsHunterSlotOne || hunterSlotOneAssigned) {
+          if (!wantsHunterSlotOne || hunterSlotOneAssignedRef.current) {
             return;
           }
         }
@@ -508,9 +510,12 @@ export const BattlePreparationScreen = React.memo(
       botCounts,
       botCountsM2,
       hasKaitoHunter,
-      hunterSlotOneAssigned,
     ]
   );
+
+  React.useEffect(() => {
+    hunterSlotOneAssignedRef.current = hunterSlotOneAssigned;
+  }, [hunterSlotOneAssigned]);
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
@@ -831,6 +836,7 @@ export const BattlePreparationScreen = React.memo(
     setAssignments({});
     setSelectedBattalion(null);
     setHunterSlotOneAssigned(false);
+    hunterSlotOneAssignedRef.current = false;
   }, []);
 
   const handleToggleHunterSlotOne = React.useCallback(() => {
