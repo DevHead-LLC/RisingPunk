@@ -42,6 +42,8 @@ interface Props {
   replayTugBlendTo?: BattleState | null;
   /** Replay only: 0–1 between current frame `t` and next; `null`/`undefined` disables blending. */
   replayTugBlendAlpha?: number | null;
+  /** Replay-only bug-hunt UX: hide neutral node tug bars. */
+  hideNeutralNodeHealthBars?: boolean;
 }
 
 export const BattleNetworkGrid = React.memo(({
@@ -53,6 +55,7 @@ export const BattleNetworkGrid = React.memo(({
   overrideBattleState,
   replayTugBlendTo,
   replayTugBlendAlpha,
+  hideNeutralNodeHealthBars = false,
 }: Props) => {
   const colors = useThemeColors();
   const {
@@ -176,7 +179,7 @@ export const BattleNetworkGrid = React.memo(({
               )}
             </View>
             
-            {node.owner === 'neutral' && (
+            {node.owner === 'neutral' && !hideNeutralNodeHealthBars && (
               <NodeHealthBar node={healthBarNode} />
             )}
           </React.Fragment>
@@ -198,6 +201,7 @@ export const BattleNetworkGrid = React.memo(({
     getNodeBorderColor,
     replayTugBlendAlpha,
     replayTugBlendNextByIndex,
+    hideNeutralNodeHealthBars,
   ]);
 
   return (

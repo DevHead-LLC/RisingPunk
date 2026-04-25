@@ -12,6 +12,8 @@ export type AttackMarchState =
   | 'done'
   | 'cancelled';
 
+export type AttackMarchType = 'solo' | 'swarm' | 'bug_hunt';
+
 /** Marches that should appear on the global HackMap feed (excludes `done`, `cancelled`). */
 export const MAP_VISIBLE_ATTACK_MARCH_STATES: AttackMarchState[] = [
   'outbound',
@@ -39,4 +41,19 @@ export interface AttackMarchArmySnapshot {
     nodeIndex?: number;
     markLevel?: number;
   }>;
+}
+
+/**
+ * Optional bug-hunt extension fields persisted on `AttackMarch`.
+ * `bugInstanceId` is the authoritative foreign key for bug lifecycle linkage.
+ */
+export interface AttackMarchBugHuntContract {
+  bugInstanceId?: string;
+  hunterRosterId?: string;
+  hunterVisualKey?: string;
+  bugHuntEndReason?: 'bug-death' | 'hunter-death' | 'timeout' | 'canceled';
+  bugHuntRemainingHpPercent?: number;
+  bugHuntBattleDurationSeconds?: number;
+  bugHuntItemDrops?: string[];
+  bugHuntHunterXpGranted?: number;
 }

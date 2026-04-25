@@ -70,7 +70,8 @@ export class BattleController {
     unlockHackRigOnWin?: boolean,
     defenderNpcInstanceId?: string,
     hackMapCellX?: number,
-    hackMapCellY?: number
+    hackMapCellY?: number,
+    hunterBattleContract?: { hunterRosterId: string; hunterVisualKey: string }
   ): Promise<BattleStateResponse> {
     try {
       const actualDefenderId = defenderId === 'computer' ? 'computer-opponent' : defenderId;
@@ -84,7 +85,9 @@ export class BattleController {
         unlockHackRigOnWin === true,
         defenderNpcInstanceId,
         hackMapCellX,
-        hackMapCellY
+        hackMapCellY,
+        undefined,
+        hunterBattleContract
       );
       const networkData = this.generateNetworkData(battle.nodes, screenWidth, screenHeight, battle);
       const mappedBattalions = BattalionMappingService.mapBattalionsForClient(battle.battalions);
