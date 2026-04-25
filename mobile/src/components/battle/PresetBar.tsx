@@ -273,6 +273,8 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     }
 
     const built = buildAssignmentsForPreset(presetFromCache, effectiveFullInventory);
+    // Bugbot: hunter-only presets intentionally produce `{}` from `buildAssignmentsForPreset`;
+    // this guard is only for `null` (cannot build / not configured), not empty assignment objects.
     if (!built) {
       if (!presetHasConfiguredSlots(presetFromCache)) {
         showBanner('Set up this preset in Profile > Battles.');
