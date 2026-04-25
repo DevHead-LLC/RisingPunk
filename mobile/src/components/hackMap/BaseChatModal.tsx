@@ -243,7 +243,9 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
       typeof bugRemainingHpPercentRaw === 'number' && Number.isFinite(bugRemainingHpPercentRaw)
         ? Math.max(0, Math.min(100, Math.round(bugRemainingHpPercentRaw * 100) / 100))
         : undefined;
-    const hunterSurvived = (payload as { hunterSurvived?: unknown }).hunterSurvived === 1 ? 1 : 0;
+    const hunterSurvivedRaw = (payload as { hunterSurvived?: unknown }).hunterSurvived;
+    const hunterSurvived =
+      hunterSurvivedRaw === 1 ? 1 : hunterSurvivedRaw === 0 ? 0 : undefined;
     const bugHuntEndReasonRaw = (payload as { bugHuntEndReason?: unknown }).bugHuntEndReason;
     const bugHuntEndReason =
       bugHuntEndReasonRaw === 'bug-death' ||
