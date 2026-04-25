@@ -102,7 +102,6 @@ export function useAttackMarchTransitionBanners(token: string | null): {
       const prev = prevStatesRef.current.get(m.marchId);
       if (
         prev === undefined &&
-        m.attackType !== 'bug_hunt' &&
         m.state === 'outbound' &&
         m.attackType === 'swarm'
       ) {
