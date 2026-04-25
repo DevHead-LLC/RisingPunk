@@ -410,9 +410,13 @@ export const BattlePreparationScreen = React.memo(
       const task = async () => {
         if (lastSuccessfulPresetSigRef.current === sig) {
           const wantsHunterSlotOne = options?.hunterSlotOneRosterId === BUG_HUNT_ROSTER_ID_KAITO;
-          if (!wantsHunterSlotOne || hunterSlotOneAssignedRef.current) {
+          if (!wantsHunterSlotOne) {
             return;
           }
+          if (!hunterSlotOneAssignedRef.current) {
+            applyPresetHunterSlotSelection();
+          }
+          return;
         }
         if (
           options?.hunterSlotOneRosterId === BUG_HUNT_ROSTER_ID_KAITO &&
