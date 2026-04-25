@@ -9,6 +9,8 @@ import {
 } from '../services/BattleReplayLifecycleService';
 import { normalizeUserBattalionsForBattleStart } from '../utils/normalizeUserBattalionsForBattleStart';
 import { recordNpcAttackProgressForGuidedTasks } from '../services/GuidedTaskNpcAttackService';
+import { UserHunter } from '../models/UserHunter';
+import { HUNTER_ROSTER_KAITO_GLITCH, HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT } from '../types/bugHunt';
 
 interface StartBattleRequest extends Request {
   body: {
@@ -28,6 +30,8 @@ interface StartBattleRequest extends Request {
     /** Hack Map grid cell when starting battle from map (optional; must send both or neither). */
     hackMapCellX?: number;
     hackMapCellY?: number;
+    hunterRosterId?: string;
+    hunterVisualKey?: string;
   }
 }
 
@@ -97,6 +101,8 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         unlockHackRigOnWin,
         hackMapCellX,
         hackMapCellY,
+        hunterRosterId,
+        hunterVisualKey,
       } = req.body;
       
       if (!screenWidth || !screenHeight) {
@@ -133,6 +139,45 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         res.status(battalionNorm.status).json({ success: false, error: battalionNorm.error });
         return;
       }
+
+      let hunterBattleContract:
+        | {
+            hunterRosterId: typeof HUNTER_ROSTER_KAITO_GLITCH;
+            hunterVisualKey: typeof HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT;
+          }
+        | undefined;
+      const hasHunterRosterId = typeof hunterRosterId === 'string' && hunterRosterId.trim().length > 0;
+      const hasHunterVisualKey = typeof hunterVisualKey === 'string' && hunterVisualKey.trim().length > 0;
+      if (hasHunterRosterId !== hasHunterVisualKey) {
+        res.status(400).json({
+          success: false,
+          error: 'hunterRosterId and hunterVisualKey must be sent together or omitted',
+        });
+        return;
+      }
+      if (hasHunterRosterId && hasHunterVisualKey) {
+        if (hunterRosterId !== HUNTER_ROSTER_KAITO_GLITCH) {
+          res.status(400).json({ success: false, error: `hunterRosterId must be '${HUNTER_ROSTER_KAITO_GLITCH}'` });
+          return;
+        }
+        if (hunterVisualKey !== HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT) {
+          res.status(400).json({ success: false, error: `hunterVisualKey must be '${HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT}'` });
+          return;
+        }
+        const ownedHunter = await UserHunter.findOne({
+          userId: String(req.user._id),
+          hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+        }).lean();
+        if (!ownedHunter) {
+          res.status(403).json({ success: false, error: 'Kaito Glitch must be unlocked before assigning to battle' });
+          return;
+        }
+        hunterBattleContract = {
+          hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+          hunterVisualKey: HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT,
+        };
+      }
+
       const normalizedBattalions = battalionNorm.normalized.map((b) => ({
         type: b.type,
         quantity: b.quantity,
@@ -149,7 +194,8 @@ router.post<{}, BattleResponse, StartBattleRequest['body']>(
         unlockHackRigOnWin === true,
         defenderNpcInstanceId,
         resolvedHackCellX,
-        resolvedHackCellY
+        resolvedHackCellY,
+        hunterBattleContract
       );
       
       try {

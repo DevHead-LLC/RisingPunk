@@ -107,7 +107,11 @@ interface PresetBarProps {
     isBattalionFUnlocked: boolean;
   };
   /** presetId + assignments; returns a promise so the bar can debounce UI and await one sync at a time. */
-  onApplyPreset: (presetId: string, assignments: Record<string, BattalionAssignment>) => Promise<void>;
+  onApplyPreset: (
+    presetId: string,
+    assignments: Record<string, BattalionAssignment>,
+    options?: { hunterSlotOneRosterId?: 'kaito_glitch' }
+  ) => Promise<void>;
   maxBattalionSizeOverride?: number;
 }
 
@@ -296,7 +300,9 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
     presetApplyGateRef.current = true;
     setPresetApplyBusy(true);
     try {
-      await onApplyPreset(preset.id, built);
+      const hunterSlotOneRosterId =
+        presetFromCache.hunterSlots?.['1'] === 'kaito_glitch' ? 'kaito_glitch' : undefined;
+      await onApplyPreset(preset.id, built, { hunterSlotOneRosterId });
     } catch {
       // Parent handles alert; applies are serialized in BattlePreparationScreen.
     } finally {
@@ -304,8 +310,7 @@ export const PresetBar = React.memo(({ botCounts, userBalance, unlockedSlots, on
       setPresetApplyBusy(false);
     }
   }, [
-    presetsData?.userLevel,
-    presetsData?.presets,
+    presetsData,
     userBalance,
     unlockPreset,
     buildAssignmentsForPreset,

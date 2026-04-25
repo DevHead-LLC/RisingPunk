@@ -168,8 +168,7 @@ export const BattleBattalion = React.memo(({
     animatedPosition.setValue(smoothPosition);
     setDisplayPosition(smoothPosition);
   }, [
-    smoothPosition.x,
-    smoothPosition.y,
+    smoothPosition,
     animatedPosition,
     hasReplayVirtualClock,
     replaySnapshotFrameIndex,
@@ -194,7 +193,8 @@ export const BattleBattalion = React.memo(({
   const attackRangeRadius = React.useMemo(() => battalion.stats.range * 8, [battalion.stats.range]);
   const isBugHuntHunterVisual = battalion.id.startsWith('bughunt-hunter-');
   const isBugHuntBugVisual = battalion.id.startsWith('bughunt-ant-');
-  const useBugHuntVisual = isBugHuntHunterVisual || isBugHuntBugVisual;
+  const isBattleHunterVisual = battalion.id.startsWith('hunter-kaito-');
+  const useBugHuntVisual = isBugHuntHunterVisual || isBugHuntBugVisual || isBattleHunterVisual;
 
   const botTypeLabel = React.useMemo(
     () => battleGridAbbrevFor(battalion.type, battalion.mark),

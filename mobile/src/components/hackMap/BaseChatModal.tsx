@@ -68,7 +68,7 @@ function parseSystemNotificationMessage(message: string): { m: string } | null {
     if (payload != null && typeof payload.m === 'string' && payload.m.trim().length > 0) {
       return { m: payload.m.trim() };
     }
-  } catch (_) {
+  } catch {
     // ignore
   }
   return null;
@@ -93,7 +93,7 @@ function parseProbeReportMessage(message: string): ProbeReportPayload | null {
       if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) return null;
       return payload;
     }
-  } catch (_) {
+  } catch {
     // ignore
   }
   return null;
@@ -192,6 +192,10 @@ export interface BattleReportPayload {
   hunterSurvived?: 0 | 1;
   bugHuntEndReason?: 'bug-death' | 'hunter-death' | 'timeout' | 'canceled';
   hunterRosterId?: string;
+  attackerHunterRosterId?: string;
+  attackerHunterName?: string;
+  attackerHunterStart?: number;
+  attackerHunterLost?: number;
 }
 
 function parseBattleReportMessage(message: string): BattleReportPayload | null {
@@ -253,6 +257,26 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
       typeof hunterRosterIdRaw === 'string' && hunterRosterIdRaw.trim().length > 0
         ? hunterRosterIdRaw.trim()
         : undefined;
+    const attackerHunterRosterIdRaw = (payload as { attackerHunterRosterId?: unknown }).attackerHunterRosterId;
+    const attackerHunterRosterId =
+      typeof attackerHunterRosterIdRaw === 'string' && attackerHunterRosterIdRaw.trim().length > 0
+        ? attackerHunterRosterIdRaw.trim()
+        : undefined;
+    const attackerHunterNameRaw = (payload as { attackerHunterName?: unknown }).attackerHunterName;
+    const attackerHunterName =
+      typeof attackerHunterNameRaw === 'string' && attackerHunterNameRaw.trim().length > 0
+        ? attackerHunterNameRaw.trim()
+        : undefined;
+    const attackerHunterStartRaw = (payload as { attackerHunterStart?: unknown }).attackerHunterStart;
+    const attackerHunterStart =
+      typeof attackerHunterStartRaw === 'number' && Number.isFinite(attackerHunterStartRaw)
+        ? Math.max(0, Math.floor(attackerHunterStartRaw))
+        : undefined;
+    const attackerHunterLostRaw = (payload as { attackerHunterLost?: unknown }).attackerHunterLost;
+    const attackerHunterLost =
+      typeof attackerHunterLostRaw === 'number' && Number.isFinite(attackerHunterLostRaw)
+        ? Math.max(0, Math.floor(attackerHunterLostRaw))
+        : undefined;
     const isNpcReport = (payload as { npc?: unknown }).npc === 1;
     const isSwarmReport = (payload as { swarm?: unknown }).swarm === 1;
     return {
@@ -273,10 +297,14 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
       hunterSurvived,
       bugHuntEndReason,
       hunterRosterId,
+      attackerHunterRosterId,
+      attackerHunterName,
+      attackerHunterStart,
+      attackerHunterLost,
       bugHuntItemDrops,
       bugHuntHunterXpGranted,
     };
-  } catch (_) {
+  } catch {
     // ignore
   }
   return null;
@@ -433,7 +461,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
       const atBottom =
         contentOffset.y + layoutMeasurement.height >= contentSize.height - SCROLL_BOTTOM_THRESHOLD;
       isAtBottomRef.current = atBottom;
-    } catch (_) {
+            } catch {
       // ignore
     }
   }, []);
@@ -449,7 +477,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 50);
-    } catch (_) {
+            } catch {
       // Caller's onSendMessage may throw; mutation exposes error state if needed
     }
   };
@@ -859,6 +887,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               title: string,
                               start: BattleReportBotCounts,
                               lost: BattleReportBotCounts,
+                              attackerHunterLine?: { name: string; start: number; lost: number },
                             ) => {
                               const m2 = sideHasMark2(start, lost);
                               /** Mark I/II labels from `botInventory` display-name maps (same payload keys). */
@@ -890,6 +919,13 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
                                     {title}
                                   </Text>
+                                  {attackerHunterLine ? (
+                                    <Text
+                                      style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}
+                                    >
+                                      {line(attackerHunterLine.name, attackerHunterLine.start, attackerHunterLine.lost)}
+                                    </Text>
+                                  ) : null}
                                   {fam(
                                     M1_UNIT_DISPLAY_NAMES.guardian,
                                     MARK2_DISPLAY_NAMES.guardian,
@@ -945,6 +981,15 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   `Attacker: ${report.attackerHandle}${isAttacker ? ' (You)' : ''}`,
                                   report.attackerStart,
                                   report.attackerLost,
+                                  report.attackerHunterName &&
+                                  typeof report.attackerHunterStart === 'number' &&
+                                  typeof report.attackerHunterLost === 'number'
+                                    ? {
+                                        name: report.attackerHunterName,
+                                        start: report.attackerHunterStart,
+                                        lost: report.attackerHunterLost,
+                                      }
+                                    : undefined,
                                 )}
                                 {renderSide(
                                   `Defender: ${report.defenderHandle}${!isAttacker ? ' (You)' : ''}`,
