@@ -28,6 +28,7 @@ import { binaryBankCrackApi } from './api/binaryBankCrackApi';
 import { battlePresetsApi } from './api/battlePresetsApi';
 import { attackApi } from './api/attackApi';
 import { swarmApi } from './api/swarmApi';
+import { bugHuntApi } from './api/bugHuntApi';
 
 export const store = configureStore({
   reducer: {
@@ -59,6 +60,7 @@ export const store = configureStore({
     [battlePresetsApi.reducerPath]: battlePresetsApi.reducer,
     [attackApi.reducerPath]: attackApi.reducer,
     [swarmApi.reducerPath]: swarmApi.reducer,
+    [bugHuntApi.reducerPath]: bugHuntApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -86,7 +88,8 @@ export const store = configureStore({
     .concat(binaryBankCrackApi.middleware)
     .concat(battlePresetsApi.middleware)
     .concat(attackApi.middleware)
-    .concat(swarmApi.middleware),
+    .concat(swarmApi.middleware)
+    .concat(bugHuntApi.middleware),
   devTools: __DEV__,
 });
 

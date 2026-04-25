@@ -18,6 +18,7 @@ import {
   LockedFeatureModal
 } from './index';
 import { SpeedupModal } from '../common/SpeedupModal';
+import type { BugHuntConstructionSpeedupTarget } from '../../store/api/bugHuntApi';
 
 type RentalHousingLocationProps = {
   propertyId: number;
@@ -292,6 +293,17 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
     return Math.max(0, completesAt - now);
   };
 
+  const constructionSpeedupTarget: BugHuntConstructionSpeedupTarget | undefined =
+    propertyId === 1
+      ? 'property-build-1'
+      : propertyId === 2
+        ? 'property-build-2'
+        : propertyId === 3
+          ? 'property-build-3'
+          : propertyId === 4
+            ? 'property-build-4'
+            : undefined;
+
   // Show loading state while fetching status
   if (statusLoading) {
     return (
@@ -428,6 +440,11 @@ export const RentalHousingLocation = memo(function RentalHousingLocation({
           currentBalance={numericBalance || 0}
           itemType="construction"
           onSpeedup={handleSpeedup}
+          storageSpeedupDomain="construction"
+          storageSpeedupTarget={constructionSpeedupTarget}
+          onStorageSpeedupApplied={async () => {
+            await refetch();
+          }}
           onClose={() => setShowSpeedupModal(false)}
         />
       )}

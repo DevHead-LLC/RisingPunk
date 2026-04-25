@@ -77,7 +77,8 @@ export async function cancelOutboundAttackMarch(
   }
 
   const armySnap = march.armySnapshot as AttackMarchArmySnapshot;
-  if (!armySnap?.battalions || !Array.isArray(armySnap.battalions)) {
+  const isBugHuntMarch = march.attackType === 'bug_hunt';
+  if (!isBugHuntMarch && (!armySnap?.battalions || !Array.isArray(armySnap.battalions))) {
     throw new AttackMarchCancelError(500, 'March army snapshot is invalid');
   }
 
@@ -87,7 +88,9 @@ export async function cancelOutboundAttackMarch(
     march.attackType === 'swarm' ||
     (typeof march.swarmSessionId === 'string' && march.swarmSessionId.trim() !== '');
 
-  if (isSwarmMarch) {
+  if (isBugHuntMarch) {
+    // Bug-hunt marches are hunters-only (no battalion commitment rows to restore on cancel-return).
+  } else if (isSwarmMarch) {
     if (!march.swarmSessionId || String(march.swarmSessionId).trim() === '') {
       throw new AttackMarchCancelError(500, 'Swarm march is missing swarmSessionId');
     }
@@ -138,7 +141,7 @@ export async function cancelOutboundAttackMarch(
         returnArriveAt,
         returnLegStartX,
         returnLegStartY,
-        returningAfterCancel: true,
+        ...(isBugHuntMarch ? {} : { returningAfterCancel: true }),
       },
     }
   );
@@ -150,7 +153,13 @@ export async function cancelOutboundAttackMarch(
   scheduleReturnMarchComplete(mid, returnArriveAt);
   try {
     const qk = defenderQueueKeyFromMarchDoc(
-      march as { defenderQueueKey?: string; defenderId: string; defenderNpcInstanceId?: string }
+      march as {
+        defenderQueueKey?: string;
+        attackType?: string;
+        defenderId: string;
+        defenderNpcInstanceId?: string;
+        bugInstanceId?: string;
+      }
     );
     void runDefenderQueueSerialized(qk, async () => {
       await reconcileDefenderQueue(qk);

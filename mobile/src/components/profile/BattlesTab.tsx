@@ -23,6 +23,9 @@ import {
 import { useGetUserFeaturesQuery } from '../../store/api/researchFeaturesApi';
 import { useAppSelector } from '../../store/hooks';
 import { BOT_FAMILY_ORDER, MARK2_DISPLAY_NAMES } from '../../utils/botInventory';
+import { useFetchMyHuntersQuery } from '../../store/api/bugHuntApi';
+import { BUG_HUNT_ROSTER_ID_KAITO, KAITO_GLITCH_HEADSHOT_IMAGE } from '../../constants/hackMapBugHuntVisuals';
+import { CircleSlot } from '../battle/CircleSlot';
 
 const BATTALION_IDS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
 type BotType = 'breacher' | 'guardian' | 'phreak';
@@ -100,14 +103,20 @@ interface PresetEditorProps {
   preset: PresetData;
   colors: any;
   choiceOptions: SlotChoice[];
-  onSavePreset: (presetId: string, battalions: Record<string, PresetBattalionConfig>) => Promise<void>;
+  hasKaitoHunter: boolean;
+  onSavePreset: (
+    presetId: string,
+    battalions: Record<string, PresetBattalionConfig>,
+    hunterSlots: Partial<Record<'1' | '2' | '3', 'kaito_glitch'>>
+  ) => Promise<void>;
   isSaving: boolean;
 }
 
 /** Must match landscape-only `UISupportedInterfaceOrientations` in Info.plist. */
 const MODAL_LANDSCAPE_ORIENTATIONS = ['landscape-left', 'landscape-right'] as const;
 
-const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, isSaving }: PresetEditorProps) => {
+const PresetEditor = React.memo(
+  ({ preset, colors, choiceOptions, hasKaitoHunter, onSavePreset, isSaving }: PresetEditorProps) => {
   const serverBattalionsSig = useMemo(
     () => JSON.stringify(preset.battalions ?? {}),
     [preset.battalions]
@@ -116,10 +125,20 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
   const [battalions, setBattalions] = useState(() =>
     buildInitialBattalions(preset.battalions, choiceOptions)
   );
+  const [hunterSlots, setHunterSlots] = useState<{ '1': 'kaito_glitch' | null; '2': null; '3': null }>(() => ({
+    '1': preset.hunterSlots?.['1'] === BUG_HUNT_ROSTER_ID_KAITO ? BUG_HUNT_ROSTER_ID_KAITO : null,
+    '2': null,
+    '3': null,
+  }));
 
   useEffect(() => {
     setBattalions(buildInitialBattalions(battalionsFromSig(serverBattalionsSig), choiceOptions));
-  }, [preset.id, serverBattalionsSig, choiceOptions]);
+    setHunterSlots({
+      '1': preset.hunterSlots?.['1'] === BUG_HUNT_ROSTER_ID_KAITO ? BUG_HUNT_ROSTER_ID_KAITO : null,
+      '2': null,
+      '3': null,
+    });
+  }, [preset.id, preset.hunterSlots, serverBattalionsSig, choiceOptions]);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [openBotPickerForRow, setOpenBotPickerForRow] = useState<string | null>(null);
 
@@ -189,22 +208,55 @@ const PresetEditor = React.memo(({ preset, colors, choiceOptions, onSavePreset, 
       }
     }
 
-    if (Object.keys(payload).length === 0) {
-      setSaveMessage('Configure at least one battalion.');
+    const hasHunterSelected = hunterSlots['1'] === BUG_HUNT_ROSTER_ID_KAITO;
+    if (Object.keys(payload).length === 0 && !hasHunterSelected) {
+      setSaveMessage('Configure at least one battalion or Hunter Slot 1.');
       return;
     }
 
     try {
-      await onSavePreset(preset.id, payload);
+      const hunterPayload: Partial<Record<'1' | '2' | '3', 'kaito_glitch'>> = {};
+      if (hunterSlots['1'] === BUG_HUNT_ROSTER_ID_KAITO) {
+        hunterPayload['1'] = BUG_HUNT_ROSTER_ID_KAITO;
+      }
+      await onSavePreset(preset.id, payload, hunterPayload);
       setSaveMessage('Saved.');
     } catch {
       setSaveMessage('Failed to save.');
     }
-  }, [battalions, preset.id, onSavePreset]);
+  }, [battalions, hunterSlots, preset.id, onSavePreset]);
+
+  const handleHunterSlotOnePress = useCallback(() => {
+    if (!hasKaitoHunter) {
+      setSaveMessage('Unlock Kaito in Hunter Facility first.');
+      return;
+    }
+    setHunterSlots((prev) => ({
+      ...prev,
+      '1': prev['1'] === BUG_HUNT_ROSTER_ID_KAITO ? null : BUG_HUNT_ROSTER_ID_KAITO,
+    }));
+    setSaveMessage(null);
+  }, [hasKaitoHunter]);
 
   return (
     <View style={[styles.presetCard, { borderColor: colors.matrix + '33' }]}>
       <Text style={[styles.presetTitle, { color: colors.matrix }]}>PRESET {preset.id}</Text>
+      <View style={styles.hunterSection}>
+        <Text style={[styles.hunterSectionTitle, { color: colors.text.primary }]}>HUNTER SLOTS</Text>
+        <View style={styles.hunterSlotRow}>
+          <CircleSlot
+            isEnemy={false}
+            isEnabled={hasKaitoHunter}
+            isFilled={hunterSlots['1'] === BUG_HUNT_ROSTER_ID_KAITO}
+            label={hasKaitoHunter ? 'SLOT 1' : 'LOCKED'}
+            filledLabel="KAITO"
+            imageSource={hunterSlots['1'] === BUG_HUNT_ROSTER_ID_KAITO ? KAITO_GLITCH_HEADSHOT_IMAGE : undefined}
+            onPress={handleHunterSlotOnePress}
+          />
+          <CircleSlot isEnemy={false} isEnabled={false} label="SLOT 2" />
+          <CircleSlot isEnemy={false} isEnabled={false} label="SLOT 3" />
+        </View>
+      </View>
       {BATTALION_IDS.map((id) => {
         const config = battalions[id];
         return (
@@ -322,6 +374,7 @@ const LockedPreset = React.memo(({ preset, colors }: LockedPresetProps) => (
 export function BattlesTab(): React.JSX.Element {
   const colors = useThemeColors();
   const token = useAppSelector((state) => state.auth.token);
+  const { data: huntersData } = useFetchMyHuntersQuery(undefined, { skip: !token });
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !token });
   const mark2Unlocked =
     hackAbilityFeatures?.some((f: { id?: string; isUnlocked?: boolean }) => f.id === 'mark-2-bots' && f.isUnlocked) ??
@@ -334,11 +387,19 @@ export function BattlesTab(): React.JSX.Element {
    */
   const [savingPresetIds, setSavingPresetIds] = useState<Record<string, boolean>>({});
   const [saveBattlePreset] = useSaveBattlePresetMutation();
+  const hasKaitoHunter = useMemo(
+    () => (huntersData?.hunters ?? []).some((h) => h.hunterRosterId === BUG_HUNT_ROSTER_ID_KAITO),
+    [huntersData?.hunters]
+  );
   const handleSavePreset = useCallback(
-    async (presetId: string, battalions: Record<string, PresetBattalionConfig>) => {
+    async (
+      presetId: string,
+      battalions: Record<string, PresetBattalionConfig>,
+      hunterSlots: Partial<Record<'1' | '2' | '3', 'kaito_glitch'>>
+    ) => {
       setSavingPresetIds((prev) => ({ ...prev, [presetId]: true }));
       try {
-        await saveBattlePreset({ presetId, battalions }).unwrap();
+        await saveBattlePreset({ presetId, battalions, hunterSlots }).unwrap();
       } finally {
         setSavingPresetIds((prev) => {
           const next = { ...prev };
@@ -386,6 +447,7 @@ export function BattlesTab(): React.JSX.Element {
             preset={preset}
             colors={colors}
             choiceOptions={choiceOptions}
+            hasKaitoHunter={hasKaitoHunter}
             onSavePreset={handleSavePreset}
             isSaving={!!savingPresetIds[preset.id]}
           />
@@ -439,6 +501,20 @@ const styles = StyleSheet.create({
   },
   lockedSubtext: {
     fontSize: SIZING.font.small * 0.8,
+  },
+  hunterSection: {
+    marginBottom: SIZING.spacing.sm,
+  },
+  hunterSectionTitle: {
+    fontSize: SIZING.font.small * 0.9,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  hunterSlotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZING.spacing.sm,
+    marginBottom: SIZING.spacing.xs,
   },
   battalionRow: {
     flexDirection: 'row',

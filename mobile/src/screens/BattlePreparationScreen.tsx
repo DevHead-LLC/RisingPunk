@@ -31,6 +31,12 @@ import { useBattalionSlotUnlocks } from '../hooks/useBattalionSlotUnlocks';
 import { useTaskGuideHighlight } from '../contexts/TaskGuideHighlightContext';
 import { TaskGuideHighlightOverlay } from '../components/turf/TaskGuideHighlightOverlay';
 import { PresetBar } from '../components/battle/PresetBar';
+import {
+  BUG_HUNT_ROSTER_ID_KAITO,
+  BUG_HUNT_VISUAL_KEY_KAITO_SPRINT,
+  KAITO_GLITCH_HEADSHOT_IMAGE,
+} from '../constants/hackMapBugHuntVisuals';
+import { useFetchMyHuntersQuery } from '../store/api/bugHuntApi';
 
 const DeployPurgeHighlightBorder = React.memo(({ colors }: { colors: any }) => {
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
@@ -146,6 +152,9 @@ export const BattlePreparationScreen = React.memo(
   const [assignments, setAssignments] = useState<Record<string, BattalionAssignment>>({});
   const [shieldCheckModalVisible, setShieldCheckModalVisible] = useState(false);
   const [isStartingBattle, setIsStartingBattle] = useState(false);
+  const [hunterSlotOneAssigned, setHunterSlotOneAssigned] = useState(false);
+  /** Mirrors hunter slot selection for queued preset tasks to avoid stale closure reads (Bugbot). */
+  const hunterSlotOneAssignedRef = useRef(false);
   /** Mirrors {@link isStartingBattle} synchronously for deploy guards (Bugbot: avoid stale useCallback closure vs async setState). */
   const isStartingBattleRef = useRef(false);
   /** Held only for the actual startBattle / launchAttackMarch phase — not during shield-only prep (Bugbot: shield return must not block continue). */
@@ -182,6 +191,15 @@ export const BattlePreparationScreen = React.memo(
   /** Single source for hack-rig vs map/NPC target (Bugbot: do not duplicate in `battleStartData` useMemo). */
   const isHackRigBattle = !defenderId && !defenderNpcSlug;
   const isSwarmLeadSetup = swarmLeadSetup != null;
+  const { data: huntersData } = useFetchMyHuntersQuery(undefined, { skip: !token || isSwarmLeadSetup });
+  const hasKaitoHunter = React.useMemo(
+    () => (huntersData?.hunters ?? []).some((h) => h.hunterRosterId === BUG_HUNT_ROSTER_ID_KAITO),
+    [huntersData?.hunters]
+  );
+  const canAssignHunterToBattle = !isSwarmLeadSetup && hasKaitoHunter;
+  const selectedBattleHunterRosterId = hunterSlotOneAssigned && canAssignHunterToBattle ? BUG_HUNT_ROSTER_ID_KAITO : undefined;
+  const selectedBattleHunterVisualKey =
+    hunterSlotOneAssigned && canAssignHunterToBattle ? BUG_HUNT_VISUAL_KEY_KAITO_SPRINT : undefined;
   const wantsMarchLaunch =
     asyncMarchesEnabled &&
     !isHackRigBattle &&
@@ -373,13 +391,39 @@ export const BattlePreparationScreen = React.memo(
   const lastSuccessfulPresetSigRef = useRef<string | null>(null);
 
   const handleApplyPreset = React.useCallback(
-    (presetId: string, presetAssignments: Record<string, BattalionAssignment>) => {
+    (
+      presetId: string,
+      presetAssignments: Record<string, BattalionAssignment>,
+      options?: { hunterSlotOneRosterId?: 'kaito_glitch' }
+    ) => {
       const sig = `${presetId}:${JSON.stringify(
         ['A', 'B', 'C', 'D', 'E', 'F'].map((id) => presetAssignments[id] ?? null)
-      )}`;
+      )}:${options?.hunterSlotOneRosterId ?? ''}`;
+      const applyPresetHunterSlotSelection = () => {
+        if (isSwarmLeadSetup) {
+          return;
+        }
+        const enableHunter = options?.hunterSlotOneRosterId === BUG_HUNT_ROSTER_ID_KAITO && hasKaitoHunter;
+        setHunterSlotOneAssigned(enableHunter);
+      };
 
       const task = async () => {
         if (lastSuccessfulPresetSigRef.current === sig) {
+          const wantsHunterSlotOne = options?.hunterSlotOneRosterId === BUG_HUNT_ROSTER_ID_KAITO;
+          if (!wantsHunterSlotOne) {
+            return;
+          }
+          if (!hunterSlotOneAssignedRef.current) {
+            applyPresetHunterSlotSelection();
+          }
+          return;
+        }
+        if (
+          options?.hunterSlotOneRosterId === BUG_HUNT_ROSTER_ID_KAITO &&
+          !hasKaitoHunter
+        ) {
+          // Hunter ownership query may still be loading. Do not lock this preset signature yet.
+          lastSuccessfulPresetSigRef.current = null;
           return;
         }
         if (isSwarmLeadSetup) {
@@ -393,10 +437,12 @@ export const BattlePreparationScreen = React.memo(
             return;
           }
           setAssignments(presetAssignments);
+          applyPresetHunterSlotSelection();
           lastSuccessfulPresetSigRef.current = sig;
           return;
         }
         setAssignments(presetAssignments);
+        applyPresetHunterSlotSelection();
         try {
           const assignmentList = ['A', 'B', 'C', 'D', 'E', 'F'].flatMap((battalionId) => {
             const a = presetAssignments[battalionId];
@@ -461,8 +507,19 @@ export const BattlePreparationScreen = React.memo(
       });
       return presetApplyChainRef.current;
     },
-    [assignPresetBattalions, refetchBots, isSwarmLeadSetup, botCounts, botCountsM2]
+    [
+      assignPresetBattalions,
+      refetchBots,
+      isSwarmLeadSetup,
+      botCounts,
+      botCountsM2,
+      hasKaitoHunter,
+    ]
   );
+
+  React.useEffect(() => {
+    hunterSlotOneAssignedRef.current = hunterSlotOneAssigned;
+  }, [hunterSlotOneAssigned]);
 
   // Convert assignments to battalion data format
   const convertAssignmentsToBattalionData = React.useCallback((assignments: Record<string, BattalionAssignment>) => {
@@ -537,9 +594,24 @@ export const BattlePreparationScreen = React.memo(
       defenderNpcSlug: isHackRigBattle ? undefined : defenderNpcSlug,
       unlockHackRigOnWin: isHackRigBattle,
       defenderNpcInstanceId,
+      ...(selectedBattleHunterRosterId != null
+        ? {
+            hunterRosterId: selectedBattleHunterRosterId,
+            hunterVisualKey: selectedBattleHunterVisualKey,
+          }
+        : {}),
       ...(hasCell ? { hackMapCellX: hackMapCell!.x, hackMapCellY: hackMapCell!.y } : {}),
     };
-  }, [userBattalions, defenderId, defenderNpcSlug, defenderNpcInstanceId, hackMapCell, isHackRigBattle]);
+  }, [
+    userBattalions,
+    defenderId,
+    defenderNpcSlug,
+    defenderNpcInstanceId,
+    selectedBattleHunterRosterId,
+    selectedBattleHunterVisualKey,
+    hackMapCell,
+    isHackRigBattle,
+  ]);
 
   const { clearHighlight } = useTaskGuideHighlight();
 
@@ -668,6 +740,8 @@ export const BattlePreparationScreen = React.memo(
                 defenderId: battleStartData.defenderId,
                 defenderNpcSlug: battleStartData.defenderNpcSlug,
                 defenderNpcInstanceId,
+                hunterRosterId: selectedBattleHunterRosterId,
+                hunterVisualKey: selectedBattleHunterVisualKey,
               }).unwrap();
               if (!res.success || res.data == null) {
                 const msg =
@@ -738,6 +812,8 @@ export const BattlePreparationScreen = React.memo(
       shieldData?.isActive,
       startBattle,
       swarmLeadSetup,
+      selectedBattleHunterRosterId,
+      selectedBattleHunterVisualKey,
       userId,
       validateDeployment,
       wantsMarchLaunch,
@@ -763,7 +839,16 @@ export const BattlePreparationScreen = React.memo(
   useEffect(() => {
     setAssignments({});
     setSelectedBattalion(null);
+    setHunterSlotOneAssigned(false);
+    hunterSlotOneAssignedRef.current = false;
   }, []);
+
+  const handleToggleHunterSlotOne = React.useCallback(() => {
+    if (!canAssignHunterToBattle) {
+      return;
+    }
+    setHunterSlotOneAssigned((prev) => !prev);
+  }, [canAssignHunterToBattle]);
 
   const renderBattalionSlots = React.useCallback((names: string[], isEnemy = false, isLocked = false) => (
     <View style={styles.battalionColumn}>
@@ -789,10 +874,19 @@ export const BattlePreparationScreen = React.memo(
   const renderCircleSlots = React.useCallback((count: number, isEnemy = false) => (
     <View style={isEnemy ? styles.circleColumnEnemy : styles.circleColumn}>
       {Array(count).fill(null).map((_, index) => (
-        <CircleSlot key={index} isEnemy={isEnemy} />
+        <CircleSlot
+          key={index}
+          isEnemy={isEnemy}
+          isEnabled={!isEnemy && index === 0 && canAssignHunterToBattle}
+          isFilled={!isEnemy && index === 0 && hunterSlotOneAssigned}
+          label={!isEnemy && index === 0 ? (canAssignHunterToBattle ? 'SLOT 1' : 'LOCKED') : undefined}
+          filledLabel={!isEnemy && index === 0 ? 'KAITO' : undefined}
+          imageSource={!isEnemy && index === 0 && hunterSlotOneAssigned ? KAITO_GLITCH_HEADSHOT_IMAGE : undefined}
+          onPress={!isEnemy && index === 0 ? handleToggleHunterSlotOne : undefined}
+        />
       ))}
     </View>
-  ), []);
+  ), [canAssignHunterToBattle, handleToggleHunterSlotOne, hunterSlotOneAssigned]);
 
   const deploymentReady = validateDeployment(assignments).isValid;
   const deployDisabled =

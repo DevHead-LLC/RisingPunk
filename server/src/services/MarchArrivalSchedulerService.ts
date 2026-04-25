@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import {
   ATTACK_MARCH_DUE_SWEEP_INTERVAL_MS,
+  ATTACK_MARCH_RETURN_LEG_MAX_MS,
   ATTACK_MARCH_STALE_ARRIVED_MS,
   ENABLE_ASYNC_BATTLES,
 } from '../config/env';
@@ -14,6 +15,7 @@ import {
   reconcileDefenderQueue,
   runDefenderQueueSerialized,
 } from './MarchDefenderQueueService';
+import { computeNextUtcGridInstant } from './BugHuntWorldService';
 
 const timersByMarchId = new Map<string, ReturnType<typeof setTimeout>>();
 const returnTimersByMarchId = new Map<string, ReturnType<typeof setTimeout>>();
@@ -31,9 +33,36 @@ export async function processMarchArrival(marchId: string): Promise<void> {
       { new: true, lean: true }
     );
     if (updated) {
+      if (updated.attackType === 'bug_hunt') {
+        const reseedCutoff = computeNextUtcGridInstant(new Date(updated.departAt));
+        if (Date.now() >= reseedCutoff.getTime()) {
+          const travelMs = Math.max(0, Math.ceil(Number(updated.totalTravelSeconds) * 1000));
+          const returnArriveAt = new Date(Date.now() + travelMs);
+          const movedToReturning = await AttackMarch.updateOne(
+            { marchId: updated.marchId, state: 'arrived' },
+            {
+              $set: {
+                state: 'returning',
+                resolvedAt: new Date(),
+                returnArriveAt,
+              },
+            }
+          );
+          if (movedToReturning.modifiedCount > 0) {
+            scheduleReturnMarchComplete(updated.marchId, returnArriveAt);
+          }
+          return;
+        }
+      }
       try {
         const qk = defenderQueueKeyFromMarchDoc(
-          updated as { defenderQueueKey?: string; defenderId: string; defenderNpcInstanceId?: string }
+          updated as {
+            defenderQueueKey?: string;
+            attackType?: string;
+            defenderId: string;
+            defenderNpcInstanceId?: string;
+            bugInstanceId?: string;
+          }
         );
         await runDefenderQueueSerialized(qk, async () => {
           await reconcileDefenderQueue(qk);
@@ -174,6 +203,7 @@ export async function processReturnMarchComplete(marchId: string): Promise<void>
       defenderQueueKey?: string;
       returningAfterCancel?: boolean;
       attackType?: string;
+      bugInstanceId?: string;
       swarmSessionId?: string;
       consumedBattalionAssignments: unknown;
       armySnapshot: unknown;
@@ -271,7 +301,13 @@ export async function processReturnMarchComplete(marchId: string): Promise<void>
     }
 
     const qk = defenderQueueKeyFromMarchDoc(
-      prevOut as { defenderQueueKey?: string; defenderId: string; defenderNpcInstanceId?: string }
+      prevOut as {
+        defenderQueueKey?: string;
+        attackType?: string;
+        defenderId: string;
+        defenderNpcInstanceId?: string;
+        bugInstanceId?: string;
+      }
     );
     await runDefenderQueueSerialized(qk, async () => {
       await reconcileDefenderQueue(qk);
@@ -366,6 +402,24 @@ export async function sweepAttackMarchesPastDueDates(): Promise<void> {
     .lean();
 
   for (const m of overdueReturning) {
+    if (m.marchId) {
+      void processReturnMarchComplete(m.marchId);
+    }
+  }
+
+  // Safety net: malformed/legacy rows missing returnArriveAt should still settle to done.
+  const staleReturningWithoutEtaCutoff = new Date(Date.now() - ATTACK_MARCH_RETURN_LEG_MAX_MS * 2);
+  const staleReturningWithoutEta = await AttackMarch.find({
+    state: 'returning',
+    $or: [{ returnArriveAt: { $exists: false } }, { returnArriveAt: null }],
+    resolvedAt: { $lte: staleReturningWithoutEtaCutoff },
+  })
+    .select('marchId')
+    .sort({ resolvedAt: 1, marchId: 1 })
+    .limit(DUE_SWEEP_BATCH_LIMIT)
+    .lean();
+
+  for (const m of staleReturningWithoutEta) {
     if (m.marchId) {
       void processReturnMarchComplete(m.marchId);
     }
