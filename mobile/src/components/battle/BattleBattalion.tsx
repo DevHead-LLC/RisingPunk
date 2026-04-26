@@ -4,11 +4,12 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image } from 'react-native';
 import { MovementState } from '../../types/battleTypes';
 import { ANIMATION_CONFIG } from '../../config';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { battleGridAbbrevFor, effectiveMarkFromBattalionMark } from '../../utils/botInventory';
+import { ANT_BUG_IMAGE, KAITO_GLITCH_SPRINT_IMAGE } from '../../constants/hackMapBugHuntVisuals';
 
 /** Above this, `startTime` is treated as Unix ms (live battle), not virtual replay ms (headless). */
 const REPLAY_WALL_CLOCK_START_TIME_THRESHOLD_MS = 1_000_000_000_000;
@@ -47,6 +48,8 @@ interface Props {
    * on each poll only when a **new snapshot** arrives; intra-snapshot motion stays **`setValue`** (~60fps) so timings don’t stack.
    */
   replaySnapshotFrameIndex?: number;
+  /** Replay-only bug-hunt UX: show percent text on hunter/bug sprites. */
+  showBugHuntPercentLabel?: boolean;
 }
 
 export const BattleBattalion = React.memo(({
@@ -58,6 +61,7 @@ export const BattleBattalion = React.memo(({
   replayMovementVirtualNowMs,
   replayMovementEpochMs,
   replaySnapshotFrameIndex,
+  showBugHuntPercentLabel = false,
 }: Props) => {
   const colors = useThemeColors();
   const animatedPosition = React.useRef(new Animated.ValueXY(position)).current;
@@ -188,6 +192,10 @@ export const BattleBattalion = React.memo(({
   , [battalion.isUser, colors]);
 
   const attackRangeRadius = React.useMemo(() => battalion.stats.range * 8, [battalion.stats.range]);
+  const isBugHuntHunterVisual = battalion.id.startsWith('bughunt-hunter-');
+  const isBugHuntBugVisual = battalion.id.startsWith('bughunt-ant-');
+  const isBattleHunterVisual = battalion.id.startsWith('hunter-kaito-');
+  const useBugHuntVisual = isBugHuntHunterVisual || isBugHuntBugVisual || isBattleHunterVisual;
 
   const botTypeLabel = React.useMemo(
     () => battleGridAbbrevFor(battalion.type, battalion.mark),
@@ -227,6 +235,19 @@ export const BattleBattalion = React.memo(({
         return base;
     }
   }, [size, displayPosition.x, displayPosition.y, borderColor, battalion.type]);
+
+  const bugHuntSpriteWrapperStyle = React.useMemo(
+    () => [
+      styles.bugHuntSpriteWrapper,
+      {
+        width: size * 1.1,
+        height: size * 1.1,
+        left: displayPosition.x - (size * 1.1) / 2,
+        top: displayPosition.y - (size * 1.1) / 2,
+      },
+    ],
+    [displayPosition.x, displayPosition.y, size]
+  );
 
   const getHealthBarColor = React.useMemo(() => {
     return healthPercentage > 60 ? '#4CAF50' : healthPercentage > 30 ? '#FF9800' : '#F44336';
@@ -291,6 +312,14 @@ export const BattleBattalion = React.memo(({
       backgroundColor: getHealthBarColor,
     },
   ], [healthPercentage, getHealthBarColor]);
+  const healthPercentLabel = React.useMemo(
+    () => `${Math.round(Math.max(0, Math.min(100, healthPercentage)))}%`,
+    [healthPercentage]
+  );
+  const healthPercentTextStyle = React.useMemo(
+    () => [styles.healthPercentText, { color: healthPercentage > 30 ? colors.text.primary : colors.error }],
+    [colors.error, colors.text.primary, healthPercentage]
+  );
 
   const labelRowStyle = React.useMemo(() => [
     styles.labelRow,
@@ -306,17 +335,27 @@ export const BattleBattalion = React.memo(({
         <View style={attackRangeStyle} />
       )}
       
-      <View style={getShapeStyle}>
-        <View style={[
-          styles.quantityBackground, 
-          { 
-            backgroundColor: '#2A2A2A',
-            transform: battalion.type === 'phreak' ? [{ rotate: '-45deg' }] : []
-          }
-        ]}>
-          <Text style={[quantityTextStyle, { color: '#FFFFFF' }]}>{formatQuantity(battalion.quantity)}</Text>
+      {useBugHuntVisual ? (
+        <View style={bugHuntSpriteWrapperStyle}>
+          <Image
+            source={isBugHuntBugVisual ? ANT_BUG_IMAGE : KAITO_GLITCH_SPRINT_IMAGE}
+            style={styles.bugHuntSpriteImage}
+            resizeMode="contain"
+          />
         </View>
-      </View>
+      ) : (
+        <View style={getShapeStyle}>
+          <View style={[
+            styles.quantityBackground, 
+            { 
+              backgroundColor: '#2A2A2A',
+              transform: battalion.type === 'phreak' ? [{ rotate: '-45deg' }] : []
+            }
+          ]}>
+            <Text style={[quantityTextStyle, { color: '#FFFFFF' }]}>{formatQuantity(battalion.quantity)}</Text>
+          </View>
+        </View>
+      )}
       
       {showHealthBar && (
         <View style={healthBarContainerStyle}>
@@ -325,14 +364,19 @@ export const BattleBattalion = React.memo(({
               style={healthBarFillStyle}
             />
           </View>
+          {showBugHuntPercentLabel && useBugHuntVisual ? (
+            <Text style={healthPercentTextStyle}>{healthPercentLabel}</Text>
+          ) : null}
         </View>
       )}
       
-      <View style={labelRowStyle}>
-        <Text style={botTypeLabelStyle}>{botTypeLabel}</Text>
-        <View style={{ width: 12 }} />
-        <Text style={markLabelStyle}>{markShortLabel}</Text>
-      </View>
+      {!useBugHuntVisual ? (
+        <View style={labelRowStyle}>
+          <Text style={botTypeLabelStyle}>{botTypeLabel}</Text>
+          <View style={{ width: 12 }} />
+          <Text style={markLabelStyle}>{markShortLabel}</Text>
+        </View>
+      ) : null}
     </View>
   );
 });
@@ -357,6 +401,15 @@ const styles = StyleSheet.create({
   healthBarFill: {
     height: '100%',
     borderRadius: 2,
+  },
+  healthPercentText: {
+    marginTop: 2,
+    alignSelf: 'center',
+    fontSize: 9,
+    fontWeight: '800',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   quantityBackground: {
     borderRadius: 10,
@@ -395,5 +448,14 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     backgroundColor: 'transparent',
     opacity: 0.3,
+  },
+  bugHuntSpriteWrapper: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bugHuntSpriteImage: {
+    width: '100%',
+    height: '100%',
   },
 });

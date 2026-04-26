@@ -4,9 +4,10 @@
  */
 
 import { Battle, IBattleDocument } from '../models/Battle';
-import { BattlePhase, IBattalion, INode, BotType } from '../types/battle';
+import { BattlePhase, IBattalion, INode, BotType, NodeOwner } from '../types/battle';
 import { createNodesWithTugOfWar } from '../services/NodeService';
 import { BattalionService } from './BattalionService';
+import { BattalionFactory } from './BattalionFactory';
 import { PointTrackingService } from './PointTrackingService';
 import { BotService } from './BotService';
 import { NPCService } from './NPCService';
@@ -19,8 +20,91 @@ import { syncAndResolveUserBotProgrammingBonuses } from '../utils/syncUserBotPro
 import { getCrewArmyBonusTotalsForUser, mergeCrewArmyIntoArmyBonus } from '../utils/researchFeatureUtils';
 import { parseInventoryKeyToFamilyAndMark } from '../utils/botInventoryKeys';
 import { normalizeNpcBattalionMarkLevel } from '../utils/npcMarkMixConfig';
+import { UserHunter } from '../models/UserHunter';
+import { HunterProgressionService } from './HunterProgressionService';
+import { HUNTER_ROSTER_KAITO_GLITCH, HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT } from '../types/bugHunt';
+
+type HunterBattleContract = {
+  hunterRosterId: string;
+  hunterVisualKey: string;
+};
+
+type ResolvedHunterBattleUnit = {
+  hunterRosterId: typeof HUNTER_ROSTER_KAITO_GLITCH;
+  hunterVisualKey: typeof HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT;
+  level: number;
+  stats: {
+    health: number;
+    offense: number;
+    defense: number;
+    speed: number;
+    range: number;
+  };
+};
 
 export class BattleSetupService {
+  private static readonly SPRINT_HACK_BOOST_ATTACK_MULTIPLIER = 1.05;
+  private static readonly SPRINT_HACK_BOOST_SPEED_BONUS = 1;
+
+  private static async resolveHunterBattleUnit(
+    attackerId: string,
+    hunterBattleContract?: HunterBattleContract
+  ): Promise<ResolvedHunterBattleUnit | null> {
+    if (hunterBattleContract == null) {
+      return null;
+    }
+    const hunterRosterId = String(hunterBattleContract.hunterRosterId || '').trim();
+    const hunterVisualKey = String(hunterBattleContract.hunterVisualKey || '').trim();
+    if (hunterRosterId !== HUNTER_ROSTER_KAITO_GLITCH) {
+      throw new Error(`Unsupported hunterRosterId '${hunterRosterId}' for battle start`);
+    }
+    if (hunterVisualKey !== HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT) {
+      throw new Error(`Unsupported hunterVisualKey '${hunterVisualKey}' for battle start`);
+    }
+    const ownedHunter = await UserHunter.findOne({
+      userId: String(attackerId),
+      hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+    }).lean();
+    if (!ownedHunter) {
+      throw new Error('Selected hunter is not unlocked for this user');
+    }
+    const stats = HunterProgressionService.computeEffectiveHunterStats(
+      HUNTER_ROSTER_KAITO_GLITCH,
+      ownedHunter.level
+    );
+    return {
+      hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+      hunterVisualKey: HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT,
+      level: ownedHunter.level,
+      stats,
+    };
+  }
+
+  private static applyHunterHackBoostIfPresent(
+    battalions: IBattalion[],
+    hunterUnit: ResolvedHunterBattleUnit | null
+  ): void {
+    if (hunterUnit == null) {
+      return;
+    }
+    if (hunterUnit.hunterRosterId !== HUNTER_ROSTER_KAITO_GLITCH) {
+      return;
+    }
+    battalions.forEach((battalion) => {
+      const isHunterUnit = battalion.id.startsWith('hunter-kaito-');
+      if (isHunterUnit || battalion.owner !== NodeOwner.USER || battalion.type !== 'guardian') {
+        return;
+      }
+      battalion.stats = {
+        ...battalion.stats,
+        offense:
+          Math.round(
+            battalion.stats.offense * this.SPRINT_HACK_BOOST_ATTACK_MULTIPLIER * 100
+          ) / 100,
+        speed: Math.round(battalion.stats.speed) + this.SPRINT_HACK_BOOST_SPEED_BONUS,
+      };
+    });
+  }
 
   static async createBattle(
     attackerId: string,
@@ -33,7 +117,8 @@ export class BattleSetupService {
     defenderNpcInstanceId?: string,
     hackMapCellX?: number,
     hackMapCellY?: number,
-    marchMeta?: { marchSourcedAttack: boolean; sourceMarchId: string }
+    marchMeta?: { marchSourcedAttack: boolean; sourceMarchId: string },
+    hunterBattleContract?: HunterBattleContract
   ): Promise<IBattleDocument> {
     const battleId = `battle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
@@ -64,6 +149,8 @@ export class BattleSetupService {
     if (userBattalions.length > MAX_USER_BATTALIONS) {
       throw new Error(`Maximum ${MAX_USER_BATTALIONS} battalions allowed`);
     }
+
+    const hunterBattleUnit = await this.resolveHunterBattleUnit(attackerId, hunterBattleContract);
     
     // Check if defender is a user (not NPC)
     // A user defender is when we have a defenderId that's not 'computer-opponent' and doesn't look like an NPC ID
@@ -171,6 +258,9 @@ export class BattleSetupService {
       );
       userTotal += botConfig.stats.health * battalion.quantity;
     }
+    if (hunterBattleUnit != null) {
+      userTotal += hunterBattleUnit.stats.health;
+    }
     
     let enemyTotal = 0;
     if (isUserDefender) {
@@ -232,6 +322,29 @@ export class BattleSetupService {
     const nodes = createNodesWithTugOfWar(totalArmyHealth, screenWidth, screenHeight);
     
     const userBattalionsList = await BattalionService.createUserBattalions(nodes, userLevel, userBattalions, attackerArmyBonus, attackerGuardianBonus, attackerPhreakBonus);
+    if (hunterBattleUnit != null) {
+      const availableUserNodes = [0, 1, 2];
+      const randomNodeIndex = Math.floor(Math.random() * availableUserNodes.length);
+      const hunterNodeIndex = availableUserNodes[randomNodeIndex];
+      const hunterBattalion = BattalionFactory.createBattalion(
+        `hunter-kaito-${hunterBattleUnit.level}`,
+        BotType.GUARDIAN,
+        1,
+        hunterNodeIndex,
+        NodeOwner.USER,
+        {
+          health: hunterBattleUnit.stats.health,
+          offense: hunterBattleUnit.stats.offense,
+          defense: hunterBattleUnit.stats.defense,
+          speed: hunterBattleUnit.stats.speed,
+          range: hunterBattleUnit.stats.range,
+        },
+        nodes,
+        1
+      );
+      userBattalionsList.push(hunterBattalion);
+    }
+    this.applyHunterHackBoostIfPresent(userBattalionsList, hunterBattleUnit);
 
     let enemyBattalions: IBattalion[];
     if (isUserDefender) {

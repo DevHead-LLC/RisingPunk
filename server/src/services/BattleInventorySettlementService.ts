@@ -9,6 +9,21 @@ import mongoose from 'mongoose';
 import { getInventoryKey } from '../utils/botInventoryKeys';
 
 export class BattleInventorySettlementService {
+  private static readonly KAITO_HUNTER_BATTALION_ID_PREFIX = 'hunter-kaito-';
+
+  private static isSyntheticHunterBattalion(
+    battalion: { id?: string | null; owner?: NodeOwner; type?: BotType }
+  ): boolean {
+    if (battalion.owner !== NodeOwner.USER) {
+      return false;
+    }
+    if (battalion.type !== BotType.GUARDIAN) {
+      return false;
+    }
+    return String(battalion.id ?? '').startsWith(
+      BattleInventorySettlementService.KAITO_HUNTER_BATTALION_ID_PREFIX
+    );
+  }
   
   /**
    * Process inventory settlement for both users at battle end
@@ -58,7 +73,11 @@ export class BattleInventorySettlementService {
       const survivorsByInventoryKey: Record<string, number> = {};
 
       for (const endingBattalion of endingBattalions) {
-        if (endingBattalion.owner === NodeOwner.USER && !endingBattalion.isDestroyed) {
+        if (
+          endingBattalion.owner === NodeOwner.USER &&
+          !endingBattalion.isDestroyed &&
+          !this.isSyntheticHunterBattalion(endingBattalion)
+        ) {
           const mark =
             typeof endingBattalion.mark === 'number' && endingBattalion.mark >= 2 ? 2 : 1;
           const invKey = getInventoryKey(endingBattalion.type as BotType, mark);
@@ -77,16 +96,19 @@ export class BattleInventorySettlementService {
       }
 
       // Clear battalion assignments for used battalionIds
-      if (inventoryUpdated) {
-        const usedBattalionIds = startingBattalions
-          .filter(b => b.owner === NodeOwner.USER)
-          .map(b => b.id);
-        
-        // Remove assignments for used battalions
-        attackerBots.battalionAssignments = attackerBots.battalionAssignments.filter(
-          (assignment: any) => !usedBattalionIds.includes(assignment.battalionId)
-        );
-        
+      const usedBattalionIds = startingBattalions
+        .filter(b => b.owner === NodeOwner.USER)
+        .map(b => b.id);
+      const currentAssignments = attackerBots.battalionAssignments || [];
+      const nextAssignments = currentAssignments.filter(
+        (assignment: any) => !usedBattalionIds.includes(assignment.battalionId)
+      );
+      const assignmentsChanged = nextAssignments.length !== currentAssignments.length;
+      if (assignmentsChanged) {
+        attackerBots.battalionAssignments = nextAssignments;
+      }
+
+      if (inventoryUpdated || assignmentsChanged) {
         await attackerBots.save();
       }
       

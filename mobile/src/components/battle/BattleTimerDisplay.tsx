@@ -13,17 +13,23 @@ export const BattleTimerDisplay = React.memo(({ battleTime, maxBattleTime, isVis
   
   if (!isVisible) return null;
 
-  // battleTime now represents time remaining (45s down to 0s)
-  // Calculate progress as (time remaining) / (max time)
-  const progressFillStyle = React.useMemo(() => [
-    styles.progressFill,
-    { width: `${(battleTime / maxBattleTime) * 100}%` as any, backgroundColor: colors.secondary },
-  ], [battleTime, maxBattleTime, colors.secondary]);
+  // Keep replay/live timer display aligned with regular battles: show whole seconds only.
+  const wholeSecondsRemaining = Math.max(0, Math.ceil(Number.isFinite(battleTime) ? battleTime : 0));
+  const safeMaxBattleTime = Number.isFinite(maxBattleTime) ? Math.max(0, maxBattleTime) : 0;
 
-  // Display time remaining directly
-  const timerText = React.useMemo(() =>
-    `${battleTime}s`
-  , [battleTime]);
+  const safeBattleTime = Number.isFinite(battleTime) ? Math.max(0, battleTime) : 0;
+
+  // battleTime now represents time remaining (45s down to 0s)
+  // Keep bar motion smooth by using finite raw seconds while the label remains whole seconds.
+  const widthPct =
+    safeMaxBattleTime > 0
+      ? Math.min(100, (safeBattleTime / safeMaxBattleTime) * 100)
+      : 0;
+  const progressFillStyle = [
+    styles.progressFill,
+    { width: `${widthPct}%` as any, backgroundColor: colors.secondary },
+  ];
+  const timerText = `${wholeSecondsRemaining}s`;
 
   return (
     <View style={styles.container}>

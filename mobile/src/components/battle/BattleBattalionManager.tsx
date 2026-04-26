@@ -23,6 +23,8 @@ interface Props {
   replayMovementEpochMs?: number;
   /** Replay: current snapshot index — battalion motion uses `Animated.timing` on index boundaries only. */
   replaySnapshotFrameIndex?: number;
+  /** Replay-only bug-hunt UX: show unit percent labels on bug/hunter sprites. */
+  showBugHuntPercentLabel?: boolean;
 }
 
 export const BattleBattalionManager = React.memo(({
@@ -33,6 +35,7 @@ export const BattleBattalionManager = React.memo(({
   replayMovementVirtualNowMs,
   replayMovementEpochMs,
   replaySnapshotFrameIndex,
+  showBugHuntPercentLabel = false,
 }: Props) => {
   const [pollingInterval, setPollingInterval] = useState<number>(ANIMATION_CONFIG.DEFAULT_POLLING_MS);
   
@@ -93,6 +96,7 @@ export const BattleBattalionManager = React.memo(({
                 replayMovementVirtualNowMs={replayMovementVirtualNowMs}
                 replayMovementEpochMs={replayMovementEpochMs}
                 replaySnapshotFrameIndex={replaySnapshotFrameIndex}
+                showBugHuntPercentLabel={showBugHuntPercentLabel}
               />
             );
           })}
@@ -108,6 +112,7 @@ export const BattleBattalionManager = React.memo(({
     replayMovementVirtualNowMs,
     replayMovementEpochMs,
     replaySnapshotFrameIndex,
+    showBugHuntPercentLabel,
   ]);
 
   return (

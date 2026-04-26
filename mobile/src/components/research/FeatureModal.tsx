@@ -5,7 +5,7 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  Platform,
+  ScrollView
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -16,6 +16,12 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { updateBalance } from '../../store/slices/balanceSlice';
 import { LockedFeatureModal } from '../turf/LockedFeatureModal';
 import { trackFirstResearch } from '../../services/analyticsService';
+import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../../store/api/bugHuntApi';
+import {
+  compareStorageSpeedupItemsByDurationDesc,
+  formatStorageSpeedupButtonDuration,
+  getMaxStorageSpeedupUsableQuantity,
+} from '../../utils/storageSpeedupUi';
 
 const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   'home-defense': 'Home Defense',
@@ -59,8 +65,14 @@ export function FeatureModal({
   useEffect(() => {
     if (visible) setIsResearching(!!feature.isResearching);
   }, [visible, feature.id, feature.isResearching]);
+  useEffect(() => {
+    setResearchCompletesAtOverrideMs(null);
+  }, [feature.id, feature.researchCompletesAt]);
   const [researchTimeRemaining, setResearchTimeRemaining] = useState(0);
   const [isSpeedupLoading, setIsSpeedupLoading] = useState(false);
+  const [researchCompletesAtOverrideMs, setResearchCompletesAtOverrideMs] = useState<number | null>(null);
+  const [selectedResearchSpeedupKey, setSelectedResearchSpeedupKey] = useState<string | null>(null);
+  const [selectedResearchSpeedupQuantity, setSelectedResearchSpeedupQuantity] = useState(1);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showRequirementsNotMet, setShowRequirementsNotMet] = useState(false);
@@ -69,6 +81,7 @@ export function FeatureModal({
   const [completeResearch, { isLoading: isCompletingResearch }] = useCompleteResearchMutation();
   const [speedupFeatureResearch] = useSpeedupFeatureResearchMutation();
   const [requestCrewBackup] = useRequestCrewBackupMutation();
+  const [useStorageItem, { isLoading: isApplyingResearchStorageSpeedup }] = useUseStorageItemMutation();
   const { data: crewStatus } = useGetCrewStatusQuery(undefined, { skip: !visible });
   // Use ?? so server's explicit false is respected; local isResearching only used when feature.isResearching is null/undefined (Bugbot).
   const { data: crewDetails, refetch: refetchCrewDetails } = useGetCrewDetailsQuery(crewStatus?.crewId ?? '', {
@@ -90,6 +103,7 @@ export function FeatureModal({
   const { data: hackCrewFeatures, isLoading: hackCrewLoading } = useGetUserFeaturesQuery('hack-crew', { skip: !visible || !refCategories.includes('hack-crew') });
   const { data: investmentsFeatures, isLoading: investmentsLoading } = useGetUserFeaturesQuery('investments', { skip: !visible || !refCategories.includes('investments') });
   const { data: researchCenterStatus } = useGetResearchCenterStatusQuery(undefined, { skip: !visible });
+  const { data: storageInventory, refetch: refetchStorageInventory } = useFetchStorageInventoryQuery(undefined, { skip: !visible });
   const currentResearchCenterLevel = researchCenterStatus?.level ?? 0;
 
   const featuresByCategory = useMemo(() => ({
@@ -180,6 +194,9 @@ export function FeatureModal({
   useEffect(() => {
     if (!visible) {
       researchCompleteRequestSentRef.current = false;
+      setSelectedResearchSpeedupKey(null);
+      setSelectedResearchSpeedupQuantity(1);
+      setResearchCompletesAtOverrideMs(null);
       if (requirementsOverlayTimerRef.current) {
         clearTimeout(requirementsOverlayTimerRef.current);
         requirementsOverlayTimerRef.current = null;
@@ -202,7 +219,11 @@ export function FeatureModal({
     if (isCurrentlyResearching && feature.researchCompletesAt) {
       const updateTimer = () => {
         const now = new Date().getTime();
-        const completesAt = new Date(feature.researchCompletesAt!).getTime();
+        const serverCompletesAt = new Date(feature.researchCompletesAt!).getTime();
+        const completesAt =
+          researchCompletesAtOverrideMs != null && Number.isFinite(researchCompletesAtOverrideMs)
+            ? researchCompletesAtOverrideMs
+            : serverCompletesAt;
         const remaining = Math.max(0, completesAt - now);
         setResearchTimeRemaining(remaining);
         
@@ -224,7 +245,15 @@ export function FeatureModal({
       const interval = setInterval(updateTimer, 1000);
       return () => clearInterval(interval);
     }
-  }, [isCurrentlyResearching, feature.researchCompletesAt, feature.id, completeResearch, categoryId, onResearchStarted]);
+  }, [
+    isCurrentlyResearching,
+    feature.researchCompletesAt,
+    feature.id,
+    completeResearch,
+    categoryId,
+    onResearchStarted,
+    researchCompletesAtOverrideMs,
+  ]);
   
   const showRequirementsNotMetOverlay = (items: string[]) => {
     if (requirementsOverlayTimerRef.current) {
@@ -284,6 +313,80 @@ export function FeatureModal({
 
   const speedupCost = getSpeedupCost();
   const canAffordSpeedup = currentBalance >= speedupCost && researchTimeRemaining > 0;
+  const researchStorageSpeedupItems = useMemo(() => {
+    return (storageInventory?.items ?? [])
+      .filter(
+        (item) =>
+          item.category === 'speedup' &&
+          item.speedupDomain === 'research' &&
+          Number.isFinite(item.durationSeconds) &&
+          Number(item.quantity) > 0
+      )
+      .sort(compareStorageSpeedupItemsByDurationDesc);
+  }, [storageInventory?.items]);
+
+  const researchSpeedupSummary = useMemo(() => {
+    return researchStorageSpeedupItems
+      .slice(0, 3)
+      .map((item) => `${item.label} x${item.quantity}`)
+      .join('   |   ');
+  }, [researchStorageSpeedupItems]);
+
+  const selectedResearchStorageSpeedupItem =
+    selectedResearchSpeedupKey == null
+      ? null
+      : researchStorageSpeedupItems.find((item) => item.itemKey === selectedResearchSpeedupKey) ?? null;
+
+  const selectedResearchStorageSpeedupMaxQuantity =
+    selectedResearchStorageSpeedupItem && Number.isFinite(selectedResearchStorageSpeedupItem.durationSeconds)
+      ? getMaxStorageSpeedupUsableQuantity(
+          selectedResearchStorageSpeedupItem.durationSeconds ?? 0,
+          selectedResearchStorageSpeedupItem.quantity,
+          researchTimeRemaining
+        )
+      : 1;
+
+  useEffect(() => {
+    if (selectedResearchSpeedupQuantity > selectedResearchStorageSpeedupMaxQuantity) {
+      setSelectedResearchSpeedupQuantity(selectedResearchStorageSpeedupMaxQuantity);
+    }
+  }, [selectedResearchSpeedupQuantity, selectedResearchStorageSpeedupMaxQuantity]);
+
+  const handleUseResearchStorageSpeedup = async () => {
+    if (
+      !selectedResearchStorageSpeedupItem ||
+      !Number.isFinite(selectedResearchStorageSpeedupItem.durationSeconds) ||
+      isApplyingResearchStorageSpeedup
+    ) {
+      return;
+    }
+    try {
+      const result = await useStorageItem({
+        itemKey: selectedResearchStorageSpeedupItem.itemKey,
+        quantity: selectedResearchSpeedupQuantity,
+        researchCategoryId: categoryId,
+        researchFeatureId: feature.id,
+      }).unwrap();
+
+      const appliedQuantity =
+        typeof result.quantityUsed === 'number' && Number.isFinite(result.quantityUsed)
+          ? Math.max(1, Math.floor(result.quantityUsed))
+          : Math.max(1, selectedResearchSpeedupQuantity);
+      const perItemDurationSeconds = Math.max(1, Math.floor(selectedResearchStorageSpeedupItem.durationSeconds ?? 0));
+      const totalDurationMs = perItemDurationSeconds * 1000 * appliedQuantity;
+      const now = Date.now();
+      const baseCompletesAt = researchCompletesAtOverrideMs ?? new Date(feature.researchCompletesAt ?? now).getTime();
+      const nextCompletesAt = Math.max(now, baseCompletesAt - totalDurationMs);
+      setResearchCompletesAtOverrideMs(nextCompletesAt);
+      setResearchTimeRemaining(Math.max(0, nextCompletesAt - now));
+      await refetchStorageInventory();
+      onResearchStarted?.();
+    } catch (error: any) {
+      const msg = error?.data?.error || error?.data?.message || 'Could not use speedup item.';
+      setErrorMessage(msg);
+      setShowErrorModal(true);
+    }
+  };
 
   const handleSpeedup = async () => {
     if (!canAffordSpeedup || isSpeedupLoading) {
@@ -515,6 +618,110 @@ export function FeatureModal({
                   Insufficient funds
                 </Text>
               )}
+              {researchStorageSpeedupItems.length > 0 ? (
+                <>
+                  <TouchableOpacity
+                    style={[
+                      styles.researchStorageSpeedupHeader,
+                      { borderColor: '#8B5CF6', backgroundColor: '#8B5CF622' },
+                    ]}
+                    activeOpacity={1}
+                  >
+                    <Text style={[styles.researchStorageSpeedupHeaderText, { color: '#8B5CF6' }]}>
+                      Use Speedup Item ({researchStorageSpeedupItems.length} type{researchStorageSpeedupItems.length === 1 ? '' : 's'})
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.researchStorageSpeedupEmptyText, { color: isLightMode ? '#374151' : '#94A3B8' }]}>
+                    {researchSpeedupSummary}
+                  </Text>
+                  <View style={styles.researchStorageSpeedupList}>
+                    {researchStorageSpeedupItems.map((item) => {
+                      const maxUsable = Number.isFinite(item.durationSeconds)
+                        ? getMaxStorageSpeedupUsableQuantity(
+                            item.durationSeconds ?? 0,
+                            item.quantity,
+                            researchTimeRemaining
+                          )
+                        : item.quantity;
+                      const isSelected = selectedResearchSpeedupKey === item.itemKey;
+                      return (
+                        <TouchableOpacity
+                          key={item.itemKey}
+                          style={[
+                            styles.researchStorageSpeedupItemButton,
+                            {
+                              borderColor: isSelected ? '#10B981' : '#8B5CF6',
+                              backgroundColor: isSelected ? '#10B98122' : '#8B5CF622',
+                              opacity: isApplyingResearchStorageSpeedup ? 0.65 : 1,
+                            },
+                          ]}
+                          disabled={isApplyingResearchStorageSpeedup}
+                          onPress={() => {
+                            setSelectedResearchSpeedupKey(item.itemKey);
+                            setSelectedResearchSpeedupQuantity(1);
+                          }}
+                        >
+                          <Text style={[styles.researchStorageSpeedupItemButtonText, { color: isLightMode ? '#374151' : '#E2E8F0' }]}>
+                            {formatStorageSpeedupButtonDuration(item.durationSeconds ?? 0)} x{item.quantity} (max {maxUsable})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {selectedResearchStorageSpeedupItem != null ? (
+                    <View style={styles.researchStorageSpeedupQuantitySection}>
+                      <View style={styles.researchStorageSpeedupQuantityRow}>
+                        <TouchableOpacity
+                          style={[styles.researchStorageSpeedupQuantityButton, { borderColor: '#8B5CF6' }]}
+                          onPress={() => setSelectedResearchSpeedupQuantity((prev) => Math.max(1, prev - 1))}
+                          disabled={isApplyingResearchStorageSpeedup || selectedResearchSpeedupQuantity <= 1}
+                        >
+                          <Text style={[styles.researchStorageSpeedupQuantityButtonText, { color: '#8B5CF6' }]}>-</Text>
+                        </TouchableOpacity>
+                        <Text style={[styles.researchStorageSpeedupQuantityValue, { color: isLightMode ? '#111827' : '#F8FAFC' }]}>
+                          {selectedResearchSpeedupQuantity}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.researchStorageSpeedupQuantityButton, { borderColor: '#8B5CF6' }]}
+                          onPress={() =>
+                            setSelectedResearchSpeedupQuantity((prev) =>
+                              Math.min(selectedResearchStorageSpeedupMaxQuantity, prev + 1)
+                            )
+                          }
+                          disabled={
+                            isApplyingResearchStorageSpeedup ||
+                            selectedResearchSpeedupQuantity >= selectedResearchStorageSpeedupMaxQuantity
+                          }
+                        >
+                          <Text style={[styles.researchStorageSpeedupQuantityButtonText, { color: '#8B5CF6' }]}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <TouchableOpacity
+                        style={[
+                          styles.researchStorageSpeedupApplyButton,
+                          {
+                            borderColor: '#10B981',
+                            backgroundColor: '#10B98122',
+                            opacity: isApplyingResearchStorageSpeedup ? 0.65 : 1,
+                          },
+                        ]}
+                        onPress={handleUseResearchStorageSpeedup}
+                        disabled={isApplyingResearchStorageSpeedup}
+                      >
+                        <Text style={[styles.researchStorageSpeedupApplyButtonText, { color: isLightMode ? '#111827' : '#F8FAFC' }]}>
+                          {isApplyingResearchStorageSpeedup
+                            ? 'Applying...'
+                            : `Use ${selectedResearchSpeedupQuantity}`}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                </>
+              ) : (
+                <Text style={[styles.researchStorageSpeedupEmptyText, { color: isLightMode ? '#374151' : '#94A3B8' }]}>
+                  No speedup items available
+                </Text>
+              )}
               <TouchableOpacity
                 style={[
                   styles.speedupButton,
@@ -648,7 +855,15 @@ export function FeatureModal({
               borderColor: colors.primary
             }
           ]}>
-            {(feature.isUnlocked || isCurrentlyResearching) ? renderUnlockedModal() : renderLockedModal()}
+            <ScrollView
+              style={styles.modalScrollView}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+            >
+              {(feature.isUnlocked || isCurrentlyResearching) ? renderUnlockedModal() : renderLockedModal()}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -673,14 +888,24 @@ const styles = StyleSheet.create({
     padding: SIZING.spacing.md,
   },
   modal: {
-    width: Platform.OS === 'android' ? '75%' : '100%',
-    maxWidth: 400,
+    width: '94%',
+    maxWidth: 980,
+    maxHeight: '82%',
     borderRadius: 12,
     borderWidth: 2,
-    padding: SIZING.spacing.md,
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.sm,
+    overflow: 'hidden',
+  },
+  modalScrollView: {
+    width: '100%',
+  },
+  modalScrollContent: {
+    width: '100%',
+    paddingBottom: SIZING.spacing.md,
   },
   modalContent: {
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
   modalTitle: {
     fontSize: SIZING.font.h2,
@@ -835,6 +1060,82 @@ const styles = StyleSheet.create({
   speedupButtonText: {
     fontSize: SIZING.font.body,
     fontWeight: '600',
+  },
+  researchStorageSpeedupHeader: {
+    marginTop: SIZING.spacing.sm,
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: SIZING.spacing.sm,
+    paddingHorizontal: SIZING.spacing.sm,
+    alignItems: 'center',
+  },
+  researchStorageSpeedupHeaderText: {
+    fontSize: SIZING.font.small,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  researchStorageSpeedupEmptyText: {
+    marginTop: SIZING.spacing.xs,
+    fontSize: SIZING.font.small,
+    textAlign: 'center',
+  },
+  researchStorageSpeedupList: {
+    width: '100%',
+    marginTop: SIZING.spacing.xs,
+    gap: SIZING.spacing.xs,
+  },
+  researchStorageSpeedupItemButton: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.sm,
+    alignItems: 'center',
+  },
+  researchStorageSpeedupItemButtonText: {
+    fontSize: SIZING.font.small,
+    fontWeight: '700',
+  },
+  researchStorageSpeedupQuantitySection: {
+    width: '100%',
+    marginTop: SIZING.spacing.sm,
+    alignItems: 'center',
+    gap: SIZING.spacing.xs,
+  },
+  researchStorageSpeedupQuantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZING.spacing.sm,
+  },
+  researchStorageSpeedupQuantityButton: {
+    width: 30,
+    height: 30,
+    borderWidth: 1,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  researchStorageSpeedupQuantityButtonText: {
+    fontSize: SIZING.font.body,
+    fontWeight: '700',
+  },
+  researchStorageSpeedupQuantityValue: {
+    minWidth: 30,
+    textAlign: 'center',
+    fontSize: SIZING.font.body,
+    fontWeight: '700',
+  },
+  researchStorageSpeedupApplyButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: SIZING.spacing.md,
+    paddingVertical: SIZING.spacing.xs,
+    alignSelf: 'center',
+  },
+  researchStorageSpeedupApplyButtonText: {
+    fontSize: SIZING.font.small,
+    fontWeight: '700',
   },
   requestBackupButton: {
     marginTop: SIZING.spacing.sm,

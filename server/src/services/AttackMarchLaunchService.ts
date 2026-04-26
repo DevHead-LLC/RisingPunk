@@ -9,9 +9,16 @@ import {
   secondsPerDuFromArmySnapshot,
   totalTravelSeconds,
 } from './MarchTimingService';
+import {
+  ANT_BUG_HUNT_TOKEN_COST,
+  spendAntBugHuntTokensAtLaunch,
+  BugHuntTokenSpendError,
+} from './BugHuntTokenService';
 import type { ResolvedMarchLaunchTarget } from './MarchTargetValidationService';
 import { defenderQueueKeyForLaunchTarget } from './MarchDefenderQueueService';
 import { recordNpcAttackProgressForGuidedTasks } from './GuidedTaskNpcAttackService';
+import type { AttackMarchType } from '../types/attackMarch';
+import { recordBugHuntLaunchConfirmed } from './BugHuntTelemetryService';
 
 const Bot = require('../models/Bot');
 
@@ -134,6 +141,16 @@ export interface ExecuteAttackMarchLaunchParams {
   originX: number;
   originY: number;
   target: ResolvedMarchLaunchTarget;
+  attackType?: AttackMarchType;
+  bugHuntContract?: {
+    bugInstanceId: string;
+    hunterRosterId: string;
+    hunterVisualKey: string;
+  };
+  hunterBattleContract?: {
+    hunterRosterId: string;
+    hunterVisualKey: string;
+  };
 }
 
 export interface ExecuteAttackMarchLaunchResult {
@@ -156,7 +173,11 @@ export async function executeAttackMarchLaunch(
     originX,
     originY,
     target,
+    attackType,
+    bugHuntContract,
+    hunterBattleContract,
   } = params;
+  const isBugHuntLaunch = attackType === 'bug_hunt';
 
   if (!Number.isFinite(originX) || !Number.isFinite(originY)) {
     throw new AttackMarchLaunchError(400, 'originX and originY must be finite numbers');
@@ -173,11 +194,9 @@ export async function executeAttackMarchLaunch(
     })),
   };
 
-  const secondsPerDu = secondsPerDuFromArmySnapshot(armySnapshot);
   const distanceDu = distanceDuTileUnits(originX, originY, target.hackMapCellX, target.hackMapCellY);
-  const travelSec = totalTravelSeconds(distanceDu, secondsPerDu);
-  const departAt = new Date();
-  const arriveAt = new Date(departAt.getTime() + Math.ceil(travelSec * 1000));
+  const secondsPerDu = isBugHuntLaunch ? 2 : secondsPerDuFromArmySnapshot(armySnapshot);
+  const baseTravelSec = isBugHuntLaunch ? Math.max(2, distanceDu * 2) : totalTravelSeconds(distanceDu, secondsPerDu);
 
   const sumByInv = sumRequiredByInventoryKey(normalizedBattalions);
   const marchId = `march-${randomUUID()}`;
@@ -197,6 +216,13 @@ export async function executeAttackMarchLaunch(
     const session = await mongoose.startSession();
     try {
       let resultPayload: ExecuteAttackMarchLaunchResult | null = null;
+      let bugHuntTelemetryPayload: {
+        userId: string;
+        marchId: string;
+        bugInstanceId: string;
+        tokensSpent: number;
+        totalTravelSeconds: number;
+      } | null = null;
 
       await session.withTransaction(async () => {
         const activeMarch = await AttackMarch.findOne({
@@ -207,65 +233,97 @@ export async function executeAttackMarchLaunch(
           .lean();
 
         if (activeMarch) {
+          const alreadyActiveMessage = isBugHuntLaunch
+            ? 'You already have an active hunting expedition. Finish or cancel it before launching another.'
+            : 'You already have an active hack expedition. Finish or cancel it before launching another.';
           throw new AttackMarchLaunchError(
             409,
-            'You already have an active hack expedition. Finish or cancel it before launching another.'
+            alreadyActiveMessage
           );
         }
 
-        const bot = await Bot.findOne({ userId: attackerId }).session(session);
-        if (!bot) {
-          throw new AttackMarchLaunchError(400, 'No bot inventory found for user');
-        }
+        let consumedRows: BattalionAssignmentRow[] = [];
+        let travelSec = baseTravelSec;
+        if (isBugHuntLaunch) {
+          try {
+            await spendAntBugHuntTokensAtLaunch({
+              userId: String(attackerId),
+              session,
+            });
+            if (bugHuntContract) {
+              bugHuntTelemetryPayload = {
+                userId: String(attackerId),
+                marchId,
+                bugInstanceId: bugHuntContract.bugInstanceId,
+                tokensSpent: ANT_BUG_HUNT_TOKEN_COST,
+                totalTravelSeconds: travelSec,
+              };
+            }
+          } catch (tokenError) {
+            if (tokenError instanceof BugHuntTokenSpendError) {
+              throw new AttackMarchLaunchError(tokenError.statusCode, tokenError.message);
+            }
+            throw tokenError;
+          }
+        } else {
+          const bot = await Bot.findOne({ userId: attackerId }).session(session);
+          if (!bot) {
+            throw new AttackMarchLaunchError(400, 'No bot inventory found for user');
+          }
 
-        const botsMap = bot.bots as Record<string, number>;
-        for (const key of Object.keys(sumByInv)) {
-          const need = sumByInv[key] || 0;
-          const owned = botsMap[key] ?? 0;
-          if (need > owned) {
-            throw new AttackMarchLaunchError(400, 'Insufficient Bots Available');
+          const botsMap = bot.bots as Record<string, number>;
+          for (const key of Object.keys(sumByInv)) {
+            const need = sumByInv[key] || 0;
+            const owned = botsMap[key] ?? 0;
+            if (need > owned) {
+              throw new AttackMarchLaunchError(400, 'Insufficient Bots Available');
+            }
+          }
+
+          const rawAssignments = (bot.battalionAssignments || []) as BattalionAssignmentRow[];
+          const assignedTotals = assignedSumByKey(rawAssignments);
+          for (const key of Object.keys(sumByInv)) {
+            const need = sumByInv[key] || 0;
+            const assigned = assignedTotals[key] ?? 0;
+            if (need > assigned) {
+              throw new AttackMarchLaunchError(
+                400,
+                'Deployed troops must be assigned in Digital Barracks (assign bots to battalion slots before deploy)'
+              );
+            }
+          }
+
+          const consumeResult = consumeAssignmentsForDeploy(rawAssignments, sumByInv);
+          consumedRows = consumeResult.consumedRows;
+
+          const $inc: Record<string, number> = { __v: 1 };
+          for (const key of Object.keys(sumByInv)) {
+            const need = sumByInv[key] || 0;
+            if (need > 0) {
+              $inc[`bots.${key}`] = -need;
+            }
+          }
+
+          const updated = await Bot.findOneAndUpdate(
+            {
+              userId: attackerId,
+              $or: [{ __v: bot.__v }, { __v: { $exists: false } }],
+            },
+            {
+              $inc,
+              battalionAssignments: consumeResult.newAssignments,
+            },
+            { new: true, session }
+          );
+
+          if (!updated) {
+            lastVersionError = true;
+            throw new Error('BOT_VERSION_CONFLICT');
           }
         }
 
-        const rawAssignments = (bot.battalionAssignments || []) as BattalionAssignmentRow[];
-        const assignedTotals = assignedSumByKey(rawAssignments);
-        for (const key of Object.keys(sumByInv)) {
-          const need = sumByInv[key] || 0;
-          const assigned = assignedTotals[key] ?? 0;
-          if (need > assigned) {
-            throw new AttackMarchLaunchError(
-              400,
-              'Deployed troops must be assigned in Digital Barracks (assign bots to battalion slots before deploy)'
-            );
-          }
-        }
-
-        const { newAssignments, consumedRows } = consumeAssignmentsForDeploy(rawAssignments, sumByInv);
-
-        const $inc: Record<string, number> = { __v: 1 };
-        for (const key of Object.keys(sumByInv)) {
-          const need = sumByInv[key] || 0;
-          if (need > 0) {
-            $inc[`bots.${key}`] = -need;
-          }
-        }
-
-        const updated = await Bot.findOneAndUpdate(
-          {
-            userId: attackerId,
-            $or: [{ __v: bot.__v }, { __v: { $exists: false } }],
-          },
-          {
-            $inc,
-            battalionAssignments: newAssignments,
-          },
-          { new: true, session }
-        );
-
-        if (!updated) {
-          lastVersionError = true;
-          throw new Error('BOT_VERSION_CONFLICT');
-        }
+        const departAt = new Date();
+        const arriveAt = new Date(departAt.getTime() + Math.ceil(travelSec * 1000));
 
         await AttackMarch.create(
           [
@@ -285,6 +343,19 @@ export async function executeAttackMarchLaunch(
               armySnapshot,
               consumedBattalionAssignments: consumedRows,
               defenderQueueKey,
+              ...(isBugHuntLaunch ? { attackType: 'bug_hunt' as const } : {}),
+              ...(bugHuntContract != null
+                ? {
+                    bugInstanceId: bugHuntContract.bugInstanceId,
+                    hunterRosterId: bugHuntContract.hunterRosterId,
+                    hunterVisualKey: bugHuntContract.hunterVisualKey,
+                  }
+                : hunterBattleContract != null
+                  ? {
+                      hunterRosterId: hunterBattleContract.hunterRosterId,
+                      hunterVisualKey: hunterBattleContract.hunterVisualKey,
+                    }
+                : {}),
               state: 'outbound',
               departAt,
               arriveAt,
@@ -307,13 +378,18 @@ export async function executeAttackMarchLaunch(
       });
 
       if (resultPayload) {
+        const launchedPayload: ExecuteAttackMarchLaunchResult = resultPayload;
         // Match battle.ts: must not fail the launch response after the transaction committed.
-        try {
-          await recordNpcAttackProgressForGuidedTasks(String(attackerId), target.defenderNpcSlug);
-        } catch (taskTrackingError) {
-          console.error('[AttackMarchLaunchService] guided task NPC attack tracking failed:', taskTrackingError);
+        if (!isBugHuntLaunch) {
+          try {
+            await recordNpcAttackProgressForGuidedTasks(String(attackerId), target.defenderNpcSlug);
+          } catch (taskTrackingError) {
+            console.error('[AttackMarchLaunchService] guided task NPC attack tracking failed:', taskTrackingError);
+          }
+        } else if (bugHuntTelemetryPayload) {
+          void recordBugHuntLaunchConfirmed(bugHuntTelemetryPayload);
         }
-        return resultPayload;
+        return launchedPayload;
       }
     } catch (e: unknown) {
       if (e instanceof AttackMarchLaunchError) {

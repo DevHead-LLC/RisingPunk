@@ -16,6 +16,7 @@ import { updateBalance } from '../../store/slices/balanceSlice';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
 import { setBuildState } from '../../store/slices/botsSlice';
 import { useTaskGuideHighlight } from '../../contexts/TaskGuideHighlightContext';
+import { projectBuildQueueProgress } from '../../utils/botBuildProjection';
 type BuildSectionProps = {
   selectedType: BotType | null;
   /** Header line (e.g. BRUTE, BREACHER, NO BOT SELECTED). */
@@ -108,6 +109,13 @@ export const BuildSection = React.memo(function BuildSection({
     }
     return Math.min(100, ((now - start) / (end - start)) * 100);
   }, [buildQueue, buildingProgress, buildUiTick]);
+
+  const projectedBuiltCount = useMemo(() => {
+    if (!buildQueue) {
+      return undefined;
+    }
+    return projectBuildQueueProgress(buildQueue, timeRemainingMs)?.projectedBuilt ?? 0;
+  }, [buildQueue, timeRemainingMs]);
 
   const completionRefetchFired = useRef(false);
   useEffect(() => {
@@ -211,6 +219,7 @@ export const BuildSection = React.memo(function BuildSection({
             progress={smoothBuildProgress}
             timeRemainingMs={timeRemainingMs}
             totalBuildQuantity={totalBuildQuantity}
+            botsBuilt={projectedBuiltCount}
           />
           <BuildProgressBar progress={smoothBuildProgress} />
         </>
@@ -223,6 +232,10 @@ export const BuildSection = React.memo(function BuildSection({
           currentBalance={numericBalance || 0}
           itemType="build"
           onSpeedup={handleSpeedup}
+          storageSpeedupDomain="bot_assembly"
+          onStorageSpeedupApplied={async () => {
+            await refetchBuildState();
+          }}
           onClose={() => setShowSpeedupModal(false)}
         />
       )}

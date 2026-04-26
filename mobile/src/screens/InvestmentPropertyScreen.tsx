@@ -19,6 +19,11 @@ import { rentalHousingApi } from '../store/api/rentalHousingApi';
 import { updateBalance } from '../store/slices/balanceSlice';
 import type { RemodelRoomType } from '../store/api/authApi';
 import { usePanGesture } from '../hooks/usePanGesture';
+import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../store/api/bugHuntApi';
+import {
+  compareStorageSpeedupItemsByDurationDesc,
+  formatStorageSpeedupButtonDuration,
+} from '../utils/storageSpeedupUi';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -161,6 +166,8 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
 
   const [startRemodel] = useStartRemodelMutation();
   const [speedupRemodel] = useSpeedupRemodelMutation();
+  const [useStorageItem, { isLoading: isUsingStorageSpeedup }] = useUseStorageItemMutation();
+  const { data: storageData, refetch: refetchStorageInventory } = useFetchStorageInventoryQuery();
   const dispatch = useAppDispatch();
   const balanceState = useAppSelector(state => state.balance);
   const propertyLevel = status?.propertyLevel ?? 0;
@@ -197,6 +204,16 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
     return () => clearInterval(id);
   }, [isModalShowingInProgress, remodelRoom, activeRemodel?.room, activeRemodel?.completesAt]);
 
+  const constructionStorageSpeedups = (storageData?.items ?? [])
+    .filter(
+      (item) =>
+        item.category === 'speedup' &&
+        item.speedupDomain === 'construction' &&
+        Number.isFinite(item.durationSeconds) &&
+        Number(item.quantity) > 0
+    )
+    .sort(compareStorageSpeedupItemsByDurationDesc);
+
   const propertyBuildCompletesAt = status?.buildStatus?.completesAt ?? null;
   const [propertyBuildCountdownNow, setPropertyBuildCountdownNow] = useState(() => Date.now());
   const propertyBuildRemainingSec = propertyBuildCompletesAt
@@ -215,6 +232,22 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
       dispatch(rentalHousingApi.util.invalidateTags(['RentalHousingIncome']));
     }
   }, [isPropertyBuilding, propertyBuildRemainingSec, refetchRentalStatus, dispatch]);
+
+  const handleUseConstructionSpeedupItem = useCallback(
+    async (itemKey: string) => {
+      try {
+        await useStorageItem({ itemKey, speedupTarget: 'remodel' }).unwrap();
+        await refetchStorageInventory();
+        refetchRentalStatus();
+        refetchCrewDetails();
+        setRemodelRoom(null);
+      } catch (error: any) {
+        const msg = error?.data?.error;
+        Alert.alert('Use failed', typeof msg === 'string' && msg.length > 0 ? msg : 'Could not use speedup item.');
+      }
+    },
+    [useStorageItem, refetchStorageInventory, refetchRentalStatus, refetchCrewDetails]
+  );
 
   const FLOOR_PLAN_WIDTH = 1250;
   const FLOOR_PLAN_HEIGHT = 950;
@@ -491,6 +524,43 @@ export const InvestmentPropertyScreen: React.FC<InvestmentPropertyScreenProps> =
                           </>
                         )}
                       </View>
+                      {!timeUp && constructionStorageSpeedups.length > 0 ? (
+                        <View style={styles.storageSpeedupSection}>
+                          <Text style={[styles.storageSpeedupTitle, { color: colors.text?.primary || '#fff' }]}>
+                            Use Speedup Item
+                          </Text>
+                          <ScrollView
+                            style={styles.storageSpeedupScroll}
+                            contentContainerStyle={styles.storageSpeedupList}
+                            showsVerticalScrollIndicator={true}
+                          >
+                            {constructionStorageSpeedups.map((item) => {
+                              const durationLabel = Number.isFinite(item.durationSeconds)
+                                ? formatStorageSpeedupButtonDuration(item.durationSeconds ?? 0)
+                                : item.label;
+                              return (
+                                <TouchableOpacity
+                                  key={item.itemKey}
+                                  style={[
+                                    styles.storageSpeedupButton,
+                                    {
+                                      borderColor: colors.primary,
+                                      backgroundColor: colors.primary + '22',
+                                      opacity: isUsingStorageSpeedup ? 0.65 : 1,
+                                    },
+                                  ]}
+                                  disabled={isUsingStorageSpeedup}
+                                  onPress={() => handleUseConstructionSpeedupItem(item.itemKey)}
+                                >
+                                  <Text style={[styles.storageSpeedupButtonText, { color: colors.text?.primary || '#fff' }]}>
+                                    {durationLabel} x{item.quantity}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </ScrollView>
+                        </View>
+                      ) : null}
                     </>
                   );
                 })()
@@ -785,5 +855,34 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  storageSpeedupSection: {
+    marginTop: SIZING.spacing.sm,
+    width: '100%',
+  },
+  storageSpeedupTitle: {
+    fontSize: SIZING.font.small,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: SIZING.spacing.xs,
+  },
+  storageSpeedupScroll: {
+    maxHeight: 90,
+    width: '100%',
+  },
+  storageSpeedupList: {
+    gap: SIZING.spacing.xs,
+  },
+  storageSpeedupButton: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingVertical: SIZING.spacing.xs,
+    paddingHorizontal: SIZING.spacing.sm,
+    alignItems: 'center',
+  },
+  storageSpeedupButtonText: {
+    color: '#fff',
+    fontSize: SIZING.font.small,
+    fontWeight: '700',
   },
 });

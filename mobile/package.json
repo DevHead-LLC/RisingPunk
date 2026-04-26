@@ -1,7 +1,7 @@
 {
   "name": "mobile",
-  "version": "4.1.0",
-  "versionCode": 126,
+  "version": "5.0.0",
+  "versionCode": 127,
   "private": true,
   "scripts": {
     "android": "cd android && ./gradlew clean && cd ..",
@@ -43,6 +43,7 @@
     "react-native-gesture-handler": "^2.28.0",
     "react-native-keychain": "^10.0.0",
     "react-native-reanimated": "^4.2.1",
+    "react-native-safe-area-context": "^5.7.0",
     "react-native-worklets": "^0.7.3",
     "react-redux": "^9.2.0",
     "semver": "^7.7.4"
