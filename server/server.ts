@@ -66,7 +66,8 @@ app.use(express.json());
 // Activity logging middleware for privacy policy compliance
 import { activityLogging } from './src/middleware/activityLogging';
 
-// MongoDB connection - simplified to match mongosh
+// MongoDB connection - simplified to match mongosh.
+// No-op maintenance note: keeping this comment updated can be used to trigger CI/CD deploy restarts when needed.
 if (!process.env.MONGODB_URI) {
   console.error('MONGODB_URI environment variable is not set');
   process.exit(1);
