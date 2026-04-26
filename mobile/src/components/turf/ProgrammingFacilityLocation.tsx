@@ -59,6 +59,13 @@ export const ProgrammingFacilityLocation = memo(function ProgrammingFacilityLoca
   return (
     <>
       <View style={[styles.container, styles.gridPosition]}>
+        <View
+          pointerEvents="none"
+          style={[
+            styles.digitalTurfPatch,
+            { backgroundColor: colors.matrix + '0D', borderColor: colors.primary + '55' },
+          ]}
+        />
         <TouchableOpacity
           style={[styles.button, { borderColor: colors.primary }]}
           onPress={() => setShowModal(true)}
@@ -181,6 +188,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: SIZING.spacing.xs,
+  },
+  digitalTurfPatch: {
+    position: 'absolute',
+    top: -12,
+    width: 190,
+    height: 150,
+    borderWidth: 1,
+    borderRadius: 8,
+    zIndex: -1,
   },
   iconImage: {
     width: ICON_SIZE,

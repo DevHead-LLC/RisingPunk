@@ -31,6 +31,7 @@ import reportsRoutes from './src/routes/reports';
 import privateMessagesRoutes from './src/routes/privateMessages';
 import probeRoutes from './src/routes/probe';
 import attackRoutes from './src/routes/attack';
+import bugHuntRoutes from './src/routes/bugHunt';
 import leaderboardRoutes from './src/routes/leaderboardRoutes';
 import userGuideRoutes from './src/routes/userGuideRoutes';
 import marketingRoutes from './src/routes/marketing';
@@ -192,6 +193,13 @@ mongoose.connect(process.env.MONGODB_URI, {
     startAttackMarchDueSweepWatchdog();
   } catch (dueSweepErr: unknown) {
     console.warn('Attack march due-date sweep watchdog failed to start (non-fatal):', dueSweepErr);
+  }
+
+  try {
+    const { startAntWorldReseedScheduler } = require('./src/services/AntWorldReseedSchedulerService');
+    startAntWorldReseedScheduler();
+  } catch (antReseedErr: unknown) {
+    console.warn('Ant world reseed scheduler failed to start (non-fatal):', antReseedErr);
   }
 
   try {
@@ -709,6 +717,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/private-messages', privateMessagesRoutes);
 app.use('/api/probe', probeRoutes);
 app.use('/api/attack', attackRoutes);
+app.use('/api/bug-hunt', bugHuntRoutes);
 app.use('/api/swarm', swarmRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/daily-haul', dailyHaulRoutes);

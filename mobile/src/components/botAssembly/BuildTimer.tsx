@@ -8,16 +8,24 @@ type BuildTimerProps = {
   progress: number;
   timeRemainingMs: number;
   totalBuildQuantity: number;
+  botsBuilt?: number;
 };
 
 export const BuildTimer = React.memo(function BuildTimer({
   progress,
   timeRemainingMs,
   totalBuildQuantity,
+  botsBuilt,
 }: BuildTimerProps) {
   const colors = useThemeColors();
 
-  const botsBuilt = Math.floor((progress / 100) * totalBuildQuantity);
+  const computedBuiltFromProgress = Math.floor((progress / 100) * totalBuildQuantity);
+  const serverBuilt = Number.isFinite(botsBuilt)
+    ? Math.max(0, Math.min(totalBuildQuantity, Math.floor(botsBuilt ?? 0)))
+    : 0;
+  const displayedBuilt = Number.isFinite(botsBuilt)
+    ? Math.max(serverBuilt, computedBuiltFromProgress)
+    : computedBuiltFromProgress;
 
   const formattedTime = useMemo(() => {
     const seconds = Math.floor(timeRemainingMs / 1000);
@@ -37,7 +45,7 @@ export const BuildTimer = React.memo(function BuildTimer({
   return (
     <View style={styles.container}>
       <Text style={[styles.progressText, { color: colors.text.primary }]} numberOfLines={1}>
-        {`${botsBuilt}/${totalBuildQuantity}`}
+        {`${displayedBuilt}/${totalBuildQuantity}`}
       </Text>
       <Text style={[styles.timerText, { color: colors.text.primary }]} numberOfLines={1}>
         {formattedTime}

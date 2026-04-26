@@ -42,6 +42,25 @@ const PROBE_REPORT_PREFIX = 'PRB|';
 const BATTLE_REPORT_PREFIX = 'BTL|';
 const SYSTEM_NOTIFICATION_PREFIX = 'SYS|';
 
+function formatBugHuntDropKey(itemKey: string): string {
+  const known: Record<string, string> = {
+    bug_hunt_cash_pack_1000: '$1,000 wallet',
+    bug_hunt_cash_pack_5000: '$5,000 wallet',
+    bug_hunt_cash_pack_10000: '$10,000 wallet',
+    bug_hunt_cash_pack_20000: '$20,000 wallet',
+    bug_hunt_travel_speedup_25_percent: '25% travel time reduction',
+    bug_hunt_travel_speedup_50_percent: '50% travel time reduction',
+    bug_hunt_travel_speedup_75_percent: '75% travel time reduction',
+    bug_hunt_research_speedup_1m: '1-minute research speedup',
+    bug_hunt_construction_speedup_1m: '1-minute construction speedup',
+    bug_hunt_bot_assembly_speedup_1m: '1-minute bot assembly speedup',
+    bug_hunt_research_speedup_5m: '5-minute research speedup',
+    bug_hunt_construction_speedup_5m: '5-minute construction speedup',
+    bug_hunt_bot_assembly_speedup_5m: '5-minute bot assembly speedup',
+  };
+  return known[itemKey] ?? itemKey;
+}
+
 function parseSystemNotificationMessage(message: string): { m: string } | null {
   if (!message.startsWith(SYSTEM_NOTIFICATION_PREFIX)) return null;
   try {
@@ -49,7 +68,7 @@ function parseSystemNotificationMessage(message: string): { m: string } | null {
     if (payload != null && typeof payload.m === 'string' && payload.m.trim().length > 0) {
       return { m: payload.m.trim() };
     }
-  } catch (_) {
+  } catch {
     // ignore
   }
   return null;
@@ -74,7 +93,7 @@ function parseProbeReportMessage(message: string): ProbeReportPayload | null {
       if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) return null;
       return payload;
     }
-  } catch (_) {
+  } catch {
     // ignore
   }
   return null;
@@ -162,6 +181,21 @@ export interface BattleReportPayload {
   y?: number;
   /** Present on newer PvP reports; links to GET /api/battle/:id/replay. */
   battleId?: string;
+  /** Bug-hunt extension: list of storage item keys granted on full defeat. */
+  bugHuntItemDrops?: string[];
+  /** Bug-hunt extension: hunter XP granted on full defeat. */
+  bugHuntHunterXpGranted?: number;
+  /** Bug-hunt extension marker. */
+  bugHunt?: 1;
+  bugInstanceId?: string;
+  bugRemainingHpPercent?: number;
+  hunterSurvived?: 0 | 1;
+  bugHuntEndReason?: 'bug-death' | 'hunter-death' | 'timeout' | 'canceled';
+  hunterRosterId?: string;
+  attackerHunterRosterId?: string;
+  attackerHunterName?: string;
+  attackerHunterStart?: number;
+  attackerHunterLost?: number;
 }
 
 function parseBattleReportMessage(message: string): BattleReportPayload | null {
@@ -187,6 +221,64 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
     const battleIdRaw = (payload as { battleId?: unknown }).battleId;
     const battleId =
       typeof battleIdRaw === 'string' && battleIdRaw.trim().length > 0 ? battleIdRaw.trim() : undefined;
+    const bugHuntItemDropsRaw = (payload as { bugHuntItemDrops?: unknown }).bugHuntItemDrops;
+    const bugHuntItemDrops = Array.isArray(bugHuntItemDropsRaw)
+      ? bugHuntItemDropsRaw
+          .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+          .map((entry) => entry.trim())
+      : undefined;
+    const bugHuntHunterXpGrantedRaw = (payload as { bugHuntHunterXpGranted?: unknown }).bugHuntHunterXpGranted;
+    const bugHuntHunterXpGranted =
+      typeof bugHuntHunterXpGrantedRaw === 'number' && Number.isFinite(bugHuntHunterXpGrantedRaw)
+        ? Math.max(0, Math.floor(bugHuntHunterXpGrantedRaw))
+        : undefined;
+    const bugHunt = (payload as { bugHunt?: unknown }).bugHunt === 1 ? 1 : undefined;
+    const bugInstanceIdRaw = (payload as { bugInstanceId?: unknown }).bugInstanceId;
+    const bugInstanceId =
+      typeof bugInstanceIdRaw === 'string' && bugInstanceIdRaw.trim().length > 0
+        ? bugInstanceIdRaw.trim()
+        : undefined;
+    const bugRemainingHpPercentRaw = (payload as { bugRemainingHpPercent?: unknown }).bugRemainingHpPercent;
+    const bugRemainingHpPercent =
+      typeof bugRemainingHpPercentRaw === 'number' && Number.isFinite(bugRemainingHpPercentRaw)
+        ? Math.max(0, Math.min(100, Math.round(bugRemainingHpPercentRaw * 100) / 100))
+        : undefined;
+    const hunterSurvivedRaw = (payload as { hunterSurvived?: unknown }).hunterSurvived;
+    const hunterSurvived =
+      hunterSurvivedRaw === 1 ? 1 : hunterSurvivedRaw === 0 ? 0 : undefined;
+    const bugHuntEndReasonRaw = (payload as { bugHuntEndReason?: unknown }).bugHuntEndReason;
+    const bugHuntEndReason =
+      bugHuntEndReasonRaw === 'bug-death' ||
+      bugHuntEndReasonRaw === 'hunter-death' ||
+      bugHuntEndReasonRaw === 'timeout' ||
+      bugHuntEndReasonRaw === 'canceled'
+        ? bugHuntEndReasonRaw
+        : undefined;
+    const hunterRosterIdRaw = (payload as { hunterRosterId?: unknown }).hunterRosterId;
+    const hunterRosterId =
+      typeof hunterRosterIdRaw === 'string' && hunterRosterIdRaw.trim().length > 0
+        ? hunterRosterIdRaw.trim()
+        : undefined;
+    const attackerHunterRosterIdRaw = (payload as { attackerHunterRosterId?: unknown }).attackerHunterRosterId;
+    const attackerHunterRosterId =
+      typeof attackerHunterRosterIdRaw === 'string' && attackerHunterRosterIdRaw.trim().length > 0
+        ? attackerHunterRosterIdRaw.trim()
+        : undefined;
+    const attackerHunterNameRaw = (payload as { attackerHunterName?: unknown }).attackerHunterName;
+    const attackerHunterName =
+      typeof attackerHunterNameRaw === 'string' && attackerHunterNameRaw.trim().length > 0
+        ? attackerHunterNameRaw.trim()
+        : undefined;
+    const attackerHunterStartRaw = (payload as { attackerHunterStart?: unknown }).attackerHunterStart;
+    const attackerHunterStart =
+      typeof attackerHunterStartRaw === 'number' && Number.isFinite(attackerHunterStartRaw)
+        ? Math.max(0, Math.floor(attackerHunterStartRaw))
+        : undefined;
+    const attackerHunterLostRaw = (payload as { attackerHunterLost?: unknown }).attackerHunterLost;
+    const attackerHunterLost =
+      typeof attackerHunterLostRaw === 'number' && Number.isFinite(attackerHunterLostRaw)
+        ? Math.max(0, Math.floor(attackerHunterLostRaw))
+        : undefined;
     const isNpcReport = (payload as { npc?: unknown }).npc === 1;
     const isSwarmReport = (payload as { swarm?: unknown }).swarm === 1;
     return {
@@ -201,8 +293,20 @@ function parseBattleReportMessage(message: string): BattleReportPayload | null {
       x: x !== undefined && Number.isFinite(x) ? x : undefined,
       y: y !== undefined && Number.isFinite(y) ? y : undefined,
       battleId,
+      bugHunt,
+      bugInstanceId,
+      bugRemainingHpPercent,
+      hunterSurvived,
+      bugHuntEndReason,
+      hunterRosterId,
+      attackerHunterRosterId,
+      attackerHunterName,
+      attackerHunterStart,
+      attackerHunterLost,
+      bugHuntItemDrops,
+      bugHuntHunterXpGranted,
     };
-  } catch (_) {
+  } catch {
     // ignore
   }
   return null;
@@ -359,7 +463,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
       const atBottom =
         contentOffset.y + layoutMeasurement.height >= contentSize.height - SCROLL_BOTTOM_THRESHOLD;
       isAtBottomRef.current = atBottom;
-    } catch (_) {
+    } catch {
       // ignore
     }
   }, []);
@@ -375,7 +479,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 50);
-    } catch (_) {
+    } catch {
       // Caller's onSendMessage may throw; mutation exposes error state if needed
     }
   };
@@ -645,6 +749,133 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               battleCoords !== null &&
                               battleMapName === 'main';
                             const fmt = (n: number) => n.toLocaleString();
+                            const battleLocationLine =
+                              hackLocLine ??
+                              (battleCoords
+                                ? formatHackLocationDisplay(battleCoords.x, battleCoords.y)
+                                : null);
+                            const hackLocationBlock = battleLocationLine ? (
+                              <>
+                                <Text
+                                  style={[
+                                    styles.messageText,
+                                    styles.probeReportLine,
+                                    { color: colors.text.primary },
+                                  ]}
+                                >
+                                  Hack Location
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.messageText,
+                                    styles.probeReportLine,
+                                    styles.hackLocationMono,
+                                    {
+                                      color: canOpenBattleOnMap
+                                        ? (colors.primary ?? colors.text.secondary)
+                                        : colors.text.secondary,
+                                      textDecorationLine: canOpenBattleOnMap ? 'underline' : 'none',
+                                    },
+                                  ]}
+                                >
+                                  {battleLocationLine}
+                                </Text>
+                                {canOpenBattleOnMap ? (
+                                  <Text
+                                    style={[
+                                      styles.messageText,
+                                      styles.probeReportLine,
+                                      {
+                                        fontSize: SIZING.font.small,
+                                        fontStyle: 'italic',
+                                        color: colors.text.secondary,
+                                      },
+                                    ]}
+                                  >
+                                    Tap to open on map
+                                  </Text>
+                                ) : null}
+                              </>
+                            ) : null;
+                            if (report.bugHunt === 1) {
+                              const huntStatus = report.winner === 'user' ? 'Hunt Successful' : 'Hunt Failed';
+                              const hunterName = report.hunterRosterId === 'kaito_glitch' ? 'Kaito Glitch' : 'Hunter';
+                              const remainingHp =
+                                typeof report.bugRemainingHpPercent === 'number' && Number.isFinite(report.bugRemainingHpPercent)
+                                  ? `${report.bugRemainingHpPercent}%`
+                                  : 'Unknown';
+                              return (
+                                <View style={styles.probeReportBlock}>
+                                  <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
+                                    Hunt Report
+                                  </Text>
+                                  {hackLocationBlock ? (
+                                    canOpenBattleOnMap && battleCoords ? (
+                                      <Pressable
+                                        onPress={() =>
+                                          onNavigateToMapCell?.({
+                                            mapName: battleMapName,
+                                            x: battleCoords.x,
+                                            y: battleCoords.y,
+                                          })
+                                        }
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Open battle location on map"
+                                      >
+                                        {hackLocationBlock}
+                                      </Pressable>
+                                    ) : (
+                                      hackLocationBlock
+                                    )
+                                  ) : null}
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    Hunter: {hunterName}
+                                  </Text>
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    Target: Ant Bug
+                                  </Text>
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    Bug HP remaining: {remainingHp}
+                                  </Text>
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    Hunter survived: {report.hunterSurvived === 1 ? 'Yes' : 'No'}
+                                  </Text>
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    Result:
+                                  </Text>
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    {huntStatus}
+                                  </Text>
+                                  {(report.bugHuntItemDrops?.length ?? 0) > 0 ? (
+                                    <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                      Bug-hunt drops:{' '}
+                                      {report.bugHuntItemDrops?.map((itemKey) => formatBugHuntDropKey(itemKey)).join(', ')}
+                                    </Text>
+                                  ) : null}
+                                  {(report.bugHuntHunterXpGranted ?? 0) > 0 ? (
+                                    <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                      Hunter XP gained: {fmt(report.bugHuntHunterXpGranted ?? 0)}
+                                    </Text>
+                                  ) : null}
+                                  {report.battleId && onWatchBattle ? (
+                                    <Pressable
+                                      onPress={() => onWatchBattle(report.battleId!)}
+                                      style={styles.watchBattleBtn}
+                                      accessibilityRole="button"
+                                      accessibilityLabel="Watch bug-hunt replay"
+                                    >
+                                      <Text style={[styles.messageText, styles.watchBattleBtnText, { color: colors.primary }]}>
+                                        Watch battle
+                                      </Text>
+                                    </Pressable>
+                                  ) : (
+                                    <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.secondary }]}>
+                                      Replay unavailable for this hunt.
+                                    </Text>
+                                  )}
+                                </View>
+                              );
+                            }
                             const line = (label: string, start: number, lost: number) =>
                               `${label} - ${fmt(start)} > ${fmt(lost)} Lost`;
                             const sideHasMark2 = (s: BattleReportBotCounts, l: BattleReportBotCounts) =>
@@ -658,6 +889,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               title: string,
                               start: BattleReportBotCounts,
                               lost: BattleReportBotCounts,
+                              attackerHunterLine?: { name: string; start: number; lost: number },
                             ) => {
                               const m2 = sideHasMark2(start, lost);
                               /** Mark I/II labels from `botInventory` display-name maps (same payload keys). */
@@ -689,6 +921,13 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
                                     {title}
                                   </Text>
+                                  {attackerHunterLine ? (
+                                    <Text
+                                      style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}
+                                    >
+                                      {line(attackerHunterLine.name, attackerHunterLine.start, attackerHunterLine.lost)}
+                                    </Text>
+                                  ) : null}
                                   {fam(
                                     M1_UNIT_DISPLAY_NAMES.guardian,
                                     MARK2_DISPLAY_NAMES.guardian,
@@ -716,49 +955,6 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 </>
                               );
                             };
-                            const hackLocationBlock = hackLocLine ? (
-                              <>
-                                <Text
-                                  style={[
-                                    styles.messageText,
-                                    styles.probeReportLine,
-                                    { color: colors.text.primary },
-                                  ]}
-                                >
-                                  Hack Location
-                                </Text>
-                                <Text
-                                  style={[
-                                    styles.messageText,
-                                    styles.probeReportLine,
-                                    styles.hackLocationMono,
-                                    {
-                                      color: canOpenBattleOnMap
-                                        ? (colors.primary ?? colors.text.secondary)
-                                        : colors.text.secondary,
-                                      textDecorationLine: canOpenBattleOnMap ? 'underline' : 'none',
-                                    },
-                                  ]}
-                                >
-                                  {hackLocLine}
-                                </Text>
-                                {canOpenBattleOnMap ? (
-                                  <Text
-                                    style={[
-                                      styles.messageText,
-                                      styles.probeReportLine,
-                                      {
-                                        fontSize: SIZING.font.small,
-                                        fontStyle: 'italic',
-                                        color: colors.text.secondary,
-                                      },
-                                    ]}
-                                  >
-                                    Tap to open on map
-                                  </Text>
-                                ) : null}
-                              </>
-                            ) : null;
                             return (
                               <View style={styles.probeReportBlock}>
                                 <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
@@ -787,6 +983,15 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   `Attacker: ${report.attackerHandle}${isAttacker ? ' (You)' : ''}`,
                                   report.attackerStart,
                                   report.attackerLost,
+                                  report.attackerHunterName &&
+                                  typeof report.attackerHunterStart === 'number' &&
+                                  typeof report.attackerHunterLost === 'number'
+                                    ? {
+                                        name: report.attackerHunterName,
+                                        start: report.attackerHunterStart,
+                                        lost: report.attackerHunterLost,
+                                      }
+                                    : undefined,
                                 )}
                                 {renderSide(
                                   `Defender: ${report.defenderHandle}${!isAttacker ? ' (You)' : ''}`,
@@ -815,6 +1020,17 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 {xp > 0 ? (
                                   <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
                                     Experience gained: {fmt(xp)} XP
+                                  </Text>
+                                ) : null}
+                                {report.bugHunt === 1 && (report.bugHuntItemDrops?.length ?? 0) > 0 ? (
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    Bug-hunt drops:{' '}
+                                    {report.bugHuntItemDrops?.map((itemKey) => formatBugHuntDropKey(itemKey)).join(', ')}
+                                  </Text>
+                                ) : null}
+                                {report.bugHunt === 1 && (report.bugHuntHunterXpGranted ?? 0) > 0 ? (
+                                  <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
+                                    Hunter XP gained: {fmt(report.bugHuntHunterXpGranted ?? 0)}
                                   </Text>
                                 ) : null}
                                 {report.battleId && onWatchBattle ? (

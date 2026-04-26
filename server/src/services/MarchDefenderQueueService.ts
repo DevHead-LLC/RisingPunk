@@ -19,6 +19,13 @@ export function runDefenderQueueSerialized(queueKey: string, task: () => Promise
 }
 
 export function defenderQueueKeyForLaunchTarget(target: ResolvedMarchLaunchTarget): string {
+  if (target.attackMarchDefenderId === 'bug') {
+    const bugId = String(target.bugInstanceId ?? '').trim();
+    if (!bugId) {
+      throw new Error('Bug-hunt march requires bugInstanceId for defender queue');
+    }
+    return `bug:${bugId}`;
+  }
   if (target.attackMarchDefenderId === 'npc') {
     const id = target.defenderNpcInstanceId;
     if (id == null || String(id).trim() === '') {
@@ -35,11 +42,20 @@ export function defenderQueueKeyForLaunchTarget(target: ResolvedMarchLaunchTarge
 
 export function defenderQueueKeyFromMarchDoc(m: {
   defenderQueueKey?: string;
+  attackType?: string;
   defenderId: string;
   defenderNpcInstanceId?: string;
+  bugInstanceId?: string;
 }): string {
   if (m.defenderQueueKey && String(m.defenderQueueKey).trim() !== '') {
     return String(m.defenderQueueKey).trim();
+  }
+  if (m.attackType === 'bug_hunt' || m.defenderId === 'bug') {
+    const bugId = String(m.bugInstanceId ?? '').trim();
+    if (!bugId) {
+      throw new Error('Bug-hunt march missing defenderQueueKey and bugInstanceId');
+    }
+    return `bug:${bugId}`;
   }
   if (m.defenderId === 'npc') {
     const id = m.defenderNpcInstanceId;

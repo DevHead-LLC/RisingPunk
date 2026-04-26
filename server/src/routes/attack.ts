@@ -3,10 +3,14 @@ import auth from '../middleware/auth';
 import { ENABLE_ASYNC_BATTLES } from '../config/env';
 import { AttackMarch } from '../models/AttackMarch';
 import { MAP_VISIBLE_ATTACK_MARCH_STATES } from '../types/attackMarch';
-import { normalizeUserBattalionsForBattleStart } from '../utils/normalizeUserBattalionsForBattleStart';
+import {
+  normalizeUserBattalionsForBattleStart,
+  type NormalizedBattleBattalion,
+} from '../utils/normalizeUserBattalionsForBattleStart';
 import {
   resolveMarchLaunchTarget,
   MarchTargetValidationError,
+  type ResolvedMarchLaunchTarget,
 } from '../services/MarchTargetValidationService';
 import {
   executeAttackMarchLaunch,
@@ -17,6 +21,14 @@ import {
   cancelOutboundAttackMarch,
   AttackMarchCancelError,
 } from '../services/AttackMarchCancelService';
+import { BugInstance } from '../models/BugInstance';
+import { UserHunter } from '../models/UserHunter';
+import {
+  BUG_TYPE_ANT,
+  HUNTER_ROSTER_KAITO_GLITCH,
+  HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT,
+} from '../types/bugHunt';
+import { getBugHuntWorldStateSnapshot } from '../services/BugHuntWorldService';
 
 const router = express.Router();
 
@@ -79,6 +91,10 @@ router.post('/launch', auth, async (req: Request, res: Response): Promise<void> 
     const userId = String(req.user._id);
     const {
       userBattalions,
+      attackType,
+      bugInstanceId,
+      hunterRosterId,
+      hunterVisualKey,
       defenderId,
       defenderNpcSlug,
       defenderNpcInstanceId,
@@ -128,30 +144,161 @@ router.post('/launch', auth, async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const battalionNorm = await normalizeUserBattalionsForBattleStart(userId, userBattalions);
-    if (!battalionNorm.ok) {
-      res.status(battalionNorm.status).json({ success: false, error: battalionNorm.error });
+    const isBugHunt = attackType === 'bug_hunt';
+    const hasHunterRosterId = typeof hunterRosterId === 'string' && hunterRosterId.trim().length > 0;
+    const hasHunterVisualKey = typeof hunterVisualKey === 'string' && hunterVisualKey.trim().length > 0;
+    if (hasHunterRosterId !== hasHunterVisualKey) {
+      res.status(400).json({
+        success: false,
+        error: 'hunterRosterId and hunterVisualKey must be sent together or omitted',
+      });
       return;
     }
+    let normalizedBattalions: NormalizedBattleBattalion[];
+    let target: ResolvedMarchLaunchTarget;
+    let hunterBattleContract:
+      | {
+          hunterRosterId: typeof HUNTER_ROSTER_KAITO_GLITCH;
+          hunterVisualKey: typeof HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT;
+        }
+      | undefined;
 
-    const target = await resolveMarchLaunchTarget({
-      attackerId: userId,
-      defenderIdRaw: typeof defenderId === 'string' ? defenderId : undefined,
-      defenderNpcSlug: typeof defenderNpcSlug === 'string' ? defenderNpcSlug : undefined,
-      defenderNpcInstanceId:
-        typeof defenderNpcInstanceId === 'string' ? defenderNpcInstanceId : undefined,
-      hackMapCellX: tx,
-      hackMapCellY: ty,
-    });
+    if (isBugHunt) {
+      if (!bugInstanceId || typeof bugInstanceId !== 'string' || bugInstanceId.trim() === '') {
+        res.status(400).json({ success: false, error: 'bugInstanceId is required for bug-hunt launch' });
+        return;
+      }
+      if (hunterRosterId !== HUNTER_ROSTER_KAITO_GLITCH) {
+        res.status(400).json({
+          success: false,
+          error: `hunterRosterId must be '${HUNTER_ROSTER_KAITO_GLITCH}' for MVP bug hunts`,
+        });
+        return;
+      }
+      if (hunterVisualKey !== HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT) {
+        res.status(400).json({
+          success: false,
+          error: `hunterVisualKey must be '${HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT}' for MVP bug hunts`,
+        });
+        return;
+      }
+
+      const list = Array.isArray(userBattalions) ? userBattalions : [];
+      const hasAnyBattalionQuantity = list.some((b) => Number((b as { quantity?: unknown }).quantity) > 0);
+      if (hasAnyBattalionQuantity) {
+        res.status(400).json({
+          success: false,
+          error: 'Bug-hunt launch payload must not include battalion bots (hunters-only march)',
+        });
+        return;
+      }
+
+      const world = getBugHuntWorldStateSnapshot();
+      if (world.reseedInProgress) {
+        res.status(409).json({ success: false, error: 'Ant world refresh in progress; hunts are temporarily unavailable' });
+        return;
+      }
+
+      const ownedHunter = await UserHunter.findOne({
+        userId,
+        hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+      }).lean();
+      if (!ownedHunter) {
+        res.status(403).json({ success: false, error: 'Kaito Glitch must be unlocked before launching a bug hunt' });
+        return;
+      }
+
+      const bug = await BugInstance.findOne({
+        bugInstanceId: bugInstanceId.trim(),
+        bugType: BUG_TYPE_ANT,
+        lifecycleState: 'alive',
+      }).lean();
+      if (!bug) {
+        res.status(404).json({ success: false, error: 'Bug instance not found or no longer huntable' });
+        return;
+      }
+      if (bug.mapCellX !== tx || bug.mapCellY !== ty) {
+        res.status(400).json({
+          success: false,
+          error: 'Bug location mismatch; refresh the map and try again',
+        });
+        return;
+      }
+
+      normalizedBattalions = [];
+      target = {
+        attackMarchDefenderId: 'bug',
+        bugInstanceId: bug.bugInstanceId,
+        hackMapCellX: bug.mapCellX,
+        hackMapCellY: bug.mapCellY,
+      };
+    } else {
+      if (hasHunterRosterId && hasHunterVisualKey) {
+        if (hunterRosterId !== HUNTER_ROSTER_KAITO_GLITCH) {
+          res.status(400).json({
+            success: false,
+            error: `hunterRosterId must be '${HUNTER_ROSTER_KAITO_GLITCH}'`,
+          });
+          return;
+        }
+        if (hunterVisualKey !== HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT) {
+          res.status(400).json({
+            success: false,
+            error: `hunterVisualKey must be '${HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT}'`,
+          });
+          return;
+        }
+        const ownedHunter = await UserHunter.findOne({
+          userId,
+          hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+        }).lean();
+        if (!ownedHunter) {
+          res.status(403).json({ success: false, error: 'Kaito Glitch must be unlocked before assigning to battle' });
+          return;
+        }
+        hunterBattleContract = {
+          hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+          hunterVisualKey: HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT,
+        };
+      }
+
+      const battalionNorm = await normalizeUserBattalionsForBattleStart(userId, userBattalions);
+      if (!battalionNorm.ok) {
+        res.status(battalionNorm.status).json({ success: false, error: battalionNorm.error });
+        return;
+      }
+      normalizedBattalions = battalionNorm.normalized;
+      target = await resolveMarchLaunchTarget({
+        attackerId: userId,
+        defenderIdRaw: typeof defenderId === 'string' ? defenderId : undefined,
+        defenderNpcSlug: typeof defenderNpcSlug === 'string' ? defenderNpcSlug : undefined,
+        defenderNpcInstanceId:
+          typeof defenderNpcInstanceId === 'string' ? defenderNpcInstanceId : undefined,
+        hackMapCellX: tx,
+        hackMapCellY: ty,
+      });
+    }
 
     const data = await executeAttackMarchLaunch({
       attackerId: userId,
-      normalizedBattalions: battalionNorm.normalized,
+      normalizedBattalions,
       screenWidth: sw,
       screenHeight: sh,
       originX: ox,
       originY: oy,
       target,
+      ...(isBugHunt
+        ? {
+            attackType: 'bug_hunt' as const,
+            bugHuntContract: {
+              bugInstanceId: String(bugInstanceId),
+              hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
+              hunterVisualKey: HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT,
+            },
+          }
+        : hunterBattleContract != null
+          ? { hunterBattleContract }
+          : {}),
     });
 
     scheduleMarchArrival(data.marchId, new Date(data.arriveAt));

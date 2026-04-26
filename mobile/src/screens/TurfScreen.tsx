@@ -1,5 +1,5 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
-import {View, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState, Image} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState, Image} from 'react-native';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -20,6 +20,9 @@ import {DevelopmentZone, RentalHousingLocation, FutureBuildingPlaceholder} from 
 import {BattlePreparationScreen} from './BattlePreparationScreen';
 import {BattleGridScreen} from './BattleGridScreen';
 import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
+import {HunterFacilityScreen} from './HunterFacilityScreen';
+import {StorageScreen} from './StorageScreen';
+import {BugHuntHunterSelectionScreen} from './BugHuntHunterSelectionScreen';
 import {PacketBreachLevelScreen} from './PacketBreachLevelScreen';
 import {PacketBreachGameScreen} from './PacketBreachGameScreen';
 import {RaceConditionHeistLevelScreen} from './RaceConditionHeistLevelScreen';
@@ -169,6 +172,10 @@ const GesturePanView = memo(function GesturePanView({
   );
 });
 
+const HUNTER_FACILITY_MAP_LEFT = 1125;
+const HUNTER_FACILITY_MAP_TOP = 750;
+const HUNTER_FACILITY_IMAGE = require('../assets/images/turfScreen/hunterFacility.png');
+
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
   
@@ -209,6 +216,11 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     targetUserId: string;
     targetX: number;
     targetY: number;
+  } | null>(null);
+  const [pendingBugSelection, setPendingBugSelection] = useState<{
+    bugInstanceId: string;
+    bugHpPercent: number;
+    bugCell: { x: number; y: number };
   } | null>(null);
   const [previousScreen, setPreviousScreen] = useState<TurfScreenName>('turf');
   const [currentPropertyId, setCurrentPropertyId] = useState<number>(1);
@@ -1186,6 +1198,33 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
     setMessagesOpenToUser(null);
   }, []);
 
+  const renderHunterFacilityMapButton = useCallback(
+    () => (
+      <TouchableOpacity
+        style={[
+          styles.hunterFacilityTapTarget,
+          {
+            left: HUNTER_FACILITY_MAP_LEFT,
+            top: HUNTER_FACILITY_MAP_TOP,
+          },
+        ]}
+        onPress={() => navigateToScreen('hunterFacility')}
+        activeOpacity={0.9}
+      >
+        <View style={[styles.hunterFacilityDigitalTurf, { backgroundColor: colors.matrix + '0D', borderColor: colors.primary + '55' }]} />
+        <View style={[styles.hunterFacilityCard, { borderColor: colors.primary }]}>
+          <Image
+            source={HUNTER_FACILITY_IMAGE}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
+        </View>
+        <Text style={[styles.hunterFacilityText, { color: colors.secondary }]}>HUNTER FACILITY</Text>
+      </TouchableOpacity>
+    ),
+    [colors.matrix, colors.secondary, navigateToScreen]
+  );
+
   const renderScreen = useCallback(() => {
     switch (currentScreen) {
       case 'hackRig':
@@ -1211,6 +1250,33 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             const slug = handoff.pendingNpcSlug;
             const defenderUserId = handoff.pendingDefenderUserId;
             const swarmTargetUserId = handoff.pendingSwarmTargetUserId;
+            const bugInstanceId = handoff.pendingBugInstanceId;
+
+            if (bugInstanceId) {
+              const mapPan = handoff.pendingMapPan;
+              const bugCell = handoff.pendingBugCell;
+              const bugHpPercent = Number(handoff.pendingBugHpPercent ?? 100);
+              handoff.pendingBugInstanceId = undefined;
+              handoff.pendingBugHpPercent = undefined;
+              handoff.pendingBugCell = undefined;
+              handoff.pendingMapPan = undefined;
+              const resolvedBugCell =
+                bugCell && Number.isFinite(bugCell.x) && Number.isFinite(bugCell.y)
+                  ? { x: bugCell.x, y: bugCell.y }
+                  : mapPan && Number.isFinite(mapPan.x) && Number.isFinite(mapPan.y)
+                    ? { x: mapPan.x, y: mapPan.y }
+                    : null;
+              if (resolvedBugCell) {
+                setPendingBugSelection({
+                  bugInstanceId: String(bugInstanceId),
+                  bugHpPercent: Number.isFinite(bugHpPercent) ? bugHpPercent : 100,
+                  bugCell: resolvedBugCell,
+                });
+                setReturnContext({ origin: 'map', mapPan });
+                navigateToScreen('bugHuntHunterSelection');
+                return;
+              }
+            }
             
             if (slug) {
               setPendingNpcSlug(slug);
@@ -1275,6 +1341,46 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         return <ResearchScreen
           onClose={() => navigateToScreen('turf')}
         />;
+      case 'storage':
+        return (
+          <StorageScreen
+            onClose={() => navigateToScreen('turf')}
+          />
+        );
+      case 'hunterFacility':
+        return (
+          <HunterFacilityScreen
+            onClose={() => navigateToScreen('turf')}
+          />
+        );
+      case 'bugHuntHunterSelection':
+        if (!pendingBugSelection) {
+          return (
+            <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{ color: colors.text.primary, marginBottom: 12 }}>Bug selection expired.</Text>
+              <TouchableOpacity
+                style={{ borderWidth: 1, borderColor: colors.matrix, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 }}
+                onPress={() => navigateToScreen('map')}
+              >
+                <Text style={{ color: colors.matrix, fontWeight: '700' }}>Back to Map</Text>
+              </TouchableOpacity>
+            </View>
+          );
+        }
+        return (
+          <BugHuntHunterSelectionScreen
+            bugInstanceId={pendingBugSelection.bugInstanceId}
+            bugHpPercent={pendingBugSelection.bugHpPercent}
+            bugCell={pendingBugSelection.bugCell}
+            onLaunched={() => {
+              setPendingBugSelection(null);
+            }}
+            onClose={() => {
+              setPendingBugSelection(null);
+              navigateToScreen('map');
+            }}
+          />
+        );
       case 'botAssembly':
         return <BotAssemblyScreen
           onClose={() => navigateToScreen(previousScreen)}
@@ -1650,6 +1756,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                         );
                       })()}
                     </DevelopmentZone>
+                    {renderHunterFacilityMapButton()}
                   </View>
                 </ScrollViewMemo>
               ) : (
@@ -1744,6 +1851,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                       );
                     })()}
                     </DevelopmentZone>
+                  {renderHunterFacilityMapButton()}
                   {isResearchCenterHighlight && (
                     <View
                       style={[StyleSheet.absoluteFill, { zIndex: 9999 }]}
@@ -1917,7 +2025,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, battleScreenMode, openMessagesAfterReplayClose, mapOpenMessagesAfterReplayToken, handleWatchBattleFromMessages, handleBattleEnd, handleBattlePrepDeployComplete, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive, dispatch, returnContext]);
+  }, [currentScreen, navigateToScreen, battleId, battleScreenMode, openMessagesAfterReplayClose, mapOpenMessagesAfterReplayToken, handleWatchBattleFromMessages, handleBattleEnd, handleBattlePrepDeployComplete, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive, dispatch, returnContext, pendingBugSelection]);
 
   // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
   if (!navRestoreAttempted) {
@@ -1940,11 +2048,18 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       {currentScreen === 'turf' && !isOnboardingOrIntroActive && (
         <View style={styles.bottomRightIcons}>
           <TouchableOpacity
+            style={styles.storageIconButton}
+            onPress={() => navigateToScreen('storage')}
+            activeOpacity={0.8}
+          >
+            <Image source={require('../assets/images/ui/storage.png')} style={{ width: 34, height: 34 }} resizeMode="contain" />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={styles.activeJobsIconButton}
             onPress={() => setShowActiveJobsModal(true)}
             activeOpacity={0.8}
           >
-            <Image source={require('../assets/images/ui/activeJobs.png')} style={styles.activeJobsIconImage} resizeMode="contain" />
+            <Image source={require('../assets/images/ui/activeJobs.png')} style={{ width: 33, height: 33 }} resizeMode="contain" />
           </TouchableOpacity>
           {crewStatus?.isInCrew && (
             <TouchableOpacity
@@ -1955,7 +2070,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               }}
               activeOpacity={0.8}
             >
-              <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={styles.crewIconImage} resizeMode="contain" />
+              <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
             </TouchableOpacity>
           )}
         </View>
@@ -2033,9 +2148,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  activeJobsIconImage: {
-    width: 33,
-    height: 33,
+  storageIconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(128, 90, 213, 0.95)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 255, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   crewIconButton: {
     width: 48,
@@ -2046,10 +2167,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 255, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  crewIconImage: {
-    width: 28,
-    height: 28,
   },
   turfGrid: {
     flex: 1,
@@ -2098,6 +2215,38 @@ const styles = StyleSheet.create({
     zIndex: 10002, // Above TouchableOpacity overlay (10001) for visit-digital-barracks
     transform: [{ translateX: -60 }, { translateY: -70 }],
     pointerEvents: 'box-none',
+  },
+  hunterFacilityTapTarget: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 300,
+    height: 250,
+    zIndex: 5,
+  },
+  hunterFacilityDigitalTurf: {
+    position: 'absolute',
+    top: 4,
+    width: 360,
+    height: 250,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  hunterFacilityCard: {
+    width: 240,
+    height: 180,
+    borderWidth: 1,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  hunterFacilityText: {
+    position: 'absolute',
+    bottom: 0,
+    width: 260,
+    textAlign: 'center',
+    fontWeight: '700',
+    fontSize: SIZING.font.body,
+    letterSpacing: 2,
   },
   scrollWrapper: {
     flex: 1,

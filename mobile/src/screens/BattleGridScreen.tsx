@@ -36,6 +36,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
   const userId = useAppSelector((state) => state.auth.user?._id);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const isReplay = mode === 'replay';
+  const isBugHuntReplay = isReplay && battleId.startsWith('bughunt-');
   const { width: vw, height: vh } = useWindowDimensions();
 
   const replay = useReplayPlayback(isReplay ? battleId : null, {
@@ -230,6 +231,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
             overrideBattleState={replayBattleStateOverride}
             replayTugBlendTo={isReplay ? viewportNextBattleState : undefined}
             replayTugBlendAlpha={isReplay ? replay.replayTugBlendAlpha : undefined}
+            hideNeutralNodeHealthBars={isBugHuntReplay}
           />
 
           <BattleBattalionManager
@@ -240,6 +242,7 @@ export const BattleGridScreen = React.memo(({ _onClose, battleId, mode = 'live' 
             replayMovementVirtualNowMs={isReplay ? replay.replayVirtualNowMs : undefined}
             replayMovementEpochMs={isReplay ? replay.replayDoc?.recordingEpochMs : undefined}
             replaySnapshotFrameIndex={isReplay ? replay.frameIndex : undefined}
+            showBugHuntPercentLabel={isBugHuntReplay}
           />
         </View>
       </View>

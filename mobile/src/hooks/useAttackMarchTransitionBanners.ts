@@ -7,6 +7,7 @@ import {
 import { useAppSelector } from '../store/hooks';
 
 type BannerPayload = { message: string; type: 'info' };
+type PreviousMarchSnapshot = { state: string; attackType?: string };
 
 /**
  * Auto-dismiss for march state toasts in AppContent `NotificationBanner` (arrive, queue, battle done, return, recall, home).
@@ -24,7 +25,7 @@ export function useAttackMarchTransitionBanners(token: string | null): {
   dismissMarchBanner: () => void;
 } {
   const [marchBanner, setMarchBanner] = useState<BannerPayload | null>(null);
-  const prevStatesRef = useRef<Map<string, string>>(new Map());
+  const prevStatesRef = useRef<Map<string, PreviousMarchSnapshot>>(new Map());
   const seededRef = useRef(false);
 
   const mineCached = useAppSelector((s) => attackApi.endpoints.getMyAttackMarches.select(undefined)(s));
@@ -89,7 +90,7 @@ export function useAttackMarchTransitionBanners(token: string | null): {
 
     if (!seededRef.current) {
       for (const m of marches) {
-        prevStatesRef.current.set(m.marchId, m.state);
+        prevStatesRef.current.set(m.marchId, { state: m.state, attackType: m.attackType });
       }
       seededRef.current = true;
       return;
@@ -99,7 +100,11 @@ export function useAttackMarchTransitionBanners(token: string | null): {
 
     for (const m of marches) {
       const prev = prevStatesRef.current.get(m.marchId);
-      if (prev === undefined && m.state === 'outbound' && m.attackType === 'swarm') {
+      if (
+        prev === undefined &&
+        m.state === 'outbound' &&
+        m.attackType === 'swarm'
+      ) {
         message = 'Swarm Initiated';
         break;
       }
@@ -108,9 +113,12 @@ export function useAttackMarchTransitionBanners(token: string | null): {
     const consider = (pred: (prev: string, next: string) => boolean, text: string) => {
       if (message) return;
       for (const m of marches) {
+        if (m.attackType === 'bug_hunt') {
+          continue;
+        }
         const prev = prevStatesRef.current.get(m.marchId);
-        if (prev === undefined || prev === m.state) continue;
-        if (pred(prev, m.state)) {
+        if (prev === undefined || prev.state === m.state) continue;
+        if (pred(prev.state, m.state)) {
           message = text;
           return;
         }
@@ -123,7 +131,7 @@ export function useAttackMarchTransitionBanners(token: string | null): {
     consider((prev, next) => next === 'queued' && prev !== 'queued', 'Your expedition is queued behind another battle.');
 
     for (const m of marches) {
-      prevStatesRef.current.set(m.marchId, m.state);
+      prevStatesRef.current.set(m.marchId, { state: m.state, attackType: m.attackType });
     }
 
     const ids = new Set(marches.map((m) => m.marchId));
@@ -131,7 +139,7 @@ export function useAttackMarchTransitionBanners(token: string | null): {
       if (!ids.has(id)) {
         const prev = prevStatesRef.current.get(id);
         // Bugbot: GET /mine omits terminal states (`done`, `cancelled`); returning→done drops the row — no in-list transition to observe.
-        if (!message && prev === 'returning') {
+        if (!message && prev?.attackType !== 'bug_hunt' && prev?.state === 'returning') {
           message = 'Your expedition has returned home.';
         }
         prevStatesRef.current.delete(id);

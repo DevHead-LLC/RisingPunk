@@ -6,10 +6,11 @@ import { ShieldService } from './ShieldService';
 import { findCellByNpcInstanceId, getCell } from './CellAccessorService';
 
 export interface ResolvedMarchLaunchTarget {
-  /** Stored on `AttackMarch.defenderId` — PvP: defender user id; NPC: `'npc'`. */
+  /** Stored on `AttackMarch.defenderId` — PvP: defender user id; NPC: `'npc'`; bug-hunt: `'bug'`. */
   attackMarchDefenderId: string;
   defenderNpcSlug?: string;
   defenderNpcInstanceId?: string;
+  bugInstanceId?: string;
   hackMapCellX: number;
   hackMapCellY: number;
 }

@@ -13,6 +13,7 @@ import {
   sumRequiredByInventoryKeyFromArmySnapshot,
   consumedRowsMatchArmySnapshot,
 } from './AttackMarchLaunchService';
+import { refundAntBugHuntTokensForFailedMarch } from './BugHuntTokenService';
 
 const Bot = require('../models/Bot');
 
@@ -125,17 +126,21 @@ export async function systemRefundAttackMarchInState(
     return { refunded: false, reason: 'state_mismatch' };
   }
 
+  const isBugHuntMarch = march.attackType === 'bug_hunt' || String(march.defenderId ?? '') === 'bug';
   const consumed = march.consumedBattalionAssignments as BattalionAssignmentRow[] | undefined;
-  if (!Array.isArray(consumed) || consumed.length === 0) {
+  if (!isBugHuntMarch && (!Array.isArray(consumed) || consumed.length === 0)) {
     return { refunded: false, reason: 'integrity' };
   }
 
   const armySnap = march.armySnapshot as AttackMarchArmySnapshot;
-  if (!armySnap?.battalions || !Array.isArray(armySnap.battalions)) {
+  if (!isBugHuntMarch && (!armySnap?.battalions || !Array.isArray(armySnap.battalions))) {
     return { refunded: false, reason: 'integrity' };
   }
 
-  if (!consumedRowsMatchArmySnapshot(consumed, armySnap)) {
+  if (
+    !isBugHuntMarch &&
+    !consumedRowsMatchArmySnapshot(consumed as BattalionAssignmentRow[], armySnap)
+  ) {
     return { refunded: false, reason: 'integrity' };
   }
 
@@ -156,12 +161,20 @@ export async function systemRefundAttackMarchInState(
         }
         refundedState = expectedState;
 
-        await restoreCommittedMarchArmyToUserBots({
-          attackerId: aid,
-          armySnap,
-          consumed,
-          session,
-        });
+        if (isBugHuntMarch) {
+          if (!(cancelled.bugHuntTokenRefundedAt instanceof Date)) {
+            await refundAntBugHuntTokensForFailedMarch({ userId: aid, session });
+            cancelled.bugHuntTokenRefundedAt = new Date();
+            await cancelled.save({ session });
+          }
+        } else {
+          await restoreCommittedMarchArmyToUserBots({
+            attackerId: aid,
+            armySnap,
+            consumed: consumed as BattalionAssignmentRow[],
+            session,
+          });
+        }
       });
 
       if (refundedState) {
