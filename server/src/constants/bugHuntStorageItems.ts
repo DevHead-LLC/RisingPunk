@@ -1,11 +1,13 @@
 export type BugHuntStorageItemDefinition = {
   itemKey: string;
   label: string;
-  category: 'cash' | 'speedup' | 'travel';
+  category: 'cash' | 'speedup' | 'travel' | 'token';
   cashAmount?: number;
+  tokenAmount?: number;
   durationSeconds?: number;
   speedupDomain?: 'research' | 'construction' | 'bot_assembly';
   travelSpeedPercent?: number;
+  shopPrice?: number;
 };
 
 export const BUG_HUNT_STORAGE_ITEM_DEFINITIONS: readonly BugHuntStorageItemDefinition[] = [
@@ -38,18 +40,56 @@ export const BUG_HUNT_STORAGE_ITEM_DEFINITIONS: readonly BugHuntStorageItemDefin
     label: '25% travel time reduction',
     category: 'travel',
     travelSpeedPercent: 25,
+    shopPrice: 500000,
   },
   {
     itemKey: 'bug_hunt_travel_speedup_50_percent',
     label: '50% travel time reduction',
     category: 'travel',
     travelSpeedPercent: 50,
+    shopPrice: 1000000,
   },
   {
     itemKey: 'bug_hunt_travel_speedup_75_percent',
     label: '75% travel time reduction',
     category: 'travel',
     travelSpeedPercent: 75,
+    shopPrice: 1500000,
+  },
+  {
+    itemKey: 'bug_hunt_token_credit_900',
+    label: 'Token credit 900',
+    category: 'token',
+    tokenAmount: 900,
+    shopPrice: 25000,
+  },
+  {
+    itemKey: 'bug_hunt_token_credit_2000',
+    label: 'Token credit 2,000',
+    category: 'token',
+    tokenAmount: 2000,
+    shopPrice: 55556,
+  },
+  {
+    itemKey: 'bug_hunt_token_credit_5000',
+    label: 'Token credit 5,000',
+    category: 'token',
+    tokenAmount: 5000,
+    shopPrice: 138889,
+  },
+  {
+    itemKey: 'bug_hunt_token_credit_10000',
+    label: 'Token credit 10,000',
+    category: 'token',
+    tokenAmount: 10000,
+    shopPrice: 277778,
+  },
+  {
+    itemKey: 'bug_hunt_token_credit_20000',
+    label: 'Token credit 20,000',
+    category: 'token',
+    tokenAmount: 20000,
+    shopPrice: 555556,
   },
   {
     itemKey: 'bug_hunt_research_speedup_1m',
@@ -57,6 +97,7 @@ export const BUG_HUNT_STORAGE_ITEM_DEFINITIONS: readonly BugHuntStorageItemDefin
     category: 'speedup',
     durationSeconds: 60,
     speedupDomain: 'research',
+    shopPrice: 305,
   },
   {
     itemKey: 'bug_hunt_construction_speedup_1m',
@@ -64,6 +105,7 @@ export const BUG_HUNT_STORAGE_ITEM_DEFINITIONS: readonly BugHuntStorageItemDefin
     category: 'speedup',
     durationSeconds: 60,
     speedupDomain: 'construction',
+    shopPrice: 305,
   },
   {
     itemKey: 'bug_hunt_bot_assembly_speedup_1m',
@@ -71,6 +113,7 @@ export const BUG_HUNT_STORAGE_ITEM_DEFINITIONS: readonly BugHuntStorageItemDefin
     category: 'speedup',
     durationSeconds: 60,
     speedupDomain: 'bot_assembly',
+    shopPrice: 305,
   },
   {
     itemKey: 'bug_hunt_research_speedup_5m',
@@ -78,6 +121,7 @@ export const BUG_HUNT_STORAGE_ITEM_DEFINITIONS: readonly BugHuntStorageItemDefin
     category: 'speedup',
     durationSeconds: 300,
     speedupDomain: 'research',
+    shopPrice: 1525,
   },
   {
     itemKey: 'bug_hunt_construction_speedup_5m',
@@ -85,6 +129,7 @@ export const BUG_HUNT_STORAGE_ITEM_DEFINITIONS: readonly BugHuntStorageItemDefin
     category: 'speedup',
     durationSeconds: 300,
     speedupDomain: 'construction',
+    shopPrice: 1525,
   },
   {
     itemKey: 'bug_hunt_bot_assembly_speedup_5m',
@@ -92,5 +137,150 @@ export const BUG_HUNT_STORAGE_ITEM_DEFINITIONS: readonly BugHuntStorageItemDefin
     category: 'speedup',
     durationSeconds: 300,
     speedupDomain: 'bot_assembly',
+    shopPrice: 1525,
+  },
+  {
+    itemKey: 'bug_hunt_research_speedup_15m',
+    label: '15-minute research speedup',
+    category: 'speedup',
+    durationSeconds: 900,
+    speedupDomain: 'research',
+    shopPrice: 4575,
+  },
+  {
+    itemKey: 'bug_hunt_construction_speedup_15m',
+    label: '15-minute construction speedup',
+    category: 'speedup',
+    durationSeconds: 900,
+    speedupDomain: 'construction',
+    shopPrice: 4575,
+  },
+  {
+    itemKey: 'bug_hunt_bot_assembly_speedup_15m',
+    label: '15-minute bot assembly speedup',
+    category: 'speedup',
+    durationSeconds: 900,
+    speedupDomain: 'bot_assembly',
+    shopPrice: 4575,
+  },
+  {
+    itemKey: 'bug_hunt_research_speedup_30m',
+    label: '30-minute research speedup',
+    category: 'speedup',
+    durationSeconds: 1800,
+    speedupDomain: 'research',
+    shopPrice: 9150,
+  },
+  {
+    itemKey: 'bug_hunt_construction_speedup_30m',
+    label: '30-minute construction speedup',
+    category: 'speedup',
+    durationSeconds: 1800,
+    speedupDomain: 'construction',
+    shopPrice: 9150,
+  },
+  {
+    itemKey: 'bug_hunt_bot_assembly_speedup_30m',
+    label: '30-minute bot assembly speedup',
+    category: 'speedup',
+    durationSeconds: 1800,
+    speedupDomain: 'bot_assembly',
+    shopPrice: 9150,
+  },
+  {
+    itemKey: 'bug_hunt_research_speedup_1h',
+    label: '1-hour research speedup',
+    category: 'speedup',
+    durationSeconds: 3600,
+    speedupDomain: 'research',
+    shopPrice: 18300,
+  },
+  {
+    itemKey: 'bug_hunt_construction_speedup_1h',
+    label: '1-hour construction speedup',
+    category: 'speedup',
+    durationSeconds: 3600,
+    speedupDomain: 'construction',
+    shopPrice: 18300,
+  },
+  {
+    itemKey: 'bug_hunt_bot_assembly_speedup_1h',
+    label: '1-hour bot assembly speedup',
+    category: 'speedup',
+    durationSeconds: 3600,
+    speedupDomain: 'bot_assembly',
+    shopPrice: 18300,
+  },
+  {
+    itemKey: 'bug_hunt_research_speedup_12h',
+    label: '12-hour research speedup',
+    category: 'speedup',
+    durationSeconds: 43200,
+    speedupDomain: 'research',
+    shopPrice: 219600,
+  },
+  {
+    itemKey: 'bug_hunt_construction_speedup_12h',
+    label: '12-hour construction speedup',
+    category: 'speedup',
+    durationSeconds: 43200,
+    speedupDomain: 'construction',
+    shopPrice: 219600,
+  },
+  {
+    itemKey: 'bug_hunt_bot_assembly_speedup_12h',
+    label: '12-hour bot assembly speedup',
+    category: 'speedup',
+    durationSeconds: 43200,
+    speedupDomain: 'bot_assembly',
+    shopPrice: 219600,
+  },
+  {
+    itemKey: 'bug_hunt_research_speedup_1d',
+    label: '1-day research speedup',
+    category: 'speedup',
+    durationSeconds: 86400,
+    speedupDomain: 'research',
+    shopPrice: 439200,
+  },
+  {
+    itemKey: 'bug_hunt_construction_speedup_1d',
+    label: '1-day construction speedup',
+    category: 'speedup',
+    durationSeconds: 86400,
+    speedupDomain: 'construction',
+    shopPrice: 439200,
+  },
+  {
+    itemKey: 'bug_hunt_bot_assembly_speedup_1d',
+    label: '1-day bot assembly speedup',
+    category: 'speedup',
+    durationSeconds: 86400,
+    speedupDomain: 'bot_assembly',
+    shopPrice: 439200,
+  },
+  {
+    itemKey: 'bug_hunt_research_speedup_1w',
+    label: '1-week research speedup',
+    category: 'speedup',
+    durationSeconds: 604800,
+    speedupDomain: 'research',
+    shopPrice: 3074400,
+  },
+  {
+    itemKey: 'bug_hunt_construction_speedup_1w',
+    label: '1-week construction speedup',
+    category: 'speedup',
+    durationSeconds: 604800,
+    speedupDomain: 'construction',
+    shopPrice: 3074400,
+  },
+  {
+    itemKey: 'bug_hunt_bot_assembly_speedup_1w',
+    label: '1-week bot assembly speedup',
+    category: 'speedup',
+    durationSeconds: 604800,
+    speedupDomain: 'bot_assembly',
+    shopPrice: 3074400,
   },
 ];

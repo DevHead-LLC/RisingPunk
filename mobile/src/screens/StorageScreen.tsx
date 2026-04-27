@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, StyleShe
 import { CloseButton } from '../components/common/CloseButton';
 import { useThemeColors } from '../hooks/useThemeColors';
 import { SIZING } from '../styles/theme';
-import { useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../store/api/bugHuntApi';
+import { bugHuntApi, useFetchBugHuntTokenStateQuery, useFetchStorageInventoryQuery, useUseStorageItemMutation } from '../store/api/bugHuntApi';
 import { useAppDispatch } from '../store/hooks';
 import { addToBalance } from '../store/slices/balanceSlice';
 import { balanceApi } from '../store/api/balanceApi';
@@ -12,11 +12,12 @@ type Props = {
   onClose: () => void;
 };
 
-type CashStorageItem = {
+type ConsumableStorageItem = {
   itemKey: string;
   label: string;
   quantity: number;
-  category: string;
+  category: 'cash' | 'token';
+  tokenAmount?: number;
 };
 
 export const StorageScreen: React.FC<Props> = ({ onClose }) => {
@@ -27,38 +28,68 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
     isLoading: storageLoading,
     refetch: refetchStorage,
   } = useFetchStorageInventoryQuery();
+  const { data: tokenStateData } = useFetchBugHuntTokenStateQuery();
   const [useStorageItem, { isLoading: isUsingStorageItem }] = useUseStorageItemMutation();
-  const [selectedCashItem, setSelectedCashItem] = useState<CashStorageItem | null>(null);
-  const [selectedCashQuantity, setSelectedCashQuantity] = useState(1);
+  const [selectedStorageItem, setSelectedStorageItem] = useState<ConsumableStorageItem | null>(null);
+  const [selectedStorageQuantity, setSelectedStorageQuantity] = useState(1);
 
   useEffect(() => {
-    if (!selectedCashItem) {
+    if (!selectedStorageItem) {
       return;
     }
-    const latest = (storageData?.items ?? []).find((item) => item.itemKey === selectedCashItem.itemKey);
-    if (!latest || latest.category !== 'cash' || Number(latest.quantity) <= 0) {
-      setSelectedCashItem(null);
-      setSelectedCashQuantity(1);
+    const latest = (storageData?.items ?? []).find((item) => item.itemKey === selectedStorageItem.itemKey);
+    if (!latest || (latest.category !== 'cash' && latest.category !== 'token') || Number(latest.quantity) <= 0) {
+      setSelectedStorageItem(null);
+      setSelectedStorageQuantity(1);
       return;
     }
-    setSelectedCashItem({
+    setSelectedStorageItem({
       itemKey: latest.itemKey,
       label: latest.label,
       quantity: Math.max(0, Math.floor(latest.quantity)),
       category: latest.category,
+      tokenAmount: latest.tokenAmount,
     });
-    setSelectedCashQuantity((prev) => Math.max(1, Math.min(Math.max(1, Math.floor(latest.quantity)), prev)));
+    setSelectedStorageQuantity((prev) => Math.max(1, Math.min(Math.max(1, Math.floor(latest.quantity)), prev)));
   }, [storageData?.items]);
 
-  const handleUseCashItem = async () => {
-    if (!selectedCashItem) {
+  const tokenCurrent = Math.max(0, Math.floor(Number(tokenStateData?.currentTokens ?? 0)));
+  const tokenMax = Math.max(1, Math.floor(Number(tokenStateData?.maxTokens ?? 1)));
+  const tokenAmountPerItem =
+    selectedStorageItem?.category === 'token'
+      ? Math.max(0, Math.floor(Number(selectedStorageItem.tokenAmount ?? 0)))
+      : 0;
+  const maxUsefulTokenQuantity =
+    selectedStorageItem?.category === 'token' && tokenAmountPerItem > 0
+      ? Math.max(0, Math.ceil((tokenMax - tokenCurrent) / tokenAmountPerItem))
+      : Number.POSITIVE_INFINITY;
+  const modalMaxSelectableQuantity = selectedStorageItem
+    ? Math.max(
+        0,
+        Math.min(
+          Math.max(0, Math.floor(selectedStorageItem.quantity)),
+          Number.isFinite(maxUsefulTokenQuantity) ? Math.max(0, Math.floor(maxUsefulTokenQuantity)) : Number.MAX_SAFE_INTEGER
+        )
+      )
+    : 0;
+  const projectedTokensAfterUse =
+    selectedStorageItem?.category === 'token'
+      ? Math.min(tokenMax, tokenCurrent + tokenAmountPerItem * Math.max(0, selectedStorageQuantity))
+      : tokenCurrent;
+
+  const handleUseStorageItem = async () => {
+    if (!selectedStorageItem) {
       return;
     }
-    const maxQty = Math.max(1, Math.floor(selectedCashItem.quantity));
-    const quantityToUse = Math.max(1, Math.min(maxQty, selectedCashQuantity));
+    const maxQty = Math.max(0, modalMaxSelectableQuantity);
+    if (maxQty < 1) {
+      Alert.alert('Item cannot be used', 'This token item would not add any tokens right now.');
+      return;
+    }
+    const quantityToUse = Math.max(1, Math.min(maxQty, selectedStorageQuantity));
     try {
       const result = await useStorageItem({
-        itemKey: selectedCashItem.itemKey,
+        itemKey: selectedStorageItem.itemKey,
         quantity: quantityToUse,
       }).unwrap();
       if (result.effect === 'cash' && Number.isFinite(result.cashAdded)) {
@@ -68,15 +99,20 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
           dispatch(balanceApi.util.invalidateTags(['Balance']));
         }
       }
+      if (result.effect === 'token') {
+        dispatch(bugHuntApi.util.invalidateTags(['BugHuntTokens']));
+      }
       const effectDetail =
         result.effect === 'cash' && Number.isFinite(result.cashAdded)
           ? `Added $${Math.floor(result.cashAdded ?? 0).toLocaleString()}.`
+          : result.effect === 'token' && Number.isFinite(result.tokenAdded)
+            ? `Added ${Math.floor(result.tokenAdded ?? 0).toLocaleString()} tokens.`
           : result.effect === 'travel'
             ? 'Applied travel time reduction.'
             : 'Applied speedup to your earliest active matching timer.';
       Alert.alert('Item used', effectDetail);
-      setSelectedCashItem(null);
-      setSelectedCashQuantity(1);
+      setSelectedStorageItem(null);
+      setSelectedStorageQuantity(1);
       await refetchStorage();
     } catch (error: unknown) {
       const dataErr =
@@ -101,7 +137,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
 
         <ScrollView contentContainerStyle={styles.content}>
           <View style={[styles.panel, { borderColor: colors.matrix, backgroundColor: `${colors.background}DD` }]}>
-            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Bug Hunt Items</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Items</Text>
             {storageLoading ? (
               <ActivityIndicator color={colors.matrix} />
             ) : (storageData?.items ?? []).length === 0 ? (
@@ -121,7 +157,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
                         Qty: {item.quantity}
                       </Text>
                     </View>
-                    {item.category === 'cash' ? (
+                    {item.category === 'cash' || item.category === 'token' ? (
                       <TouchableOpacity
                         style={[
                           styles.useButton,
@@ -129,13 +165,14 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
                         ]}
                         disabled={isUsingStorageItem}
                         onPress={() => {
-                          setSelectedCashItem({
+                          setSelectedStorageItem({
                             itemKey: item.itemKey,
                             label: item.label,
                             quantity: Math.max(0, Math.floor(item.quantity)),
                             category: item.category,
+                            tokenAmount: item.tokenAmount,
                           });
-                          setSelectedCashQuantity(1);
+                          setSelectedStorageQuantity(1);
                         }}
                       >
                         <Text style={[styles.useButtonText, { color: colors.background }]}>Use</Text>
@@ -148,41 +185,51 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
           </View>
         </ScrollView>
       </View>
-      {selectedCashItem ? (
+      {selectedStorageItem ? (
         <View style={styles.quantityOverlay}>
           <Pressable
             style={styles.quantityOverlayBackdrop}
             onPress={() => {
               if (!isUsingStorageItem) {
-                setSelectedCashItem(null);
-                setSelectedCashQuantity(1);
+                setSelectedStorageItem(null);
+                setSelectedStorageQuantity(1);
               }
             }}
           />
           <View style={[styles.quantityModalCard, { backgroundColor: colors.background, borderColor: colors.matrix }]}>
-            <Text style={[styles.quantityModalTitle, { color: colors.secondary }]}>Use Wallet Item</Text>
+            <Text style={[styles.quantityModalTitle, { color: colors.secondary }]}>Use Item</Text>
             <Text style={[styles.quantityModalItemLabel, { color: colors.text.primary }]}>
-              {selectedCashItem.label}
+              {selectedStorageItem.label}
             </Text>
             <Text style={[styles.meta, { color: colors.text.secondary }]}>
-              Owned: {selectedCashItem.quantity}
+              Owned: {selectedStorageItem.quantity}
             </Text>
+            {selectedStorageItem.category === 'token' ? (
+              <>
+                <Text style={[styles.meta, { color: colors.text.secondary }]}>
+                  Tokens: {tokenCurrent.toLocaleString()}/{tokenMax.toLocaleString()} -> {projectedTokensAfterUse.toLocaleString()}/{tokenMax.toLocaleString()}
+                </Text>
+                <Text style={[styles.meta, { color: colors.text.secondary }]}>
+                  Per item: +{tokenAmountPerItem.toLocaleString()} tokens
+                </Text>
+              </>
+            ) : null}
             <View style={styles.quantityControls}>
               <TouchableOpacity
                 style={[styles.quantityButton, { borderColor: colors.primary }]}
-                disabled={isUsingStorageItem || selectedCashQuantity <= 1}
-                onPress={() => setSelectedCashQuantity((prev) => Math.max(1, prev - 1))}
+                disabled={isUsingStorageItem || selectedStorageQuantity <= 1}
+                onPress={() => setSelectedStorageQuantity((prev) => Math.max(1, prev - 1))}
               >
                 <Text style={[styles.quantityButtonText, { color: colors.primary }]}>-</Text>
               </TouchableOpacity>
               <Text style={[styles.quantityValue, { color: colors.text.primary }]}>
-                {selectedCashQuantity}
+                {selectedStorageQuantity}
               </Text>
               <TouchableOpacity
                 style={[styles.quantityButton, { borderColor: colors.primary }]}
-                disabled={isUsingStorageItem || selectedCashQuantity >= Math.max(1, selectedCashItem.quantity)}
+                disabled={isUsingStorageItem || selectedStorageQuantity >= Math.max(1, modalMaxSelectableQuantity)}
                 onPress={() =>
-                  setSelectedCashQuantity((prev) => Math.min(Math.max(1, selectedCashItem.quantity), prev + 1))
+                  setSelectedStorageQuantity((prev) => Math.min(Math.max(1, modalMaxSelectableQuantity), prev + 1))
                 }
               >
                 <Text style={[styles.quantityButtonText, { color: colors.primary }]}>+</Text>
@@ -193,7 +240,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
                   { borderColor: colors.primary, opacity: isUsingStorageItem ? 0.65 : 1 },
                 ]}
                 disabled={isUsingStorageItem}
-                onPress={() => setSelectedCashQuantity(Math.max(1, selectedCashItem.quantity))}
+                onPress={() => setSelectedStorageQuantity(Math.max(1, modalMaxSelectableQuantity))}
               >
                 <Text style={[styles.quantityMaxButtonText, { color: colors.primary }]}>MAX</Text>
               </TouchableOpacity>
@@ -206,8 +253,8 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
                 ]}
                 disabled={isUsingStorageItem}
                 onPress={() => {
-                  setSelectedCashItem(null);
-                  setSelectedCashQuantity(1);
+                  setSelectedStorageItem(null);
+                  setSelectedStorageQuantity(1);
                 }}
               >
                 <Text style={[styles.quantityCancelButtonText, { color: colors.primary }]}>Cancel</Text>
@@ -215,13 +262,16 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
               <TouchableOpacity
                 style={[
                   styles.quantityUseButton,
-                  { backgroundColor: colors.matrix, opacity: isUsingStorageItem ? 0.65 : 1 },
+                  {
+                    backgroundColor: colors.matrix,
+                    opacity: isUsingStorageItem || modalMaxSelectableQuantity < 1 ? 0.65 : 1,
+                  },
                 ]}
-                disabled={isUsingStorageItem}
-                onPress={handleUseCashItem}
+                disabled={isUsingStorageItem || modalMaxSelectableQuantity < 1}
+                onPress={handleUseStorageItem}
               >
                 <Text style={[styles.quantityUseButtonText, { color: colors.background }]}>
-                  {isUsingStorageItem ? 'Using...' : `Use ${selectedCashQuantity}`}
+                  {isUsingStorageItem ? 'Using...' : `Use ${selectedStorageQuantity}`}
                 </Text>
               </TouchableOpacity>
             </View>
