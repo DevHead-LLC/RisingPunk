@@ -11,7 +11,7 @@ if [ -z "$REPO" ]; then
 fi
 
 PR_NUMBER=""
-REQUESTED_BY="manual"
+REQUESTED_BY="${GITHUB_ACTOR:-manual}"
 
 if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
   PR_NUMBER="${INPUT_PR_NUMBER:-}"
