@@ -34,8 +34,33 @@ export class ResearchUnlockService {
     'gear': 400000,
     'investments': 75000,
     /** Matches `research` category doc / seed when `unlockCost` is absent. */
-    'swarm': 25000000
+    'swarm': 25000000,
+    'hunting': 10000000,
   };
+
+  static async ensureHuntingCategoryDefinition(): Promise<void> {
+    await Research.findOneAndUpdate(
+      { categoryId: 'hunting' },
+      {
+        $set: {
+          categoryId: 'hunting',
+          name: 'Hunting',
+          levelRequirement: 40,
+          balanceRequirement: 10000000,
+          dependencies: ['investments'],
+          image: 'researchCenter/hunting.png',
+          description: 'Hunting progression and bug-hunt specialization research.',
+          features: [],
+          unlockCost: 10000000,
+          requiredFeatureRefs: [],
+        },
+        $unset: {
+          researchCenterLevelRequirement: 1,
+        },
+      },
+      { upsert: true }
+    );
+  }
 
   static async validateUnlockRequirements(
     userId: string,

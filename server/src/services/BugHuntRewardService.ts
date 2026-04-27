@@ -3,8 +3,7 @@ import { UserHunter } from '../models/UserHunter';
 import { UserBugHuntState } from '../models/UserBugHuntState';
 import { HunterProgressionService } from './HunterProgressionService';
 import {
-  BUG_HUNT_TOKEN_MAX,
-  BUG_HUNT_TOKEN_REGEN_PER_MINUTE,
+  resolveEffectiveBugHuntTokenConfig,
 } from './BugHuntTokenService';
 
 const ANT_BUG_HUNTER_XP_ON_FULL_DEFEAT = 50_000;
@@ -181,12 +180,13 @@ export async function grantAntBugDefeatRewards(params: {
     state.storageItems = storageItems;
     await state.save({ session });
   } else {
+    const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({ userId, session });
     await UserBugHuntState.create(
       [{
         userId,
-        currentTokens: BUG_HUNT_TOKEN_MAX,
-        maxTokens: BUG_HUNT_TOKEN_MAX,
-        regenPerMinute: BUG_HUNT_TOKEN_REGEN_PER_MINUTE,
+        currentTokens: effectiveTokenConfig.maxTokens,
+        maxTokens: effectiveTokenConfig.maxTokens,
+        regenPerMinute: effectiveTokenConfig.regenPerMinute,
         lastRegenAt: new Date(),
         storageItems,
       }],

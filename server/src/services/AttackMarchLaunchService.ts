@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { randomUUID } from 'crypto';
 import { AttackMarch } from '../models/AttackMarch';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 import { getInventoryKey } from '../utils/botInventoryKeys';
 import type { NormalizedBattleBattalion } from '../utils/normalizeUserBattalionsForBattleStart';
 import type { AttackMarchArmySnapshot } from '../types/attackMarch';
@@ -21,6 +22,7 @@ import type { AttackMarchType } from '../types/attackMarch';
 import { recordBugHuntLaunchConfirmed } from './BugHuntTelemetryService';
 
 const Bot = require('../models/Bot');
+const HUNTER_TRAVEL_SPEED_FEATURE_ID = 'hunter-travel-speed-05';
 
 type BattalionAssignmentRow = {
   battalionId: string;
@@ -245,6 +247,18 @@ export async function executeAttackMarchLaunch(
         let consumedRows: BattalionAssignmentRow[] = [];
         let travelSec = baseTravelSec;
         if (isBugHuntLaunch) {
+          const hasHunterTravelSpeedResearch = await UserResearchFeature.findOne({
+            userId: String(attackerId),
+            categoryId: 'hunting',
+            featureId: HUNTER_TRAVEL_SPEED_FEATURE_ID,
+            isUnlocked: true,
+          })
+            .select('_id')
+            .session(session)
+            .lean();
+          if (hasHunterTravelSpeedResearch) {
+            travelSec = Math.max(2, Math.ceil(baseTravelSec * 0.95));
+          }
           try {
             await spendAntBugHuntTokensAtLaunch({
               userId: String(attackerId),
