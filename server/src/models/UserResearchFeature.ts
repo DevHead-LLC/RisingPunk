@@ -34,6 +34,8 @@ const userResearchFeatureSchema = new Schema({
       'hack-crew',
       'npc',
       'cash-flow',
+      'swarm',
+      'hunting',
       'construction',
       'battle-mechanics',
       'gear',

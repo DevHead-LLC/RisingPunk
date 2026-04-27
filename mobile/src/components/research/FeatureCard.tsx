@@ -111,6 +111,10 @@ const BACKGROUND_IMAGE_MAP: Record<string, ImageSourcePropType> = {
   'probe': require('../../assets/images/researchCenter/probeResearch.png'),
   'mark-2-bots': require('../../assets/images/researchCenter/botUpgradeEvolution.png'),
   'swarm-lead': require('../../assets/images/researchCenter/swarmLead.png'),
+  'token-max-900': require('../../assets/images/researchCenter/tokenMaxIncrease.png'),
+  'token-regen-1': require('../../assets/images/researchCenter/tokenRegenIncrease.png'),
+  'hunter-travel-speed-05': require('../../assets/images/researchCenter/hunterSpeedIncrease.png'),
+  'kaito-glitch-hunt-atk-01': require('../../assets/images/researchCenter/hunterAttackIncrease.png'),
 };
 
 const CREW_BONUS_CARD_IMAGE = require('../../assets/images/researchCenter/crewBonus.png');

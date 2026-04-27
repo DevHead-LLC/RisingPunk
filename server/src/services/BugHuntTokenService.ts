@@ -1,9 +1,12 @@
 import { ClientSession } from 'mongoose';
 import { UserBugHuntState, type IUserBugHuntStateDocument } from '../models/UserBugHuntState';
+import { UserResearchFeature } from '../models/UserResearchFeature';
 
 export const ANT_BUG_HUNT_TOKEN_COST = 900;
 export const BUG_HUNT_TOKEN_MAX = 5400;
 export const BUG_HUNT_TOKEN_REGEN_PER_MINUTE = 5;
+const HUNTING_TOKEN_MAX_FEATURE_ID = 'token-max-900';
+const HUNTING_TOKEN_REGEN_FEATURE_ID = 'token-regen-1';
 
 export class BugHuntTokenSpendError extends Error {
   constructor(
@@ -25,6 +28,27 @@ type TokenSnapshot = {
 type RegeneratedTokenState = TokenSnapshot & {
   stateDoc: IUserBugHuntStateDocument;
 };
+
+export async function resolveEffectiveBugHuntTokenConfig(params: {
+  userId: string;
+  session: ClientSession;
+}): Promise<{ maxTokens: number; regenPerMinute: number }> {
+  const { userId, session } = params;
+  const unlockedRows = await UserResearchFeature.find({
+    userId,
+    categoryId: 'hunting',
+    featureId: { $in: [HUNTING_TOKEN_MAX_FEATURE_ID, HUNTING_TOKEN_REGEN_FEATURE_ID] },
+    isUnlocked: true,
+  })
+    .select('featureId')
+    .session(session)
+    .lean();
+  const unlocked = new Set(unlockedRows.map((row) => String(row.featureId)));
+  const maxTokens = BUG_HUNT_TOKEN_MAX + (unlocked.has(HUNTING_TOKEN_MAX_FEATURE_ID) ? 900 : 0);
+  const regenPerMinute =
+    BUG_HUNT_TOKEN_REGEN_PER_MINUTE + (unlocked.has(HUNTING_TOKEN_REGEN_FEATURE_ID) ? 1 : 0);
+  return { maxTokens, regenPerMinute };
+}
 
 function applyMinuteRegen(snapshot: TokenSnapshot, nowMs: number): TokenSnapshot {
   const lastMs = snapshot.lastRegenAt.getTime();
@@ -60,6 +84,7 @@ async function getOrCreateRegeneratedTokenState(params: {
   const { userId, session } = params;
   const now = new Date();
   const nowMs = now.getTime();
+  const effectiveConfig = await resolveEffectiveBugHuntTokenConfig({ userId, session });
   const existing = await UserBugHuntState.findOne({ userId }).session(session);
 
   if (!existing) {
@@ -67,9 +92,9 @@ async function getOrCreateRegeneratedTokenState(params: {
       [
         {
           userId,
-          currentTokens: BUG_HUNT_TOKEN_MAX,
-          maxTokens: BUG_HUNT_TOKEN_MAX,
-          regenPerMinute: BUG_HUNT_TOKEN_REGEN_PER_MINUTE,
+          currentTokens: effectiveConfig.maxTokens,
+          maxTokens: effectiveConfig.maxTokens,
+          regenPerMinute: effectiveConfig.regenPerMinute,
           lastRegenAt: now,
         },
       ],
@@ -88,6 +113,8 @@ async function getOrCreateRegeneratedTokenState(params: {
     };
   }
 
+  // Regen elapsed time using the persisted historical config to avoid
+  // retroactively applying newly unlocked research to minutes before unlock.
   const regenerated = applyMinuteRegen(
     {
       currentTokens: existing.currentTokens,
@@ -97,22 +124,29 @@ async function getOrCreateRegeneratedTokenState(params: {
     },
     nowMs
   );
+  const syncedMaxTokens = effectiveConfig.maxTokens;
+  const syncedRegenPerMinute = effectiveConfig.regenPerMinute;
+  const syncedCurrentTokens = Math.min(syncedMaxTokens, regenerated.currentTokens);
 
   const shouldPersistRegen =
-    regenerated.currentTokens !== existing.currentTokens ||
-    regenerated.lastRegenAt.getTime() !== existing.lastRegenAt.getTime();
+    syncedCurrentTokens !== existing.currentTokens ||
+    regenerated.lastRegenAt.getTime() !== existing.lastRegenAt.getTime() ||
+    syncedMaxTokens !== existing.maxTokens ||
+    syncedRegenPerMinute !== existing.regenPerMinute;
 
   if (shouldPersistRegen) {
-    existing.currentTokens = regenerated.currentTokens;
+    existing.currentTokens = syncedCurrentTokens;
+    existing.maxTokens = syncedMaxTokens;
+    existing.regenPerMinute = syncedRegenPerMinute;
     existing.lastRegenAt = regenerated.lastRegenAt;
     await existing.save({ session });
   }
 
   return {
     stateDoc: existing,
-    currentTokens: regenerated.currentTokens,
-    maxTokens: regenerated.maxTokens,
-    regenPerMinute: regenerated.regenPerMinute,
+    currentTokens: syncedCurrentTokens,
+    maxTokens: syncedMaxTokens,
+    regenPerMinute: syncedRegenPerMinute,
     lastRegenAt: regenerated.lastRegenAt,
   };
 }
