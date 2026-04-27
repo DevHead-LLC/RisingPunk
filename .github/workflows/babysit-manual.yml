@@ -1,0 +1,42 @@
+name: Babysit Manual Trigger (Detect Only)
+
+on:
+  issue_comment:
+    types:
+      - created
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to evaluate (for manual testing)"
+        required: true
+        type: string
+
+env:
+  GH_TOKEN: ${{ secrets.GH_PAT }}
+  INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number || '' }}
+
+jobs:
+  detect-bugbot-status:
+    if: github.event_name == 'workflow_dispatch' || github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Ensure dependencies
+        run: |
+          gh --version
+          sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Run detect-only babysit status check
+        run: |
+          chmod +x .github/scripts/babysit-detect.sh
+          .github/scripts/babysit-detect.sh
