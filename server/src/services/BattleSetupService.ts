@@ -95,7 +95,7 @@ export class BattleSetupService {
     marchMeta?: { marchSourcedAttack: boolean; sourceMarchId: string }
   ): Promise<number> {
     if (!marchMeta?.marchSourcedAttack || !marchMeta.sourceMarchId) {
-      return 1;
+      return 0;
     }
     const sourceMarch = await AttackMarch.findOne({
       marchId: marchMeta.sourceMarchId,
@@ -104,7 +104,7 @@ export class BattleSetupService {
       .select('attackType')
       .lean();
     if (!sourceMarch || sourceMarch.attackType !== 'bug_hunt') {
-      return 1;
+      return 0;
     }
     const hasResearch = await UserResearchFeature.findOne({
       userId: String(attackerId),
