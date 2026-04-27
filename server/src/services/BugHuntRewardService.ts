@@ -14,8 +14,6 @@ type AntDropTier = {
   itemKey:
     | 'bug_hunt_cash_pack_20000'
     | 'bug_hunt_travel_speedup_25_percent'
-    | 'bug_hunt_travel_speedup_50_percent'
-    | 'bug_hunt_travel_speedup_75_percent'
     | 'bug_hunt_cash_pack_10000'
     | 'bug_hunt_cash_pack_5000'
     | 'bug_hunt_cash_pack_1000'
@@ -51,8 +49,6 @@ function randomChoice<T>(values: readonly T[]): T {
 function resolveAntItemDrops(): AntDropTier['itemKey'][] {
   const tiers: Array<AntDropTier | { probability: number; pickSpeedup: '5m' | '1m' }> = [
     { itemKey: 'bug_hunt_cash_pack_20000', probability: 0.02 },
-    { itemKey: 'bug_hunt_travel_speedup_75_percent', probability: 0.01 },
-    { itemKey: 'bug_hunt_travel_speedup_50_percent', probability: 0.03 },
     { itemKey: 'bug_hunt_travel_speedup_25_percent', probability: 0.05 },
     { itemKey: 'bug_hunt_cash_pack_10000', probability: 0.05 },
     { probability: 0.15, pickSpeedup: '5m' },
