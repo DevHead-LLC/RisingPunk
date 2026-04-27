@@ -101,12 +101,12 @@ for RUN_ID in $CURSOR_RUN_IDS; do
   fi
 done
 
-REVIEWS_JSON="$(gh api "repos/$REPO/pulls/$PR_NUMBER/reviews?per_page=200")"
+REVIEWS_JSON="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/reviews?per_page=100" | jq -s 'add')"
 LATEST_REVIEW_ID="$(echo "$REVIEWS_JSON" | jq -r 'map(select(.user.login=="cursor[bot]")) | sort_by(.submitted_at) | last | .id // empty')"
 
 ACTIONABLE_LINKS="(none)"
 if [ -n "$LATEST_REVIEW_ID" ]; then
-  COMMENTS_JSON="$(gh api "repos/$REPO/pulls/$PR_NUMBER/comments?per_page=200")"
+  COMMENTS_JSON="$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/comments?per_page=100" | jq -s 'add')"
   ACTIONABLE_LINKS="$(echo "$COMMENTS_JSON" | jq -r --arg sha "$HEAD_SHA" --argjson rid "$LATEST_REVIEW_ID" '
     .[]
     | select(.pull_request_review_id == $rid and .commit_id == $sha and .user.login == "cursor[bot]")
