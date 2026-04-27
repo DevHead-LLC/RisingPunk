@@ -246,6 +246,17 @@ mongoose.connect(process.env.MONGODB_URI, {
     process.exit(1);
   }
 
+  // Ensure Hunting research category + feature definitions exist (DB-backed authority).
+  try {
+    const { ResearchUnlockService } = require('./src/services/ResearchUnlockService');
+    const { ResearchFeatureService } = require('./src/services/ResearchFeatureService');
+    await ResearchUnlockService.ensureHuntingCategoryDefinition();
+    await ResearchFeatureService.ensureHuntingFeatureDefinitions();
+  } catch (bootstrapErr: unknown) {
+    console.error('Hunting research bootstrap failed:', bootstrapErr);
+    process.exit(1);
+  }
+
   // Initialize Google Auth Service
   try {
     const { GoogleAuthService } = require('./src/services/GoogleAuthService');
