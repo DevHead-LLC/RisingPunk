@@ -257,7 +257,13 @@ export async function executeAttackMarchLaunch(
             .session(session)
             .lean();
           if (hasHunterTravelSpeedResearch) {
-            travelSec = Math.max(2, Math.ceil(baseTravelSec * 0.95));
+            const reducedTravelSec = Math.ceil(baseTravelSec * 0.95);
+            // Preserve the 2s floor while guaranteeing a tangible reduction
+            // for short marches where ceil(5% off) can round back to base.
+            travelSec =
+              baseTravelSec > 2
+                ? Math.max(2, Math.min(baseTravelSec - 1, reducedTravelSec))
+                : 2;
           }
           try {
             await spendAntBugHuntTokensAtLaunch({

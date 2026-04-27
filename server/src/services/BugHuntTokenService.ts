@@ -113,35 +113,40 @@ async function getOrCreateRegeneratedTokenState(params: {
     };
   }
 
+  // Regen elapsed time using the persisted historical config to avoid
+  // retroactively applying newly unlocked research to minutes before unlock.
   const regenerated = applyMinuteRegen(
     {
       currentTokens: existing.currentTokens,
-      maxTokens: effectiveConfig.maxTokens,
-      regenPerMinute: effectiveConfig.regenPerMinute,
+      maxTokens: existing.maxTokens,
+      regenPerMinute: existing.regenPerMinute,
       lastRegenAt: existing.lastRegenAt,
     },
     nowMs
   );
+  const syncedMaxTokens = effectiveConfig.maxTokens;
+  const syncedRegenPerMinute = effectiveConfig.regenPerMinute;
+  const syncedCurrentTokens = Math.min(syncedMaxTokens, regenerated.currentTokens);
 
   const shouldPersistRegen =
-    regenerated.currentTokens !== existing.currentTokens ||
+    syncedCurrentTokens !== existing.currentTokens ||
     regenerated.lastRegenAt.getTime() !== existing.lastRegenAt.getTime() ||
-    effectiveConfig.maxTokens !== existing.maxTokens ||
-    effectiveConfig.regenPerMinute !== existing.regenPerMinute;
+    syncedMaxTokens !== existing.maxTokens ||
+    syncedRegenPerMinute !== existing.regenPerMinute;
 
   if (shouldPersistRegen) {
-    existing.currentTokens = regenerated.currentTokens;
-    existing.maxTokens = effectiveConfig.maxTokens;
-    existing.regenPerMinute = effectiveConfig.regenPerMinute;
+    existing.currentTokens = syncedCurrentTokens;
+    existing.maxTokens = syncedMaxTokens;
+    existing.regenPerMinute = syncedRegenPerMinute;
     existing.lastRegenAt = regenerated.lastRegenAt;
     await existing.save({ session });
   }
 
   return {
     stateDoc: existing,
-    currentTokens: regenerated.currentTokens,
-    maxTokens: regenerated.maxTokens,
-    regenPerMinute: regenerated.regenPerMinute,
+    currentTokens: syncedCurrentTokens,
+    maxTokens: syncedMaxTokens,
+    regenPerMinute: syncedRegenPerMinute,
     lastRegenAt: regenerated.lastRegenAt,
   };
 }
