@@ -21,6 +21,8 @@ import { getCrewArmyBonusTotalsForUser, mergeCrewArmyIntoArmyBonus } from '../ut
 import { parseInventoryKeyToFamilyAndMark } from '../utils/botInventoryKeys';
 import { normalizeNpcBattalionMarkLevel } from '../utils/npcMarkMixConfig';
 import { UserHunter } from '../models/UserHunter';
+import { UserResearchFeature } from '../models/UserResearchFeature';
+import { AttackMarch } from '../models/AttackMarch';
 import { HunterProgressionService } from './HunterProgressionService';
 import { HUNTER_ROSTER_KAITO_GLITCH, HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT } from '../types/bugHunt';
 
@@ -42,13 +44,17 @@ type ResolvedHunterBattleUnit = {
   };
 };
 
+const KAITO_HUNT_ATTACK_FEATURE_ID = 'kaito-glitch-hunt-atk-01';
+const KAITO_HUNT_ATTACK_BONUS_FLAT_ADD = 0.1;
+
 export class BattleSetupService {
   private static readonly SPRINT_HACK_BOOST_ATTACK_MULTIPLIER = 1.05;
   private static readonly SPRINT_HACK_BOOST_SPEED_BONUS = 1;
 
   private static async resolveHunterBattleUnit(
     attackerId: string,
-    hunterBattleContract?: HunterBattleContract
+    hunterBattleContract?: HunterBattleContract,
+    kaitoHuntAttackFlatAdd: number = 0
   ): Promise<ResolvedHunterBattleUnit | null> {
     if (hunterBattleContract == null) {
       return null;
@@ -72,12 +78,43 @@ export class BattleSetupService {
       HUNTER_ROSTER_KAITO_GLITCH,
       ownedHunter.level
     );
+    const offenseWithContextBonus = Math.round((stats.offense + Math.max(0, kaitoHuntAttackFlatAdd)) * 100) / 100;
     return {
       hunterRosterId: HUNTER_ROSTER_KAITO_GLITCH,
       hunterVisualKey: HUNTER_VISUAL_KEY_KAITO_GLITCH_SPRINT,
       level: ownedHunter.level,
-      stats,
+      stats: {
+        ...stats,
+        offense: offenseWithContextBonus,
+      },
     };
+  }
+
+  private static async resolveKaitoHuntAttackFlatAdd(
+    attackerId: string,
+    marchMeta?: { marchSourcedAttack: boolean; sourceMarchId: string }
+  ): Promise<number> {
+    if (!marchMeta?.marchSourcedAttack || !marchMeta.sourceMarchId) {
+      return 0;
+    }
+    const sourceMarch = await AttackMarch.findOne({
+      marchId: marchMeta.sourceMarchId,
+      attackerId: String(attackerId),
+    })
+      .select('attackType')
+      .lean();
+    if (!sourceMarch || sourceMarch.attackType !== 'bug_hunt') {
+      return 0;
+    }
+    const hasResearch = await UserResearchFeature.findOne({
+      userId: String(attackerId),
+      categoryId: 'hunting',
+      featureId: KAITO_HUNT_ATTACK_FEATURE_ID,
+      isUnlocked: true,
+    })
+      .select('_id')
+      .lean();
+    return hasResearch ? KAITO_HUNT_ATTACK_BONUS_FLAT_ADD : 0;
   }
 
   private static applyHunterHackBoostIfPresent(
@@ -150,7 +187,12 @@ export class BattleSetupService {
       throw new Error(`Maximum ${MAX_USER_BATTALIONS} battalions allowed`);
     }
 
-    const hunterBattleUnit = await this.resolveHunterBattleUnit(attackerId, hunterBattleContract);
+    const kaitoHuntAttackFlatAdd = await this.resolveKaitoHuntAttackFlatAdd(attackerId, marchMeta);
+    const hunterBattleUnit = await this.resolveHunterBattleUnit(
+      attackerId,
+      hunterBattleContract,
+      kaitoHuntAttackFlatAdd
+    );
     
     // Check if defender is a user (not NPC)
     // A user defender is when we have a defenderId that's not 'computer-opponent' and doesn't look like an NPC ID

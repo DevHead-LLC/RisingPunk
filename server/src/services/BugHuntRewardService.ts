@@ -3,8 +3,7 @@ import { UserHunter } from '../models/UserHunter';
 import { UserBugHuntState } from '../models/UserBugHuntState';
 import { HunterProgressionService } from './HunterProgressionService';
 import {
-  BUG_HUNT_TOKEN_MAX,
-  BUG_HUNT_TOKEN_REGEN_PER_MINUTE,
+  resolveEffectiveBugHuntTokenConfig,
 } from './BugHuntTokenService';
 
 const ANT_BUG_HUNTER_XP_ON_FULL_DEFEAT = 50_000;
@@ -15,8 +14,6 @@ type AntDropTier = {
   itemKey:
     | 'bug_hunt_cash_pack_20000'
     | 'bug_hunt_travel_speedup_25_percent'
-    | 'bug_hunt_travel_speedup_50_percent'
-    | 'bug_hunt_travel_speedup_75_percent'
     | 'bug_hunt_cash_pack_10000'
     | 'bug_hunt_cash_pack_5000'
     | 'bug_hunt_cash_pack_1000'
@@ -52,8 +49,6 @@ function randomChoice<T>(values: readonly T[]): T {
 function resolveAntItemDrops(): AntDropTier['itemKey'][] {
   const tiers: Array<AntDropTier | { probability: number; pickSpeedup: '5m' | '1m' }> = [
     { itemKey: 'bug_hunt_cash_pack_20000', probability: 0.02 },
-    { itemKey: 'bug_hunt_travel_speedup_75_percent', probability: 0.01 },
-    { itemKey: 'bug_hunt_travel_speedup_50_percent', probability: 0.03 },
     { itemKey: 'bug_hunt_travel_speedup_25_percent', probability: 0.05 },
     { itemKey: 'bug_hunt_cash_pack_10000', probability: 0.05 },
     { probability: 0.15, pickSpeedup: '5m' },
@@ -181,12 +176,13 @@ export async function grantAntBugDefeatRewards(params: {
     state.storageItems = storageItems;
     await state.save({ session });
   } else {
+    const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({ userId, session });
     await UserBugHuntState.create(
       [{
         userId,
-        currentTokens: BUG_HUNT_TOKEN_MAX,
-        maxTokens: BUG_HUNT_TOKEN_MAX,
-        regenPerMinute: BUG_HUNT_TOKEN_REGEN_PER_MINUTE,
+        currentTokens: effectiveTokenConfig.maxTokens,
+        maxTokens: effectiveTokenConfig.maxTokens,
+        regenPerMinute: effectiveTokenConfig.regenPerMinute,
         lastRegenAt: new Date(),
         storageItems,
       }],

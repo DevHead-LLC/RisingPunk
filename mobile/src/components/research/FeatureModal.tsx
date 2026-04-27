@@ -5,7 +5,9 @@ import {
   StyleSheet,
   Modal,
   TouchableOpacity,
-  ScrollView
+  ScrollView,
+  SafeAreaView,
+  useWindowDimensions,
 } from 'react-native';
 import { SIZING } from '../../styles/theme';
 import { useThemeColors } from '../../hooks/useThemeColors';
@@ -29,6 +31,7 @@ const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
   'hack-ability': 'Hack Ability',
   'hack-crew': 'Hack Crew',
   'investments': 'Investments',
+  'hunting': 'Hunting',
   'financial': 'Financial',
   'npc': 'NPC',
   'construction': 'Construction',
@@ -56,6 +59,7 @@ export function FeatureModal({
   onResearchStarted,
 }: FeatureModalProps) {
   const colors = useThemeColors();
+  const { width: windowWidth } = useWindowDimensions();
   const dispatch = useAppDispatch();
   const currentBalanceState = useAppSelector((state) => state.balance);
   const userId = useAppSelector((state) => state.auth.user?._id);
@@ -102,6 +106,7 @@ export function FeatureModal({
   const { data: hackAbilityFeatures } = useGetUserFeaturesQuery('hack-ability', { skip: !visible || !refCategories.includes('hack-ability') });
   const { data: hackCrewFeatures } = useGetUserFeaturesQuery('hack-crew', { skip: !visible || !refCategories.includes('hack-crew') });
   const { data: investmentsFeatures } = useGetUserFeaturesQuery('investments', { skip: !visible || !refCategories.includes('investments') });
+  const { data: huntingFeatures } = useGetUserFeaturesQuery('hunting', { skip: !visible || !refCategories.includes('hunting') });
   const { data: researchCenterStatus } = useGetResearchCenterStatusQuery(undefined, { skip: !visible });
   const { data: storageInventory, refetch: refetchStorageInventory } = useFetchStorageInventoryQuery(undefined, { skip: !visible });
   const currentResearchCenterLevel = researchCenterStatus?.level ?? 0;
@@ -112,7 +117,8 @@ export function FeatureModal({
     'hack-ability': hackAbilityFeatures ?? [],
     'hack-crew': hackCrewFeatures ?? [],
     'investments': investmentsFeatures ?? [],
-  }), [homeDefFeatures, cashFlowFeatures, hackAbilityFeatures, hackCrewFeatures, investmentsFeatures]);
+    'hunting': huntingFeatures ?? [],
+  }), [homeDefFeatures, cashFlowFeatures, hackAbilityFeatures, hackCrewFeatures, investmentsFeatures, huntingFeatures]);
 
   const missingRequiredRefs = useMemo(() => {
     if (refs.length === 0) return [];
@@ -826,6 +832,12 @@ export function FeatureModal({
     </View>
   );
 
+  // Keep content clear of landscape unsafe edges even without safe-area-context provider/native module.
+  const modalWidth = useMemo(() => {
+    const sideGutterPx = 140;
+    return Math.max(320, Math.min(980, windowWidth - sideGutterPx));
+  }, [windowWidth]);
+
   return (
     <>
       <Modal
@@ -837,23 +849,26 @@ export function FeatureModal({
         statusBarTranslucent={false}
       >
         <View style={styles.overlay}>
-          <View style={[
-            styles.modal,
-            {
-              backgroundColor: colors.background,
-              borderColor: colors.primary
-            }
-          ]}>
-            <ScrollView
-              style={styles.modalScrollView}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled
-            >
-              {(feature.isUnlocked || isCurrentlyResearching) ? renderUnlockedModal() : renderLockedModal()}
-            </ScrollView>
-          </View>
+          <SafeAreaView style={styles.safeContentWrapper}>
+            <View style={[
+              styles.modal,
+              {
+                width: modalWidth,
+                backgroundColor: colors.background,
+                borderColor: colors.primary
+              }
+            ]}>
+              <ScrollView
+                style={styles.modalScrollView}
+                contentContainerStyle={styles.modalScrollContent}
+                showsVerticalScrollIndicator={true}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+              >
+                {(feature.isUnlocked || isCurrentlyResearching) ? renderUnlockedModal() : renderLockedModal()}
+              </ScrollView>
+            </View>
+          </SafeAreaView>
         </View>
       </Modal>
       
@@ -874,10 +889,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SIZING.spacing.md,
+  },
+  safeContentWrapper: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SIZING.spacing.sm,
+    paddingVertical: SIZING.spacing.sm,
   },
   modal: {
-    width: '94%',
     maxWidth: 980,
     maxHeight: '82%',
     borderRadius: 12,

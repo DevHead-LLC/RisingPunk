@@ -23,8 +23,7 @@ import {
 import { BUG_HUNT_STORAGE_ITEM_DEFINITIONS } from '../constants/bugHuntStorageItems';
 import { JWT_SECRET } from '../config/env';
 import {
-  BUG_HUNT_TOKEN_MAX,
-  BUG_HUNT_TOKEN_REGEN_PER_MINUTE,
+  resolveEffectiveBugHuntTokenConfig,
   readBugHuntTokens,
 } from '../services/BugHuntTokenService';
 import { getBugHuntTelemetrySummary, recordBugHuntStorageItemConsumed } from '../services/BugHuntTelemetryService';
@@ -85,13 +84,17 @@ async function getOrCreateUserBugHuntState(params: {
     }
     return existing;
   }
+  const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({
+    userId: params.userId,
+    session: params.session,
+  });
   const created = await UserBugHuntState.create(
     [
       {
         userId: params.userId,
-        currentTokens: BUG_HUNT_TOKEN_MAX,
-        maxTokens: BUG_HUNT_TOKEN_MAX,
-        regenPerMinute: BUG_HUNT_TOKEN_REGEN_PER_MINUTE,
+        currentTokens: effectiveTokenConfig.maxTokens,
+        maxTokens: effectiveTokenConfig.maxTokens,
+        regenPerMinute: effectiveTokenConfig.regenPerMinute,
         lastRegenAt: new Date(),
         storageItems: [],
       },
