@@ -92,7 +92,7 @@ for RUN_ID in $CURSOR_RUN_IDS; do
     N="${BASH_REMATCH[1]}"
   elif [[ "$RUN_TEXT" =~ found[[:space:]]+([0-9]+)[[:space:]]+potential[[:space:]]+issues? ]]; then
     N="${BASH_REMATCH[1]}"
-  elif [[ "$RUN_TEXT" =~ posted[[:space:]]+analysis[[:space:]]+results.*([0-9]+)[[:space:]]+bug ]]; then
+  elif [[ "$RUN_TEXT" =~ posted[[:space:]]+analysis[[:space:]]+results[^0-9]*([0-9]+)[[:space:]]+bug ]]; then
     N="${BASH_REMATCH[1]}"
   fi
 
