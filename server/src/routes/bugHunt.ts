@@ -1009,11 +1009,9 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error('Bug-hunt tokens are already full');
         }
         const tokensNeededToCap = maxTokens - currentTokens;
-        // Bugbot: floor keeps token-item use full-value only; never consume an extra partial-overflow item at cap boundary.
+        // Bugbot: any positive token gap should allow at least one item use; downstream token apply remains max-capped.
         const maxUsefulQuantity =
-          tokenAmountPerItem > maxTokens
-            ? 1
-            : Math.max(0, Math.floor(tokensNeededToCap / tokenAmountPerItem));
+          tokensNeededToCap <= 0 ? 0 : Math.max(1, Math.ceil(tokensNeededToCap / tokenAmountPerItem));
         if (!Number.isFinite(maxUsefulQuantity) || maxUsefulQuantity < 1) {
           throw new Error('This token item would exceed bug-hunt token capacity');
         }
