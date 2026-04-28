@@ -59,9 +59,12 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
     selectedStorageItem?.category === 'token'
       ? Math.max(0, Math.floor(Number(selectedStorageItem.tokenAmount ?? 0)))
       : 0;
+  const tokensNeededToCap = Math.max(0, tokenMax - tokenCurrent);
   const maxUsefulTokenQuantity =
     selectedStorageItem?.category === 'token' && tokenAmountPerItem > 0
-      ? Math.max(0, Math.floor((tokenMax - tokenCurrent) / tokenAmountPerItem))
+      ? tokenAmountPerItem > tokenMax
+        ? 1
+        : Math.max(0, Math.floor(tokensNeededToCap / tokenAmountPerItem))
       : Number.POSITIVE_INFINITY;
   const modalMaxSelectableQuantity = selectedStorageItem
     ? Math.max(

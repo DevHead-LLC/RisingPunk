@@ -1008,7 +1008,10 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error('Bug-hunt tokens are already full');
         }
         const tokensNeededToCap = maxTokens - currentTokens;
-        const maxUsefulQuantity = Math.floor(tokensNeededToCap / tokenAmountPerItem);
+        const maxUsefulQuantity =
+          tokenAmountPerItem > maxTokens
+            ? 1
+            : Math.max(0, Math.floor(tokensNeededToCap / tokenAmountPerItem));
         if (!Number.isFinite(maxUsefulQuantity) || maxUsefulQuantity < 1) {
           throw new Error('This token item would exceed bug-hunt token capacity');
         }
