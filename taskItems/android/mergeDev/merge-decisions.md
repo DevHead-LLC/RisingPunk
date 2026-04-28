@@ -1,4 +1,4 @@
-# Merge Decisions — dev -> android_mergeDev (2026-04-25)
+# Merge Decisions — dev -> android_mergeDev (2026-04-28)
 
 ---
 
@@ -6,36 +6,36 @@
 
 | Side | Content |
 |------|---------|
-| **HEAD (androidStaging)** | `"version": "4.1.0"`, `"versionCode": 126` |
-| **dev** | `"version": "5.0.0"` (no `versionCode`) |
+| **HEAD (androidStaging)** | `"version": "5.0.0"`, `"versionCode": 128` |
+| **dev** | `"version": "5.1.0"` (no `versionCode`) |
 
-**Resolution:** Took dev `version` (`5.0.0`) and kept Android `versionCode: 126`.
+**Resolution:** Kept Android branch values (`"version": "5.0.0"` and `"versionCode": 128`).
 
-**Rationale:** Keep Android Play Console authority (`versionCode`) while advancing app semantic version from dev.
+**Rationale:** `versionCode` is Android/Play authority and must remain present/increment-safe. Keeping `version` aligned to HEAD here avoids introducing mixed release metadata during the Android merge pass.
 
-**Rejected content:** HEAD-only `version: 4.1.0`.
+**Rejected content:** Dev-only `"version": "5.1.0"` without `versionCode`.
 
-**Failure-mode hints:** Before publishing, verify `versionCode` is higher than the latest accepted Play build.
+**Failure-mode hints:** Before Android release, verify `versionCode` is greater than latest Play Console build and version metadata matches the intended release train.
 
 ---
 
-## 2. `mobile/package-lock.json`
+## 2. `mobile/src/components/research/FeatureModal.tsx`
 
 | Side | Content |
 |------|---------|
-| **HEAD (androidStaging)** | `packages[""].version: "2.8.0"`, `hasInstallScript: true` |
-| **dev** | `packages[""].version: "4.1.0"` (no `hasInstallScript`) |
+| **HEAD (androidStaging)** | `useGetUserFeaturesQuery` data consumed as `{ features }`, with per-category `isLoading` guards in `loadingByCategory`. |
+| **dev** | Added `hunting` category support, but switched several category mappings to raw array access (no `.features`) and removed loading flags. |
 
-**Resolution:** Set `packages[""].version` to dev (`4.1.0`) and kept `hasInstallScript: true` from HEAD.
+**Resolution:** Merged both intents: kept HEAD's `{ features }` data-shape access and loading guards, and added dev's new `hunting` query/category plus `huntingLoading` in `loadingByCategory`.
 
-**Rationale:** Preserve Android install-script metadata while taking the newer lockfile root version present on dev.
+**Rationale:** The RTK query endpoint currently returns `{ features: any[] }`; preserving that contract avoids prerequisite checks reading empty data. Bringing in `hunting` keeps new dev functionality.
 
-**Rejected content:** HEAD `packages[""].version: 2.8.0`; dev omission of `hasInstallScript`.
+**Rejected content:** Dev's raw-array mappings (`homeDefFeatures ?? []`, etc.) and removal of loading guards; these would conflict with current API response shape and could cause false prerequisite failures while queries are still resolving.
 
-**Failure-mode hints:** If postinstall behavior regresses locally/CI, confirm lockfile still includes `hasInstallScript: true` for root package.
+**Failure-mode hints:** If research prerequisites appear incorrectly blocked, check `featuresByCategory` still reads `.features` and `loadingByCategory` includes every queried category (including `hunting`).
 
 ---
 
 ## Deploy workflow files
 
-No conflicts. Kept HEAD per merge-flow; workflows unchanged by intent.
+No conflicts this session. Kept HEAD per merge-flow; `.github/workflows/deploy-production.yml` and `.github/workflows/deploy-staging.yml` unchanged by intent.
