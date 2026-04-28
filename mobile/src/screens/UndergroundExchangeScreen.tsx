@@ -182,6 +182,10 @@ export const UndergroundExchangeScreen: React.FC<Props> = ({ onClose }) => {
       return;
     }
     const maxQty = selectedItemMaxAffordableQuantity;
+    if (maxQty < 1) {
+      Alert.alert('Purchase unavailable', 'You no longer have enough funds for this purchase.');
+      return;
+    }
     const quantityToBuy = Math.max(1, Math.min(maxQty, selectedQuantity));
     try {
       const result =
