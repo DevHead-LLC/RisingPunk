@@ -134,7 +134,7 @@ export async function recordBugHuntRewardGranted(params: {
 export async function recordBugHuntStorageItemConsumed(params: {
   userId: string;
   itemKey: string;
-  effect: 'cash' | 'speedup' | 'travel';
+  effect: 'cash' | 'speedup' | 'travel' | 'token';
 }): Promise<void> {
   await recordBugHuntTelemetryEvent({
     eventType: 'storage_item_consumed',

@@ -31,6 +31,7 @@ import { getBugHuntOperationalChecks } from '../services/BugHuntOperationalCheck
 import { buildMillisecondsPerUnit, getBuildQueueFamily, getInventoryKey } from '../utils/botInventoryKeys';
 import { scheduleMarchArrival, scheduleReturnMarchComplete } from '../services/MarchArrivalSchedulerService';
 import { reduceProbeTravelTime } from './probe';
+import { buildUndergroundExchangePacks, resolvePackById } from '../services/UndergroundExchangePackService';
 
 const Bot = require('../models/Bot');
 
@@ -40,6 +41,21 @@ const KAITO_UNLOCK_MIN_USER_LEVEL = 5;
 const STORAGE_DEFINITION_BY_KEY = new Map(
   BUG_HUNT_STORAGE_ITEM_DEFINITIONS.map((def) => [def.itemKey, def])
 );
+const EXCHANGE_CATALOG_ITEMS = BUG_HUNT_STORAGE_ITEM_DEFINITIONS.filter((def) =>
+  Number.isFinite(def.shopPrice) && Number(def.shopPrice) > 0
+);
+const EXCHANGE_CATALOG_BY_KEY = new Map(EXCHANGE_CATALOG_ITEMS.map((def) => [def.itemKey, def]));
+
+function requireExchangeCatalogItem(itemKey: string) {
+  const def = EXCHANGE_CATALOG_BY_KEY.get(itemKey);
+  if (!def) {
+    throw new Error(`Unknown Underground Exchange item '${itemKey}'`);
+  }
+  if (!Number.isFinite(def.shopPrice) || (def.shopPrice ?? 0) <= 0) {
+    throw new Error(`Underground Exchange item '${itemKey}' is missing a valid shop price`);
+  }
+  return def;
+}
 
 function asBugType(value: unknown): BugType {
   if (value !== BUG_TYPE_ANT) {
@@ -670,6 +686,198 @@ router.get('/storage-item-definitions', auth, async (_req: Request, res: Respons
   });
 });
 
+router.get('/exchange/catalog', auth, async (_req: Request, res: Response): Promise<void> => {
+  const items = EXCHANGE_CATALOG_ITEMS.map((def) => ({
+    itemKey: def.itemKey,
+    label: def.label,
+    category: def.category,
+    shopPrice: Math.floor(def.shopPrice ?? 0),
+    durationSeconds: def.durationSeconds,
+    speedupDomain: def.speedupDomain,
+    travelSpeedPercent: def.travelSpeedPercent,
+    tokenAmount: def.tokenAmount,
+  }));
+  res.json({ items, serverTimeMs: Date.now() });
+});
+
+router.get('/exchange/packs', auth, async (_req: Request, res: Response): Promise<void> => {
+  const packs = buildUndergroundExchangePacks({
+    now: new Date(),
+    itemDefinitions: BUG_HUNT_STORAGE_ITEM_DEFINITIONS,
+  });
+  res.json({
+    staplePacks: packs.staplePacks,
+    weeklyPacks: packs.weeklyPacks,
+    weekStartUtc: packs.weekWindow.weekStartUtc,
+    weekEndUtc: packs.weekWindow.weekEndUtc,
+    serverTimeMs: Date.now(),
+  });
+});
+
+router.post('/exchange/purchase', auth, async (req: Request, res: Response): Promise<void> => {
+  const itemKey = String(req.body?.itemKey ?? '').trim();
+  const quantityRaw = Number(req.body?.quantity);
+  const quantity = Math.floor(quantityRaw);
+  if (itemKey === '') {
+    res.status(400).json({ error: 'itemKey is required' });
+    return;
+  }
+  if (!Number.isFinite(quantityRaw) || !Number.isInteger(quantityRaw) || quantity <= 0) {
+    res.status(400).json({ error: 'quantity must be a positive integer' });
+    return;
+  }
+
+  let definition: (typeof BUG_HUNT_STORAGE_ITEM_DEFINITIONS)[number];
+  try {
+    definition = requireExchangeCatalogItem(itemKey);
+  } catch (error) {
+    res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid exchange catalog item' });
+    return;
+  }
+
+  const userId = String(req.user._id);
+  const session = await mongoose.startSession();
+  try {
+    let newBalance = 0;
+    await session.withTransaction(async () => {
+      const user = await User.findById(userId).session(session);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      const unitPrice = Math.floor(definition.shopPrice ?? 0);
+      if (unitPrice <= 0) {
+        throw new Error(`Underground Exchange item '${definition.itemKey}' has invalid unit price`);
+      }
+      const totalCost = unitPrice * quantity;
+      if (!Number.isFinite(user.balance.total)) {
+        throw new Error('User wallet balance is invalid');
+      }
+      if (user.balance.total < totalCost) {
+        throw new Error(`Insufficient balance for purchase ($${totalCost.toLocaleString()} required)`);
+      }
+
+      const state = await getOrCreateUserBugHuntState({ userId, session });
+      const currentItems = [...(state.storageItems ?? [])];
+      const rowIdx = currentItems.findIndex((row) => row.itemKey === definition.itemKey);
+      if (rowIdx >= 0) {
+        const existingQty = Math.max(0, Math.floor(Number(currentItems[rowIdx].quantity ?? 0)));
+        currentItems[rowIdx] = { itemKey: definition.itemKey, quantity: existingQty + quantity };
+      } else {
+        currentItems.push({ itemKey: definition.itemKey, quantity });
+      }
+      state.storageItems = currentItems.sort((a, b) => a.itemKey.localeCompare(b.itemKey));
+      await state.save({ session });
+
+      user.balance.total -= totalCost;
+      user.balance.lastUpdated = new Date();
+      await user.save({ session });
+      newBalance = user.balance.total;
+    });
+
+    res.json({
+      success: true,
+      itemKey: definition.itemKey,
+      quantityPurchased: quantity,
+      totalCost: Math.floor(definition.shopPrice ?? 0) * quantity,
+      newBalance,
+      serverTimeMs: Date.now(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to purchase exchange item';
+    const isUserError = message.includes('Unknown Underground Exchange item') || message.includes('Insufficient balance');
+    if (isUserError) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    console.error('POST /api/bug-hunt/exchange/purchase error:', error);
+    res.status(500).json({ error: message });
+  } finally {
+    session.endSession();
+  }
+});
+
+router.post('/exchange/packs/purchase', auth, async (req: Request, res: Response): Promise<void> => {
+  const packId = String(req.body?.packId ?? '').trim();
+  const quantityRaw = Number(req.body?.quantity);
+  const quantity = Math.floor(quantityRaw);
+  if (packId === '') {
+    res.status(400).json({ error: 'packId is required' });
+    return;
+  }
+  if (!Number.isFinite(quantityRaw) || !Number.isInteger(quantityRaw) || quantity <= 0) {
+    res.status(400).json({ error: 'quantity must be a positive integer' });
+    return;
+  }
+  const pack = resolvePackById({
+    now: new Date(),
+    itemDefinitions: BUG_HUNT_STORAGE_ITEM_DEFINITIONS,
+    packId,
+  });
+  if (!pack) {
+    res.status(400).json({ error: `Unknown or inactive Underground Exchange pack '${packId}'` });
+    return;
+  }
+  const unitPrice = Math.max(1, Math.floor(pack.discountedPrice));
+  const totalCost = unitPrice * quantity;
+
+  const userId = String(req.user._id);
+  const session = await mongoose.startSession();
+  try {
+    let newBalance = 0;
+    await session.withTransaction(async () => {
+      const user = await User.findById(userId).session(session);
+      if (!user) {
+        throw new Error('User not found');
+      }
+      if (!Number.isFinite(user.balance.total)) {
+        throw new Error('User wallet balance is invalid');
+      }
+      if (user.balance.total < totalCost) {
+        throw new Error(`Insufficient balance for purchase ($${totalCost.toLocaleString()} required)`);
+      }
+
+      const state = await getOrCreateUserBugHuntState({ userId, session });
+      const inventoryMap = new Map<string, number>();
+      for (const row of state.storageItems ?? []) {
+        inventoryMap.set(String(row.itemKey), Math.max(0, Math.floor(Number(row.quantity ?? 0))));
+      }
+      for (const row of pack.items) {
+        const addQty = Math.max(1, Math.floor(row.quantity)) * quantity;
+        inventoryMap.set(row.itemKey, (inventoryMap.get(row.itemKey) ?? 0) + addQty);
+      }
+      state.storageItems = [...inventoryMap.entries()]
+        .map(([itemKey, qty]) => ({ itemKey, quantity: qty }))
+        .sort((a, b) => a.itemKey.localeCompare(b.itemKey));
+      await state.save({ session });
+
+      user.balance.total -= totalCost;
+      user.balance.lastUpdated = new Date();
+      await user.save({ session });
+      newBalance = user.balance.total;
+    });
+
+    res.json({
+      success: true,
+      packId: pack.packId,
+      quantityPurchased: quantity,
+      totalCost,
+      newBalance,
+      serverTimeMs: Date.now(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to purchase exchange pack';
+    const isUserError = message.includes('Unknown or inactive Underground Exchange pack') || message.includes('Insufficient balance');
+    if (isUserError) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    console.error('POST /api/bug-hunt/exchange/packs/purchase error:', error);
+    res.status(500).json({ error: message });
+  } finally {
+    session.endSession();
+  }
+});
+
 router.get('/storage/inventory', auth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = String(req.user._id);
@@ -775,6 +983,41 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           cashAdded,
           quantityUsed: quantity,
           itemKey: definition.itemKey,
+        };
+      } else if (definition.category === 'token') {
+        if (!Number.isFinite(definition.tokenAmount) || (definition.tokenAmount ?? 0) <= 0) {
+          throw new Error(`Storage item '${definition.itemKey}' missing tokenAmount`);
+        }
+        const tokenAmountPerItem = Math.floor(definition.tokenAmount ?? 0);
+        const tokenSnapshot = await readBugHuntTokens({ userId, session });
+        const currentTokens = Math.max(0, Math.floor(Number(tokenSnapshot.currentTokens ?? 0)));
+        const maxTokens = Math.max(1, Math.floor(Number(tokenSnapshot.maxTokens ?? 0)));
+        if (!Number.isFinite(currentTokens) || !Number.isFinite(maxTokens)) {
+          throw new Error('Token state is invalid');
+        }
+        if (currentTokens >= maxTokens) {
+          throw new Error('Bug-hunt tokens are already full');
+        }
+        const tokensNeededToCap = maxTokens - currentTokens;
+        const maxUsefulQuantity = Math.max(1, Math.ceil(tokensNeededToCap / tokenAmountPerItem));
+        quantityToConsume = Math.min(quantity, maxUsefulQuantity);
+        const tokenGrantAttempt = tokenAmountPerItem * quantityToConsume;
+        const tokensAfterUse = Math.min(maxTokens, currentTokens + tokenGrantAttempt);
+        const tokenAdded = tokensAfterUse - currentTokens;
+        if (tokenAdded <= 0) {
+          throw new Error('Bug-hunt tokens are already full');
+        }
+        state.currentTokens = tokensAfterUse;
+        state.maxTokens = tokenSnapshot.maxTokens;
+        state.regenPerMinute = tokenSnapshot.regenPerMinute;
+        state.lastRegenAt = tokenSnapshot.lastRegenAt;
+        responsePayload = {
+          effect: 'token',
+          tokenAdded,
+          itemKey: definition.itemKey,
+          quantityUsed: quantityToConsume,
+          tokensAfterUse,
+          maxTokens,
         };
       } else if (definition.category === 'speedup') {
         if (!Number.isFinite(definition.durationSeconds) || (definition.durationSeconds ?? 0) <= 0) {
@@ -1067,11 +1310,11 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
     }
     const payload = responsePayload as Record<string, unknown>;
     const effectRaw = String(payload.effect ?? '').trim();
-    if (effectRaw === 'cash' || effectRaw === 'speedup' || effectRaw === 'travel') {
+    if (effectRaw === 'cash' || effectRaw === 'speedup' || effectRaw === 'travel' || effectRaw === 'token') {
       void recordBugHuntStorageItemConsumed({
         userId,
         itemKey: definition.itemKey,
-        effect: effectRaw === 'speedup' ? 'speedup' : (effectRaw as 'cash' | 'travel'),
+        effect: effectRaw as 'cash' | 'speedup' | 'travel' | 'token',
       });
     }
     res.json({
@@ -1114,7 +1357,8 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
       message.includes('already completed its return') ||
       message.includes('No active owned probe found') ||
       message.includes('already reached its target') ||
-      message.includes('probeId is required');
+      message.includes('probeId is required') ||
+      message.includes('already full');
     if (isUserError) {
       res.status(400).json({ error: message });
       return;
