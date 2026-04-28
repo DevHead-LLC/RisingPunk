@@ -61,7 +61,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
       : 0;
   const maxUsefulTokenQuantity =
     selectedStorageItem?.category === 'token' && tokenAmountPerItem > 0
-      ? Math.max(0, Math.ceil((tokenMax - tokenCurrent) / tokenAmountPerItem))
+      ? Math.max(0, Math.floor((tokenMax - tokenCurrent) / tokenAmountPerItem))
       : Number.POSITIVE_INFINITY;
   const modalMaxSelectableQuantity = selectedStorageItem
     ? Math.max(
@@ -189,7 +189,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
                             itemKey: item.itemKey,
                             label: item.label,
                             quantity: Math.max(0, Math.floor(item.quantity)),
-                            category: item.category,
+                            category: item.category === 'cash' ? 'cash' : 'token',
                             tokenAmount: item.tokenAmount,
                           });
                           setSelectedStorageQuantity(1);
@@ -227,7 +227,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
             {selectedStorageItem.category === 'token' ? (
               <>
                 <Text style={[styles.meta, { color: colors.text.secondary }]}>
-                  Tokens: {tokenCurrent.toLocaleString()}/{tokenMax.toLocaleString()} -> {projectedTokensAfterUse.toLocaleString()}/{tokenMax.toLocaleString()}
+                  Tokens: {tokenCurrent.toLocaleString()}/{tokenMax.toLocaleString()} {'->'} {projectedTokensAfterUse.toLocaleString()}/{tokenMax.toLocaleString()}
                 </Text>
                 <Text style={[styles.meta, { color: colors.text.secondary }]}>
                   Per item: +{tokenAmountPerItem.toLocaleString()} tokens

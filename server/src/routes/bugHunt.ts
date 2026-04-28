@@ -24,7 +24,6 @@ import { BUG_HUNT_STORAGE_ITEM_DEFINITIONS } from '../constants/bugHuntStorageIt
 import { JWT_SECRET } from '../config/env';
 import {
   resolveEffectiveBugHuntTokenConfig,
-  readBugHuntTokens,
 } from '../services/BugHuntTokenService';
 import { getBugHuntTelemetrySummary, recordBugHuntStorageItemConsumed } from '../services/BugHuntTelemetryService';
 import { getBugHuntOperationalChecks } from '../services/BugHuntOperationalChecksService';
@@ -128,6 +127,54 @@ function applySpeedupDate(originalDate: Date, durationSeconds: number): Date {
   const nowMs = Date.now();
   const reducedMs = originalDate.getTime() - durationSeconds * 1000;
   return new Date(Math.max(nowMs, reducedMs));
+}
+
+function resolveRegeneratedTokenSnapshotFromState(params: {
+  currentTokensRaw: unknown;
+  maxTokensRaw: unknown;
+  regenPerMinuteRaw: unknown;
+  lastRegenAt: Date | null | undefined;
+  syncedMaxTokens: number;
+  syncedRegenPerMinute: number;
+  now: Date;
+}): {
+  currentTokens: number;
+  maxTokens: number;
+  regenPerMinute: number;
+  lastRegenAt: Date;
+} {
+  const currentTokensPersisted = Math.max(0, Math.floor(Number(params.currentTokensRaw ?? 0)));
+  const maxTokensPersisted = Math.max(1, Math.floor(Number(params.maxTokensRaw ?? 0)));
+  const regenPerMinutePersisted = Math.max(0, Math.floor(Number(params.regenPerMinuteRaw ?? 0)));
+  const nowMs = params.now.getTime();
+  const lastMs = params.lastRegenAt instanceof Date ? params.lastRegenAt.getTime() : NaN;
+
+  if (!Number.isFinite(lastMs) || lastMs <= 0) {
+    throw new Error('Bug-hunt token state has invalid lastRegenAt');
+  }
+
+  let regeneratedTokens = currentTokensPersisted;
+  let regeneratedLastRegenAt = new Date(lastMs);
+  if (nowMs > lastMs) {
+    const elapsedMinutes = Math.floor((nowMs - lastMs) / 60_000);
+    if (elapsedMinutes > 0) {
+      const regained = elapsedMinutes * regenPerMinutePersisted;
+      regeneratedTokens = Math.min(maxTokensPersisted, currentTokensPersisted + regained);
+      regeneratedLastRegenAt =
+        regeneratedTokens >= maxTokensPersisted ? params.now : new Date(lastMs + elapsedMinutes * 60_000);
+    }
+  }
+
+  const syncedMaxTokens = Math.max(1, Math.floor(params.syncedMaxTokens));
+  const syncedRegenPerMinute = Math.max(0, Math.floor(params.syncedRegenPerMinute));
+  const syncedCurrentTokens = Math.min(syncedMaxTokens, Math.max(0, Math.floor(regeneratedTokens)));
+
+  return {
+    currentTokens: syncedCurrentTokens,
+    maxTokens: syncedMaxTokens,
+    regenPerMinute: syncedRegenPerMinute,
+    lastRegenAt: regeneratedLastRegenAt,
+  };
 }
 
 type ConstructionSpeedupTarget =
@@ -989,9 +1036,18 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error(`Storage item '${definition.itemKey}' missing tokenAmount`);
         }
         const tokenAmountPerItem = Math.floor(definition.tokenAmount ?? 0);
-        const tokenSnapshot = await readBugHuntTokens({ userId, session });
-        const currentTokens = Math.max(0, Math.floor(Number(tokenSnapshot.currentTokens ?? 0)));
-        const maxTokens = Math.max(1, Math.floor(Number(tokenSnapshot.maxTokens ?? 0)));
+        const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({ userId, session });
+        const tokenSnapshot = resolveRegeneratedTokenSnapshotFromState({
+          currentTokensRaw: state.currentTokens,
+          maxTokensRaw: state.maxTokens,
+          regenPerMinuteRaw: state.regenPerMinute,
+          lastRegenAt: state.lastRegenAt,
+          syncedMaxTokens: effectiveTokenConfig.maxTokens,
+          syncedRegenPerMinute: effectiveTokenConfig.regenPerMinute,
+          now: new Date(),
+        });
+        const currentTokens = tokenSnapshot.currentTokens;
+        const maxTokens = tokenSnapshot.maxTokens;
         if (!Number.isFinite(currentTokens) || !Number.isFinite(maxTokens)) {
           throw new Error('Token state is invalid');
         }
@@ -999,7 +1055,10 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error('Bug-hunt tokens are already full');
         }
         const tokensNeededToCap = maxTokens - currentTokens;
-        const maxUsefulQuantity = Math.max(1, Math.ceil(tokensNeededToCap / tokenAmountPerItem));
+        const maxUsefulQuantity = Math.floor(tokensNeededToCap / tokenAmountPerItem);
+        if (!Number.isFinite(maxUsefulQuantity) || maxUsefulQuantity < 1) {
+          throw new Error('This token item would exceed bug-hunt token capacity');
+        }
         quantityToConsume = Math.min(quantity, maxUsefulQuantity);
         const tokenGrantAttempt = tokenAmountPerItem * quantityToConsume;
         const tokensAfterUse = Math.min(maxTokens, currentTokens + tokenGrantAttempt);
