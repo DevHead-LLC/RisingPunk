@@ -23,6 +23,7 @@ import {
 import { BUG_HUNT_STORAGE_ITEM_DEFINITIONS } from '../constants/bugHuntStorageItems';
 import { JWT_SECRET } from '../config/env';
 import {
+  resolveRegeneratedTokenSnapshotFromPersistedState,
   resolveEffectiveBugHuntTokenConfig,
 } from '../services/BugHuntTokenService';
 import { getBugHuntTelemetrySummary, recordBugHuntStorageItemConsumed } from '../services/BugHuntTelemetryService';
@@ -127,54 +128,6 @@ function applySpeedupDate(originalDate: Date, durationSeconds: number): Date {
   const nowMs = Date.now();
   const reducedMs = originalDate.getTime() - durationSeconds * 1000;
   return new Date(Math.max(nowMs, reducedMs));
-}
-
-function resolveRegeneratedTokenSnapshotFromState(params: {
-  currentTokensRaw: unknown;
-  maxTokensRaw: unknown;
-  regenPerMinuteRaw: unknown;
-  lastRegenAt: Date | null | undefined;
-  syncedMaxTokens: number;
-  syncedRegenPerMinute: number;
-  now: Date;
-}): {
-  currentTokens: number;
-  maxTokens: number;
-  regenPerMinute: number;
-  lastRegenAt: Date;
-} {
-  const currentTokensPersisted = Math.max(0, Math.floor(Number(params.currentTokensRaw ?? 0)));
-  const maxTokensPersisted = Math.max(1, Math.floor(Number(params.maxTokensRaw ?? 0)));
-  const regenPerMinutePersisted = Math.max(0, Math.floor(Number(params.regenPerMinuteRaw ?? 0)));
-  const nowMs = params.now.getTime();
-  const lastMs = params.lastRegenAt instanceof Date ? params.lastRegenAt.getTime() : NaN;
-
-  if (!Number.isFinite(lastMs) || lastMs <= 0) {
-    throw new Error('Bug-hunt token state has invalid lastRegenAt');
-  }
-
-  let regeneratedTokens = currentTokensPersisted;
-  let regeneratedLastRegenAt = new Date(lastMs);
-  if (nowMs > lastMs) {
-    const elapsedMinutes = Math.floor((nowMs - lastMs) / 60_000);
-    if (elapsedMinutes > 0) {
-      const regained = elapsedMinutes * regenPerMinutePersisted;
-      regeneratedTokens = Math.min(maxTokensPersisted, currentTokensPersisted + regained);
-      regeneratedLastRegenAt =
-        regeneratedTokens >= maxTokensPersisted ? params.now : new Date(lastMs + elapsedMinutes * 60_000);
-    }
-  }
-
-  const syncedMaxTokens = Math.max(1, Math.floor(params.syncedMaxTokens));
-  const syncedRegenPerMinute = Math.max(0, Math.floor(params.syncedRegenPerMinute));
-  const syncedCurrentTokens = Math.min(syncedMaxTokens, Math.max(0, Math.floor(regeneratedTokens)));
-
-  return {
-    currentTokens: syncedCurrentTokens,
-    maxTokens: syncedMaxTokens,
-    regenPerMinute: syncedRegenPerMinute,
-    lastRegenAt: regeneratedLastRegenAt,
-  };
 }
 
 type ConstructionSpeedupTarget =
@@ -1037,7 +990,7 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
         }
         const tokenAmountPerItem = Math.floor(definition.tokenAmount ?? 0);
         const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({ userId, session });
-        const tokenSnapshot = resolveRegeneratedTokenSnapshotFromState({
+        const tokenSnapshot = resolveRegeneratedTokenSnapshotFromPersistedState({
           currentTokensRaw: state.currentTokens,
           maxTokensRaw: state.maxTokens,
           regenPerMinuteRaw: state.regenPerMinute,
@@ -1417,7 +1370,8 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
       message.includes('No active owned probe found') ||
       message.includes('already reached its target') ||
       message.includes('probeId is required') ||
-      message.includes('already full');
+      message.includes('already full') ||
+      message.includes('would exceed bug-hunt token capacity');
     if (isUserError) {
       res.status(400).json({ error: message });
       return;
