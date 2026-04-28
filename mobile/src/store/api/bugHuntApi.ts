@@ -292,7 +292,7 @@ export const bugHuntApi = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['UserHunters', 'BugHuntTokens'],
+      invalidatesTags: ['UserHunters'],
     }),
   }),
 });
