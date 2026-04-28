@@ -1,7 +1,7 @@
 {
   "name": "mobile",
-  "version": "5.0.0",
-  "versionCode": 131,
+  "version": "5.1.0",
+  "versionCode": 135,
   "private": true,
   "scripts": {
     "android": "cd android && ./gradlew clean && cd ..",
@@ -24,8 +24,8 @@
     "start": "react-native start",
     "test": "jest --runInBand; cd ../server && npm test -- --runInBand",
     "android:build:release": "node -e \"process.platform==='win32'?process.exit(require('child_process').spawnSync('npm.cmd',['run','android:build:release:win'],{stdio:'inherit'}).status):process.exit(require('child_process').spawnSync('npm',['run','android:build:release:mac'],{stdio:'inherit'}).status)\"",
-    "android:build:bundle": "npm run android:clean && cd android && ENVFILE=.env.prod ./gradlew bundleRelease -DENVFILE=.env.prod && cd ../.. && mkdir -p deployments/client/mobile/prod && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/prod/rising-punk-prod.aab && echo \"✅ Production AAB ready: deployments/client/mobile/prod/rising-punk-prod.aab\"",
-    "android:build:bundle:staging": "npm run android:clean && cd android && ENVFILE=.env.staging ./gradlew bundleRelease -DENVFILE=.env.staging && cd ../.. && mkdir -p deployments/client/mobile/staging && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/staging/rising-punk-staging.aab && echo \"✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab\"",
+    "android:build:bundle": "cd android && ENVFILE=.env.prod ./gradlew clean bundleRelease -DENVFILE=.env.prod --no-build-cache --rerun-tasks --no-configuration-cache && cd ../.. && mkdir -p deployments/client/mobile/prod && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/prod/rising-punk-prod.aab && echo \"✅ Production AAB ready: deployments/client/mobile/prod/rising-punk-prod.aab\"",
+    "android:build:bundle:staging": "cd android && ENVFILE=.env.staging ./gradlew clean bundleRelease -DENVFILE=.env.staging --no-build-cache --rerun-tasks --no-configuration-cache && cd ../.. && mkdir -p deployments/client/mobile/staging && cp mobile/android/app/build/outputs/bundle/release/app-release.aab deployments/client/mobile/staging/rising-punk-staging.aab && echo \"✅ Staging AAB ready: deployments/client/mobile/staging/rising-punk-staging.aab\"",
     "postinstall": "node scripts/patch-statusbar-android15.js"
   },
   "dependencies": {
