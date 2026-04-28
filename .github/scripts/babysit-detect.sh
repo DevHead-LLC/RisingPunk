@@ -146,7 +146,10 @@ resolve_pr_metadata() {
   HEAD_REF="$(echo "$PR_JSON" | jq -r '.headRefName')"
   BASE_REF="$(echo "$PR_JSON" | jq -r '.baseRefName')"
   PR_STATE="$(echo "$PR_JSON" | jq -r '.state // "UNKNOWN"')"
-  HEAD_SHA="$(echo "$PR_JSON" | jq -r '.headRefOid // empty')"
+  RESOLVED_HEAD_SHA="$(echo "$PR_JSON" | jq -r '.headRefOid // empty')"
+  if [ -z "$HEAD_SHA" ]; then
+    HEAD_SHA="$RESOLVED_HEAD_SHA"
+  fi
   if [ -z "$HEAD_SHA" ] || [ "$HEAD_SHA" = "null" ]; then
     echo "Unable to resolve PR head SHA." >&2
     exit 1
@@ -194,7 +197,7 @@ collect_detection_snapshot() {
   CURSOR_COMMENTS="$(
     echo "$ISSUE_COMMENTS_JSON" | jq -r '
       map(select(.user.login | ascii_downcase | contains("cursor")))
-      | sort_by(.updated_at // .created_at, .created_at)
+      | sort_by(.updated_at // .created_at)
       | last
       | .body // ""
     '
