@@ -37,6 +37,8 @@ type WeekWindow = {
   weekEndUtc: string;
 };
 
+const PREVIOUS_WEEK_PACK_GRACE_MS = 10 * 60 * 1000;
+
 const STAPLE_PACK_SEEDS: readonly PackSeed[] = [
   {
     packId: 'hunter-pack-starter',
@@ -318,6 +320,11 @@ export function resolvePackById(params: {
     return currentWeekMatch;
   }
   if (!params.packId.startsWith('weekly-pack-')) {
+    return null;
+  }
+  // Allow a brief rollover grace so users who opened the weekly modal just before UTC week switch can still complete purchase.
+  const currentWeekWindow = getUtcWeekWindow(params.now);
+  if (params.now.getTime() - currentWeekWindow.weekStartUtc.getTime() > PREVIOUS_WEEK_PACK_GRACE_MS) {
     return null;
   }
   const previousWeekReference = new Date(params.now.getTime() - 7 * 24 * 60 * 60 * 1000);

@@ -107,7 +107,13 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
     }
     const maxQty = Math.max(0, modalMaxSelectableQuantity);
     if (maxQty < 1) {
-      Alert.alert('Item cannot be used', 'This token item would not add any tokens right now.');
+      const noUseReason =
+        selectedStorageItem.category === 'token'
+          ? 'This token item would not add any tokens right now.'
+          : selectedStorageItem.category === 'cash'
+            ? 'This wallet item cannot be used right now.'
+            : 'This item cannot be used right now.';
+      Alert.alert('Item cannot be used', noUseReason);
       return;
     }
     const quantityToUse = effectiveSelectedStorageQuantity;
