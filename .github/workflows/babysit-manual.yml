@@ -20,6 +20,9 @@ env:
 jobs:
   babysit:
     runs-on: ubuntu-latest
+    concurrency:
+      group: babysit-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.event.check_run.head_sha || github.run_id }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
@@ -121,7 +124,10 @@ jobs:
           export INPUT_PR_NUMBER="${{ steps.context.outputs.pr_number }}"
           export GITHUB_EVENT_NAME=workflow_dispatch
           chmod +x .github/scripts/babysit-detect.sh
-          .github/scripts/babysit-detect.sh
+          .github/scripts/babysit-detect.sh \
+            --wait \
+            --timeout-seconds 1500 \
+            --poll-seconds 20
 
       - name: Detect blockers for auto trigger
         id: detect_auto
@@ -133,6 +139,9 @@ jobs:
             --repo "${{ github.repository }}" \
             --pr "${{ steps.context.outputs.pr_number }}" \
             --head-sha "${{ steps.context.outputs.head_sha }}" \
+            --wait \
+            --timeout-seconds 300 \
+            --poll-seconds 15 \
             --no-comment
           DETECT_EXIT=$?
           set -e
@@ -145,6 +154,11 @@ jobs:
             echo "blocked=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          if [ "$DETECT_EXIT" -eq 3 ]; then
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+            echo "inconclusive=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "Detection failed with exit code $DETECT_EXIT"
           exit "$DETECT_EXIT"
 
@@ -154,6 +168,7 @@ jobs:
           PR_NUMBER="${{ steps.context.outputs.pr_number }}"
           HEAD_SHA="${{ steps.context.outputs.head_sha }}"
           MARKER="<!-- babysit-auto:$HEAD_SHA -->"
+          INCONCLUSIVE="${{ steps.detect_auto.outputs.inconclusive }}"
 
           # Bugbot: duplicate guard keys off marker only (not author), so PAT-authored auto-comments still dedupe.
           EXISTING=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments?per_page=200" \
@@ -163,5 +178,9 @@ jobs:
             exit 0
           fi
 
-          BODY="/babysit"$'\n\n'"Phase 2 auto-trigger: Bugbot blocker detected on head commit \`$HEAD_SHA\`."$'\n'"$MARKER"
+          if [ "$INCONCLUSIVE" = "true" ]; then
+            BODY="/babysit"$'\n\n'"Phase 2 auto-trigger: Bugbot state is inconclusive for head commit \`$HEAD_SHA\` (checks not fully settled in wait window)."$'\n'"$MARKER"
+          else
+            BODY="/babysit"$'\n\n'"Phase 2 auto-trigger: Bugbot blocker detected on head commit \`$HEAD_SHA\`."$'\n'"$MARKER"
+          fi
           gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "$BODY"

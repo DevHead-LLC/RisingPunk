@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 [--repo owner/repo] [--pr number] [--head-sha sha] [--no-comment]" >&2
+  echo "Usage: $0 [--repo owner/repo] [--pr number] [--head-sha sha] [--no-comment] [--wait --timeout-seconds n --poll-seconds n]" >&2
 }
 
 extract_bug_count() {
@@ -27,7 +27,12 @@ EVENT_PATH="${GITHUB_EVENT_PATH:-}"
 PR_NUMBER=""
 HEAD_SHA=""
 NO_COMMENT="false"
+WAIT_MODE="false"
+TIMEOUT_SECONDS=""
+POLL_SECONDS="20"
 REQUESTED_BY="${GITHUB_ACTOR:-manual}"
+TIMED_OUT="false"
+PR_STATE="OPEN"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -46,6 +51,18 @@ while [ $# -gt 0 ]; do
     --no-comment)
       NO_COMMENT="true"
       shift
+      ;;
+    --wait)
+      WAIT_MODE="true"
+      shift
+      ;;
+    --timeout-seconds)
+      TIMEOUT_SECONDS="${2:-}"
+      shift 2
+      ;;
+    --poll-seconds)
+      POLL_SECONDS="${2:-}"
+      shift 2
       ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -93,56 +110,135 @@ if [ -z "$PR_NUMBER" ]; then
 fi
 
 PR_JSON="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json number,url,headRefName,baseRefName,headRefOid)"
-PR_URL="$(echo "$PR_JSON" | jq -r '.url')"
-HEAD_REF="$(echo "$PR_JSON" | jq -r '.headRefName')"
-BASE_REF="$(echo "$PR_JSON" | jq -r '.baseRefName')"
-if [ -z "$HEAD_SHA" ]; then
-  HEAD_SHA="$(echo "$PR_JSON" | jq -r '.headRefOid')"
-fi
-
-if [ -z "$HEAD_SHA" ] || [ "$HEAD_SHA" = "null" ]; then
-  echo "Unable to resolve PR head SHA." >&2
+if [ "$WAIT_MODE" = "true" ] && [ -z "$TIMEOUT_SECONDS" ]; then
+  echo "--wait requires --timeout-seconds." >&2
   exit 1
 fi
 
-CHECK_RUNS_JSON="$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100")"
-CURSOR_RUN_IDS="$(echo "$CHECK_RUNS_JSON" | jq -r '.check_runs[]? | select(.name | ascii_downcase | test("cursor|bugbot")) | .id')"
+if [ -n "$TIMEOUT_SECONDS" ] && ! [[ "$TIMEOUT_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "--timeout-seconds must be an integer." >&2
+  exit 1
+fi
 
+if ! [[ "$POLL_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "--poll-seconds must be an integer." >&2
+  exit 1
+fi
+
+if [ "$POLL_SECONDS" -lt 1 ]; then
+  echo "--poll-seconds must be >= 1." >&2
+  exit 1
+fi
+
+PR_URL=""
+HEAD_REF=""
+BASE_REF=""
 BUGS_REPORTED=0
 RUN_SUMMARY_LINES=""
 BLOCKING_SOURCE="none"
+CURSOR_RUN_IDS=""
+CURSOR_RUN_COUNT=0
+INCOMPLETE_CURSOR_RUNS=0
+DETECTION_READY="false"
 
-for RUN_ID in $CURSOR_RUN_IDS; do
-  RUN_JSON="$(gh api "repos/$REPO/check-runs/$RUN_ID")"
-  RUN_NAME="$(echo "$RUN_JSON" | jq -r '.name // "unknown"')"
-  RUN_STATUS="$(echo "$RUN_JSON" | jq -r '.status // "unknown"')"
-  RUN_CONCLUSION="$(echo "$RUN_JSON" | jq -r '.conclusion // "none"')"
-  RUN_TEXT="$(echo "$RUN_JSON" | jq -r '.output.summary // .output.text // ""')"
+resolve_pr_metadata() {
+  PR_JSON="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json number,url,headRefName,baseRefName,headRefOid,state)"
+  PR_URL="$(echo "$PR_JSON" | jq -r '.url')"
+  HEAD_REF="$(echo "$PR_JSON" | jq -r '.headRefName')"
+  BASE_REF="$(echo "$PR_JSON" | jq -r '.baseRefName')"
+  PR_STATE="$(echo "$PR_JSON" | jq -r '.state // "UNKNOWN"')"
+  HEAD_SHA="$(echo "$PR_JSON" | jq -r '.headRefOid // empty')"
+  if [ -z "$HEAD_SHA" ] || [ "$HEAD_SHA" = "null" ]; then
+    echo "Unable to resolve PR head SHA." >&2
+    exit 1
+  fi
+}
 
-  RUN_SUMMARY_LINES="${RUN_SUMMARY_LINES}- ${RUN_NAME} (id ${RUN_ID}): status=${RUN_STATUS}, conclusion=${RUN_CONCLUSION}
+collect_detection_snapshot() {
+  BUGS_REPORTED=0
+  RUN_SUMMARY_LINES=""
+  BLOCKING_SOURCE="none"
+  CURSOR_RUN_IDS=""
+  CURSOR_RUN_COUNT=0
+  INCOMPLETE_CURSOR_RUNS=0
+  DETECTION_READY="false"
+
+  CHECK_RUNS_JSON="$(gh api "repos/$REPO/commits/$HEAD_SHA/check-runs?per_page=100")"
+  CURSOR_RUN_IDS="$(echo "$CHECK_RUNS_JSON" | jq -r '.check_runs[]? | select(.name | ascii_downcase | test("cursor|bugbot")) | .id')"
+  if [ -n "$CURSOR_RUN_IDS" ]; then
+    CURSOR_RUN_COUNT="$(echo "$CURSOR_RUN_IDS" | wc -l | tr -d ' ')"
+  fi
+
+  for RUN_ID in $CURSOR_RUN_IDS; do
+    RUN_JSON="$(gh api "repos/$REPO/check-runs/$RUN_ID")"
+    RUN_NAME="$(echo "$RUN_JSON" | jq -r '.name // "unknown"')"
+    RUN_STATUS="$(echo "$RUN_JSON" | jq -r '.status // "unknown"')"
+    RUN_CONCLUSION="$(echo "$RUN_JSON" | jq -r '.conclusion // "none"')"
+    RUN_TEXT="$(echo "$RUN_JSON" | jq -r '.output.summary // .output.text // ""')"
+
+    RUN_SUMMARY_LINES="${RUN_SUMMARY_LINES}- ${RUN_NAME} (id ${RUN_ID}): status=${RUN_STATUS}, conclusion=${RUN_CONCLUSION}
 "
 
-  N="$(extract_bug_count "$RUN_TEXT")"
-  if [ "$N" -gt "$BUGS_REPORTED" ] 2>/dev/null; then
-    BUGS_REPORTED="$N"
-    BLOCKING_SOURCE="check_run:${RUN_NAME}:${RUN_ID}"
-  fi
-done
+    if [ "$RUN_STATUS" != "completed" ]; then
+      INCOMPLETE_CURSOR_RUNS=$((INCOMPLETE_CURSOR_RUNS + 1))
+    fi
 
-ISSUE_COMMENTS_JSON="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments?per_page=200")"
-# Bugbot: use the latest Cursor-authored issue comment so stale older bug counts cannot override newer results.
-CURSOR_COMMENTS="$(
-  echo "$ISSUE_COMMENTS_JSON" | jq -r '
-    map(select(.user.login | ascii_downcase | contains("cursor")))
-    | sort_by(.created_at)
-    | last
-    | .body // ""
-  '
-)"
-COMMENT_BUGS="$(extract_bug_count "$CURSOR_COMMENTS")"
-if [ "$COMMENT_BUGS" -gt "$BUGS_REPORTED" ] 2>/dev/null; then
-  BUGS_REPORTED="$COMMENT_BUGS"
-  BLOCKING_SOURCE="issue_comment:cursor"
+    N="$(extract_bug_count "$RUN_TEXT")"
+    if [ "$N" -gt "$BUGS_REPORTED" ] 2>/dev/null; then
+      BUGS_REPORTED="$N"
+      BLOCKING_SOURCE="check_run:${RUN_NAME}:${RUN_ID}"
+    fi
+  done
+
+  ISSUE_COMMENTS_JSON="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments?per_page=200")"
+  # Bugbot: use the latest Cursor-authored issue comment so stale older bug counts cannot override newer results.
+  CURSOR_COMMENTS="$(
+    echo "$ISSUE_COMMENTS_JSON" | jq -r '
+      map(select(.user.login | ascii_downcase | contains("cursor")))
+      | sort_by(.created_at)
+      | last
+      | .body // ""
+    '
+  )"
+  COMMENT_BUGS="$(extract_bug_count "$CURSOR_COMMENTS")"
+  if [ "$COMMENT_BUGS" -gt "$BUGS_REPORTED" ] 2>/dev/null; then
+    BUGS_REPORTED="$COMMENT_BUGS"
+    BLOCKING_SOURCE="issue_comment:cursor"
+  fi
+
+  if [ "$CURSOR_RUN_COUNT" -gt 0 ] && [ "$INCOMPLETE_CURSOR_RUNS" -eq 0 ]; then
+    DETECTION_READY="true"
+  fi
+}
+
+resolve_pr_metadata
+collect_detection_snapshot
+
+if [ "$WAIT_MODE" = "true" ]; then
+  WAIT_STARTED_AT="$(date +%s)"
+  while true; do
+    if [ "$PR_STATE" != "OPEN" ]; then
+      break
+    fi
+    if [ "$BUGS_REPORTED" -gt 0 ] 2>/dev/null; then
+      break
+    fi
+    if [ "$DETECTION_READY" = "true" ]; then
+      break
+    fi
+
+    NOW_TS="$(date +%s)"
+    ELAPSED="$((NOW_TS - WAIT_STARTED_AT))"
+    if [ "$ELAPSED" -ge "$TIMEOUT_SECONDS" ]; then
+      TIMED_OUT="true"
+      break
+    fi
+
+    echo "WAIT: PR #$PR_NUMBER @ $HEAD_SHA not ready yet (cursor_runs=$CURSOR_RUN_COUNT, incomplete=$INCOMPLETE_CURSOR_RUNS, elapsed=${ELAPSED}s/${TIMEOUT_SECONDS}s)"
+    sleep "$POLL_SECONDS"
+    resolve_pr_metadata
+    collect_detection_snapshot
+  done
 fi
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
@@ -152,6 +248,11 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "base_ref=$BASE_REF"
     echo "bug_count=$BUGS_REPORTED"
     echo "blocking_source=$BLOCKING_SOURCE"
+    echo "pr_state=$PR_STATE"
+    echo "cursor_run_count=$CURSOR_RUN_COUNT"
+    echo "incomplete_cursor_runs=$INCOMPLETE_CURSOR_RUNS"
+    echo "detection_ready=$DETECTION_READY"
+    echo "timed_out=$TIMED_OUT"
   } >> "$GITHUB_OUTPUT"
 fi
 
@@ -160,11 +261,54 @@ if [ "$NO_COMMENT" = "true" ]; then
     echo "BLOCKED: detected $BUGS_REPORTED bug(s)/issues from $BLOCKING_SOURCE"
     exit 2
   fi
+  if [ "$DETECTION_READY" != "true" ]; then
+    echo "INCONCLUSIVE: cursor/bugbot checks are not complete for current head commit"
+    exit 3
+  fi
   echo "CLEAR: no blocker patterns detected"
   exit 0
 fi
 
-if [ -z "$CURSOR_RUN_IDS" ]; then
+if [ "$PR_STATE" != "OPEN" ]; then
+  COMMENT_BODY="$(cat <<EOF
+## Babysit Status (Detect Only)
+
+PR: $PR_URL
+Head: \`$HEAD_REF\` -> Base: \`$BASE_REF\`
+Head SHA: \`$HEAD_SHA\`
+
+PR is no longer open (state: \`$PR_STATE\`).
+
+Next step: re-sync to the next open promotion-stage PR and run \`/babysit\` there.
+EOF
+)"
+  gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$COMMENT_BODY"
+  exit 0
+fi
+
+if [ "$TIMED_OUT" = "true" ]; then
+  COMMENT_BODY="$(cat <<EOF
+## Babysit Status (Detect Only)
+
+PR: $PR_URL
+Head: \`$HEAD_REF\` -> Base: \`$BASE_REF\`
+Head SHA: \`$HEAD_SHA\`
+
+Timed out while waiting for Cursor/Bugbot completion (\`${TIMEOUT_SECONDS}s\` window).
+
+Current signals:
+- Cursor/Bugbot runs found: \`$CURSOR_RUN_COUNT\`
+- Incomplete runs: \`$INCOMPLETE_CURSOR_RUNS\`
+- Detected blockers: \`$BUGS_REPORTED\`
+
+Next step: wait for Bugbot to finish and run \`/babysit\` again.
+EOF
+)"
+  gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$COMMENT_BODY"
+  exit 0
+fi
+
+if [ "$CURSOR_RUN_COUNT" -eq 0 ]; then
   COMMENT_BODY="$(cat <<EOF
 ## Babysit Status (Detect Only)
 
