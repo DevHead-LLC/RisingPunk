@@ -1,24 +1,28 @@
-name: Babysit Manual Trigger (Detect Only)
+name: Babysit Trigger (Phase 2)
 
 on:
   issue_comment:
     types:
       - created
+  check_run:
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to evaluate (for manual testing)"
+        description: "PR number to evaluate"
         required: true
         type: string
 
 env:
   GH_TOKEN: ${{ secrets.GH_PAT }}
-  INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number || '' }}
 
 jobs:
-  detect-bugbot-status:
-    if: github.event_name == 'workflow_dispatch' || (github.event.issue.pull_request != null && contains(github.event.comment.body, '/babysit'))
+  babysit:
     runs-on: ubuntu-latest
+    concurrency:
+      group: babysit-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.event.check_run.id || github.run_id }}
+      cancel-in-progress: true
     permissions:
       contents: read
       pull-requests: write
@@ -26,17 +30,157 @@ jobs:
       checks: read
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
       - name: Ensure dependencies
         run: |
           gh --version
           sudo apt-get update && sudo apt-get install -y jq
 
+      - name: Resolve context
+        id: context
+        run: |
+          EVENT_NAME="${{ github.event_name }}"
+          PR_NUMBER=""
+          HEAD_SHA=""
+          SHOULD_RUN="false"
+          TRIGGER_MODE=""
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            PR_NUMBER="${{ github.event.inputs.pr_number }}"
+            SHOULD_RUN="true"
+            TRIGGER_MODE="manual-dispatch"
+          elif [ "$EVENT_NAME" = "issue_comment" ]; then
+            ISSUE_PR_URL="$(jq -r '.issue.pull_request.url // empty' "$GITHUB_EVENT_PATH")"
+            COMMENT_BODY="$(jq -r '.comment.body // ""' "$GITHUB_EVENT_PATH")"
+            AUTHOR="$(jq -r '.comment.user.login // "unknown"' "$GITHUB_EVENT_PATH")"
+
+            if [ -z "$ISSUE_PR_URL" ]; then
+              echo "Issue comment is not on a PR. Skipping."
+            elif [ "$AUTHOR" = "github-actions[bot]" ]; then
+              echo "Skipping bot-authored command to avoid loops."
+            # Bugbot: auto /babysit comments can be authored by GH_PAT user (not github-actions[bot]);
+            # marker-based skip is intentionally author-agnostic to prevent issue_comment trigger loops.
+            elif echo "$COMMENT_BODY" | grep -q "babysit-auto:"; then
+              echo "Skipping auto-generated babysit marker comment."
+            elif [[ "$COMMENT_BODY" =~ (^|[[:space:]])/babysit([[:space:]]|$) ]]; then
+              PR_NUMBER="$(jq -r '.issue.number // empty' "$GITHUB_EVENT_PATH")"
+              SHOULD_RUN="true"
+              TRIGGER_MODE="manual-comment"
+            else
+              echo "Comment does not contain /babysit. Skipping."
+            fi
+          elif [ "$EVENT_NAME" = "check_run" ]; then
+            CHECK_NAME="$(jq -r '.check_run.name // ""' "$GITHUB_EVENT_PATH")"
+            CHECK_STATUS="$(jq -r '.check_run.status // ""' "$GITHUB_EVENT_PATH")"
+            CHECK_CONCLUSION="$(jq -r '.check_run.conclusion // ""' "$GITHUB_EVENT_PATH")"
+            PR_NUMBER="$(jq -r '.check_run.pull_requests[0].number // empty' "$GITHUB_EVENT_PATH")"
+            BASE_REF="$(jq -r '.check_run.pull_requests[0].base.ref // empty' "$GITHUB_EVENT_PATH")"
+            HEAD_SHA="$(jq -r '.check_run.head_sha // empty' "$GITHUB_EVENT_PATH")"
+
+            if [ "$CHECK_STATUS" != "completed" ]; then
+              echo "check_run not completed. Skipping."
+            elif ! echo "$CHECK_NAME" | grep -qiE "cursor|bugbot"; then
+              echo "check_run is not Cursor/Bugbot. Skipping."
+            elif [ -z "$PR_NUMBER" ]; then
+              echo "No PR attached to check_run. Skipping."
+            elif [ "$CHECK_CONCLUSION" != "success" ] && [ "$CHECK_CONCLUSION" != "neutral" ] && [ "$CHECK_CONCLUSION" != "failure" ]; then
+              echo "Unsupported check_run conclusion ($CHECK_CONCLUSION). Skipping."
+            else
+              case "$BASE_REF" in
+                dev|main|staging|prod)
+                  SHOULD_RUN="true"
+                  TRIGGER_MODE="auto-check-run"
+                  ;;
+                *)
+                  echo "Base ref $BASE_REF is outside promotion chain. Skipping."
+                  ;;
+              esac
+            fi
+          fi
+
+          if [ "$SHOULD_RUN" = "true" ] && [ -z "$PR_NUMBER" ]; then
+            echo "Could not resolve PR number."
+            exit 1
+          fi
+
+          if [ "$SHOULD_RUN" = "true" ] && [ -z "$HEAD_SHA" ]; then
+            HEAD_SHA="$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefOid -q '.headRefOid')"
+          fi
+
+          echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+          echo "trigger_mode=$TRIGGER_MODE" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        if: steps.context.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: main
+
       - name: Run detect-only babysit status check
+        if: steps.context.outputs.should_run == 'true' && (steps.context.outputs.trigger_mode == 'manual-dispatch' || steps.context.outputs.trigger_mode == 'manual-comment')
+        run: |
+          export INPUT_PR_NUMBER="${{ steps.context.outputs.pr_number }}"
+          export GITHUB_EVENT_NAME=workflow_dispatch
+          chmod +x .github/scripts/babysit-detect.sh
+          .github/scripts/babysit-detect.sh \
+            --wait \
+            --timeout-seconds 1500 \
+            --poll-seconds 20
+
+      - name: Detect blockers for auto trigger
+        id: detect_auto
+        if: steps.context.outputs.should_run == 'true' && steps.context.outputs.trigger_mode == 'auto-check-run'
         run: |
           chmod +x .github/scripts/babysit-detect.sh
-          .github/scripts/babysit-detect.sh
+          set +e
+          .github/scripts/babysit-detect.sh \
+            --repo "${{ github.repository }}" \
+            --pr "${{ steps.context.outputs.pr_number }}" \
+            --head-sha "${{ steps.context.outputs.head_sha }}" \
+            --wait \
+            --timeout-seconds 300 \
+            --poll-seconds 15 \
+            --no-comment
+          DETECT_EXIT=$?
+          set -e
+
+          if [ "$DETECT_EXIT" -eq 2 ]; then
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$DETECT_EXIT" -eq 0 ]; then
+            echo "blocked=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$DETECT_EXIT" -eq 3 ]; then
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+            echo "inconclusive=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Detection failed with exit code $DETECT_EXIT"
+          exit "$DETECT_EXIT"
+
+      - name: Auto-comment /babysit on blocked PR
+        if: steps.context.outputs.should_run == 'true' && steps.context.outputs.trigger_mode == 'auto-check-run' && steps.detect_auto.outputs.blocked == 'true'
+        run: |
+          PR_NUMBER="${{ steps.context.outputs.pr_number }}"
+          HEAD_SHA="${{ steps.context.outputs.head_sha }}"
+          MARKER="<!-- babysit-auto:$HEAD_SHA -->"
+          INCONCLUSIVE="${{ steps.detect_auto.outputs.inconclusive }}"
+
+          # Bugbot: duplicate guard keys off marker only (not author), so PAT-authored auto-comments still dedupe.
+          EXISTING=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments?per_page=200" \
+            --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" || true)
+          if [ -n "$EXISTING" ]; then
+            echo "Auto /babysit already posted for this head SHA. Skipping duplicate."
+            exit 0
+          fi
+
+          if [ "$INCONCLUSIVE" = "true" ]; then
+            BODY="/babysit"$'\n\n'"Phase 2 auto-trigger: Bugbot state is inconclusive for head commit \`$HEAD_SHA\` (checks not fully settled in wait window)."$'\n'"$MARKER"
+          else
+            BODY="/babysit"$'\n\n'"Phase 2 auto-trigger: Bugbot blocker detected on head commit \`$HEAD_SHA\`."$'\n'"$MARKER"
+          fi
+          gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "$BODY"
