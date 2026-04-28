@@ -72,10 +72,30 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
         )
       )
     : 0;
+  const effectiveSelectedStorageQuantity = selectedStorageItem
+    ? modalMaxSelectableQuantity < 1
+      ? 0
+      : Math.max(1, Math.min(selectedStorageQuantity, modalMaxSelectableQuantity))
+    : 0;
   const projectedTokensAfterUse =
     selectedStorageItem?.category === 'token'
-      ? Math.min(tokenMax, tokenCurrent + tokenAmountPerItem * Math.max(0, selectedStorageQuantity))
+      ? Math.min(tokenMax, tokenCurrent + tokenAmountPerItem * Math.max(0, effectiveSelectedStorageQuantity))
       : tokenCurrent;
+
+  useEffect(() => {
+    if (!selectedStorageItem) {
+      return;
+    }
+    if (modalMaxSelectableQuantity < 1) {
+      if (selectedStorageQuantity !== 1) {
+        setSelectedStorageQuantity(1);
+      }
+      return;
+    }
+    if (selectedStorageQuantity > modalMaxSelectableQuantity) {
+      setSelectedStorageQuantity(modalMaxSelectableQuantity);
+    }
+  }, [selectedStorageItem, modalMaxSelectableQuantity, selectedStorageQuantity]);
 
   const handleUseStorageItem = async () => {
     if (!selectedStorageItem) {
@@ -86,7 +106,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
       Alert.alert('Item cannot be used', 'This token item would not add any tokens right now.');
       return;
     }
-    const quantityToUse = Math.max(1, Math.min(maxQty, selectedStorageQuantity));
+    const quantityToUse = effectiveSelectedStorageQuantity;
     try {
       const result = await useStorageItem({
         itemKey: selectedStorageItem.itemKey,
@@ -217,17 +237,17 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
             <View style={styles.quantityControls}>
               <TouchableOpacity
                 style={[styles.quantityButton, { borderColor: colors.primary }]}
-                disabled={isUsingStorageItem || selectedStorageQuantity <= 1}
+                disabled={isUsingStorageItem || effectiveSelectedStorageQuantity <= 1}
                 onPress={() => setSelectedStorageQuantity((prev) => Math.max(1, prev - 1))}
               >
                 <Text style={[styles.quantityButtonText, { color: colors.primary }]}>-</Text>
               </TouchableOpacity>
               <Text style={[styles.quantityValue, { color: colors.text.primary }]}>
-                {selectedStorageQuantity}
+                {effectiveSelectedStorageQuantity}
               </Text>
               <TouchableOpacity
                 style={[styles.quantityButton, { borderColor: colors.primary }]}
-                disabled={isUsingStorageItem || selectedStorageQuantity >= Math.max(1, modalMaxSelectableQuantity)}
+                disabled={isUsingStorageItem || effectiveSelectedStorageQuantity >= Math.max(1, modalMaxSelectableQuantity)}
                 onPress={() =>
                   setSelectedStorageQuantity((prev) => Math.min(Math.max(1, modalMaxSelectableQuantity), prev + 1))
                 }
@@ -271,7 +291,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
                 onPress={handleUseStorageItem}
               >
                 <Text style={[styles.quantityUseButtonText, { color: colors.background }]}>
-                  {isUsingStorageItem ? 'Using...' : `Use ${selectedStorageQuantity}`}
+                  {isUsingStorageItem ? 'Using...' : `Use ${effectiveSelectedStorageQuantity}`}
                 </Text>
               </TouchableOpacity>
             </View>
