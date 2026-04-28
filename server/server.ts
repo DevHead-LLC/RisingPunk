@@ -66,7 +66,8 @@ app.use(express.json());
 // Activity logging middleware for privacy policy compliance
 import { activityLogging } from './src/middleware/activityLogging';
 
-// MongoDB connection - simplified to match mongosh
+// MongoDB connection - simplified to match mongosh.
+// No-op maintenance note: keeping this comment updated can be used to trigger CI/CD deploy restarts when needed.
 if (!process.env.MONGODB_URI) {
   console.error('MONGODB_URI environment variable is not set');
   process.exit(1);
@@ -242,6 +243,17 @@ mongoose.connect(process.env.MONGODB_URI, {
     await ensureRentalPropertyConfig();
   } catch (bootstrapErr: unknown) {
     console.error('Rental property config bootstrap failed:', bootstrapErr);
+    process.exit(1);
+  }
+
+  // Ensure Hunting research category + feature definitions exist (DB-backed authority).
+  try {
+    const { ResearchUnlockService } = require('./src/services/ResearchUnlockService');
+    const { ResearchFeatureService } = require('./src/services/ResearchFeatureService');
+    await ResearchUnlockService.ensureHuntingCategoryDefinition();
+    await ResearchFeatureService.ensureHuntingFeatureDefinitions();
+  } catch (bootstrapErr: unknown) {
+    console.error('Hunting research bootstrap failed:', bootstrapErr);
     process.exit(1);
   }
 

@@ -1,6 +1,7 @@
 import { User } from '../models/User';
 import { Research } from '../models/Research';
 import { UserResearchFeature } from '../models/UserResearchFeature';
+import { ResearchFeatureDefinition } from '../models/ResearchFeatureDefinition';
 import { getResearchFeaturesAsync, getFeatureByIdAsync } from '../config/researchFeatures';
 import mongoose from 'mongoose';
 
@@ -67,6 +68,77 @@ const LEGACY_FEATURE_ID_LOOKUP: Record<string, string[]> = {
 };
 
 export class ResearchFeatureService {
+  private static readonly HUNTING_FEATURE_DEFINITIONS: Array<{
+    categoryId: 'hunting';
+    id: string;
+    name: string;
+    description: string;
+    unlockCost: number;
+    levelRequirement: number;
+    researchTimeHours: number;
+    requiredFeatureRefs: Array<{ categoryId: string; featureId: string }>;
+    effect: {
+      type: 'improvement';
+      value: number;
+      target: string;
+    };
+  }> = [
+    {
+      categoryId: 'hunting',
+      id: 'token-max-900',
+      name: 'Token Max +900',
+      description: 'Increase bug-hunt token max capacity by 900.',
+      unlockCost: 25_000_000,
+      levelRequirement: 40,
+      researchTimeHours: 50,
+      requiredFeatureRefs: [{ categoryId: 'investments', featureId: 'rental-profit-02-i' }],
+      effect: { type: 'improvement', value: 900, target: 'bug-hunt-token-max' },
+    },
+    {
+      categoryId: 'hunting',
+      id: 'token-regen-1',
+      name: 'Token Regen +1',
+      description: 'Increase bug-hunt token regeneration by +1 token per minute.',
+      unlockCost: 25_000_000,
+      levelRequirement: 41,
+      researchTimeHours: 50,
+      requiredFeatureRefs: [{ categoryId: 'hunting', featureId: 'token-max-900' }],
+      effect: { type: 'improvement', value: 1, target: 'bug-hunt-token-regen-per-minute' },
+    },
+    {
+      categoryId: 'hunting',
+      id: 'hunter-travel-speed-05',
+      name: 'Hunter Travel Speed +5%',
+      description: 'Reduce bug-hunt march travel time by 5%.',
+      unlockCost: 30_000_000,
+      levelRequirement: 42,
+      researchTimeHours: 55,
+      requiredFeatureRefs: [{ categoryId: 'hunting', featureId: 'token-regen-1' }],
+      effect: { type: 'improvement', value: 0.05, target: 'bug-hunt-hunter-travel-speed' },
+    },
+    {
+      categoryId: 'hunting',
+      id: 'kaito-glitch-hunt-atk-01',
+      name: 'Kaito Glitch Hunt ATK +0.1',
+      description: 'Increase Kaito Glitch attack by +0.1 during hunting battles only.',
+      unlockCost: 30_000_000,
+      levelRequirement: 42,
+      researchTimeHours: 55,
+      requiredFeatureRefs: [{ categoryId: 'hunting', featureId: 'hunter-travel-speed-05' }],
+      effect: { type: 'improvement', value: 0.1, target: 'bug-hunt-kaito-attack' },
+    },
+  ];
+
+  static async ensureHuntingFeatureDefinitions(): Promise<void> {
+    for (const def of this.HUNTING_FEATURE_DEFINITIONS) {
+      await ResearchFeatureDefinition.findOneAndUpdate(
+        { categoryId: def.categoryId, id: def.id },
+        { $set: def, $unset: { researchCenterLevelRequirement: 1 } },
+        { upsert: true }
+      );
+    }
+  }
+
   private static isValidResearchTimeHours(hours: number | null | undefined): boolean {
     if (hours == null) return false;
     return hours > 0;
