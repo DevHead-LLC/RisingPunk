@@ -87,15 +87,15 @@ export async function resolveMarchLaunchTarget(params: {
 
   let effectiveDefenderNpcInstanceId = defenderNpcInstanceId;
   let verifiedByCoords = false;
-  if (
+  let cachedMapDoc: Awaited<ReturnType<typeof MapModel.findOne>> | null = null;
+  const canValidateByCoords =
     actualDefenderNpcSlug &&
-    !effectiveDefenderNpcInstanceId &&
     Number.isFinite(hackMapCellX) &&
-    Number.isFinite(hackMapCellY)
-  ) {
-    const mapDoc = await MapModel.findOne({ name: 'main' });
-    if (mapDoc) {
-      const cell = await getCell(mapDoc, hackMapCellX, hackMapCellY);
+    Number.isFinite(hackMapCellY);
+  if (canValidateByCoords) {
+    cachedMapDoc = await MapModel.findOne({ name: 'main' });
+    if (cachedMapDoc) {
+      const cell = await getCell(cachedMapDoc, hackMapCellX, hackMapCellY);
       if (
         cell &&
         cell.occupiedBy === 'npc' &&
@@ -112,7 +112,7 @@ export async function resolveMarchLaunchTarget(params: {
   }
 
   if (effectiveDefenderNpcInstanceId && actualDefenderNpcSlug && !verifiedByCoords) {
-    const mapDoc = await MapModel.findOne({ name: 'main' });
+    const mapDoc = cachedMapDoc ?? (await MapModel.findOne({ name: 'main' }));
     if (!mapDoc) {
       throw new MarchTargetValidationError(404, 'Map not found');
     }
