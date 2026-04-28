@@ -21,7 +21,7 @@ jobs:
   babysit:
     runs-on: ubuntu-latest
     concurrency:
-      group: babysit-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.event.check_run.head_sha || github.run_id }}
+      group: babysit-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.event.check_run.id || github.run_id }}
       cancel-in-progress: true
     permissions:
       contents: read
