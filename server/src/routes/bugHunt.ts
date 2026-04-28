@@ -997,7 +997,10 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
         if (currentTokens >= maxTokens) {
           throw new Error('Bug-hunt tokens are already full');
         }
-        const tokenGrantAttempt = tokenAmountPerItem * quantity;
+        const tokensNeededToCap = maxTokens - currentTokens;
+        const maxUsefulQuantity = Math.max(1, Math.ceil(tokensNeededToCap / tokenAmountPerItem));
+        quantityToConsume = Math.min(quantity, maxUsefulQuantity);
+        const tokenGrantAttempt = tokenAmountPerItem * quantityToConsume;
         const tokensAfterUse = Math.min(maxTokens, currentTokens + tokenGrantAttempt);
         const tokenAdded = tokensAfterUse - currentTokens;
         if (tokenAdded <= 0) {
@@ -1009,7 +1012,7 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           effect: 'token',
           tokenAdded,
           itemKey: definition.itemKey,
-          quantityUsed: quantity,
+          quantityUsed: quantityToConsume,
           tokensAfterUse,
           maxTokens,
         };
@@ -1308,10 +1311,7 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
       void recordBugHuntStorageItemConsumed({
         userId,
         itemKey: definition.itemKey,
-        effect:
-          effectRaw === 'speedup' || effectRaw === 'token'
-            ? 'speedup'
-            : (effectRaw as 'cash' | 'travel'),
+        effect: effectRaw as 'cash' | 'speedup' | 'travel' | 'token',
       });
     }
     res.json({

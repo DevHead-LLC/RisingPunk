@@ -15,6 +15,7 @@ import {
 import { useAppDispatch } from '../store/hooks';
 import { balanceApi } from '../store/api/balanceApi';
 import { useFetchBalanceQuery } from '../store/api/balanceApi';
+import { subtractFromBalance } from '../store/slices/balanceSlice';
 
 type Props = {
   onClose: () => void;
@@ -193,6 +194,10 @@ export const UndergroundExchangeScreen: React.FC<Props> = ({ onClose }) => {
               packId: selectedPurchaseTarget.pack.packId,
               quantity: quantityToBuy,
             }).unwrap();
+      const totalCost = Math.max(0, Math.floor(Number(result.totalCost ?? 0)));
+      if (totalCost > 0) {
+        dispatch(subtractFromBalance(totalCost));
+      }
       dispatch(balanceApi.util.invalidateTags(['Balance']));
       Alert.alert(
         'Purchased',
