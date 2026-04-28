@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { CloseButton } from '../components/common/CloseButton';
 import { useThemeColors } from '../hooks/useThemeColors';
@@ -157,8 +157,30 @@ export const UndergroundExchangeScreen: React.FC<Props> = ({ onClose }) => {
     selectedPurchaseTarget == null
       ? 1
       : Math.max(0, Math.floor(currentBalance / Math.max(1, Math.floor(selectedUnitPrice))));
-  const selectedItemTotalCost = selectedPurchaseTarget == null ? 0 : Math.floor(selectedUnitPrice) * selectedQuantity;
+  const effectiveSelectedQuantity =
+    selectedPurchaseTarget == null
+      ? 0
+      : selectedItemMaxAffordableQuantity < 1
+        ? 0
+        : Math.max(1, Math.min(selectedQuantity, selectedItemMaxAffordableQuantity));
+  const selectedItemTotalCost =
+    selectedPurchaseTarget == null ? 0 : Math.floor(selectedUnitPrice) * effectiveSelectedQuantity;
   const isAnyPurchaseInFlight = isPurchasing || isPurchasingPack;
+
+  useEffect(() => {
+    if (!selectedPurchaseTarget) {
+      return;
+    }
+    if (selectedItemMaxAffordableQuantity < 1) {
+      if (selectedQuantity !== 1) {
+        setSelectedQuantity(1);
+      }
+      return;
+    }
+    if (selectedQuantity > selectedItemMaxAffordableQuantity) {
+      setSelectedQuantity(selectedItemMaxAffordableQuantity);
+    }
+  }, [selectedPurchaseTarget, selectedItemMaxAffordableQuantity, selectedQuantity]);
 
   const openQuantityModal = (item: UndergroundExchangeCatalogItemDto) => {
     const maxQty = Math.max(0, Math.floor(currentBalance / Math.max(1, Math.floor(item.shopPrice))));
@@ -186,7 +208,7 @@ export const UndergroundExchangeScreen: React.FC<Props> = ({ onClose }) => {
       Alert.alert('Purchase unavailable', 'You no longer have enough funds for this purchase.');
       return;
     }
-    const quantityToBuy = Math.max(1, Math.min(maxQty, selectedQuantity));
+    const quantityToBuy = effectiveSelectedQuantity;
     try {
       const result =
         selectedPurchaseTarget.kind === 'item'
@@ -469,12 +491,12 @@ export const UndergroundExchangeScreen: React.FC<Props> = ({ onClose }) => {
             <View style={styles.quantityControls}>
               <TouchableOpacity
                 style={[styles.quantityButton, { borderColor: colors.primary }]}
-                disabled={isAnyPurchaseInFlight || selectedQuantity <= 1}
+                disabled={isAnyPurchaseInFlight || effectiveSelectedQuantity <= 1}
                 onPress={() => setSelectedQuantity((prev) => Math.max(1, prev - 1))}
               >
                 <Text style={[styles.quantityButtonText, { color: colors.primary }]}>-</Text>
               </TouchableOpacity>
-              <Text style={[styles.quantityValue, { color: colors.text.primary }]}>{selectedQuantity}</Text>
+              <Text style={[styles.quantityValue, { color: colors.text.primary }]}>{effectiveSelectedQuantity}</Text>
               <TouchableOpacity
                 style={[styles.quantityButton, { borderColor: colors.primary }]}
                 disabled={isAnyPurchaseInFlight || selectedQuantity >= selectedItemMaxAffordableQuantity}
