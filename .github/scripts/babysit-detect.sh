@@ -191,11 +191,11 @@ collect_detection_snapshot() {
   done
 
   ISSUE_COMMENTS_JSON="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments?per_page=200")"
-  # Bugbot: use the latest Cursor-authored issue comment so stale older bug counts cannot override newer results.
+  # Bugbot: choose by freshest update timestamp so edited Cursor summaries override stale older counts.
   CURSOR_COMMENTS="$(
     echo "$ISSUE_COMMENTS_JSON" | jq -r '
       map(select(.user.login | ascii_downcase | contains("cursor")))
-      | sort_by(.created_at)
+      | sort_by(.updated_at // .created_at, .created_at)
       | last
       | .body // ""
     '
