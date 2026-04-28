@@ -19,6 +19,7 @@ env:
 
 jobs:
   babysit:
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request != null && contains(github.event.comment.body, '/babysit'))
     runs-on: ubuntu-latest
     concurrency:
       group: babysit-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.event.check_run.id || github.run_id }}
