@@ -989,8 +989,9 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error(`Storage item '${definition.itemKey}' missing tokenAmount`);
         }
         const tokenAmountPerItem = Math.floor(definition.tokenAmount ?? 0);
-        const currentTokens = Math.max(0, Math.floor(Number(state.currentTokens ?? 0)));
-        const maxTokens = Math.max(1, Math.floor(Number(state.maxTokens ?? 0)));
+        const tokenSnapshot = await readBugHuntTokens({ userId, session });
+        const currentTokens = Math.max(0, Math.floor(Number(tokenSnapshot.currentTokens ?? 0)));
+        const maxTokens = Math.max(1, Math.floor(Number(tokenSnapshot.maxTokens ?? 0)));
         if (!Number.isFinite(currentTokens) || !Number.isFinite(maxTokens)) {
           throw new Error('Token state is invalid');
         }
@@ -1007,7 +1008,9 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error('Bug-hunt tokens are already full');
         }
         state.currentTokens = tokensAfterUse;
-        state.lastRegenAt = new Date();
+        state.maxTokens = tokenSnapshot.maxTokens;
+        state.regenPerMinute = tokenSnapshot.regenPerMinute;
+        state.lastRegenAt = tokenSnapshot.lastRegenAt;
         responsePayload = {
           effect: 'token',
           tokenAdded,
