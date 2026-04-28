@@ -239,21 +239,21 @@ export class BattleSetupService {
       throw new Error('Computer-opponent battle requires an NPC configuration. No NPC found or specified.');
     }
 
-    /** Client should send this for map NPCs; if missing but hack map coords + slug match a cell, resolve from DB (aligns with map route npcInstanceId synthesis). */
+    /** Client should send this for map NPCs; if missing/stale but hack map coords + slug match a cell, resolve from DB. */
     let effectiveDefenderNpcInstanceId = defenderNpcInstanceId;
     let defenderNpcInstanceIdVerifiedByCoords = false;
-    if (
+    let cachedMapDoc: Awaited<ReturnType<typeof MapModel.findOne>> | null = null;
+    const canValidateByCoords =
       !isUserDefender &&
       actualDefenderNpcSlug &&
-      !effectiveDefenderNpcInstanceId &&
       typeof hackMapCellX === 'number' &&
       Number.isFinite(hackMapCellX) &&
       typeof hackMapCellY === 'number' &&
-      Number.isFinite(hackMapCellY)
-    ) {
-      const mapDoc = await MapModel.findOne({ name: 'main' });
-      if (mapDoc) {
-        const cell = await getCell(mapDoc, hackMapCellX, hackMapCellY);
+      Number.isFinite(hackMapCellY);
+    if (canValidateByCoords) {
+      cachedMapDoc = await MapModel.findOne({ name: 'main' });
+      if (cachedMapDoc) {
+        const cell = await getCell(cachedMapDoc, hackMapCellX, hackMapCellY);
         if (
           cell &&
           cell.occupiedBy === 'npc' &&
@@ -271,7 +271,7 @@ export class BattleSetupService {
 
     // Validate that NPC instance exists on map if instance ID is provided (only for NPC battles)
     if (!isUserDefender && effectiveDefenderNpcInstanceId && actualDefenderNpcSlug && !defenderNpcInstanceIdVerifiedByCoords) {
-      const mapDoc = await MapModel.findOne({ name: 'main' });
+      const mapDoc = cachedMapDoc ?? (await MapModel.findOne({ name: 'main' }));
       if (!mapDoc) {
         throw new Error('Map not found');
       }
