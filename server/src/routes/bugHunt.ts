@@ -990,6 +990,7 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
         }
         const tokenAmountPerItem = Math.floor(definition.tokenAmount ?? 0);
         const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({ userId, session });
+        // Bugbot: keep regen snapshot + token write on this same state doc instance to avoid dual-document save races.
         const tokenSnapshot = resolveRegeneratedTokenSnapshotFromPersistedState({
           currentTokensRaw: state.currentTokens,
           maxTokensRaw: state.maxTokens,
@@ -1008,6 +1009,7 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error('Bug-hunt tokens are already full');
         }
         const tokensNeededToCap = maxTokens - currentTokens;
+        // Bugbot: floor keeps token-item use full-value only; never consume an extra partial-overflow item at cap boundary.
         const maxUsefulQuantity =
           tokenAmountPerItem > maxTokens
             ? 1

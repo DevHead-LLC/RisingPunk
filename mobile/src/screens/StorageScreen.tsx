@@ -60,10 +60,13 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
       ? Math.max(0, Math.floor(Number(selectedStorageItem.tokenAmount ?? 0)))
       : 0;
   const tokensNeededToCap = Math.max(0, tokenMax - tokenCurrent);
+  // Bugbot: mirror server floor-based max-use so modal "MAX" never suggests consuming a partial-overflow token item.
   const maxUsefulTokenQuantity =
     selectedStorageItem?.category === 'token' && tokenAmountPerItem > 0
       ? tokenAmountPerItem > tokenMax
-        ? 1
+        ? tokensNeededToCap > 0
+          ? 1
+          : 0
         : Math.max(0, Math.floor(tokensNeededToCap / tokenAmountPerItem))
       : Number.POSITIVE_INFINITY;
   const modalMaxSelectableQuantity = selectedStorageItem

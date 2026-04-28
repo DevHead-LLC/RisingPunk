@@ -54,6 +54,8 @@ jobs:
               echo "Issue comment is not on a PR. Skipping."
             elif [ "$AUTHOR" = "github-actions[bot]" ]; then
               echo "Skipping bot-authored command to avoid loops."
+            # Bugbot: auto /babysit comments can be authored by GH_PAT user (not github-actions[bot]);
+            # marker-based skip is intentionally author-agnostic to prevent issue_comment trigger loops.
             elif echo "$COMMENT_BODY" | grep -q "babysit-auto:"; then
               echo "Skipping auto-generated babysit marker comment."
             elif [[ "$COMMENT_BODY" =~ (^|[[:space:]])/babysit([[:space:]]|$) ]]; then
@@ -153,6 +155,7 @@ jobs:
           HEAD_SHA="${{ steps.context.outputs.head_sha }}"
           MARKER="<!-- babysit-auto:$HEAD_SHA -->"
 
+          # Bugbot: duplicate guard keys off marker only (not author), so PAT-authored auto-comments still dedupe.
           EXISTING=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments?per_page=200" \
             --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" || true)
           if [ -n "$EXISTING" ]; then
