@@ -59,9 +59,13 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
     selectedStorageItem?.category === 'token'
       ? Math.max(0, Math.floor(Number(selectedStorageItem.tokenAmount ?? 0)))
       : 0;
+  const tokensNeededToCap = Math.max(0, tokenMax - tokenCurrent);
+  // Bugbot: mirror server ceil-based max-use so any positive token gap can consume at least one token item.
   const maxUsefulTokenQuantity =
     selectedStorageItem?.category === 'token' && tokenAmountPerItem > 0
-      ? Math.max(0, Math.ceil((tokenMax - tokenCurrent) / tokenAmountPerItem))
+      ? tokensNeededToCap <= 0
+        ? 0
+        : Math.max(1, Math.ceil(tokensNeededToCap / tokenAmountPerItem))
       : Number.POSITIVE_INFINITY;
   const modalMaxSelectableQuantity = selectedStorageItem
     ? Math.max(
@@ -189,7 +193,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
                             itemKey: item.itemKey,
                             label: item.label,
                             quantity: Math.max(0, Math.floor(item.quantity)),
-                            category: item.category,
+                            category: item.category === 'cash' ? 'cash' : 'token',
                             tokenAmount: item.tokenAmount,
                           });
                           setSelectedStorageQuantity(1);
@@ -227,7 +231,7 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
             {selectedStorageItem.category === 'token' ? (
               <>
                 <Text style={[styles.meta, { color: colors.text.secondary }]}>
-                  Tokens: {tokenCurrent.toLocaleString()}/{tokenMax.toLocaleString()} -> {projectedTokensAfterUse.toLocaleString()}/{tokenMax.toLocaleString()}
+                  Tokens: {tokenCurrent.toLocaleString()}/{tokenMax.toLocaleString()} {'->'} {projectedTokensAfterUse.toLocaleString()}/{tokenMax.toLocaleString()}
                 </Text>
                 <Text style={[styles.meta, { color: colors.text.secondary }]}>
                   Per item: +{tokenAmountPerItem.toLocaleString()} tokens

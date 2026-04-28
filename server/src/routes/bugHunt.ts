@@ -23,8 +23,8 @@ import {
 import { BUG_HUNT_STORAGE_ITEM_DEFINITIONS } from '../constants/bugHuntStorageItems';
 import { JWT_SECRET } from '../config/env';
 import {
+  resolveRegeneratedTokenSnapshotFromPersistedState,
   resolveEffectiveBugHuntTokenConfig,
-  readBugHuntTokens,
 } from '../services/BugHuntTokenService';
 import { getBugHuntTelemetrySummary, recordBugHuntStorageItemConsumed } from '../services/BugHuntTelemetryService';
 import { getBugHuntOperationalChecks } from '../services/BugHuntOperationalChecksService';
@@ -989,9 +989,19 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error(`Storage item '${definition.itemKey}' missing tokenAmount`);
         }
         const tokenAmountPerItem = Math.floor(definition.tokenAmount ?? 0);
-        const tokenSnapshot = await readBugHuntTokens({ userId, session });
-        const currentTokens = Math.max(0, Math.floor(Number(tokenSnapshot.currentTokens ?? 0)));
-        const maxTokens = Math.max(1, Math.floor(Number(tokenSnapshot.maxTokens ?? 0)));
+        const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({ userId, session });
+        // Bugbot: keep regen snapshot + token write on this same state doc instance to avoid dual-document save races.
+        const tokenSnapshot = resolveRegeneratedTokenSnapshotFromPersistedState({
+          currentTokensRaw: state.currentTokens,
+          maxTokensRaw: state.maxTokens,
+          regenPerMinuteRaw: state.regenPerMinute,
+          lastRegenAt: state.lastRegenAt,
+          syncedMaxTokens: effectiveTokenConfig.maxTokens,
+          syncedRegenPerMinute: effectiveTokenConfig.regenPerMinute,
+          now: new Date(),
+        });
+        const currentTokens = tokenSnapshot.currentTokens;
+        const maxTokens = tokenSnapshot.maxTokens;
         if (!Number.isFinite(currentTokens) || !Number.isFinite(maxTokens)) {
           throw new Error('Token state is invalid');
         }
@@ -999,7 +1009,12 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
           throw new Error('Bug-hunt tokens are already full');
         }
         const tokensNeededToCap = maxTokens - currentTokens;
-        const maxUsefulQuantity = Math.max(1, Math.ceil(tokensNeededToCap / tokenAmountPerItem));
+        // Bugbot: any positive token gap should allow at least one item use; downstream token apply remains max-capped.
+        const maxUsefulQuantity =
+          tokensNeededToCap <= 0 ? 0 : Math.max(1, Math.ceil(tokensNeededToCap / tokenAmountPerItem));
+        if (!Number.isFinite(maxUsefulQuantity) || maxUsefulQuantity < 1) {
+          throw new Error('This token item would exceed bug-hunt token capacity');
+        }
         quantityToConsume = Math.min(quantity, maxUsefulQuantity);
         const tokenGrantAttempt = tokenAmountPerItem * quantityToConsume;
         const tokensAfterUse = Math.min(maxTokens, currentTokens + tokenGrantAttempt);
@@ -1358,7 +1373,8 @@ router.post('/storage/use', auth, async (req: Request, res: Response): Promise<v
       message.includes('No active owned probe found') ||
       message.includes('already reached its target') ||
       message.includes('probeId is required') ||
-      message.includes('already full');
+      message.includes('already full') ||
+      message.includes('would exceed bug-hunt token capacity');
     if (isUserError) {
       res.status(400).json({ error: message });
       return;
