@@ -109,7 +109,6 @@ if [ -z "$PR_NUMBER" ]; then
   exit 1
 fi
 
-PR_JSON="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json number,url,headRefName,baseRefName,headRefOid)"
 if [ "$WAIT_MODE" = "true" ] && [ -z "$TIMEOUT_SECONDS" ]; then
   echo "--wait requires --timeout-seconds." >&2
   exit 1
