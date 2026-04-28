@@ -313,5 +313,17 @@ export function resolvePackById(params: {
     itemDefinitions: params.itemDefinitions,
   });
   const combined = [...all.staplePacks, ...all.weeklyPacks];
-  return combined.find((pack) => pack.packId === params.packId) ?? null;
+  const currentWeekMatch = combined.find((pack) => pack.packId === params.packId);
+  if (currentWeekMatch) {
+    return currentWeekMatch;
+  }
+  if (!params.packId.startsWith('weekly-pack-')) {
+    return null;
+  }
+  const previousWeekReference = new Date(params.now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const previousWeekPacks = buildUndergroundExchangePacks({
+    now: previousWeekReference,
+    itemDefinitions: params.itemDefinitions,
+  });
+  return previousWeekPacks.weeklyPacks.find((pack) => pack.packId === params.packId) ?? null;
 }
