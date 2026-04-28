@@ -193,10 +193,10 @@ collect_detection_snapshot() {
   done
 
   ISSUE_COMMENTS_JSON="$(gh api "repos/$REPO/issues/$PR_NUMBER/comments?per_page=200")"
-  # Bugbot: choose by freshest update timestamp so edited Cursor summaries override stale older counts.
+  # Bugbot: only trust Cursor comments tied to this head SHA, then pick freshest update to avoid stale blocker carryover.
   CURSOR_COMMENTS="$(
-    echo "$ISSUE_COMMENTS_JSON" | jq -r '
-      map(select(.user.login | ascii_downcase | contains("cursor")))
+    echo "$ISSUE_COMMENTS_JSON" | jq -r --arg head_sha "$HEAD_SHA" '
+      map(select((.user.login | ascii_downcase | contains("cursor")) and ((.body // "") | contains($head_sha))))
       | sort_by(.updated_at // .created_at)
       | last
       | .body // ""

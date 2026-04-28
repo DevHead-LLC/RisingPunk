@@ -22,7 +22,7 @@ jobs:
     if: github.event_name != 'issue_comment' || (github.event.issue.pull_request != null && contains(github.event.comment.body, '/babysit'))
     runs-on: ubuntu-latest
     concurrency:
-      group: babysit-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || github.event.check_run.id || github.run_id }}
+      group: babysit-${{ github.repository }}-${{ github.event.issue.number || github.event.inputs.pr_number || (github.event.check_run.head_sha && format('{0}-{1}', github.event.check_run.head_sha, github.event.check_run.name)) || github.run_id }}
       cancel-in-progress: true
     permissions:
       contents: read
