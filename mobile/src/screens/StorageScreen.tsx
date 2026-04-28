@@ -247,7 +247,11 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
               </Text>
               <TouchableOpacity
                 style={[styles.quantityButton, { borderColor: colors.primary }]}
-                disabled={isUsingStorageItem || effectiveSelectedStorageQuantity >= Math.max(1, modalMaxSelectableQuantity)}
+                disabled={
+                  isUsingStorageItem ||
+                  modalMaxSelectableQuantity < 1 ||
+                  selectedStorageQuantity >= modalMaxSelectableQuantity
+                }
                 onPress={() =>
                   setSelectedStorageQuantity((prev) => Math.min(Math.max(1, modalMaxSelectableQuantity), prev + 1))
                 }
