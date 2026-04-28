@@ -55,12 +55,43 @@ export type BugHuntTokenStateDto = {
 export type BugHuntStorageInventoryItemDto = {
   itemKey: string;
   label: string;
-  category: 'cash' | 'speedup' | 'travel';
+  category: 'cash' | 'speedup' | 'travel' | 'token';
   quantity: number;
   cashAmount?: number;
+  tokenAmount?: number;
   durationSeconds?: number;
   speedupDomain?: 'research' | 'construction' | 'bot_assembly';
   travelSpeedPercent?: number;
+};
+
+export type UndergroundExchangeCatalogItemDto = {
+  itemKey: string;
+  label: string;
+  category: 'speedup' | 'travel' | 'token';
+  shopPrice: number;
+  durationSeconds?: number;
+  speedupDomain?: 'research' | 'construction' | 'bot_assembly';
+  travelSpeedPercent?: number;
+  tokenAmount?: number;
+};
+
+export type UndergroundExchangePackItemDto = {
+  itemKey: string;
+  label: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+};
+
+export type UndergroundExchangePackDto = {
+  packId: string;
+  displayName: string;
+  tier: 'staple' | 'weekly';
+  discountPercent: number;
+  basePrice: number;
+  discountedPrice: number;
+  savings: number;
+  items: UndergroundExchangePackItemDto[];
 };
 
 export type BugHuntConstructionSpeedupTarget =
@@ -92,7 +123,7 @@ const bugHuntBaseQuery = async (args: any, api: any, extraOptions: any) => {
 export const bugHuntApi = createApi({
   reducerPath: 'bugHuntApi',
   baseQuery: bugHuntBaseQuery,
-  tagTypes: ['BugInstances', 'BugWorldState', 'UserHunters', 'BugHuntTokens'],
+  tagTypes: ['BugInstances', 'BugWorldState', 'UserHunters', 'BugHuntTokens', 'UndergroundExchangeCatalog'],
   endpoints: (builder) => ({
     fetchBugInstances: builder.query<
       { bugs: BugInstanceDto[]; antWorldCap: number; serverNowUtc: string },
@@ -166,13 +197,72 @@ export const bugHuntApi = createApi({
       query: () => '/api/bug-hunt/storage/inventory',
       providesTags: ['UserHunters'],
     }),
+    fetchUndergroundExchangeCatalog: builder.query<
+      { items: UndergroundExchangeCatalogItemDto[]; serverTimeMs: number },
+      void
+    >({
+      query: () => '/api/bug-hunt/exchange/catalog',
+      providesTags: ['UndergroundExchangeCatalog'],
+    }),
+    fetchUndergroundExchangePacks: builder.query<
+      {
+        staplePacks: UndergroundExchangePackDto[];
+        weeklyPacks: UndergroundExchangePackDto[];
+        weekStartUtc: string;
+        weekEndUtc: string;
+        serverTimeMs: number;
+      },
+      void
+    >({
+      query: () => '/api/bug-hunt/exchange/packs',
+      providesTags: ['UndergroundExchangeCatalog'],
+    }),
+    purchaseUndergroundExchangeItem: builder.mutation<
+      {
+        success: true;
+        itemKey: string;
+        quantityPurchased: number;
+        totalCost: number;
+        newBalance: number;
+        serverTimeMs: number;
+      },
+      { itemKey: string; quantity: number }
+    >({
+      query: (body) => ({
+        url: '/api/bug-hunt/exchange/purchase',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['UserHunters', 'UndergroundExchangeCatalog'],
+    }),
+    purchaseUndergroundExchangePack: builder.mutation<
+      {
+        success: true;
+        packId: string;
+        quantityPurchased: number;
+        totalCost: number;
+        newBalance: number;
+        serverTimeMs: number;
+      },
+      { packId: string; quantity: number }
+    >({
+      query: (body) => ({
+        url: '/api/bug-hunt/exchange/packs/purchase',
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['UserHunters', 'UndergroundExchangeCatalog'],
+    }),
     useStorageItem: builder.mutation<
       {
         success: true;
-        effect: 'cash' | 'speedup' | 'travel';
+        effect: 'cash' | 'speedup' | 'travel' | 'token';
         itemKey: string;
         quantityUsed?: number;
         cashAdded?: number;
+        tokenAdded?: number;
+        tokensAfterUse?: number;
+        maxTokens?: number;
         domain?: 'research' | 'construction' | 'bot_assembly';
         target?: string;
         nextCompletesAt?: string;
@@ -217,5 +307,9 @@ export const {
   useUnlockHunterMutation,
   useFetchHunterStatsQuery,
   useFetchStorageInventoryQuery,
+  useFetchUndergroundExchangeCatalogQuery,
+  useFetchUndergroundExchangePacksQuery,
+  usePurchaseUndergroundExchangeItemMutation,
+  usePurchaseUndergroundExchangePackMutation,
   useUseStorageItemMutation,
 } = bugHuntApi;

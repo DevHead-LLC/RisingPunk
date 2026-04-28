@@ -22,6 +22,7 @@ import {BattleGridScreen} from './BattleGridScreen';
 import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
 import {HunterFacilityScreen} from './HunterFacilityScreen';
 import {StorageScreen} from './StorageScreen';
+import {UndergroundExchangeScreen} from './UndergroundExchangeScreen';
 import {BugHuntHunterSelectionScreen} from './BugHuntHunterSelectionScreen';
 import {PacketBreachLevelScreen} from './PacketBreachLevelScreen';
 import {PacketBreachGameScreen} from './PacketBreachGameScreen';
@@ -1328,6 +1329,12 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
         return <ResearchScreen
           onClose={() => navigateToScreen('turf')}
         />;
+      case 'undergroundExchange':
+        return (
+          <UndergroundExchangeScreen
+            onClose={() => navigateToScreen('turf')}
+          />
+        );
       case 'storage':
         return (
           <StorageScreen
@@ -1934,6 +1941,19 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             <DailyHaulLocation />
             {!isOnboardingOrIntroActive && (
               <>
+                <View style={styles.exchangeIconDock}>
+                  <TouchableOpacity
+                    style={styles.exchangeIconButton}
+                    onPress={() => navigateToScreen('undergroundExchange')}
+                    activeOpacity={0.8}
+                  >
+                    <Image
+                      source={require('../assets/images/ui/undergroundExchange.png')}
+                      style={{ width: 56, height: 56 }}
+                      resizeMode="contain"
+                    />
+                  </TouchableOpacity>
+                </View>
                 <TaskGuide 
                   currentScreen={currentScreen} 
                   onNavigateToProfile={() => navigateToScreen('profile')}
@@ -2126,6 +2146,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     zIndex: 10002,
+  },
+  exchangeIconDock: {
+    position: 'absolute',
+    left: SIZING.spacing.lg,
+    bottom: SIZING.spacing.lg + 52,
+    zIndex: 10002,
+  },
+  exchangeIconButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 8,
+    backgroundColor: 'rgba(128, 90, 213, 0.95)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 255, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   activeJobsIconButton: {
     width: 48,

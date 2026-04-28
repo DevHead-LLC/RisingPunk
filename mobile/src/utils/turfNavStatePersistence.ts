@@ -27,6 +27,7 @@ export type TurfScreenName =
   | 'map'
   | 'profile'
   | 'research'
+  | 'undergroundExchange'
   | 'storage'
   | 'hunterFacility'
   | 'bugHuntHunterSelection'
@@ -48,6 +49,7 @@ const VALID_SCREENS: TurfScreenName[] = [
   'map',
   'profile',
   'research',
+  'undergroundExchange',
   'storage',
   'hunterFacility',
   'bugHuntHunterSelection',

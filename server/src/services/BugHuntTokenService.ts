@@ -77,6 +77,33 @@ function applyMinuteRegen(snapshot: TokenSnapshot, nowMs: number): TokenSnapshot
   };
 }
 
+export function resolveRegeneratedTokenSnapshotFromPersistedState(params: {
+  currentTokensRaw: unknown;
+  maxTokensRaw: unknown;
+  regenPerMinuteRaw: unknown;
+  lastRegenAt: Date | null | undefined;
+  syncedMaxTokens: number;
+  syncedRegenPerMinute: number;
+  now: Date;
+}): TokenSnapshot {
+  const persistedSnapshot: TokenSnapshot = {
+    currentTokens: Math.max(0, Math.floor(Number(params.currentTokensRaw ?? 0))),
+    maxTokens: Math.max(1, Math.floor(Number(params.maxTokensRaw ?? 0))),
+    regenPerMinute: Math.max(0, Math.floor(Number(params.regenPerMinuteRaw ?? 0))),
+    lastRegenAt: params.lastRegenAt instanceof Date ? params.lastRegenAt : new Date(NaN),
+  };
+  const regenerated = applyMinuteRegen(persistedSnapshot, params.now.getTime());
+  const syncedMaxTokens = Math.max(1, Math.floor(Number(params.syncedMaxTokens)));
+  const syncedRegenPerMinute = Math.max(0, Math.floor(Number(params.syncedRegenPerMinute)));
+  const syncedCurrentTokens = Math.min(syncedMaxTokens, Math.max(0, Math.floor(regenerated.currentTokens)));
+  return {
+    currentTokens: syncedCurrentTokens,
+    maxTokens: syncedMaxTokens,
+    regenPerMinute: syncedRegenPerMinute,
+    lastRegenAt: regenerated.lastRegenAt,
+  };
+}
+
 async function getOrCreateRegeneratedTokenState(params: {
   userId: string;
   session: ClientSession;
