@@ -147,12 +147,17 @@ async function getMapOccupantAtTile(params: {
   x: number;
   y: number;
   session?: mongoose.ClientSession;
+  /** Bugbot: when provided, avoids a second `MapModel.findOne({ name: 'main' })` in `launchTransferRun`. */
+  mapDoc?: Record<string, unknown> | null;
 }): Promise<{ occupiedBy: 'none' | 'player' | 'npc'; userId: string | null } | null> {
-  const mapQuery = MapModel.findOne({ name: 'main' });
-  if (params.session) {
-    mapQuery.session(params.session);
+  let mapDoc = params.mapDoc;
+  if (mapDoc === undefined) {
+    const mapQuery = MapModel.findOne({ name: 'main' });
+    if (params.session) {
+      mapQuery.session(params.session);
+    }
+    mapDoc = (await mapQuery.lean()) as Record<string, unknown> | null;
   }
-  const mapDoc = await mapQuery.lean();
   if (!mapDoc) {
     return null;
   }
@@ -256,14 +261,18 @@ export async function launchTransferRun(
     requestedItemsRaw: params.items,
   });
 
-  const recipientTile = await getMapOccupantAtTile({ x: recipientTargetX, y: recipientTargetY });
-  if (!recipientTile || recipientTile.occupiedBy !== 'player' || recipientTile.userId !== recipientId) {
-    throw new TransferRunError(409, 'Recipient is no longer at the selected location');
-  }
-
   const mapDoc = await MapModel.findOne({ name: 'main' }).lean();
   if (!mapDoc) {
     throw new TransferRunError(404, 'Main map not found');
+  }
+
+  const recipientTile = await getMapOccupantAtTile({
+    x: recipientTargetX,
+    y: recipientTargetY,
+    mapDoc: mapDoc as Record<string, unknown>,
+  });
+  if (!recipientTile || recipientTile.occupiedBy !== 'player' || recipientTile.userId !== recipientId) {
+    throw new TransferRunError(409, 'Recipient is no longer at the selected location');
   }
 
   const senderHouse = await (async () => {
@@ -582,7 +591,14 @@ export async function settleDueTransferRunsOnce(): Promise<void> {
       .select('transferRunId')
       .lean();
     for (const row of due) {
-      await settleTransferRunArrival(String(row.transferRunId));
+      try {
+        await settleTransferRunArrival(String(row.transferRunId));
+      } catch (error) {
+        console.error(
+          `Transfer run settlement failed for transferRunId=${String(row.transferRunId)}:`,
+          error
+        );
+      }
     }
 
     const staleResolvingCutoff = new Date(Date.now() - TRANSFER_RESOLVING_RECOVERY_MS);
@@ -596,21 +612,28 @@ export async function settleDueTransferRunsOnce(): Promise<void> {
     for (const row of staleResolvingRuns) {
       const session = await mongoose.startSession();
       try {
-        await session.withTransaction(async () => {
-          const run = await TransferRun.findOne({
-            transferRunId: String(row.transferRunId),
-            state: 'resolving',
-          }).session(session);
-          if (!run) {
-            return;
-          }
-          await settleTransferRunAsFailedOrCancelled({
-            session,
-            run,
-            outcomeState: 'failed',
-            failureReason: 'resolving-recovery-timeout',
+        try {
+          await session.withTransaction(async () => {
+            const run = await TransferRun.findOne({
+              transferRunId: String(row.transferRunId),
+              state: 'resolving',
+            }).session(session);
+            if (!run) {
+              return;
+            }
+            await settleTransferRunAsFailedOrCancelled({
+              session,
+              run,
+              outcomeState: 'failed',
+              failureReason: 'resolving-recovery-timeout',
+            });
           });
-        });
+        } catch (error) {
+          console.error(
+            `Stale resolving recovery failed for transferRunId=${String(row.transferRunId)}:`,
+            error
+          );
+        }
       } finally {
         session.endSession();
       }
