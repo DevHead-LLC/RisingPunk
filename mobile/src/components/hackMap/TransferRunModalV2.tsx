@@ -50,6 +50,8 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
     const items = [...selectedItems].sort((a, b) => a.itemKey.localeCompare(b.itemKey));
     return JSON.stringify({ w: walletAmount, items });
   }, [walletAmount, selectedItems]);
+  const quoteInputsKeyRef = useRef(quoteInputsKey);
+  quoteInputsKeyRef.current = quoteInputsKey;
   const [quoteKeyAtLastSuccess, setQuoteKeyAtLastSuccess] = useState<string | null>(null);
   const rows = inventoryData?.items ?? [];
   const quote = latestQuote;
@@ -80,7 +82,7 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
         try {
           const data = await quoteTransfer({ walletAmount, items: selectedItems }).unwrap();
           if (reqSeq !== quoteReqSeqRef.current) return;
-          if (quoteInputsKey !== inputsKeyWhenScheduled) {
+          if (quoteInputsKeyRef.current !== inputsKeyWhenScheduled) {
             return;
           }
           setLatestQuote(data as TransferQuote);
