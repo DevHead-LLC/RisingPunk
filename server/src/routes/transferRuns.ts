@@ -55,6 +55,7 @@ router.post('/quote', auth, async (req: Request, res: Response): Promise<void> =
       feeAmount: quote.feeAmount,
       totalSenderCashDebit: quote.totalSenderCashDebit,
       itemPayload: quote.itemPayload,
+      feeRate: quote.feeRate,
       feePolicyNote: 'Transfer fee is non-refundable once transfer launches.',
     });
   } catch (error) {

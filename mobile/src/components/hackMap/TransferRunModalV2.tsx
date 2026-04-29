@@ -16,6 +16,7 @@ type TransferQuote = {
   feeAmount: number;
   totalSenderCashDebit: number;
   itemPayload: Array<{ itemKey: string; quantity: number; unitValue: number; totalValue: number }>;
+  feeRate: number;
   feePolicyNote: string;
 };
 
@@ -252,14 +253,33 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
               </ScrollView>
             </View>
 
-            <View style={styles.summary}>
-              <View style={styles.summaryRow}><Text style={styles.summaryLabel}>You send</Text><Text style={styles.summaryValue}>${Math.floor(quote?.totalTransferValue ?? 0).toLocaleString()}</Text></View>
-              <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Fee (10%)</Text><Text style={styles.summaryFee}>${Math.floor(quote?.feeAmount ?? 0).toLocaleString()}</Text></View>
-              <View style={styles.summaryRow}><Text style={styles.summaryTotalLabel}>Total cash debit</Text><Text style={styles.summaryTotalValue}>${Math.floor(quote?.totalSenderCashDebit ?? 0).toLocaleString()}</Text></View>
-              <Text style={styles.warning}>Transfer fee is non-refundable once launched.</Text>
-              {quoteState.isLoading ? <Text style={styles.helper}>Updating quote...</Text> : null}
-              {quoteError ? <Text style={styles.error}>{quoteError}</Text> : null}
-            </View>
+            {tab !== 'active' ? (
+              <View style={styles.summary}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Cash send</Text>
+                  <Text style={styles.summaryValue}>${Math.floor(quote?.walletAmount ?? 0).toLocaleString()}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Items value</Text>
+                  <Text style={styles.summaryValue}>${Math.floor(quote?.itemValueTotal ?? 0).toLocaleString()}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>You send (combined)</Text>
+                  <Text style={styles.summaryValue}>${Math.floor(quote?.totalTransferValue ?? 0).toLocaleString()}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Fee ({quote ? Math.round(quote.feeRate * 100) : 0}%)</Text>
+                  <Text style={styles.summaryFee}>${Math.floor(quote?.feeAmount ?? 0).toLocaleString()}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryTotalLabel}>Total cash debit</Text>
+                  <Text style={styles.summaryTotalValue}>${Math.floor(quote?.totalSenderCashDebit ?? 0).toLocaleString()}</Text>
+                </View>
+                <Text style={styles.warning}>Transfer fee is non-refundable once launched.</Text>
+                {quoteState.isLoading ? <Text style={styles.helper}>Updating quote...</Text> : null}
+                {quoteError ? <Text style={styles.error}>{quoteError}</Text> : null}
+              </View>
+            ) : null}
 
             <View style={styles.footer}>
               <TouchableOpacity style={styles.ghostBtn} onPress={onClose}><Text style={styles.ghostText}>Close</Text></TouchableOpacity>

@@ -44,6 +44,8 @@ export type TransferRunQuote = {
   feeAmount: number;
   totalSenderCashDebit: number;
   itemPayload: TransferRunItemPayloadRow[];
+  /** Matches fee calculation (`feeAmount ≈ round(totalTransferValue * feeRate)`). Exposed for UI labels. */
+  feeRate: number;
 };
 
 export type LaunchTransferRunParams = {
@@ -140,6 +142,7 @@ export function buildTransferRunQuote(params: {
     feeAmount,
     totalSenderCashDebit: walletAmount + feeAmount,
     itemPayload,
+    feeRate: TRANSFER_FEE_RATE,
   };
 }
 

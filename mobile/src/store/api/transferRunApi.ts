@@ -74,6 +74,7 @@ export const transferRunApi = createApi({
         feeAmount: number;
         totalSenderCashDebit: number;
         itemPayload: TransferRunItemPayload[];
+        feeRate: number;
         feePolicyNote: string;
       },
       { walletAmount: number; items: Array<{ itemKey: string; quantity: number }> }
