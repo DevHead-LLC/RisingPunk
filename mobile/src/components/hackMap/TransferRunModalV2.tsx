@@ -88,16 +88,7 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
     return () => clearTimeout(timer);
   }, [visible, walletAmount, selectedItems, quoteTransfer]);
 
-  useEffect(() => {
-    if (visible) return;
-    // Reset once when modal closes; avoid hidden-state render loops.
-    setTab('items');
-    setSelectedByKey({});
-    setCashInput('');
-    setQuoteError(null);
-    setLatestQuote(null);
-    quoteReqSeqRef.current = 0;
-  }, [visible]);
+  // Bugbot note: parent unmounts when hidden, so visible never goes false while mounted; no close cleanup effect needed.
 
   const canSend = recipient != null && !launchState.isLoading && quote != null && quoteError == null && !quoteState.isLoading;
   const headerBalance = Math.max(0, Math.floor(Number(balanceData?.total ?? 0)));
@@ -124,10 +115,6 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
         items: selectedItems,
       }).unwrap();
       Alert.alert('Transfer launched', `Transfer run sent to ${recipient.username}. Fee is non-refundable.`);
-      setSelectedByKey({});
-      setCashInput('');
-      setQuoteError(null);
-      setLatestQuote(null);
       onClose();
       await Promise.all([refetchBalance(), refetchInventory(), refetchRuns()]);
     } catch (error: unknown) {

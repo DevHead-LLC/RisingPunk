@@ -130,7 +130,7 @@ export function buildTransferRunQuote(params: {
   }
   const feeAmount = Math.round(totalTransferValue * TRANSFER_FEE_RATE);
   if (!Number.isFinite(feeAmount) || feeAmount <= 0) {
-    throw new TransferRunError(500, 'Transfer fee calculation failed');
+    throw new TransferRunError(400, 'Transfer value is too small to produce a valid fee');
   }
 
   return {
