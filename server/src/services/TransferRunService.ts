@@ -70,7 +70,8 @@ function normalizeRequestedItems(items: RequestedTransferItem[]): RequestedTrans
   for (const row of items) {
     const itemKey = String(row.itemKey ?? '').trim();
     const quantity = Math.floor(Number(row.quantity ?? 0));
-    if (itemKey === '' || quantity <= 0) {
+    // NaN (e.g. non-numeric quantity) must fail here; quantity <= 0 does not reject NaN.
+    if (itemKey === '' || !Number.isFinite(quantity) || quantity <= 0) {
       throw new TransferRunError(400, 'Each transfer item must include a valid itemKey and positive quantity');
     }
     quantityByKey.set(itemKey, (quantityByKey.get(itemKey) ?? 0) + quantity);
@@ -82,7 +83,12 @@ export function buildTransferRunQuote(params: {
   walletAmountRaw: unknown;
   requestedItemsRaw: RequestedTransferItem[];
 }): TransferRunQuote {
-  const walletAmount = Math.max(0, Math.floor(Number(params.walletAmountRaw ?? 0)));
+  const walletNumeric = Number(params.walletAmountRaw ?? 0);
+  // Math.max(0, Math.floor(NaN)) is NaN; NaN > 0 is false so min-wallet and caps are bypassed.
+  if (!Number.isFinite(walletNumeric)) {
+    throw new TransferRunError(400, 'Wallet amount must be a valid number');
+  }
+  const walletAmount = Math.max(0, Math.floor(walletNumeric));
   const requestedItems = normalizeRequestedItems(params.requestedItemsRaw ?? []);
   const itemPayload: TransferRunItemPayloadRow[] = [];
   let itemValueTotal = 0;
@@ -252,18 +258,6 @@ export async function launchTransferRun(
     requestedItemsRaw: params.items,
   });
 
-  const senderCrewStatus = await CrewStatus.findOne({ userId: senderId }).lean();
-  const recipientCrewStatus = await CrewStatus.findOne({ userId: recipientId }).lean();
-  if (
-    !senderCrewStatus?.isInCrew ||
-    !recipientCrewStatus?.isInCrew ||
-    !senderCrewStatus.crewId ||
-    !recipientCrewStatus.crewId ||
-    String(senderCrewStatus.crewId) !== String(recipientCrewStatus.crewId)
-  ) {
-    throw new TransferRunError(403, 'Sender and recipient must be in the same crew at launch');
-  }
-
   const recipientTile = await getMapOccupantAtTile({ x: recipientTargetX, y: recipientTargetY });
   if (!recipientTile || recipientTile.occupiedBy !== 'player' || recipientTile.userId !== recipientId) {
     throw new TransferRunError(409, 'Recipient is no longer at the selected location');
@@ -329,6 +323,18 @@ export async function launchTransferRun(
           409,
           `Maximum ${TRANSFER_MAX_ACTIVE_PER_SENDER} active transfer runs per sender`
         );
+      }
+
+      const senderCrewStatus = await CrewStatus.findOne({ userId: senderId }).session(session).lean();
+      const recipientCrewStatus = await CrewStatus.findOne({ userId: recipientId }).session(session).lean();
+      if (
+        !senderCrewStatus?.isInCrew ||
+        !recipientCrewStatus?.isInCrew ||
+        !senderCrewStatus.crewId ||
+        !recipientCrewStatus.crewId ||
+        String(senderCrewStatus.crewId) !== String(recipientCrewStatus.crewId)
+      ) {
+        throw new TransferRunError(403, 'Sender and recipient must be in the same crew at launch');
       }
 
       const senderUser = await User.findById(senderId).session(session);
