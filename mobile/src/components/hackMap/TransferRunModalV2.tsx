@@ -33,7 +33,8 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
   const [latestQuote, setLatestQuote] = useState<TransferQuote | null>(null);
   const [quoteTransfer, quoteState] = useQuoteTransferRunMutation();
   const [launchTransfer, launchState] = useLaunchTransferRunMutation();
-  const [cancelTransfer, cancelState] = useCancelTransferRunMutation();
+  const [cancelTransfer] = useCancelTransferRunMutation();
+  const [cancelBusyTransferRunId, setCancelBusyTransferRunId] = useState<string | null>(null);
   const { data: balanceData, refetch: refetchBalance } = useFetchBalanceQuery(undefined, { skip: !visible, pollingInterval: visible ? 5000 : 0 });
   const { data: inventoryData, refetch: refetchInventory } = useFetchStorageInventoryQuery(undefined, { skip: !visible, pollingInterval: visible ? 5000 : 0 });
   const { data: myRunsData, isFetching: runsLoading, refetch: refetchRuns } = useGetMyTransferRunsQuery(undefined, { skip: !visible, pollingInterval: visible ? 3000 : 0 });
@@ -147,6 +148,7 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
   };
 
   const onCancelRun = async (transferRunId: string) => {
+    setCancelBusyTransferRunId(transferRunId);
     try {
       await cancelTransfer({ transferRunId }).unwrap();
       Alert.alert('Transfer cancelled', 'Payload refunded minus non-refundable fee.');
@@ -154,6 +156,8 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
     } catch (error: unknown) {
       const message = (error as { data?: { error?: string } })?.data?.error;
       Alert.alert('Cancel failed', message ? String(message) : 'Unable to cancel transfer');
+    } finally {
+      setCancelBusyTransferRunId(null);
     }
   };
 
@@ -243,7 +247,21 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
                           <Text style={styles.rowTitle}>${Math.floor(run.totalTransferValue).toLocaleString()} transfer</Text>
                           <Text style={styles.rowMeta}>Fee: ${Math.floor(run.feeAmount).toLocaleString()} | ETA: {eta}s</Text>
                         </View>
-                        <TouchableOpacity style={[styles.cancelBtn, { opacity: run.state === 'outbound' && !cancelState.isLoading ? 1 : 0.6 }]} onPress={() => onCancelRun(run.transferRunId)} disabled={run.state !== 'outbound' || cancelState.isLoading}>
+                        <TouchableOpacity
+                          style={[
+                            styles.cancelBtn,
+                            {
+                              opacity:
+                                run.state !== 'outbound'
+                                  ? 0.6
+                                  : cancelBusyTransferRunId === run.transferRunId
+                                    ? 0.75
+                                    : 1,
+                            },
+                          ]}
+                          onPress={() => onCancelRun(run.transferRunId)}
+                          disabled={run.state !== 'outbound' || cancelBusyTransferRunId === run.transferRunId}
+                        >
                           <Text style={styles.cancelText}>Cancel</Text>
                         </TouchableOpacity>
                       </View>

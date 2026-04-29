@@ -10,7 +10,10 @@ const TRANSFER_ICON = require('../../assets/images/hackMap/sharing/gifting.png')
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reanimated typing mismatch with RN types.
 const ReanimatedView = Animated.View as any;
 
-function computeTransferFrame(run: TransferRunActivePublic, nowMs: number): { x: number; y: number } | null {
+function computeTransferFrame(
+  run: TransferRunActivePublic,
+  nowMs: number
+): { x: number; y: number; start: { cx: number; cy: number }; end: { cx: number; cy: number } } | null {
   if (run.state !== 'outbound') {
     return null;
   }
@@ -25,6 +28,8 @@ function computeTransferFrame(run: TransferRunActivePublic, nowMs: number): { x:
   return {
     x: start.cx + (end.cx - start.cx) * progress,
     y: start.cy + (end.cy - start.cy) * progress,
+    start,
+    end,
   };
 }
 
@@ -108,8 +113,7 @@ export const TransferRunAnimationLayer: React.FC<Props> = ({ runs, animatedMapSt
       {runs.map((run) => {
         const frame = computeTransferFrame(run, nowMs);
         if (!frame) return null;
-        const start = marchTileCenter(run.originX, run.originY);
-        const end = marchTileCenter(run.targetX, run.targetY);
+        const { start, end, x: iconX, y: iconY } = frame;
         const dx = end.cx - start.cx;
         const dy = end.cy - start.cy;
         const length = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -142,8 +146,8 @@ export const TransferRunAnimationLayer: React.FC<Props> = ({ runs, animatedMapSt
             <View
               style={{
               position: 'absolute',
-              left: frame.x - TRANSFER_ICON_SIZE / 2,
-              top: frame.y - TRANSFER_ICON_SIZE / 2,
+              left: iconX - TRANSFER_ICON_SIZE / 2,
+              top: iconY - TRANSFER_ICON_SIZE / 2,
               width: TRANSFER_ICON_SIZE,
               height: TRANSFER_ICON_SIZE,
             }}
