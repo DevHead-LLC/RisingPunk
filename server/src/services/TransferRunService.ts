@@ -20,7 +20,13 @@ const TRANSFER_SWEEP_INTERVAL_MS = 5_000;
 const TRANSFER_RESOLVING_RECOVERY_MS = 60_000;
 
 const STORAGE_VALUE_BY_ITEM_KEY = new Map(
-  BUG_HUNT_STORAGE_ITEM_DEFINITIONS.map((row) => [row.itemKey, Math.floor(Number(row.shopPrice ?? 0))])
+  BUG_HUNT_STORAGE_ITEM_DEFINITIONS.map((row) => {
+    const shopPrice = Math.floor(Number(row.shopPrice ?? 0));
+    const cashAmount = Math.floor(Number(row.cashAmount ?? 0));
+    // Cash wallet drops are transferable and their authoritative unit value is the cash amount itself.
+    const resolvedUnitValue = shopPrice > 0 ? shopPrice : cashAmount;
+    return [row.itemKey, resolvedUnitValue];
+  })
 );
 
 let transferRunSweepTimer: NodeJS.Timeout | null = null;

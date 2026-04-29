@@ -108,10 +108,39 @@ export const TransferRunAnimationLayer: React.FC<Props> = ({ runs, animatedMapSt
       {runs.map((run) => {
         const frame = computeTransferFrame(run, nowMs);
         if (!frame) return null;
+        const start = marchTileCenter(run.originX, run.originY);
+        const end = marchTileCenter(run.targetX, run.targetY);
+        const dx = end.cx - start.cx;
+        const dy = end.cy - start.cy;
+        const length = Math.sqrt(dx * dx + dy * dy) || 1;
+        const angle = Math.atan2(dy, dx);
+        const midX = (start.cx + end.cx) / 2;
+        const midY = (start.cy + end.cy) / 2;
         return (
           <View
             key={run.transferRunId}
             style={{
+              ...StyleSheet.absoluteFillObject,
+            }}
+            pointerEvents="none"
+          >
+            <View
+              style={{
+                position: 'absolute',
+                left: midX - length / 2,
+                top: midY - 0.5,
+                width: length,
+                height: 1,
+                borderWidth: 1,
+                borderStyle: 'dashed',
+                borderColor: '#00FF41',
+                borderRadius: 0.5,
+                opacity: 0.72,
+                transform: [{ rotate: `${angle}rad` }],
+              }}
+            />
+            <View
+              style={{
               position: 'absolute',
               left: frame.x - TRANSFER_ICON_SIZE / 2,
               top: frame.y - TRANSFER_ICON_SIZE / 2,
@@ -120,6 +149,7 @@ export const TransferRunAnimationLayer: React.FC<Props> = ({ runs, animatedMapSt
             }}
           >
             <Image source={TRANSFER_ICON} style={{ width: TRANSFER_ICON_SIZE, height: TRANSFER_ICON_SIZE }} resizeMode="contain" />
+          </View>
           </View>
         );
       })}
