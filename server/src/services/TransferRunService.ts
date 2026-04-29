@@ -345,8 +345,8 @@ export async function launchTransferRun(
       }
 
       const senderUser = await User.findById(senderId).session(session);
-      const recipientUser = await User.findById(recipientId).session(session);
-      if (!senderUser || !recipientUser) {
+      const recipientExists = await User.exists({ _id: recipientId }).session(session);
+      if (!senderUser || !recipientExists) {
         throw new TransferRunError(404, 'Sender or recipient account not found');
       }
 
@@ -488,22 +488,14 @@ async function settleTransferRunAsDelivered(params: {
 }
 
 export async function settleTransferRunArrival(transferRunId: string): Promise<void> {
-  const run = await TransferRun.findOneAndUpdate(
-    { transferRunId, state: 'outbound' },
-    { $set: { state: 'resolving' } },
-    { new: true }
-  );
-  if (!run) {
-    return;
-  }
-
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
-      const resolvingRun = await TransferRun.findOne({
-        transferRunId,
-        state: 'resolving',
-      }).session(session);
+      const resolvingRun = await TransferRun.findOneAndUpdate(
+        { transferRunId, state: 'outbound' },
+        { $set: { state: 'resolving' } },
+        { new: true, session }
+      );
       if (!resolvingRun) {
         return;
       }
