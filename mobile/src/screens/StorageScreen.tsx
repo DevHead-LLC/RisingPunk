@@ -27,7 +27,12 @@ export const StorageScreen: React.FC<Props> = ({ onClose }) => {
     data: storageData,
     isLoading: storageLoading,
     refetch: refetchStorage,
-  } = useFetchStorageInventoryQuery();
+  } = useFetchStorageInventoryQuery(undefined, {
+    // Keep recipient inventory feeling live while Storage is open.
+    pollingInterval: 2500,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
   const { data: tokenStateData } = useFetchBugHuntTokenStateQuery();
   const [useStorageItem, { isLoading: isUsingStorageItem }] = useUseStorageItemMutation();
   const [selectedStorageItem, setSelectedStorageItem] = useState<ConsumableStorageItem | null>(null);
