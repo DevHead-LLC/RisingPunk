@@ -50,6 +50,42 @@ export async function resolveEffectiveBugHuntTokenConfig(params: {
   return { maxTokens, regenPerMinute };
 }
 
+export async function getOrCreateUserBugHuntStateDocument(params: {
+  userId: string;
+  session: ClientSession;
+}): Promise<IUserBugHuntStateDocument> {
+  const existing = await UserBugHuntState.findOne({ userId: params.userId }).session(params.session);
+  if (existing) {
+    if (!Array.isArray(existing.storageItems)) {
+      existing.storageItems = [];
+    }
+    return existing;
+  }
+
+  const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({
+    userId: params.userId,
+    session: params.session,
+  });
+  const created = await UserBugHuntState.create(
+    [
+      {
+        userId: params.userId,
+        currentTokens: effectiveTokenConfig.maxTokens,
+        maxTokens: effectiveTokenConfig.maxTokens,
+        regenPerMinute: effectiveTokenConfig.regenPerMinute,
+        lastRegenAt: new Date(),
+        storageItems: [],
+      },
+    ],
+    { session: params.session }
+  );
+  const state = created[0];
+  if (!state) {
+    throw new BugHuntTokenSpendError(500, 'Failed to initialize user bug-hunt state');
+  }
+  return state;
+}
+
 function applyMinuteRegen(snapshot: TokenSnapshot, nowMs: number): TokenSnapshot {
   const lastMs = snapshot.lastRegenAt.getTime();
   if (!Number.isFinite(lastMs) || lastMs <= 0) {
