@@ -186,6 +186,46 @@ async function getMapOccupantAtTile(params: {
   };
 }
 
+async function resolveSenderHouseFromMapDoc(params: {
+  mapDoc: Record<string, unknown>;
+  senderId: string;
+  session: mongoose.ClientSession;
+}): Promise<{ x: number; y: number } | null> {
+  const { mapDoc, senderId, session } = params;
+  if ((mapDoc as { gridSize?: number }).gridSize === 500) {
+    const row = await MapCell.findOne({
+      mapId: (mapDoc as { _id: mongoose.Types.ObjectId })._id,
+      userId: senderId,
+      occupiedBy: 'player',
+      entityName: { $ne: 'YOU' },
+    })
+      .session(session)
+      .lean()
+      .select('x y');
+    if (row) return { x: Number(row.x), y: Number(row.y) };
+    const fallback = await MapCell.findOne({
+      mapId: (mapDoc as { _id: mongoose.Types.ObjectId })._id,
+      userId: senderId,
+      occupiedBy: 'player',
+    })
+      .session(session)
+      .lean()
+      .select('x y');
+    return fallback ? { x: Number(fallback.x), y: Number(fallback.y) } : null;
+  }
+  const cells = Array.isArray((mapDoc as any).cells) ? ((mapDoc as any).cells as any[]) : [];
+  const row =
+    cells.find(
+      (cell) =>
+        String(cell.userId ?? '') === senderId &&
+        cell.occupiedBy === 'player' &&
+        String(cell.entityName ?? '') !== 'YOU'
+    ) ??
+    cells.find((cell) => String(cell.userId ?? '') === senderId && cell.occupiedBy === 'player');
+  if (!row) return null;
+  return { x: Number(row.x), y: Number(row.y) };
+}
+
 function upsertStorageItems(params: {
   stateDoc: IUserBugHuntStateDocument;
   rows: Array<{ itemKey: string; quantityDelta: number }>;
@@ -261,66 +301,17 @@ export async function launchTransferRun(
     requestedItemsRaw: params.items,
   });
 
-  const mapDoc = await MapModel.findOne({ name: 'main' }).lean();
-  if (!mapDoc) {
-    throw new TransferRunError(404, 'Main map not found');
-  }
-
-  const recipientTile = await getMapOccupantAtTile({
-    x: recipientTargetX,
-    y: recipientTargetY,
-    mapDoc: mapDoc as Record<string, unknown>,
-  });
-  if (!recipientTile || recipientTile.occupiedBy !== 'player' || recipientTile.userId !== recipientId) {
-    throw new TransferRunError(409, 'Recipient is no longer at the selected location');
-  }
-
-  const senderHouse = await (async () => {
-    if ((mapDoc as { gridSize?: number }).gridSize === 500) {
-      const row = await MapCell.findOne({
-        mapId: (mapDoc as { _id: mongoose.Types.ObjectId })._id,
-        userId: senderId,
-        occupiedBy: 'player',
-        entityName: { $ne: 'YOU' },
-      })
-        .lean()
-        .select('x y');
-      if (row) return { x: Number(row.x), y: Number(row.y) };
-      const fallback = await MapCell.findOne({
-        mapId: (mapDoc as { _id: mongoose.Types.ObjectId })._id,
-        userId: senderId,
-        occupiedBy: 'player',
-      })
-        .lean()
-        .select('x y');
-      return fallback ? { x: Number(fallback.x), y: Number(fallback.y) } : null;
-    }
-    const cells = Array.isArray((mapDoc as any).cells) ? ((mapDoc as any).cells as any[]) : [];
-    const row =
-      cells.find(
-        (cell) =>
-          String(cell.userId ?? '') === senderId &&
-          cell.occupiedBy === 'player' &&
-          String(cell.entityName ?? '') !== 'YOU'
-      ) ??
-      cells.find((cell) => String(cell.userId ?? '') === senderId && cell.occupiedBy === 'player');
-    if (!row) return null;
-    return { x: Number(row.x), y: Number(row.y) };
-  })();
-
-  if (!senderHouse) {
-    throw new TransferRunError(404, 'Sender does not have a valid home location on map');
-  }
-
-  const distanceDu = distanceDuTileUnits(senderHouse.x, senderHouse.y, recipientTargetX, recipientTargetY);
-  const totalTravelSeconds = Math.max(1, distanceDu * TRANSFER_SECONDS_PER_DU);
-  const now = new Date();
-  const arriveAt = new Date(now.getTime() + Math.ceil(totalTravelSeconds * 1000));
-  const transferRunId = `transfer-${randomUUID()}`;
+  let transferRunId = '';
+  let departAtIso = '';
+  let arriveAtIso = '';
+  let distanceDu = 0;
+  let totalTravelSeconds = 0;
 
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
+      const now = new Date();
+
       const activeCount = await TransferRun.countDocuments({
         senderId,
         state: 'outbound',
@@ -331,6 +322,35 @@ export async function launchTransferRun(
           `Maximum ${TRANSFER_MAX_ACTIVE_PER_SENDER} active transfer runs per sender`
         );
       }
+
+      const mapDoc = (await MapModel.findOne({ name: 'main' }).session(session).lean()) as Record<string, unknown> | null;
+      if (!mapDoc) {
+        throw new TransferRunError(404, 'Main map not found');
+      }
+
+      const recipientTile = await getMapOccupantAtTile({
+        x: recipientTargetX,
+        y: recipientTargetY,
+        mapDoc,
+        session,
+      });
+      if (!recipientTile || recipientTile.occupiedBy !== 'player' || recipientTile.userId !== recipientId) {
+        throw new TransferRunError(409, 'Recipient is no longer at the selected location');
+      }
+
+      const senderHouse = await resolveSenderHouseFromMapDoc({ mapDoc, senderId, session });
+      if (!senderHouse) {
+        throw new TransferRunError(404, 'Sender does not have a valid home location on map');
+      }
+
+      const du = distanceDuTileUnits(senderHouse.x, senderHouse.y, recipientTargetX, recipientTargetY);
+      const tts = Math.max(1, du * TRANSFER_SECONDS_PER_DU);
+      const arriveAt = new Date(now.getTime() + Math.ceil(tts * 1000));
+      transferRunId = `transfer-${randomUUID()}`;
+      distanceDu = du;
+      totalTravelSeconds = tts;
+      departAtIso = now.toISOString();
+      arriveAtIso = arriveAt.toISOString();
 
       const senderCrewStatus = await CrewStatus.findOne({ userId: senderId }).session(session).lean();
       const recipientCrewStatus = await CrewStatus.findOne({ userId: recipientId }).session(session).lean();
@@ -402,8 +422,8 @@ export async function launchTransferRun(
 
   return {
     transferRunId,
-    departAt: now.toISOString(),
-    arriveAt: arriveAt.toISOString(),
+    departAt: departAtIso,
+    arriveAt: arriveAtIso,
     distanceDu,
     secondsPerDu: TRANSFER_SECONDS_PER_DU,
     totalTravelSeconds,

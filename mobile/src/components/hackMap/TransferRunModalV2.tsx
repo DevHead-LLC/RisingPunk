@@ -45,6 +45,12 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
         .filter((row) => row.quantity > 0),
     [selectedByKey]
   );
+  /** Stable key for “quote must match what user sees before Launch.” */
+  const quoteInputsKey = useMemo(() => {
+    const items = [...selectedItems].sort((a, b) => a.itemKey.localeCompare(b.itemKey));
+    return JSON.stringify({ w: walletAmount, items });
+  }, [walletAmount, selectedItems]);
+  const [quoteKeyAtLastSuccess, setQuoteKeyAtLastSuccess] = useState<string | null>(null);
   const rows = inventoryData?.items ?? [];
   const quote = latestQuote;
 
@@ -63,22 +69,29 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
     if (walletAmount <= 0 && selectedItems.length === 0) {
       setQuoteError(null);
       setLatestQuote(null);
+      setQuoteKeyAtLastSuccess(null);
       return;
     }
     const timer = setTimeout(() => {
       const reqSeq = quoteReqSeqRef.current + 1;
       quoteReqSeqRef.current = reqSeq;
+      const inputsKeyWhenScheduled = quoteInputsKey;
       const requestQuote = async () => {
         try {
           const data = await quoteTransfer({ walletAmount, items: selectedItems }).unwrap();
           if (reqSeq !== quoteReqSeqRef.current) return;
+          if (quoteInputsKey !== inputsKeyWhenScheduled) {
+            return;
+          }
           setLatestQuote(data as TransferQuote);
+          setQuoteKeyAtLastSuccess(inputsKeyWhenScheduled);
           setQuoteError(null);
         } catch (error: unknown) {
           if (reqSeq !== quoteReqSeqRef.current) return;
           const message = (error as { data?: { error?: string } })?.data?.error;
           setQuoteError(message ? String(message) : 'Could not calculate transfer quote');
           setLatestQuote(null);
+          setQuoteKeyAtLastSuccess(null);
         }
       };
       requestQuote().catch(() => {
@@ -86,11 +99,18 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
       });
     }, 180);
     return () => clearTimeout(timer);
-  }, [visible, walletAmount, selectedItems, quoteTransfer]);
+  }, [visible, walletAmount, selectedItems, quoteInputsKey, quoteTransfer]);
 
   // Bugbot note: parent unmounts when hidden, so visible never goes false while mounted; no close cleanup effect needed.
 
-  const canSend = recipient != null && !launchState.isLoading && quote != null && quoteError == null && !quoteState.isLoading;
+  const quoteMatchesDisplayedInputs = quoteKeyAtLastSuccess != null && quoteKeyAtLastSuccess === quoteInputsKey;
+  const canSend =
+    recipient != null &&
+    !launchState.isLoading &&
+    quote != null &&
+    quoteError == null &&
+    !quoteState.isLoading &&
+    quoteMatchesDisplayedInputs;
   const headerBalance = Math.max(0, Math.floor(Number(balanceData?.total ?? 0)));
 
   const onChangeItemQty = (itemKey: string, qty: number, maxOwned: number) => {
