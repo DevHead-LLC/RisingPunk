@@ -110,6 +110,7 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
   const quoteMatchesDisplayedInputs = quoteKeyAtLastSuccess != null && quoteKeyAtLastSuccess === quoteInputsKey;
   const canSend =
     recipient != null &&
+    tab !== 'active' &&
     !launchState.isLoading &&
     quote != null &&
     quoteError == null &&

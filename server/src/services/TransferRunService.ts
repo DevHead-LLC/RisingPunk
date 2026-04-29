@@ -98,8 +98,8 @@ export function buildTransferRunQuote(params: {
     const unitValue = Math.floor(Number(STORAGE_VALUE_BY_ITEM_KEY.get(row.itemKey) ?? 0));
     if (!Number.isFinite(unitValue) || unitValue <= 0) {
       throw new TransferRunError(
-        500,
-        `Transfer item '${row.itemKey}' is missing an authoritative per-unit value`
+        400,
+        `Transfer item '${row.itemKey}' is unknown or not transferable`
       );
     }
     const totalValue = unitValue * row.quantity;
