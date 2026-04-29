@@ -449,6 +449,7 @@ async function settleTransferRunAsFailedOrCancelled(params: {
     throw new TransferRunError(500, 'Sender account missing during transfer settlement');
   }
   const senderBalance = accrueUserBalanceInPlace(senderUser, now);
+  // Bugbot: refund wallet payload only — fee stays sunk after launch for cancelled and automatic failures (recipient moved, etc.); same rule as UI copy.
   senderUser.balance.total = senderBalance + params.run.walletAmount;
   await senderUser.save({ session: params.session });
 
@@ -510,7 +511,7 @@ async function settleTransferRunAsDelivered(params: {
   await params.run.save({ session: params.session });
 }
 
-export async function settleTransferRunArrival(transferRunId: string): Promise<void> {
+async function settleTransferRunArrival(transferRunId: string): Promise<void> {
   const session = await mongoose.startSession();
   try {
     await session.withTransaction(async () => {
