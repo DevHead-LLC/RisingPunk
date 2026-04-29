@@ -5,10 +5,10 @@ import { User } from '../models/User';
 import { CrewStatus } from '../models/CrewStatus';
 import { Map as MapModel } from '../models/Map';
 import { MapCell } from '../models/MapCell';
-import { UserBugHuntState, type IUserBugHuntStateDocument } from '../models/UserBugHuntState';
+import { type IUserBugHuntStateDocument } from '../models/UserBugHuntState';
 import { BUG_HUNT_STORAGE_ITEM_DEFINITIONS } from '../constants/bugHuntStorageItems';
 import { distanceDuTileUnits } from './MarchTimingService';
-import { resolveEffectiveBugHuntTokenConfig } from './BugHuntTokenService';
+import { getOrCreateUserBugHuntStateDocument } from './BugHuntTokenService';
 import { accrueBalanceFromTo } from '../utils/balanceAccrual';
 
 const TRANSFER_SECONDS_PER_DU = 3;
@@ -173,37 +173,6 @@ async function getMapOccupantAtTile(params: {
     occupiedBy: (cell.occupiedBy as 'none' | 'player' | 'npc') ?? 'none',
     userId: cell.userId ? String(cell.userId) : null,
   };
-}
-
-async function getOrCreateUserBugHuntState(params: {
-  userId: string;
-  session: mongoose.ClientSession;
-}): Promise<IUserBugHuntStateDocument> {
-  const existing = await UserBugHuntState.findOne({ userId: params.userId }).session(params.session);
-  if (existing) {
-    if (!Array.isArray(existing.storageItems)) {
-      existing.storageItems = [];
-    }
-    return existing;
-  }
-  const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({
-    userId: params.userId,
-    session: params.session,
-  });
-  const created = await UserBugHuntState.create(
-    [
-      {
-        userId: params.userId,
-        currentTokens: effectiveTokenConfig.maxTokens,
-        maxTokens: effectiveTokenConfig.maxTokens,
-        regenPerMinute: effectiveTokenConfig.regenPerMinute,
-        lastRegenAt: new Date(),
-        storageItems: [],
-      },
-    ],
-    { session: params.session }
-  );
-  return created[0];
 }
 
 function upsertStorageItems(params: {
@@ -378,7 +347,7 @@ export async function launchTransferRun(
       senderUser.balance.total = senderBalance - quote.totalSenderCashDebit;
       await senderUser.save({ session });
 
-      const senderState = await getOrCreateUserBugHuntState({ userId: senderId, session });
+      const senderState = await getOrCreateUserBugHuntStateDocument({ userId: senderId, session });
       upsertStorageItems({
         stateDoc: senderState,
         rows: quote.itemPayload.map((row) => ({ itemKey: row.itemKey, quantityDelta: row.quantity })),
@@ -448,7 +417,7 @@ async function settleTransferRunAsFailedOrCancelled(params: {
   await senderUser.save({ session: params.session });
 
   if ((params.run.itemPayload ?? []).length > 0) {
-    const senderState = await getOrCreateUserBugHuntState({
+    const senderState = await getOrCreateUserBugHuntStateDocument({
       userId: params.run.senderId,
       session: params.session,
     });
@@ -484,7 +453,7 @@ async function settleTransferRunAsDelivered(params: {
   await recipientUser.save({ session: params.session });
 
   if ((params.run.itemPayload ?? []).length > 0) {
-    const recipientState = await getOrCreateUserBugHuntState({
+    const recipientState = await getOrCreateUserBugHuntStateDocument({
       userId: params.run.recipientId,
       session: params.session,
     });
@@ -529,6 +498,7 @@ export async function settleTransferRunArrival(transferRunId: string): Promise<v
       const recipientTile = await getMapOccupantAtTile({
         x: resolvingRun.recipientTargetX,
         y: resolvingRun.recipientTargetY,
+        session,
       });
       const recipientStillValid =
         recipientTile != null &&
