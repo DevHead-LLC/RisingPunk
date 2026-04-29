@@ -41,6 +41,7 @@ import raceConditionHeistRoutes from './src/routes/raceConditionHeist';
 import binaryBankCrackRoutes from './src/routes/binaryBankCrack';
 import battlePresetsRoutes from './src/routes/battlePresets';
 import swarmRoutes from './src/routes/swarm';
+import transferRunsRoutes from './src/routes/transferRuns';
 
 declare global {
   namespace Express {
@@ -235,6 +236,21 @@ mongoose.connect(process.env.MONGODB_URI, {
     }
   } catch (pruneModuleErr: unknown) {
     console.warn('Attack march terminal prune module load failed (non-fatal):', pruneModuleErr);
+  }
+
+  try {
+    const {
+      settleDueTransferRunsOnce,
+      startTransferRunDueSweepWatchdog,
+    } = require('./src/services/TransferRunService');
+    startTransferRunDueSweepWatchdog();
+    try {
+      await settleDueTransferRunsOnce();
+    } catch (initialSweepErr: unknown) {
+      console.warn('Transfer run initial sweep failed (non-fatal):', initialSweepErr);
+    }
+  } catch (transferSweepErr: unknown) {
+    console.warn('Transfer run sweep module load or watchdog start failed (non-fatal):', transferSweepErr);
   }
 
   // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
@@ -731,6 +747,7 @@ app.use('/api/probe', probeRoutes);
 app.use('/api/attack', attackRoutes);
 app.use('/api/bug-hunt', bugHuntRoutes);
 app.use('/api/swarm', swarmRoutes);
+app.use('/api/transfer-runs', transferRunsRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/daily-haul', dailyHaulRoutes);
 app.use('/api/packet-breach', packetBreachRoutes);

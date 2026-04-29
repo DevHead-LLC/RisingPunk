@@ -29,6 +29,7 @@ import { battlePresetsApi } from './api/battlePresetsApi';
 import { attackApi } from './api/attackApi';
 import { swarmApi } from './api/swarmApi';
 import { bugHuntApi } from './api/bugHuntApi';
+import { transferRunApi } from './api/transferRunApi';
 
 export const store = configureStore({
   reducer: {
@@ -61,6 +62,7 @@ export const store = configureStore({
     [attackApi.reducerPath]: attackApi.reducer,
     [swarmApi.reducerPath]: swarmApi.reducer,
     [bugHuntApi.reducerPath]: bugHuntApi.reducer,
+    [transferRunApi.reducerPath]: transferRunApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -89,7 +91,8 @@ export const store = configureStore({
     .concat(battlePresetsApi.middleware)
     .concat(attackApi.middleware)
     .concat(swarmApi.middleware)
-    .concat(bugHuntApi.middleware),
+    .concat(bugHuntApi.middleware)
+    .concat(transferRunApi.middleware),
   devTools: __DEV__,
 });
 

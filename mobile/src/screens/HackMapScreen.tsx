@@ -53,6 +53,8 @@ import {
 } from '../utils/turfHackMapHandoffGlobals';
 import { AttackMarchAnimationLayer } from '../components/hackMap/AttackMarchAnimationLayer';
 import { outboundProgressTForAttackMarch } from '../components/hackMap/attackMarchMapFrame';
+import { TransferRunModal } from '../components/hackMap/TransferRunModal';
+import { TransferRunAnimationLayer } from '../components/hackMap/TransferRunAnimationLayer';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery, useSendCrewChatMessageMutation } from '../store/api/authApi';
@@ -78,6 +80,7 @@ import {
 } from '../store/api/bugHuntApi';
 import { ANT_BUG_IMAGE } from '../constants/hackMapBugHuntVisuals';
 import { AntWorldReseedCountdownText } from '../components/hackMap/AntWorldReseedCountdownText';
+import { useGetActiveTransferRunsQuery } from '../store/api/transferRunApi';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
@@ -1564,6 +1567,13 @@ export const HackMapScreen: React.FC<Props> = ({
   const [followProbeId, setFollowProbeId] = useState<string | null>(null);
   /** Owner hack expedition modal (tap **outbound** or **returning** march on map). */
   const [marchOwnerModalId, setMarchOwnerModalId] = useState<string | null>(null);
+  const [showTransferRunModal, setShowTransferRunModal] = useState(false);
+  const [transferRecipient, setTransferRecipient] = useState<{
+    userId: string;
+    username: string;
+    targetX: number;
+    targetY: number;
+  } | null>(null);
   const [marchModalTimeTick, setMarchModalTimeTick] = useState(0);
   const [showProbeFollowModal, setShowProbeFollowModal] = useState(false);
   /** Live remainingSec/phase for the followed probe (updated by ProbeAnimationLayer each tick when modal open). */
@@ -1583,6 +1593,10 @@ export const HackMapScreen: React.FC<Props> = ({
     data: activeAttackMarchesData,
     refetch: refetchActiveAttackMarches,
   } = useGetActiveAttackMarchesQuery(undefined, {
+    skip: !token,
+    pollingInterval: 3000,
+  });
+  const { data: activeTransferRunsData } = useGetActiveTransferRunsQuery(undefined, {
     skip: !token,
     pollingInterval: 3000,
   });
@@ -2900,7 +2914,23 @@ export const HackMapScreen: React.FC<Props> = ({
     if (isSameCrewMember) return false;
     return true;
   }, [isSwarmLeadUnlocked, crewStatus?.isInCrew, selectedCell, currentUserHandle, isSameCrewMember]);
-  
+
+  const shouldShowTransferButton = useMemo(() => {
+    if (!selectedCell) return false;
+    if (selectedCell.info.owner !== 'player') return false;
+    if (!selectedCell.info.userId) return false;
+    if (!crewStatus?.isInCrew) return false;
+    if (selectedCell.info.name === currentUserHandle) return false;
+    if (isLoadingSelectedUserCrewStatus) return false;
+    return isSameCrewMember;
+  }, [
+    selectedCell,
+    crewStatus?.isInCrew,
+    currentUserHandle,
+    isLoadingSelectedUserCrewStatus,
+    isSameCrewMember,
+  ]);
+
   // Debug logging - REMOVED to fix infinite loop
   
   const isShieldActive = shieldData?.isActive || false;
@@ -5157,7 +5187,29 @@ export const HackMapScreen: React.FC<Props> = ({
                       </Text>
                     </TouchableOpacity>
                   )}
-                  
+
+                  {shouldShowTransferButton && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                      onPress={() => {
+                        const userId = selectedCell.info.userId != null ? String(selectedCell.info.userId).trim() : '';
+                        if (!userId) return;
+                        setTransferRecipient({
+                          userId,
+                          username: String(selectedCell.info.name ?? 'Player'),
+                          targetX: selectedCell.x,
+                          targetY: selectedCell.y,
+                        });
+                        setShowTransferRunModal(true);
+                        setSelectedCell(null);
+                      }}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        Transfer
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
                   {selectedCell.info.owner === 'player' && 
                    selectedCell.info.userId && 
                    selectedCell.info.name !== currentUserHandle &&
@@ -5250,7 +5302,7 @@ export const HackMapScreen: React.FC<Props> = ({
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, selectedBugMarker, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress, hasUnlockedHunter, bugWorldStateData?.reseedInProgress, bugWorldStateData?.nextAntWorldReseedAtUtc, serverSkewMs]);
+  }, [selectedCell, selectedBugMarker, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, shouldShowTransferButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress, hasUnlockedHunter, bugWorldStateData?.reseedInProgress, bugWorldStateData?.nextAntWorldReseedAtUtc, serverSkewMs]);
 
   if (loading || !isMapReady || !terrainDataLoaded) {
     return <View style={styles.container}><LoadingSpinner /></View>;
@@ -5368,6 +5420,17 @@ export const HackMapScreen: React.FC<Props> = ({
         }
       />
 
+      {showTransferRunModal ? (
+        <TransferRunModal
+          visible={showTransferRunModal}
+          onClose={() => {
+            setShowTransferRunModal(false);
+            setTransferRecipient(null);
+          }}
+          recipient={transferRecipient}
+        />
+      ) : null}
+
       {visitingProfileUserId && (
         <VisitingProfileModal
           visible={showVisitingProfileModal}
@@ -5482,6 +5545,10 @@ export const HackMapScreen: React.FC<Props> = ({
           animatedMapStyle={animatedMapStyle as any}
           currentUserId={currentUserId}
           onOwnerMarchPress={handleOwnerMarchPress}
+        />
+        <TransferRunAnimationLayer
+          runs={activeTransferRunsData?.runs ?? []}
+          animatedMapStyle={animatedMapStyle as any}
         />
         <ProbeAnimationLayer
           probes={displayProbes}
