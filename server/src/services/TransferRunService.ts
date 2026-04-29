@@ -9,7 +9,7 @@ import { type IUserBugHuntStateDocument } from '../models/UserBugHuntState';
 import { BUG_HUNT_STORAGE_ITEM_DEFINITIONS } from '../constants/bugHuntStorageItems';
 import { distanceDuTileUnits } from './MarchTimingService';
 import { getOrCreateUserBugHuntStateDocument } from './BugHuntTokenService';
-import { accrueBalanceFromTo } from '../utils/balanceAccrual';
+import { accrueBalanceToTime } from '../utils/balanceAccrual';
 
 const TRANSFER_SECONDS_PER_DU = 3;
 const TRANSFER_MIN_WALLET_AMOUNT = 10_000;
@@ -210,19 +210,17 @@ function upsertStorageItems(params: {
 }
 
 function accrueUserBalanceInPlace(user: InstanceType<typeof User>, now: Date): number {
-  const result = accrueBalanceFromTo({
-    lastUpdatedMs: user.balance.lastUpdated.getTime(),
-    toTimeMs: now.getTime(),
-    ratePerSecond: user.balance.ratePerSecond,
-    fractionalRemainder: user.balance.fractionalRemainder ?? 0,
-  });
-  const current = user.balance.total + result.wholeDollarsToAdd;
-  user.balance.total = current;
-  user.balance.fractionalRemainder = result.newFractionalRemainder;
-  user.balance.lastUpdated = new Date(
-    user.balance.lastUpdated.getTime() + result.roundedSecondsElapsed * 1000
+  const updated = accrueBalanceToTime(
+    user.balance.total,
+    user.balance.ratePerSecond,
+    user.balance.lastUpdated,
+    user.balance.fractionalRemainder ?? 0,
+    now
   );
-  return current;
+  user.balance.total = updated.total;
+  user.balance.fractionalRemainder = updated.fractionalRemainder;
+  user.balance.lastUpdated = updated.lastUpdated;
+  return updated.total;
 }
 
 export async function launchTransferRun(

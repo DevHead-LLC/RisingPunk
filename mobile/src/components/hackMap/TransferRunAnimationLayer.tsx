@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Image, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { marchTileCenter, parseMarchTimeMs } from './attackMarchMapFrame';
-import type { TransferRunListItem } from '../../store/api/transferRunApi';
+import type { TransferRunActivePublic } from '../../store/api/transferRunApi';
 
 const TRANSFER_ICON_SIZE = 64;
 const TRANSFER_ICON = require('../../assets/images/hackMap/sharing/gifting.png');
@@ -10,7 +10,7 @@ const TRANSFER_ICON = require('../../assets/images/hackMap/sharing/gifting.png')
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Reanimated typing mismatch with RN types.
 const ReanimatedView = Animated.View as any;
 
-function computeTransferFrame(run: TransferRunListItem, nowMs: number): { x: number; y: number } | null {
+function computeTransferFrame(run: TransferRunActivePublic, nowMs: number): { x: number; y: number } | null {
   if (run.state !== 'outbound') {
     return null;
   }
@@ -29,7 +29,7 @@ function computeTransferFrame(run: TransferRunListItem, nowMs: number): { x: num
 }
 
 type Props = {
-  runs: TransferRunListItem[];
+  runs: TransferRunActivePublic[];
   animatedMapStyle?: Record<string, unknown>;
 };
 

@@ -11,18 +11,24 @@ export type TransferRunItemPayload = {
   totalValue: number;
 };
 
-export type TransferRunListItem = {
+export type TransferRunState = 'outbound' | 'resolving' | 'delivered' | 'failed' | 'cancelled';
+
+/** GET /transfer-runs/active — positions/timing only (no user ids or amounts). */
+export type TransferRunActivePublic = {
   transferRunId: string;
-  senderId: string;
-  recipientId: string;
   originX: number;
   originY: number;
   targetX: number;
   targetY: number;
-  state: 'outbound' | 'resolving' | 'delivered' | 'failed' | 'cancelled';
+  state: TransferRunState;
   departAt: string;
   arriveAt: string;
   totalTravelSeconds: number;
+};
+
+export type TransferRunListItem = TransferRunActivePublic & {
+  senderId: string;
+  recipientId: string;
   totalTransferValue: number;
   feeAmount: number;
   walletAmount?: number;
@@ -52,7 +58,7 @@ export const transferRunApi = createApi({
   baseQuery: transferRunBaseQuery,
   tagTypes: ['TransferRuns'],
   endpoints: (builder) => ({
-    getActiveTransferRuns: builder.query<{ runs: TransferRunListItem[] }, void>({
+    getActiveTransferRuns: builder.query<{ runs: TransferRunActivePublic[] }, void>({
       query: () => '/api/transfer-runs/active',
       providesTags: ['TransferRuns'],
     }),

@@ -12,10 +12,11 @@ const router = express.Router();
 
 router.get('/active', auth, async (_req: Request, res: Response): Promise<void> => {
   try {
+    // Map animation only — omit sender/recipient ids and financial fields (peer privacy).
     const runs = await TransferRun.find({ state: 'outbound' })
       .sort({ departAt: 1 })
       .select(
-        'transferRunId senderId recipientId originX originY targetX targetY state departAt arriveAt totalTravelSeconds totalTransferValue feeAmount'
+        'transferRunId originX originY targetX targetY state departAt arriveAt totalTravelSeconds'
       )
       .lean();
     res.json({ runs });
