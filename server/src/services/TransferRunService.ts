@@ -523,6 +523,7 @@ export async function settleTransferRunArrival(transferRunId: string): Promise<v
         return;
       }
 
+      // `session` is passed so main-map + map-cell reads use the same transaction snapshot as delivery.
       const recipientTile = await getMapOccupantAtTile({
         x: resolvingRun.recipientTargetX,
         y: resolvingRun.recipientTargetY,

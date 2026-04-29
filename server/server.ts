@@ -243,10 +243,14 @@ mongoose.connect(process.env.MONGODB_URI, {
       settleDueTransferRunsOnce,
       startTransferRunDueSweepWatchdog,
     } = require('./src/services/TransferRunService');
-    await settleDueTransferRunsOnce();
     startTransferRunDueSweepWatchdog();
+    try {
+      await settleDueTransferRunsOnce();
+    } catch (initialSweepErr: unknown) {
+      console.warn('Transfer run initial sweep failed (non-fatal):', initialSweepErr);
+    }
   } catch (transferSweepErr: unknown) {
-    console.warn('Transfer run sweep watchdog failed to start (non-fatal):', transferSweepErr);
+    console.warn('Transfer run sweep module load or watchdog start failed (non-fatal):', transferSweepErr);
   }
 
   // Ensure rental_property construction config exists so rental endpoints don't 500 (bootstrap if missing)
