@@ -11,6 +11,7 @@ import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
 import { MapService } from '../services/MapService';
 import { AccountDeletionService } from '../services/AccountDeletionService';
+import { bumpLastLoginAtIfStale } from '../services/LastLoginHeartbeatService';
 import { filterBadWords, containsBadWords, containsBadWordsForHandle, isDisallowedHandle } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 
@@ -30,27 +31,6 @@ function isUserAdmin(user: { _id?: unknown }): boolean {
 // Helper function to safely escape regex special characters
 function escapeRegexString(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-const LAST_LOGIN_HEARTBEAT_MS = 15 * 60 * 1000;
-
-async function bumpLastLoginAtIfStale(userId: string, currentLastLoginAt?: Date | null): Promise<void> {
-  const now = new Date();
-  const cutoff = new Date(now.getTime() - LAST_LOGIN_HEARTBEAT_MS);
-  if (currentLastLoginAt instanceof Date && currentLastLoginAt.getTime() > cutoff.getTime()) {
-    return;
-  }
-  await User.updateOne(
-    {
-      _id: userId,
-      $or: [
-        { lastLoginAt: { $exists: false } },
-        { lastLoginAt: null },
-        { lastLoginAt: { $lte: cutoff } }
-      ]
-    },
-    { $set: { lastLoginAt: now } }
-  );
 }
 
 interface RegisterRequest extends Request {
@@ -1622,7 +1602,12 @@ router.get('/verify-token', async (req, res): Promise<void> => {
       return;
     }
 
-    await bumpLastLoginAtIfStale(String(user._id), user.lastLoginAt);
+    try {
+      await bumpLastLoginAtIfStale(String(user._id), user.lastLoginAt);
+    } catch (heartbeatError) {
+      // Token verification succeeded; heartbeat writes must not force logout behavior.
+      console.warn('verify-token lastLoginAt heartbeat update failed:', heartbeatError);
+    }
 
 
     res.json({

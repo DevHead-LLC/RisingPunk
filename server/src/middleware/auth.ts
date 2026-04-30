@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
-
-const LAST_LOGIN_HEARTBEAT_MS = 15 * 60 * 1000;
+import { bumpLastLoginAtIfStale } from '../services/LastLoginHeartbeatService';
 
 const auth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -31,20 +30,11 @@ const auth = async (req: Request, res: Response, next: NextFunction): Promise<vo
       return;
     }
 
-    const now = new Date();
-    const cutoff = new Date(now.getTime() - LAST_LOGIN_HEARTBEAT_MS);
-    if (!user.lastLoginAt || user.lastLoginAt.getTime() <= cutoff.getTime()) {
-      await User.updateOne(
-        {
-          _id: userId,
-          $or: [
-            { lastLoginAt: { $exists: false } },
-            { lastLoginAt: null },
-            { lastLoginAt: { $lte: cutoff } }
-          ]
-        },
-        { $set: { lastLoginAt: now } }
-      );
+    try {
+      await bumpLastLoginAtIfStale(String(userId), user.lastLoginAt);
+    } catch (heartbeatError) {
+      // Authentication already succeeded; avoid failing the request on heartbeat write issues.
+      console.warn('AUTH: lastLoginAt heartbeat update failed:', heartbeatError);
     }
     
     req.user = { _id: userId };

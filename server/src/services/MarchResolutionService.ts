@@ -58,6 +58,26 @@ async function isNpcTargetMissingAtResolution(march: {
   return !matchesCoords;
 }
 
+async function reconcileMarchResolutionQueue(march: {
+  marchId?: string;
+  defenderQueueKey?: string;
+  attackType?: string;
+  defenderId: string;
+  defenderNpcInstanceId?: string;
+  bugInstanceId?: string;
+}): Promise<void> {
+  try {
+    const qk = defenderQueueKeyFromMarchDoc(march);
+    // IMPORTANT: do not call runDefenderQueueSerialized() recursively for the same queue key here.
+    // This function is already executed inside the per-queue serialized task, and re-entering the
+    // serializer with await can deadlock that queue (current task waiting on its own tail).
+    await reconcileDefenderQueue(qk);
+    await tryStartNextMarchResolutionForQueueKey(qk);
+  } catch (queueErr) {
+    console.error('[MarchResolution] post-failure queue reconcile failed:', march.marchId, queueErr);
+  }
+}
+
 export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): Promise<void> {
   if (!ENABLE_ASYNC_BATTLES) {
     return;
@@ -137,24 +157,7 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
         );
       }
 
-      try {
-        const qk = defenderQueueKeyFromMarchDoc(
-          updated as {
-            defenderQueueKey?: string;
-            attackType?: string;
-            defenderId: string;
-            defenderNpcInstanceId?: string;
-            bugInstanceId?: string;
-          }
-        );
-        // IMPORTANT: do not call runDefenderQueueSerialized() recursively for the same queue key here.
-        // This function is already executed inside the per-queue serialized task, and re-entering the
-        // serializer with await can deadlock that queue (current task waiting on its own tail).
-        await reconcileDefenderQueue(qk);
-        await tryStartNextMarchResolutionForQueueKey(qk);
-      } catch (queueErr) {
-        console.error('[MarchResolution] bug-hunt post-failure queue reconcile failed:', updated.marchId, queueErr);
-      }
+      await reconcileMarchResolutionQueue(updated);
     }
     return;
   }
@@ -251,6 +254,7 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
           updated.marchId,
           updated.defenderNpcInstanceId
         );
+        await reconcileMarchResolutionQueue(updated);
         return;
       }
       console.error(
