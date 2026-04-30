@@ -263,6 +263,13 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
           updated.marchId,
           updated.defenderNpcInstanceId
         );
+        if (battle?.battleId) {
+          try {
+            await battleService.abandonMarchBattleRuntimeNoSettlement(battle.battleId);
+          } catch (abandonErr) {
+            console.error('[MarchResolution] abandonMarchBattleRuntimeNoSettlement failed:', battle.battleId, abandonErr);
+          }
+        }
         await reconcileMarchResolutionQueue(updated);
         return;
       }
