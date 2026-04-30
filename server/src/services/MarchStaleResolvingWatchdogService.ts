@@ -72,7 +72,12 @@ export async function runStaleResolvingMarchRecoveryOnce(): Promise<void> {
         await battleService.abandonMarchBattleRuntimeNoSettlement(battle.battleId);
       }
 
-      const refund = await systemRefundAttackMarchInState(m.marchId, String(m.attackerId), 'resolving');
+      const refund = await systemRefundAttackMarchInState(
+        m.marchId,
+        String(m.attackerId),
+        'resolving',
+        'stale-resolving-watchdog'
+      );
       if (!refund.refunded) {
         console.warn('[MarchStaleResolving] refund not applied:', m.marchId, refund);
         continue;

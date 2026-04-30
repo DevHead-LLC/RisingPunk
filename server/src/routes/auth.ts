@@ -11,6 +11,7 @@ import { EmailService } from '../services/EmailService';
 import { EncryptionService } from '../services/EncryptionService';
 import { MapService } from '../services/MapService';
 import { AccountDeletionService } from '../services/AccountDeletionService';
+import { bumpLastLoginAtIfStale } from '../services/LastLoginHeartbeatService';
 import { filterBadWords, containsBadWords, containsBadWordsForHandle, isDisallowedHandle } from '../utils/contentModeration';
 import { getAdminUserIds } from '../config/env';
 
@@ -1599,6 +1600,13 @@ router.get('/verify-token', async (req, res): Promise<void> => {
     if (decoded.sessionId && !user.isTokenValid(decoded.sessionId)) {
       res.status(401).json({ error: 'ACCOUNT_SWITCHED' });
       return;
+    }
+
+    try {
+      await bumpLastLoginAtIfStale(String(user._id), user.lastLoginAt);
+    } catch (heartbeatError) {
+      // Token verification succeeded; heartbeat writes must not force logout behavior.
+      console.warn('verify-token lastLoginAt heartbeat update failed:', heartbeatError);
     }
 
 
