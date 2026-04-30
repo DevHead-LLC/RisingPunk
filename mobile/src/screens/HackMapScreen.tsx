@@ -2441,8 +2441,10 @@ export const HackMapScreen: React.FC<Props> = ({
 
   useEffect(() => {
     if (!initialViewportData?.grid || frozenInitialViewportRef.current) return;
+    // Do not freeze on pan-0/center viewport while my-position is still loading — wait so we can seed from API (Bugbot).
+    if (shouldFetchMyPosition && myPositionLoading) return;
     frozenInitialViewportRef.current = initialViewport;
-  }, [initialViewportData?.grid, initialViewport]);
+  }, [initialViewportData?.grid, initialViewport, shouldFetchMyPosition, myPositionLoading]);
 
   // Step 2: Check if user's house is in initial viewport, if not, fetch full map
   const [needsFullMap, setNeedsFullMap] = useState<boolean>(false);
