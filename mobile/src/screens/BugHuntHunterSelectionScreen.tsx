@@ -45,7 +45,7 @@ export const BugHuntHunterSelectionScreen: React.FC<Props> = ({
   const colors = useThemeColors();
   const { data } = useFetchMyHuntersQuery();
   const { data: tokenStateData } = useFetchBugHuntTokenStateQuery();
-  const { data: myMapPos } = useGetMyMapPositionQuery();
+  const { data: myMapPos } = useGetMyMapPositionQuery('me');
   const [launchAttackMarch, { isLoading: isLaunching }] = useLaunchAttackMarchMutation();
   const [selectedHunterRosterIds, setSelectedHunterRosterIds] = React.useState<string[]>([]);
   const hasKaito = (data?.hunters ?? []).some((h) => h.hunterRosterId === BUG_HUNT_ROSTER_ID_KAITO);

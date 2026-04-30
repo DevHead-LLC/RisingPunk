@@ -2354,7 +2354,9 @@ export const HackMapScreen: React.FC<Props> = ({
   // My-position API: reliable (x,y) for user's house for initial center and locator (user-position-and-locator.md)
   // Fetch early so initial viewport can target user's home instead of center-origin.
   const shouldFetchMyPosition = !restorePan && !!currentUserHandle;
-  const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(undefined, { skip: !shouldFetchMyPosition });
+  const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(currentUserHandle ?? '', {
+    skip: !shouldFetchMyPosition,
+  });
   const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
   
   // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
@@ -2519,7 +2521,7 @@ export const HackMapScreen: React.FC<Props> = ({
       appStateRef.current = nextState;
       if (wasBackgroundOrInactive && nextState === 'active') {
         if (shouldFetchMyPosition) {
-          triggerGetMyMapPosition();
+          triggerGetMyMapPosition(currentUserHandle ?? '');
         }
         void refetchBugInstances();
         void refetchBugWorldState();
@@ -2529,6 +2531,7 @@ export const HackMapScreen: React.FC<Props> = ({
     return () => sub?.remove();
   }, [
     shouldFetchMyPosition,
+    currentUserHandle,
     triggerGetMyMapPosition,
     refetchBugInstances,
     refetchBugWorldState,
@@ -4191,7 +4194,7 @@ export const HackMapScreen: React.FC<Props> = ({
         minimal: false,
       });
     }
-  }, [myPositionData, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
+  }, [myPositionData, currentUserHandle, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
 
   // Center on current user's home on initial entry (only if not returning from battle with restorePan)
   // Fallback when my-position API not available or user's house is in initial viewport (grid-scan)
@@ -4478,7 +4481,7 @@ export const HackMapScreen: React.FC<Props> = ({
       doPanTo(userMapPositionRef.current);
       return;
     }
-    triggerGetMyMapPosition()
+    triggerGetMyMapPosition(currentUserHandle ?? '')
       .unwrap()
       .then((payload) => doPanTo(payload))
       .catch(() => {});
@@ -4717,7 +4720,7 @@ export const HackMapScreen: React.FC<Props> = ({
               .then(() => {
                 dispatch(refreshUserDataSilent());
                 refetch();
-                triggerGetMyMapPosition();
+                triggerGetMyMapPosition(currentUserHandle ?? '');
                 setSelectedCell(null);
               })
               .catch((err: any) => {

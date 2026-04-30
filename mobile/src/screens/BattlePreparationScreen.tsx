@@ -207,7 +207,7 @@ export const BattlePreparationScreen = React.memo(
     hackMapCell != null &&
     Number.isFinite(hackMapCell.x) &&
     Number.isFinite(hackMapCell.y);
-  const { data: myMapPos } = useGetMyMapPositionQuery(undefined, {
+  const { data: myMapPos } = useGetMyMapPositionQuery('me', {
     skip: !token || !wantsMarchLaunch,
   });
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
