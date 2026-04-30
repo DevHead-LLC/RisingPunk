@@ -17,6 +17,7 @@ import {
   Keyboard,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  Alert,
 } from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
@@ -79,6 +80,7 @@ export interface ProbeReportPayload {
   n: string;
   t: 'player' | 'npc';
   l: number;
+  mapName?: string;
   x: number;
   y: number;
   b: { breacher: number; guardian: number; phreak: number };
@@ -91,7 +93,15 @@ function parseProbeReportMessage(message: string): ProbeReportPayload | null {
     const payload = JSON.parse(json) as ProbeReportPayload;
     if (payload?.pr === 1 && payload.n != null && payload.b) {
       if (!Number.isFinite(payload.x) || !Number.isFinite(payload.y)) return null;
-      return payload;
+      const mapName =
+        typeof (payload as { mapName?: unknown }).mapName === 'string' &&
+        (payload as { mapName?: string }).mapName!.trim().length > 0
+          ? (payload as { mapName?: string }).mapName!.trim()
+          : undefined;
+      return {
+        ...payload,
+        mapName,
+      };
     }
   } catch {
     // ignore
@@ -402,6 +412,8 @@ export interface BaseChatModalProps {
   onWatchBattle?: (battleId: string) => void;
 }
 
+type MapCellTarget = { mapName: string; x: number; y: number };
+
 export const BaseChatModal: React.FC<BaseChatModalProps> = ({
   visible,
   onClose,
@@ -520,6 +532,29 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
     setShowReportModal(false);
     setReportedMessage(null);
   };
+
+  const handleNavigateToMapCell = useCallback(
+    (target: MapCellTarget) => {
+      if (!onNavigateToMapCell) return;
+      const mapName = typeof target.mapName === 'string' ? target.mapName.trim() : '';
+      const x = Number(target.x);
+      const y = Number(target.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        Alert.alert('Location unavailable', 'This shared location is invalid and cannot be opened.');
+        return;
+      }
+      if (mapName !== 'main') {
+        Alert.alert('Location unavailable', 'This shared location is not on the supported map.');
+        return;
+      }
+      onNavigateToMapCell({
+        mapName: 'main',
+        x: Math.floor(x),
+        y: Math.floor(y),
+      });
+    },
+    [onNavigateToMapCell]
+  );
 
   const styles = createStyles(colors);
 
@@ -641,7 +676,14 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               );
                             }
                             const probeHackLocLine = formatHackLocationDisplay(report.x, report.y);
-                            return (
+                            const probeMapName =
+                              typeof report.mapName === 'string' && report.mapName.trim().length > 0
+                                ? report.mapName.trim()
+                                : 'main';
+                            const canTapProbeLocation =
+                              Boolean(onNavigateToMapCell) &&
+                              probeMapName === 'main';
+                            const probeBlock = (
                               <View style={styles.probeReportBlock}>
                                 <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
                                   Probe Report
@@ -663,17 +705,55 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                     styles.messageText,
                                     styles.probeReportLine,
                                     styles.hackLocationMono,
-                                    { color: colors.text.secondary },
+                                    {
+                                      color: canTapProbeLocation
+                                        ? (colors.primary ?? colors.text.secondary)
+                                        : colors.text.secondary,
+                                      textDecorationLine: canTapProbeLocation ? 'underline' : 'none',
+                                    },
                                   ]}
                                 >
                                   {probeHackLocLine}
                                 </Text>
+                                {canTapProbeLocation ? (
+                                  <Text
+                                    style={[
+                                      styles.messageText,
+                                      styles.probeReportLine,
+                                      {
+                                        fontSize: SIZING.font.small,
+                                        fontStyle: 'italic',
+                                        color: colors.text.secondary,
+                                      },
+                                    ]}
+                                  >
+                                    Tap to open on map
+                                  </Text>
+                                ) : null}
                                 <Text style={[styles.messageText, styles.probeReportLine, { color: colors.text.primary }]}>
                                   {M1_UNIT_DISPLAY_NAMES.breacher}: {report.b.breacher} · {M1_UNIT_DISPLAY_NAMES.guardian}:{' '}
                                   {report.b.guardian} · {M1_UNIT_DISPLAY_NAMES.phreak}: {report.b.phreak}
                                 </Text>
                               </View>
                             );
+                            if (canTapProbeLocation) {
+                              return (
+                                <Pressable
+                                  onPress={() =>
+                                    handleNavigateToMapCell({
+                                      mapName: probeMapName,
+                                      x: report.x,
+                                      y: report.y,
+                                    })
+                                  }
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Open probe location on map"
+                                >
+                                  {probeBlock}
+                                </Pressable>
+                              );
+                            }
+                            return probeBlock;
                           })() : message.userId === BATTLE_REPORT_SENDER_ID ? (() => {
                             const report = parseBattleReportMessage(message.message);
                             if (!report) {
@@ -744,7 +824,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                 : hackLocLine
                                   ? parseHackLocationDisplayCoords(hackLocLine)
                                   : null;
-                            const canOpenBattleOnMap =
+                            const canTapBattleLocation =
                               Boolean(onNavigateToMapCell) &&
                               battleCoords !== null &&
                               battleMapName === 'main';
@@ -771,16 +851,16 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                     styles.probeReportLine,
                                     styles.hackLocationMono,
                                     {
-                                      color: canOpenBattleOnMap
+                                      color: canTapBattleLocation
                                         ? (colors.primary ?? colors.text.secondary)
                                         : colors.text.secondary,
-                                      textDecorationLine: canOpenBattleOnMap ? 'underline' : 'none',
+                                      textDecorationLine: canTapBattleLocation ? 'underline' : 'none',
                                     },
                                   ]}
                                 >
                                   {battleLocationLine}
                                 </Text>
-                                {canOpenBattleOnMap ? (
+                                {canTapBattleLocation ? (
                                   <Text
                                     style={[
                                       styles.messageText,
@@ -810,10 +890,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                     Hunt Report
                                   </Text>
                                   {hackLocationBlock ? (
-                                    canOpenBattleOnMap && battleCoords ? (
+                                    canTapBattleLocation && battleCoords ? (
                                       <Pressable
                                         onPress={() =>
-                                          onNavigateToMapCell?.({
+                                          handleNavigateToMapCell({
                                             mapName: battleMapName,
                                             x: battleCoords.x,
                                             y: battleCoords.y,
@@ -961,10 +1041,10 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   Battle Report
                                 </Text>
                                 {hackLocationBlock ? (
-                                  canOpenBattleOnMap && battleCoords ? (
+                                  canTapBattleLocation && battleCoords ? (
                                     <Pressable
                                       onPress={() =>
-                                        onNavigateToMapCell?.({
+                                        handleNavigateToMapCell({
                                           mapName: battleMapName,
                                           x: battleCoords.x,
                                           y: battleCoords.y,
@@ -1077,6 +1157,9 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               const hackLocLine = formatHackLocationDisplay(locShare.x, locShare.y);
                               const primaryOnBubble = isOwnMessage ? colors.background : colors.text.primary;
                               const secondaryOnBubble = isOwnMessage ? colors.background : colors.text.secondary;
+                              const canTapSharedLocation =
+                                Boolean(onNavigateToMapCell) &&
+                                locShare.mapName === 'main';
                               const card = (
                                 <View style={styles.probeReportBlock}>
                                   <Text style={[styles.probeReportTitle, { color: primaryOnBubble }]}>
@@ -1101,7 +1184,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   >
                                     {hackLocLine}
                                   </Text>
-                                  {onNavigateToMapCell ? (
+                                  {canTapSharedLocation ? (
                                     <Text
                                       style={[
                                         styles.messageText,
@@ -1118,11 +1201,11 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   ) : null}
                                 </View>
                               );
-                              if (onNavigateToMapCell) {
+                              if (canTapSharedLocation) {
                                 return (
                                   <Pressable
                                     onPress={() =>
-                                      onNavigateToMapCell({
+                                      handleNavigateToMapCell({
                                         mapName: locShare.mapName,
                                         x: locShare.x,
                                         y: locShare.y,
