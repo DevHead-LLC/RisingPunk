@@ -2358,10 +2358,22 @@ export const HackMapScreen: React.FC<Props> = ({
     skip: !shouldFetchMyPosition,
   });
   const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
-  
+
+  /** Once we have grid data, stop tying viewport query args to `myPositionData` so Map-tag refetches do not restart initial load / full-screen spinner (Bugbot). */
+  const frozenInitialViewportRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const prevHandleForFrozenViewportRef = useRef<string | null | undefined>(undefined);
+  const handleKeyForFrozenViewport = currentUserHandle ?? null;
+  if (prevHandleForFrozenViewportRef.current !== handleKeyForFrozenViewport) {
+    prevHandleForFrozenViewportRef.current = handleKeyForFrozenViewport;
+    frozenInitialViewportRef.current = null;
+  }
+
   // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
   // Step 1: Fetch a reasonable initial viewport based on actual pan position (0,0) and visible area
   const initialViewport = useMemo(() => {
+    if (frozenInitialViewportRef.current) {
+      return frozenInitialViewportRef.current;
+    }
     if (containerSize.width === 0 || containerSize.height === 0) {
       // Fallback to center if container not ready (shouldn't happen due to skip condition)
       const buffer = 15;
@@ -2420,14 +2432,20 @@ export const HackMapScreen: React.FC<Props> = ({
       y2: endRow,
     };
   }, [gridSize, containerSize.width, containerSize.height, myPositionData]);
-  
+
   const shouldSkipInitialQuery = containerSize.width === 0 || containerSize.height === 0;
   const { data: initialViewportData, isLoading: isLoadingInitialViewport, refetch: refetchInitialViewport } = useFetchMapViewportQuery(
     initialViewport,
     { skip: shouldSkipInitialQuery }
   );
-  
-  
+
+  useEffect(() => {
+    if (!initialViewportData?.grid || frozenInitialViewportRef.current) return;
+    // Do not freeze on pan-0/center viewport while my-position is still loading — wait so we can seed from API (Bugbot).
+    if (shouldFetchMyPosition && myPositionLoading) return;
+    frozenInitialViewportRef.current = initialViewport;
+  }, [initialViewportData?.grid, initialViewport, shouldFetchMyPosition, myPositionLoading]);
+
   // Step 2: Check if user's house is in initial viewport, if not, fetch full map
   const [needsFullMap, setNeedsFullMap] = useState<boolean>(false);
   const { data: fullMapData, isLoading: isLoadingFullMap, refetch: refetchFullMap } = useFetchMapQuery(undefined, {
