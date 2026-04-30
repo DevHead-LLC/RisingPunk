@@ -4168,6 +4168,26 @@ export const HackMapScreen: React.FC<Props> = ({
     }
   }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, mapGridSize, restorePan, calculateVirtualViewport]);
 
+  // initialCenterResolved + handle reset must run before home-centering effects (same commit) so
+  // SharedValue resets are visible when centering runs; avoids stuck spinner (Bugbot: effect order).
+  useEffect(() => {
+    if (restorePan || !currentUserHandle) {
+      setInitialCenterResolved(true);
+      return;
+    }
+    setInitialCenterResolved(false);
+  }, [restorePan, currentUserHandle]);
+
+  const prevHandleRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevHandleRef.current;
+    prevHandleRef.current = currentUserHandle ?? undefined;
+    if (prev !== undefined && prev !== (currentUserHandle ?? undefined)) {
+      hasCenteredOnHome.value = false;
+      userMapPositionRef.current = null;
+    }
+  }, [currentUserHandle]);
+
   // Center on user's home from my-position API when data arrives (user-position-and-locator.md)
   useEffect(() => {
     if (!myPositionData) return;
@@ -4262,26 +4282,6 @@ export const HackMapScreen: React.FC<Props> = ({
     hasCenteredOnHome.value = true;
     setInitialCenterResolved(true);
   }, [grid, mapGridSize, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, offsetX, offsetY, calculateVirtualViewport, myPositionData, myPositionLoading, myPositionError]);
-
-  // When handle changes (e.g. after profile update), reset center flag and cached position so we re-center on home when fresh map data arrives.
-  const prevHandleRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    const prev = prevHandleRef.current;
-    prevHandleRef.current = currentUserHandle ?? undefined;
-    if (prev !== undefined && prev !== (currentUserHandle ?? undefined)) {
-      hasCenteredOnHome.value = false;
-      userMapPositionRef.current = null;
-    }
-  }, [currentUserHandle]);
-
-  useEffect(() => {
-    // If we cannot/shouldn't center on home for this entry path, allow map render immediately.
-    if (restorePan || !currentUserHandle) {
-      setInitialCenterResolved(true);
-      return;
-    }
-    setInitialCenterResolved(false);
-  }, [restorePan, currentUserHandle]);
 
   const handleCellPressRef = useRef<((x: number, y: number, cellData: CellData) => Promise<void>) | null>(null);
   const lastPressTimeRef = useRef<number>(0);
