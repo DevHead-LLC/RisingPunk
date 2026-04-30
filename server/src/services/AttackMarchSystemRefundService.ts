@@ -113,7 +113,8 @@ export type SystemRefundResult =
 export async function systemRefundAttackMarchInState(
   marchId: string,
   attackerId: string,
-  expectedState: RefundableMarchState
+  expectedState: RefundableMarchState,
+  cancelReason: string = 'system-refund'
 ): Promise<SystemRefundResult> {
   const mid = marchId.trim();
   const aid = String(attackerId);
@@ -153,7 +154,7 @@ export async function systemRefundAttackMarchInState(
       await session.withTransaction(async () => {
         const cancelled = await AttackMarch.findOneAndUpdate(
           { marchId: mid, attackerId: aid, state: expectedState },
-          { $set: { state: 'cancelled' } },
+          { $set: { state: 'cancelled', cancelReason, resolvedAt: new Date() } },
           { new: true, session }
         );
         if (!cancelled) {

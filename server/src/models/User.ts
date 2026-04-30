@@ -52,6 +52,8 @@ export interface IUser extends Document {
   /** Stable device identifier (e.g. iOS identifierForVendor) for recovery when AsyncStorage/Keychain is cleared; prefer oldest account by createdAt when multiple guests share same vendor. */
   guestVendorId?: string;
   currentTokenId?: string;
+  /** Last successful authenticated account access (new login or valid returning-session verification). */
+  lastLoginAt?: Date;
   /** Research Center building level 1–20 (max from construction_config). Missing or 0 = not built (or legacy, resolved on read). */
   researchCenterLevel?: number;
   researchCenterBuild?: {
@@ -560,6 +562,10 @@ const userSchema = new Schema({
     type: String,
     required: false
   },
+  lastLoginAt: {
+    type: Date,
+    required: false
+  },
   dailyHaul: {
     weekStartUtc: { type: Date, required: false },
     claimedDays: { type: [Number], default: [] },
@@ -753,6 +759,7 @@ userSchema.statics.findByAppleId = async function(appleId: string): Promise<IUse
 // Method to set current token (invalidates all previous tokens)
 userSchema.methods.setCurrentToken = function(tokenId: string): void {
   this.currentTokenId = tokenId;
+  this.lastLoginAt = new Date();
 };
 
 // Method to check if token is valid

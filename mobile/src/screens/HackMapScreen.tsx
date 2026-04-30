@@ -53,6 +53,8 @@ import {
 } from '../utils/turfHackMapHandoffGlobals';
 import { AttackMarchAnimationLayer } from '../components/hackMap/AttackMarchAnimationLayer';
 import { outboundProgressTForAttackMarch } from '../components/hackMap/attackMarchMapFrame';
+import { TransferRunModal } from '../components/hackMap/TransferRunModal';
+import { TransferRunAnimationLayer } from '../components/hackMap/TransferRunAnimationLayer';
 import { useGetShieldStatusQuery } from '../store/api/antivirusApi';
 import { useGetUserFeaturesQuery } from '../store/api/researchFeaturesApi';
 import { useGetCrewStatusQuery, useGetUserCrewStatusQuery, useGetCrewDetailsQuery, useGetWarStatusQuery, useGetAllianceStatusQuery, useSendCrewChatMessageMutation } from '../store/api/authApi';
@@ -78,6 +80,7 @@ import {
 } from '../store/api/bugHuntApi';
 import { ANT_BUG_IMAGE } from '../constants/hackMapBugHuntVisuals';
 import { AntWorldReseedCountdownText } from '../components/hackMap/AntWorldReseedCountdownText';
+import { useGetActiveTransferRunsQuery } from '../store/api/transferRunApi';
 
 const CELL_SIZE = 75;
 const MARGIN_SIZE = 80;
@@ -1607,6 +1610,13 @@ export const HackMapScreen: React.FC<Props> = ({
   const [followProbeId, setFollowProbeId] = useState<string | null>(null);
   /** Owner hack expedition modal (tap **outbound** or **returning** march on map). */
   const [marchOwnerModalId, setMarchOwnerModalId] = useState<string | null>(null);
+  const [showTransferRunModal, setShowTransferRunModal] = useState(false);
+  const [transferRecipient, setTransferRecipient] = useState<{
+    userId: string;
+    username: string;
+    targetX: number;
+    targetY: number;
+  } | null>(null);
   const [marchModalTimeTick, setMarchModalTimeTick] = useState(0);
   const [showProbeFollowModal, setShowProbeFollowModal] = useState(false);
   /** Live remainingSec/phase for the followed probe (updated by ProbeAnimationLayer each tick when modal open). */
@@ -2028,6 +2038,7 @@ export const HackMapScreen: React.FC<Props> = ({
   const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
   
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
+  const [initialCenterResolved, setInitialCenterResolved] = useState<boolean>(false);
   
   // Static vs Dynamic Data Separation
   const [staticTerrainData, setStaticTerrainData] = useState<Record<string, TerrainType>>({});
@@ -2041,6 +2052,12 @@ export const HackMapScreen: React.FC<Props> = ({
     npcLevel?: number;
   }>>({});
   const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
+
+  const { data: activeTransferRunsData } = useGetActiveTransferRunsQuery(undefined, {
+    // Keep transfer polling out of initial map bootstrap; enable once terrain + first map readiness are done.
+    skip: !token || !terrainDataLoaded || !isMapReady,
+    pollingInterval: 5000,
+  });
   
   // Shield status change tracking
   const [lastShieldStatus, setLastShieldStatus] = useState<boolean | null>(null);
@@ -2390,10 +2407,30 @@ export const HackMapScreen: React.FC<Props> = ({
   const gridSizeRef = useRef(gridSize);
   gridSizeRef.current = gridSize;
   const totalSize = gridSize * CELL_SIZE;
-  
+
+  // My-position API: reliable (x,y) for user's house for initial center and locator (user-position-and-locator.md)
+  // Fetch early so initial viewport can target user's home instead of center-origin.
+  const shouldFetchMyPosition = !restorePan && !!currentUserHandle;
+  const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(currentUserHandle ?? '', {
+    skip: !shouldFetchMyPosition,
+  });
+  const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
+
+  /** Once we have grid data, stop tying viewport query args to `myPositionData` so Map-tag refetches do not restart initial load / full-screen spinner (Bugbot). */
+  const frozenInitialViewportRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const prevHandleForFrozenViewportRef = useRef<string | null | undefined>(undefined);
+  const handleKeyForFrozenViewport = currentUserHandle ?? null;
+  if (prevHandleForFrozenViewportRef.current !== handleKeyForFrozenViewport) {
+    prevHandleForFrozenViewportRef.current = handleKeyForFrozenViewport;
+    frozenInitialViewportRef.current = null;
+  }
+
   // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
   // Step 1: Fetch a reasonable initial viewport based on actual pan position (0,0) and visible area
   const initialViewport = useMemo(() => {
+    if (frozenInitialViewportRef.current) {
+      return frozenInitialViewportRef.current;
+    }
     if (containerSize.width === 0 || containerSize.height === 0) {
       // Fallback to center if container not ready (shouldn't happen due to skip condition)
       const buffer = 15;
@@ -2407,6 +2444,31 @@ export const HackMapScreen: React.FC<Props> = ({
       };
     }
     
+    // When available, target user's current position to avoid initial black-pan gap.
+    if (myPositionData) {
+      const { x: userPanX, y: userPanY } = gridToPanCoordinates(
+        myPositionData.x,
+        myPositionData.y,
+        containerSize.width,
+        containerSize.height
+      );
+      const buffer = 15;
+      const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
+        userPanX,
+        userPanY,
+        containerSize.width,
+        containerSize.height,
+        gridSize,
+        buffer
+      );
+      return {
+        x1: startCol,
+        y1: startRow,
+        x2: endCol,
+        y2: endRow,
+      };
+    }
+
     // Calculate viewport from initial pan position (0,0) to match what's actually visible
     const buffer = 15; // Larger buffer to increase chance of finding user
     const initialPanX = 0;
@@ -2426,15 +2488,21 @@ export const HackMapScreen: React.FC<Props> = ({
       x2: endCol,
       y2: endRow,
     };
-  }, [gridSize, containerSize.width, containerSize.height]);
-  
+  }, [gridSize, containerSize.width, containerSize.height, myPositionData]);
+
   const shouldSkipInitialQuery = containerSize.width === 0 || containerSize.height === 0;
   const { data: initialViewportData, isLoading: isLoadingInitialViewport, refetch: refetchInitialViewport } = useFetchMapViewportQuery(
     initialViewport,
     { skip: shouldSkipInitialQuery }
   );
-  
-  
+
+  useEffect(() => {
+    if (!initialViewportData?.grid || frozenInitialViewportRef.current) return;
+    // Do not freeze on pan-0/center viewport while my-position is still loading — wait so we can seed from API (Bugbot).
+    if (shouldFetchMyPosition && myPositionLoading) return;
+    frozenInitialViewportRef.current = initialViewport;
+  }, [initialViewportData?.grid, initialViewport, shouldFetchMyPosition, myPositionLoading]);
+
   // Step 2: Check if user's house is in initial viewport, if not, fetch full map
   const [needsFullMap, setNeedsFullMap] = useState<boolean>(false);
   const { data: fullMapData, isLoading: isLoadingFullMap, refetch: refetchFullMap } = useFetchMapQuery(undefined, {
@@ -2496,24 +2564,24 @@ export const HackMapScreen: React.FC<Props> = ({
     }
   }, [needsFullMap, refetchFullMap, refetchInitialViewport]);
 
-  // My-position API: reliable (x,y) for user's house for initial center and locator (user-position-and-locator.md)
-  // Single grid scan: one useMemo returns (x,y) or null; userHouseInGrid derived from it (Bugbot: no duplicate full-grid scan).
+  // My-position API when available; else single grid scan for (x,y) or null (user-position-and-locator.md; Bugbot: no duplicate full-grid scan).
+  // Fallback: derive from already loaded grid when my-position is unavailable.
   const gridDerivedUserPosition = useMemo((): { x: number; y: number } | null => {
-    if (!grid?.length || !currentUserHandle) return null;
-    for (let y = 0; y < grid.length; y++) {
+    if (!terrainDataLoaded || !grid?.length || !currentUserHandle) return null;
+    // When API position is available, skip grid scan entirely.
+    if (myPositionData) return null;
+    // Avoid scanning sparse backing storage beyond authoritative map size.
+    const size = mapGridSize ?? getGridSize(grid);
+    for (let y = 0; y < size; y++) {
       const row = grid[y];
       if (!row) continue;
-      for (let x = 0; x < row.length; x++) {
+      for (let x = 0; x < size; x++) {
         const cell = row[x] as any;
         if (cell?.entity === 'house' && cell?.name === currentUserHandle) return { x, y };
       }
     }
     return null;
-  }, [grid, currentUserHandle]);
-  const userHouseInGrid = gridDerivedUserPosition !== null;
-  const shouldFetchMyPosition = !restorePan && !!currentUserHandle && terrainDataLoaded && !userHouseInGrid;
-  const { data: myPositionData, error: myPositionError, isLoading: myPositionLoading } = useGetMyMapPositionQuery(undefined, { skip: !shouldFetchMyPosition });
-  const [triggerGetMyMapPosition] = useLazyGetMyMapPositionQuery();
+  }, [terrainDataLoaded, grid, currentUserHandle, myPositionData, mapGridSize]);
   /** Single source for "current user position": API when fetched, else grid when house in grid, else last known (e.g. after background). Probe and animation use this. */
   const effectiveMyPosition = myPositionData ?? gridDerivedUserPosition ?? null;
   const lastKnownPositionRef = useRef<{ x: number; y: number } | null>(null);
@@ -2529,7 +2597,7 @@ export const HackMapScreen: React.FC<Props> = ({
       appStateRef.current = nextState;
       if (wasBackgroundOrInactive && nextState === 'active') {
         if (shouldFetchMyPosition) {
-          triggerGetMyMapPosition();
+          triggerGetMyMapPosition(currentUserHandle ?? '');
         }
         void refetchBugInstances();
         void refetchBugWorldState();
@@ -2539,6 +2607,7 @@ export const HackMapScreen: React.FC<Props> = ({
     return () => sub?.remove();
   }, [
     shouldFetchMyPosition,
+    currentUserHandle,
     triggerGetMyMapPosition,
     refetchBugInstances,
     refetchBugWorldState,
@@ -2966,7 +3035,28 @@ export const HackMapScreen: React.FC<Props> = ({
     if (isSameCrewMember) return false;
     return true;
   }, [isSwarmLeadUnlocked, crewStatus?.isInCrew, selectedCell, currentUserHandle, isSameCrewMember]);
-  
+
+  const shouldShowTransferButton = useMemo(() => {
+    if (!selectedCell) return false;
+    if (selectedCell.info.owner !== 'player') return false;
+    if (!selectedCell.info.userId) return false;
+    if (!crewStatus?.isInCrew) return false;
+    if (selectedCell.info.name === currentUserHandle) return false;
+    const selectedUid = String(selectedCell.info.userId);
+    // Roster already includes them — no need to block on per-user crew-status fetch.
+    if (isLoadingSelectedUserCrewStatus && !crewMemberUserIds.has(selectedUid)) {
+      return false;
+    }
+    return isSameCrewMember;
+  }, [
+    selectedCell,
+    crewStatus?.isInCrew,
+    currentUserHandle,
+    isLoadingSelectedUserCrewStatus,
+    isSameCrewMember,
+    crewMemberUserIds,
+  ]);
+
   // Debug logging - REMOVED to fix infinite loop
   
   const isShieldActive = shieldData?.isActive || false;
@@ -4028,6 +4118,7 @@ export const HackMapScreen: React.FC<Props> = ({
       
       // Mark this position as restored
       restoredPanRef.current = { x: restorePan.x, y: restorePan.y };
+      setInitialCenterResolved(true);
       
       // Force tile loading by properly calculating the new window range
       // Reset throttle timestamp to ensure computeWindow runs immediately
@@ -4138,46 +4229,28 @@ export const HackMapScreen: React.FC<Props> = ({
         lastComputedPan.value = clamped;
         computeWindow(clamped.x, clamped.y, containerSize.width, containerSize.height);
       }
-      // Bounds are now set; attempt centering on user's home
-      if (!restorePan && !hasCenteredOnHome.value && currentUserHandle) {
-        // Inline center-on-home logic to avoid using computeWindow before declaration
-        // Bugbot: Use authoritative map size for iteration; grid.length is 500 for 50×50 sparse grid (unnecessary 500 rows + wrong viewport).
-        const size = mapGridSize ?? getGridSize(grid);
-        if (size && grid) {
-          let homeX: number | null = null;
-          let homeY: number | null = null;
-          for (let y = 0; y < size; y++) {
-            const row = grid[y];
-            if (!row) continue;
-            for (let x = 0; x < size; x++) {
-              const cell = row[x] as any;
-              if (cell && cell.entity === 'house' && cell.name === currentUserHandle) {
-                homeX = x; homeY = y; break;
-              }
-            }
-            if (homeX != null) break;
-          }
-          if (homeX != null && homeY != null) {
-            userMapPositionRef.current = { x: homeX, y: homeY };
-            const { x: targetX, y: targetY } = gridToPanCoordinates(homeX, homeY, containerSize.width, containerSize.height);
-            const cx = Math.min(maxX.value, Math.max(minX.value, targetX));
-            const cy = Math.min(maxY.value, Math.max(minY.value, targetY));
-            offsetX.value = cx;
-            offsetY.value = cy;
-            // Bypass computeWindow so pan-delta skip doesn't prevent window range update (Bugbot: same as restorePan).
-            const gridSizeBounds = mapGridSize ?? getGridSize(grid);
-            const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSizeBounds, PAN_BUFFER);
-            calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
-            const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
-            windowRangeRef.current = newRange;
-            setWindowRange(newRange);
-            lastComputedPan.value = { x: cx, y: cy };
-            hasCenteredOnHome.value = true;
-          }
-        }
-      }
     }
-  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, mapGridSize, currentUserHandle, restorePan, calculateVirtualViewport]);
+  }, [containerSize.width, containerSize.height, totalSize, minX, maxX, minY, maxY, offsetX, offsetY, grid, mapGridSize, restorePan, calculateVirtualViewport]);
+
+  // initialCenterResolved + handle reset must run before home-centering effects (same commit) so
+  // SharedValue resets are visible when centering runs; avoids stuck spinner (Bugbot: effect order).
+  useEffect(() => {
+    if (restorePan || !currentUserHandle) {
+      setInitialCenterResolved(true);
+      return;
+    }
+    setInitialCenterResolved(false);
+  }, [restorePan, currentUserHandle]);
+
+  const prevHandleRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const prev = prevHandleRef.current;
+    prevHandleRef.current = currentUserHandle ?? undefined;
+    if (prev !== undefined && prev !== (currentUserHandle ?? undefined)) {
+      hasCenteredOnHome.value = false;
+      userMapPositionRef.current = null;
+    }
+  }, [currentUserHandle]);
 
   // Center on user's home from my-position API when data arrives (user-position-and-locator.md)
   useEffect(() => {
@@ -4201,6 +4274,7 @@ export const HackMapScreen: React.FC<Props> = ({
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
+    setInitialCenterResolved(true);
     const buffer = 15;
     const restoreViewport = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, buffer);
     if (viewportRequestInFlightRef.current) {
@@ -4222,7 +4296,7 @@ export const HackMapScreen: React.FC<Props> = ({
         minimal: false,
       });
     }
-  }, [myPositionData, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
+  }, [myPositionData, currentUserHandle, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
 
   // Center on current user's home on initial entry (only if not returning from battle with restorePan)
   // Fallback when my-position API not available or user's house is in initial viewport (grid-scan)
@@ -4231,7 +4305,9 @@ export const HackMapScreen: React.FC<Props> = ({
     if (restorePan) return; // respect return-from-battle view
     if (hasCenteredOnHome.value) return;
     if (!currentUserHandle) return;
-    // Bugbot: Use authoritative map size for iteration; grid.length is 500 for 50×50 sparse grid.
+    // API-first centering path: only do expensive grid fallback when my-position failed.
+    if (myPositionData || myPositionLoading || !myPositionError) return;
+    // Bugbot: Use authoritative map size for iteration; grid.length is 500 for 50x50 sparse grid.
     const size = mapGridSize ?? getGridSize(grid);
     if (!size || !grid) return;
     let homeX: number | null = null;
@@ -4247,7 +4323,11 @@ export const HackMapScreen: React.FC<Props> = ({
       }
       if (homeX != null) break;
     }
-    if (homeX == null || homeY == null) return;
+    if (homeX == null || homeY == null) {
+      // Fallback failed too; allow map to render at current pan instead of indefinite spinner.
+      setInitialCenterResolved(true);
+      return;
+    }
     userMapPositionRef.current = { x: homeX, y: homeY };
     const targetX = (containerSize.width / 2) - MARGIN_SIZE - ((homeX + 0.5) * CELL_SIZE);
     const targetY = (containerSize.height / 2) - MARGIN_SIZE - ((homeY + 0.5) * CELL_SIZE);
@@ -4264,18 +4344,8 @@ export const HackMapScreen: React.FC<Props> = ({
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
-  }, [grid, mapGridSize, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, offsetX, offsetY, calculateVirtualViewport]);
-
-  // When handle changes (e.g. after profile update), reset center flag and cached position so we re-center on home when fresh map data arrives.
-  const prevHandleRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    const prev = prevHandleRef.current;
-    prevHandleRef.current = currentUserHandle ?? undefined;
-    if (prev !== undefined && prev !== (currentUserHandle ?? undefined)) {
-      hasCenteredOnHome.value = false;
-      userMapPositionRef.current = null;
-    }
-  }, [currentUserHandle]);
+    setInitialCenterResolved(true);
+  }, [grid, mapGridSize, currentUserHandle, restorePan, containerSize.width, containerSize.height, minX, maxX, boundsReady, offsetX, offsetY, calculateVirtualViewport, myPositionData, myPositionLoading, myPositionError]);
 
   const handleCellPressRef = useRef<((x: number, y: number, cellData: CellData) => Promise<void>) | null>(null);
   const lastPressTimeRef = useRef<number>(0);
@@ -4350,29 +4420,40 @@ export const HackMapScreen: React.FC<Props> = ({
         return;
       }
       
+      // Open the tile panel immediately; merge authoritative shield when the request finishes.
+      // Avoids “dead” first taps while `/shield-status` is in flight and fixes AbortError-only paths leaving no selection.
+      setSelectedCell({ x, y, info: cellData });
+      
       // Performance: Cancel previous request if new one starts
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-      abortControllerRef.current = new AbortController();
+      const ac = new AbortController();
+      abortControllerRef.current = ac;
       
       try {
-        const response = await fetch(`${API_URL}/api/users/shield-status/${userId}`, {
+        const response = await fetch(`${API_URL}/api/users/shield-status/${encodeURIComponent(userId.trim())}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
           },
-          signal: abortControllerRef.current.signal,
+          signal: ac.signal,
         });
+        
+        if (ac.signal.aborted) {
+          return;
+        }
         
         // Security: Validate API response
         if (!response.ok) {
-          setSelectedCell({x, y, info: cellData});
           return;
         }
         
         const userData = await response.json();
         if (!userData || typeof userData !== 'object') {
-          setSelectedCell({x, y, info: cellData});
+          return;
+        }
+        
+        if (ac.signal.aborted) {
           return;
         }
         
@@ -4380,14 +4461,18 @@ export const HackMapScreen: React.FC<Props> = ({
           ...cellData,
           isShielded: userData.antivirusShield?.active || false
         };
-        setSelectedCell({x, y, info: updatedCellData});
+        // Do not apply shield merge if the user already selected another tile (optimistic open + slow network).
+        setSelectedCell((prev) => {
+          if (prev == null || prev.x !== x || prev.y !== y) return prev;
+          if (String(prev.info.userId ?? '') !== String(userId.trim())) return prev;
+          return { x, y, info: updatedCellData };
+        });
         return;
       } catch (error: any) {
-        if (error.name === 'AbortError') {
+        if (error?.name === 'AbortError') {
           return;
         }
         console.error('Failed to fetch shield status:', error);
-        setSelectedCell({x, y, info: cellData});
         return;
       }
     }
@@ -4492,7 +4577,7 @@ export const HackMapScreen: React.FC<Props> = ({
       doPanTo(userMapPositionRef.current);
       return;
     }
-    triggerGetMyMapPosition()
+    triggerGetMyMapPosition(currentUserHandle ?? '')
       .unwrap()
       .then((payload) => doPanTo(payload))
       .catch(() => {});
@@ -4731,7 +4816,7 @@ export const HackMapScreen: React.FC<Props> = ({
               .then(() => {
                 dispatch(refreshUserDataSilent());
                 refetch();
-                triggerGetMyMapPosition();
+                triggerGetMyMapPosition(currentUserHandle ?? '');
                 setSelectedCell(null);
               })
               .catch((err: any) => {
@@ -4746,6 +4831,7 @@ export const HackMapScreen: React.FC<Props> = ({
     selectedCell,
     effectiveMyPosition,
     currentBalanceDisplay,
+    currentUserHandle,
     movePropertyMutation,
     dispatch,
     refetch,
@@ -5234,7 +5320,29 @@ export const HackMapScreen: React.FC<Props> = ({
                       </Text>
                     </TouchableOpacity>
                   )}
-                  
+
+                  {shouldShowTransferButton && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.matrix, borderColor: colors.matrix }]}
+                      onPress={() => {
+                        const userId = selectedCell.info.userId != null ? String(selectedCell.info.userId).trim() : '';
+                        if (!userId) return;
+                        setTransferRecipient({
+                          userId,
+                          username: String(selectedCell.info.name ?? 'Player'),
+                          targetX: selectedCell.x,
+                          targetY: selectedCell.y,
+                        });
+                        setShowTransferRunModal(true);
+                        setSelectedCell(null);
+                      }}
+                    >
+                      <Text style={[styles.actionButtonText, { color: colors.background }]}>
+                        Transfer
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
                   {selectedCell.info.owner === 'player' && 
                    selectedCell.info.userId && 
                    selectedCell.info.name !== currentUserHandle &&
@@ -5327,9 +5435,10 @@ export const HackMapScreen: React.FC<Props> = ({
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  }, [selectedCell, selectedBugMarker, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress, hasUnlockedHunter, bugWorldStateData?.reseedInProgress, bugWorldStateData?.nextAntWorldReseedAtUtc, serverSkewMs]);
+  }, [selectedCell, selectedBugMarker, styles, colors, currentUserHandle, onClose, selectedUserCrewStatus, handleViewCrewPress, shouldShowHackButton, shouldShowSwarmButton, shouldShowTransferButton, handleCreateSwarmForSelectedCell, handleOpenSwarmModal, mySwarmSession?.swarmId, researchFeatures, probes, displayProbes, positionForProbe, currentUserId, launchProbeMutation, handleShareLocationPress, effectiveMyPosition, currentBalanceDisplay, handleMovePropertyPress, hasUnlockedHunter, bugWorldStateData?.reseedInProgress, bugWorldStateData?.nextAntWorldReseedAtUtc, serverSkewMs]);
 
-  if (loading || !isMapReady || !terrainDataLoaded) {
+  const shouldWaitForInitialCenter = !restorePan && !!currentUserHandle && !initialCenterResolved;
+  if (loading || !isMapReady || !terrainDataLoaded || shouldWaitForInitialCenter) {
     return <View style={styles.container}><LoadingSpinner /></View>;
   }
 
@@ -5444,6 +5553,17 @@ export const HackMapScreen: React.FC<Props> = ({
           isAbortingSwarm
         }
       />
+
+      {showTransferRunModal ? (
+        <TransferRunModal
+          visible={showTransferRunModal}
+          onClose={() => {
+            setShowTransferRunModal(false);
+            setTransferRecipient(null);
+          }}
+          recipient={transferRecipient}
+        />
+      ) : null}
 
       {visitingProfileUserId && (
         <VisitingProfileModal
@@ -5592,6 +5712,10 @@ export const HackMapScreen: React.FC<Props> = ({
           animatedMapStyle={animatedMapStyle as any}
           currentUserId={currentUserId}
           onOwnerMarchPress={handleOwnerMarchPress}
+        />
+        <TransferRunAnimationLayer
+          runs={activeTransferRunsData?.runs ?? []}
+          animatedMapStyle={animatedMapStyle as any}
         />
       </View>
       ) : null}
