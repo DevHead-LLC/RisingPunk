@@ -680,7 +680,9 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               typeof report.mapName === 'string' && report.mapName.trim().length > 0
                                 ? report.mapName.trim()
                                 : 'main';
-                            const canTapProbeLocation = Boolean(onNavigateToMapCell);
+                            const canTapProbeLocation =
+                              Boolean(onNavigateToMapCell) &&
+                              probeMapName === 'main';
                             const probeBlock = (
                               <View style={styles.probeReportBlock}>
                                 <Text style={[styles.probeReportTitle, { color: colors.text.primary }]}>
@@ -824,7 +826,8 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   : null;
                             const canTapBattleLocation =
                               Boolean(onNavigateToMapCell) &&
-                              battleCoords !== null;
+                              battleCoords !== null &&
+                              battleMapName === 'main';
                             const fmt = (n: number) => n.toLocaleString();
                             const battleLocationLine =
                               hackLocLine ??
