@@ -240,7 +240,16 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
       console.error('[MarchResolution] failed to attach swarm battle id:', battle.battleId, swarmAttachErr);
     }
   } catch (e) {
-    const targetMissingAtResolution = await isNpcTargetMissingAtResolution(updated);
+    let targetMissingAtResolution = false;
+    try {
+      targetMissingAtResolution = await isNpcTargetMissingAtResolution(updated);
+    } catch (targetMissingCheckErr) {
+      console.error(
+        '[MarchResolution] failed to verify NPC target presence during resolution error handling:',
+        updated.marchId,
+        targetMissingCheckErr
+      );
+    }
     if (targetMissingAtResolution) {
       const refunded = await systemRefundAttackMarchInState(
         updated.marchId,
