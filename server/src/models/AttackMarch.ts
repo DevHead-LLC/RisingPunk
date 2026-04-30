@@ -49,6 +49,8 @@ export interface IAttackMarchDocument extends Document, AttackMarchBugHuntContra
   returnLegStartY?: number;
   /** True only for user-cancelled outbound marches; inventory refunds when return leg completes. */
   returningAfterCancel?: boolean;
+  /** Diagnostic reason when a march is terminally cancelled by system or user-facing flows. */
+  cancelReason?: string;
   battleId?: string;
   /** Set for Swarm marches to link settlement/report fan-out to the session. */
   swarmSessionId?: string;
@@ -99,6 +101,7 @@ const attackMarchSchema = new Schema<IAttackMarchDocument>(
     returnLegStartX: { type: Number, required: false },
     returnLegStartY: { type: Number, required: false },
     returningAfterCancel: { type: Boolean, required: false },
+    cancelReason: { type: String, required: false },
     battleId: { type: String, required: false },
     swarmSessionId: { type: String, required: false },
     attackType: { type: String, required: false, enum: ['solo', 'swarm', 'bug_hunt'], default: 'solo' },

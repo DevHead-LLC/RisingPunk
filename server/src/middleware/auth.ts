@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
+import { bumpLastLoginAtIfStale } from '../services/LastLoginHeartbeatService';
 
 const auth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -27,6 +28,13 @@ const auth = async (req: Request, res: Response, next: NextFunction): Promise<vo
     if (sessionId && !user.isTokenValid(sessionId)) {
       res.status(401).json({ error: 'ACCOUNT_SWITCHED' });
       return;
+    }
+
+    try {
+      await bumpLastLoginAtIfStale(String(userId), user.lastLoginAt);
+    } catch (heartbeatError) {
+      // Authentication already succeeded; avoid failing the request on heartbeat write issues.
+      console.warn('AUTH: lastLoginAt heartbeat update failed:', heartbeatError);
     }
     
     req.user = { _id: userId };
