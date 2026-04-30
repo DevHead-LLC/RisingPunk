@@ -1157,6 +1157,9 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                               const hackLocLine = formatHackLocationDisplay(locShare.x, locShare.y);
                               const primaryOnBubble = isOwnMessage ? colors.background : colors.text.primary;
                               const secondaryOnBubble = isOwnMessage ? colors.background : colors.text.secondary;
+                              const canTapSharedLocation =
+                                Boolean(onNavigateToMapCell) &&
+                                locShare.mapName === 'main';
                               const card = (
                                 <View style={styles.probeReportBlock}>
                                   <Text style={[styles.probeReportTitle, { color: primaryOnBubble }]}>
@@ -1181,7 +1184,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   >
                                     {hackLocLine}
                                   </Text>
-                                  {onNavigateToMapCell ? (
+                                  {canTapSharedLocation ? (
                                     <Text
                                       style={[
                                         styles.messageText,
@@ -1198,7 +1201,7 @@ export const BaseChatModal: React.FC<BaseChatModalProps> = ({
                                   ) : null}
                                 </View>
                               );
-                              if (onNavigateToMapCell) {
+                              if (canTapSharedLocation) {
                                 return (
                                   <Pressable
                                     onPress={() =>
