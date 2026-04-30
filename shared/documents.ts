@@ -2,12 +2,12 @@
  * Shared document data for Privacy Policy and Terms of Service
  * Used by web, mobile, and server applications
  * 
- * Last Updated: March 19, 2026
+ * Last Updated: April 29, 2026
  */
 
 export const DOCUMENTS = {
   privacyPolicy: {
-    effectiveDate: 'March 19, 2026',
+    effectiveDate: 'April 29, 2026',
     sections: [
       {
         title: 'Data Controller',
@@ -25,6 +25,10 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
           {
             label: 'Email verification status',
             text: 'we track whether your email has been verified to provide appropriate account security features.'
+          },
+          {
+            label: 'Last login activity',
+            text: 'we store the timestamp of successful account access, including new sign-ins and returning sessions, to support account security, fraud prevention, and account support.'
           },
           {
             label: 'Handle/username',
@@ -85,6 +89,7 @@ support@risingpunk.com (forwarded and hosted through Google Workspace)`
         title: 'How We Use Information',
         items: [
           'Authenticate and manage accounts.',
+          'Record successful login and returning-session activity for account security and support.',
           'Send essential service messages or support replies.',
           'Send email verification links and password recovery emails.',
           'Protect the service against fraud or abuse.',
@@ -255,7 +260,7 @@ Whether you allow or deny tracking in the ATT prompt, we may still use Firebase 
     ]
   },
   termsOfService: {
-    effectiveDate: 'March 19, 2026',
+    effectiveDate: 'April 29, 2026',
     sections: [
       {
         title: 'Acceptance of Terms',
@@ -270,6 +275,7 @@ Whether you allow or deny tracking in the ATT prompt, we may still use Firebase 
         items: [
           'Provide a valid email and choose a handle.',
           'Verify your email address to ensure account security and enable password recovery.',
+          'We record successful login and returning-session activity to protect account security and support account recovery/troubleshooting.',
           'You are responsible for safeguarding your password.',
           'Unverified accounts may have limited functionality and may be unrecoverable if locked.',
           'We may suspend or terminate accounts for violations or security concerns.'

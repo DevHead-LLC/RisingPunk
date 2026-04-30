@@ -11,9 +11,72 @@ import { BattleService } from './BattleService';
 import { attachHeadlessWorkingBattle } from './HeadlessBattleRunner';
 import { defenderQueueKeyFromMarchDoc, reconcileDefenderQueue } from './MarchDefenderQueueService';
 import { systemRefundAttackMarchInState } from './AttackMarchSystemRefundService';
+import { Map as MapModel } from '../models/Map';
+import { findCellByNpcInstanceId, getCell } from './CellAccessorService';
 
 export const MARCH_HEADLESS_BATTLE_WIDTH = 844;
 export const MARCH_HEADLESS_BATTLE_HEIGHT = 390;
+
+async function isNpcTargetMissingAtResolution(march: {
+  defenderId: string;
+  defenderNpcSlug?: string;
+  defenderNpcInstanceId?: string;
+  hackMapCellX?: number;
+  hackMapCellY?: number;
+}): Promise<boolean> {
+  if (march.defenderId !== 'npc') {
+    return false;
+  }
+  const npcSlug = String(march.defenderNpcSlug ?? '').trim();
+  if (npcSlug === '') {
+    return false;
+  }
+
+  const mapDoc = await MapModel.findOne({ name: 'main' });
+  if (!mapDoc) {
+    return false;
+  }
+
+  const npcInstanceId = String(march.defenderNpcInstanceId ?? '').trim();
+  if (npcInstanceId !== '') {
+    const byInstance = await findCellByNpcInstanceId(mapDoc, npcInstanceId, npcSlug);
+    if (byInstance) {
+      return false;
+    }
+  }
+
+  const x = Number(march.hackMapCellX);
+  const y = Number(march.hackMapCellY);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return true;
+  }
+  const byCoords = await getCell(mapDoc, x, y);
+  const matchesCoords =
+    !!byCoords &&
+    byCoords.occupiedBy === 'npc' &&
+    String((byCoords as { npcSlug?: unknown }).npcSlug ?? '').trim() === npcSlug;
+  return !matchesCoords;
+}
+
+async function reconcileMarchResolutionQueue(march: {
+  marchId?: string;
+  defenderQueueKey?: string;
+  attackType?: string;
+  defenderId: string;
+  defenderNpcInstanceId?: string;
+  bugInstanceId?: string;
+}): Promise<void> {
+  try {
+    const qk = defenderQueueKeyFromMarchDoc(march);
+    // IMPORTANT: do not call runDefenderQueueSerialized() recursively for the same queue key here.
+    // This function is already executed inside the per-queue serialized task, and re-entering the
+    // serializer with await can deadlock that queue (current task waiting on its own tail).
+    await reconcileDefenderQueue(qk);
+    await tryStartNextMarchResolutionForQueueKey(qk);
+  } catch (queueErr) {
+    console.error('[MarchResolution] post-failure queue reconcile failed:', march.marchId, queueErr);
+  }
+}
 
 export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): Promise<void> {
   if (!ENABLE_ASYNC_BATTLES) {
@@ -72,7 +135,8 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
       const refund = await systemRefundAttackMarchInState(
         updated.marchId,
         String(updated.attackerId),
-        'resolving'
+        'resolving',
+        'bug-hunt-resolution-failed'
       );
       if (!refund.refunded) {
         console.error(
@@ -93,24 +157,7 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
         );
       }
 
-      try {
-        const qk = defenderQueueKeyFromMarchDoc(
-          updated as {
-            defenderQueueKey?: string;
-            attackType?: string;
-            defenderId: string;
-            defenderNpcInstanceId?: string;
-            bugInstanceId?: string;
-          }
-        );
-        // IMPORTANT: do not call runDefenderQueueSerialized() recursively for the same queue key here.
-        // This function is already executed inside the per-queue serialized task, and re-entering the
-        // serializer with await can deadlock that queue (current task waiting on its own tail).
-        await reconcileDefenderQueue(qk);
-        await tryStartNextMarchResolutionForQueueKey(qk);
-      } catch (queueErr) {
-        console.error('[MarchResolution] bug-hunt post-failure queue reconcile failed:', updated.marchId, queueErr);
-      }
+      await reconcileMarchResolutionQueue(updated);
     }
     return;
   }
@@ -193,6 +240,29 @@ export async function tryStartNextMarchResolutionForQueueKey(queueKey: string): 
       console.error('[MarchResolution] failed to attach swarm battle id:', battle.battleId, swarmAttachErr);
     }
   } catch (e) {
+    const targetMissingAtResolution = await isNpcTargetMissingAtResolution(updated);
+    if (targetMissingAtResolution) {
+      const refunded = await systemRefundAttackMarchInState(
+        updated.marchId,
+        String(updated.attackerId),
+        'resolving',
+        'npc-target-missing-at-resolution'
+      );
+      if (refunded.refunded) {
+        console.warn(
+          '[MarchResolution] NPC target missing at resolution; refunded immediately:',
+          updated.marchId,
+          updated.defenderNpcInstanceId
+        );
+        await reconcileMarchResolutionQueue(updated);
+        return;
+      }
+      console.error(
+        '[MarchResolution] NPC target missing at resolution; immediate refund failed, falling back to arrived retry:',
+        updated.marchId,
+        refunded
+      );
+    }
     console.error('[MarchResolution] createBattle or headless resolution failed, reverting march:', updated.marchId, e);
     if (battle?.battleId) {
       try {
