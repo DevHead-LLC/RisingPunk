@@ -74,7 +74,12 @@ export async function runStuckAtTargetRecoveryOnce(): Promise<void> {
           await battleService.abandonMarchBattleRuntimeNoSettlement(battle.battleId);
         }
 
-        const refund = await systemRefundAttackMarchInState(m.marchId, String(m.attackerId), 'resolving');
+        const refund = await systemRefundAttackMarchInState(
+          m.marchId,
+          String(m.attackerId),
+          'resolving',
+          'stuck-at-target-recovery'
+        );
         if (!refund.refunded) {
           continue;
         }
@@ -82,7 +87,8 @@ export async function runStuckAtTargetRecoveryOnce(): Promise<void> {
         const refund = await systemRefundAttackMarchInState(
           m.marchId,
           String(m.attackerId),
-          state
+          state,
+          'stuck-at-target-recovery'
         );
         if (!refund.refunded) {
           continue;

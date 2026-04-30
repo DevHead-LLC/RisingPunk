@@ -41,7 +41,12 @@ export async function sweepQueuedMarchesAfterNpcInstanceDefeated(
     if (!m.marchId || !isRefundableState(m.state)) {
       continue;
     }
-    const result = await systemRefundAttackMarchInState(m.marchId, String(m.attackerId), m.state);
+    const result = await systemRefundAttackMarchInState(
+      m.marchId,
+      String(m.attackerId),
+      m.state,
+      'npc-instance-defeated'
+    );
     if (!result.refunded) {
       if (result.reason !== 'state_mismatch') {
         console.warn('[MarchNpcKnockout] refund skipped:', m.marchId, result.reason);

@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 
+const LAST_LOGIN_HEARTBEAT_MS = 15 * 60 * 1000;
+
 const auth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -27,6 +29,22 @@ const auth = async (req: Request, res: Response, next: NextFunction): Promise<vo
     if (sessionId && !user.isTokenValid(sessionId)) {
       res.status(401).json({ error: 'ACCOUNT_SWITCHED' });
       return;
+    }
+
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - LAST_LOGIN_HEARTBEAT_MS);
+    if (!user.lastLoginAt || user.lastLoginAt.getTime() <= cutoff.getTime()) {
+      await User.updateOne(
+        {
+          _id: userId,
+          $or: [
+            { lastLoginAt: { $exists: false } },
+            { lastLoginAt: null },
+            { lastLoginAt: { $lte: cutoff } }
+          ]
+        },
+        { $set: { lastLoginAt: now } }
+      );
     }
     
     req.user = { _id: userId };
