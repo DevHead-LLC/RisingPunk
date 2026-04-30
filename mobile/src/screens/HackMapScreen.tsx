@@ -2361,9 +2361,12 @@ export const HackMapScreen: React.FC<Props> = ({
 
   /** Once we have grid data, stop tying viewport query args to `myPositionData` so Map-tag refetches do not restart initial load / full-screen spinner (Bugbot). */
   const frozenInitialViewportRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
-  useEffect(() => {
+  const prevHandleForFrozenViewportRef = useRef<string | null | undefined>(undefined);
+  const handleKeyForFrozenViewport = currentUserHandle ?? null;
+  if (prevHandleForFrozenViewportRef.current !== handleKeyForFrozenViewport) {
+    prevHandleForFrozenViewportRef.current = handleKeyForFrozenViewport;
     frozenInitialViewportRef.current = null;
-  }, [currentUserHandle]);
+  }
 
   // Phase 5: Two-step approach - fetch initial viewport, then full map if user not found
   // Step 1: Fetch a reasonable initial viewport based on actual pan position (0,0) and visible area
