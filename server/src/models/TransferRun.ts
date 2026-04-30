@@ -84,5 +84,6 @@ const transferRunSchema = new Schema<ITransferRunDocument>(
 transferRunSchema.index({ state: 1, arriveAt: 1 });
 transferRunSchema.index({ senderId: 1, state: 1, departAt: -1 });
 transferRunSchema.index({ recipientId: 1, state: 1, departAt: -1 });
+transferRunSchema.index({ state: 1, resolvedAt: 1, updatedAt: 1 });
 
 export const TransferRun = mongoose.model<ITransferRunDocument>('TransferRun', transferRunSchema);

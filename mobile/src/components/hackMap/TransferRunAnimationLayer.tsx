@@ -17,6 +17,14 @@ function computeTransferFrame(
   if (run.state !== 'outbound') {
     return null;
   }
+  if (
+    !Number.isFinite(run.originX) ||
+    !Number.isFinite(run.originY) ||
+    !Number.isFinite(run.targetX) ||
+    !Number.isFinite(run.targetY)
+  ) {
+    return null;
+  }
   const departMs = parseMarchTimeMs(run.departAt);
   const arriveMs = parseMarchTimeMs(run.arriveAt);
   if (departMs == null || arriveMs == null || arriveMs <= departMs) {
@@ -132,13 +140,13 @@ export const TransferRunAnimationLayer: React.FC<Props> = ({ runs, animatedMapSt
               style={{
                 position: 'absolute',
                 left: midX - length / 2,
-                top: midY - 0.5,
+                top: midY - 1,
                 width: length,
-                height: 1,
+                height: 2,
                 borderWidth: 1,
                 borderStyle: 'dashed',
                 borderColor: '#00FF41',
-                borderRadius: 0.5,
+                borderRadius: 1,
                 opacity: 0.72,
                 transform: [{ rotate: `${angle}rad` }],
               }}
