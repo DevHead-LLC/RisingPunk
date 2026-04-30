@@ -10,10 +10,15 @@ import {
 
 const router = express.Router();
 
-router.get('/active', auth, async (_req: Request, res: Response): Promise<void> => {
+router.get('/active', auth, async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = String(req.user._id);
     // Map animation only — omit sender/recipient ids and financial fields (peer privacy).
-    const runs = await TransferRun.find({ state: 'outbound' })
+    // Restrict to runs this viewer is party to so the client does not animate unrelated peers’ marches.
+    const runs = await TransferRun.find({
+      state: 'outbound',
+      $or: [{ senderId: userId }, { recipientId: userId }],
+    })
       .sort({ departAt: 1 })
       .select(
         'transferRunId originX originY targetX targetY state departAt arriveAt totalTravelSeconds'

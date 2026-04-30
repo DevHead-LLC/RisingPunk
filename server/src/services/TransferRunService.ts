@@ -31,6 +31,7 @@ const STORAGE_VALUE_BY_ITEM_KEY = new Map(
 
 let transferRunSweepTimer: NodeJS.Timeout | null = null;
 let transferRunSweepInFlight = false;
+let lastTransferResolvingRecoverySweepMs = 0;
 
 type RequestedTransferItem = {
   itemKey: string;
@@ -618,42 +619,50 @@ export async function settleDueTransferRunsOnce(): Promise<void> {
       }
     }
 
-    const staleResolvingCutoff = new Date(Date.now() - TRANSFER_RESOLVING_RECOVERY_MS);
-    const staleResolvingRuns = await TransferRun.find({
-      state: 'resolving',
-      resolvedAt: { $exists: false },
-      updatedAt: { $lte: staleResolvingCutoff },
-    })
-      .select('transferRunId')
-      .lean();
-    for (const row of staleResolvingRuns) {
-      const session = await mongoose.startSession();
-      try {
+    const nowMs = now.getTime();
+    const shouldRunResolvingRecovery =
+      lastTransferResolvingRecoverySweepMs === 0 ||
+      nowMs - lastTransferResolvingRecoverySweepMs >= TRANSFER_RESOLVING_RECOVERY_MS;
+
+    if (shouldRunResolvingRecovery) {
+      const staleResolvingCutoff = new Date(nowMs - TRANSFER_RESOLVING_RECOVERY_MS);
+      const staleResolvingRuns = await TransferRun.find({
+        state: 'resolving',
+        resolvedAt: { $exists: false },
+        updatedAt: { $lte: staleResolvingCutoff },
+      })
+        .select('transferRunId')
+        .lean();
+      for (const row of staleResolvingRuns) {
+        const session = await mongoose.startSession();
         try {
-          await session.withTransaction(async () => {
-            const run = await TransferRun.findOne({
-              transferRunId: String(row.transferRunId),
-              state: 'resolving',
-            }).session(session);
-            if (!run) {
-              return;
-            }
-            await settleTransferRunAsFailedOrCancelled({
-              session,
-              run,
-              outcomeState: 'failed',
-              failureReason: 'resolving-recovery-timeout',
+          try {
+            await session.withTransaction(async () => {
+              const run = await TransferRun.findOne({
+                transferRunId: String(row.transferRunId),
+                state: 'resolving',
+              }).session(session);
+              if (!run) {
+                return;
+              }
+              await settleTransferRunAsFailedOrCancelled({
+                session,
+                run,
+                outcomeState: 'failed',
+                failureReason: 'resolving-recovery-timeout',
+              });
             });
-          });
-        } catch (error) {
-          console.error(
-            `Stale resolving recovery failed for transferRunId=${String(row.transferRunId)}:`,
-            error
-          );
+          } catch (error) {
+            console.error(
+              `Stale resolving recovery failed for transferRunId=${String(row.transferRunId)}:`,
+              error
+            );
+          }
+        } finally {
+          session.endSession();
         }
-      } finally {
-        session.endSession();
       }
+      lastTransferResolvingRecoverySweepMs = Date.now();
     }
   } finally {
     transferRunSweepInFlight = false;
