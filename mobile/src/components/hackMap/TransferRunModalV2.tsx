@@ -1,5 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  InteractionManager,
+  Modal,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { useFetchBalanceQuery } from '../../store/api/balanceApi';
@@ -23,8 +36,17 @@ type TransferQuote = {
 const FONT = { xs: SIZING.font.small, sm: SIZING.font.small, md: SIZING.font.body, lg: SIZING.font.large } as const;
 
 export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipient }) => {
+  const { width: winW, height: winH } = useWindowDimensions();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const layout = useMemo(() => {
+    const edgePad = SIZING.spacing.md;
+    // Outer overlay padding only; SafeAreaView inside the sheet applies notch/home-indicator insets (avoid double-counting).
+    const maxH = Math.max(260, Math.floor(winH - edgePad * 2));
+    const maxW = Math.min(920, Math.floor(winW - edgePad * 2));
+    const itemsMinH = Math.max(220, Math.floor(Math.min(winW, winH) * 0.38));
+    return { maxH, maxW, itemsMinH, edgePad };
+  }, [winW, winH]);
   const quoteReqSeqRef = useRef(0);
   const [tab, setTab] = useState<Tab>('items');
   const [selectedByKey, setSelectedByKey] = useState<Record<string, number>>({});
@@ -139,9 +161,20 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
         walletAmount,
         items: selectedItems,
       }).unwrap();
-      Alert.alert('Transfer launched', `Transfer run sent to ${recipient.username}. Fee is non-refundable.`);
+      const recipientName = recipient.username;
       onClose();
-      await Promise.all([refetchBalance(), refetchInventory(), refetchRuns()]);
+      void Promise.all([refetchBalance(), refetchInventory(), refetchRuns()]);
+      let launchAlertShown = false;
+      let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+      const showLaunchedAlertOnce = () => {
+        if (launchAlertShown) return;
+        launchAlertShown = true;
+        if (fallbackTimer != null) clearTimeout(fallbackTimer);
+        Alert.alert('Transfer launched', `Transfer run sent to ${recipientName}. Fee is non-refundable.`);
+      };
+      InteractionManager.runAfterInteractions(showLaunchedAlertOnce);
+      // Fallback if runAfterInteractions never fires (e.g. perpetual gesture interaction on map).
+      fallbackTimer = setTimeout(showLaunchedAlertOnce, 450);
     } catch (error: unknown) {
       const message = (error as { data?: { error?: string } })?.data?.error;
       Alert.alert('Transfer failed', message ? String(message) : 'Unable to launch transfer');
@@ -164,8 +197,8 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} supportedOrientations={['landscape-left', 'landscape-right']}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
+      <View style={[styles.overlay, { padding: layout.edgePad }]}>
+        <View style={[styles.sheet, { height: layout.maxH, maxHeight: layout.maxH, width: '92%', maxWidth: layout.maxW }]}>
           <View style={styles.bgLayer} pointerEvents="none">
             <View style={[styles.bgShape, styles.bgOvalOne]} />
             <View style={[styles.bgShape, styles.bgOvalTwo]} />
@@ -177,135 +210,155 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
             <View style={[styles.bgShape, styles.bgPanelThree]} />
           </View>
           <SafeAreaView style={styles.safe}>
-            <View style={styles.head}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title}>Transfer Run</Text>
-                <Text style={styles.subTitle}>
-                  {recipient ? `To ${recipient.username} @ (${recipient.targetX}, ${recipient.targetY})` : 'Select a teammate from map'}
-                </Text>
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
+              <View style={styles.head}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.title}>Transfer Run</Text>
+                  <Text style={styles.subTitle}>
+                    {recipient ? `To ${recipient.username} @ (${recipient.targetX}, ${recipient.targetY})` : 'Select a teammate from map'}
+                  </Text>
+                </View>
+                <Text style={styles.balanceTag}>Wallet ${headerBalance.toLocaleString()}</Text>
               </View>
-              <Text style={styles.balanceTag}>Wallet ${headerBalance.toLocaleString()}</Text>
-            </View>
 
-            <View style={styles.tabs}>
-              {(['items', 'cash', 'active'] as const).map((t) => (
-                <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
-                  <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t === 'items' ? 'Items' : t === 'cash' ? 'Send Cash' : 'Active Runs'}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <View style={styles.tabs}>
+                {(['items', 'cash', 'active'] as const).map((t) => (
+                  <TouchableOpacity key={t} style={[styles.tab, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
+                    <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>{t === 'items' ? 'Items' : t === 'cash' ? 'Send Cash' : 'Active Runs'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <View style={styles.bodyWrap}>
-              <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
-                {tab === 'items' && rows.map((row) => {
-                  const qty = Math.max(0, Math.floor(selectedByKey[row.itemKey] ?? 0));
-                  const owned = Math.max(0, Math.floor(Number(row.quantity ?? 0)));
-                  return (
-                    <View key={row.itemKey} style={styles.rowCard}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.rowTitle}>{row.label}</Text>
-                        <Text style={styles.rowMeta}>Owned: {owned}</Text>
-                      </View>
-                      <View style={styles.stepper}>
-                        <TouchableOpacity style={styles.stepBtn} onPress={() => onChangeItemQty(row.itemKey, qty - 1, owned)}><Text style={styles.stepText}>-</Text></TouchableOpacity>
-                        <Text style={styles.qtyText}>{qty}</Text>
-                        <TouchableOpacity style={styles.stepBtn} onPress={() => onChangeItemQty(row.itemKey, qty + 1, owned)}><Text style={styles.stepText}>+</Text></TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })}
-
-                {tab === 'cash' && (
-                  <View style={styles.cashCard}>
-                    <Text style={styles.inputLabel}>Cash Amount To Send</Text>
-                    <TextInput value={cashInput} onChangeText={(v) => setCashInput(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="10000" placeholderTextColor={colors.text.secondary} style={styles.input} />
-                    <View style={styles.cashQuickActions}>
-                      <TouchableOpacity style={styles.cashQuickBtn} onPress={() => applyCashDelta(10_000)}>
-                        <Text style={styles.cashQuickText}>+10k</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.cashQuickBtn} onPress={() => applyCashDelta(100_000)}>
-                        <Text style={styles.cashQuickText}>+100k</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.cashQuickBtn} onPress={() => applyCashDelta(1_000_000)}>
-                        <Text style={styles.cashQuickText}>+1m</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.cashQuickBtn} onPress={() => setCashInput('')}>
-                        <Text style={styles.cashQuickText}>Clear</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={styles.helper}>Minimum send amount is $10,000. Fee is charged on top.</Text>
-                  </View>
-                )}
-
-                {tab === 'active' && ((myRunsData?.runs?.length ?? 0) === 0 ? (
-                  <View style={styles.empty}><Text style={styles.helper}>{runsLoading ? 'Loading active runs...' : 'No active transfer runs.'}</Text></View>
-                ) : (
-                  myRunsData?.runs?.map((run) => {
-                    const eta = Math.max(0, Math.ceil((Date.parse(run.arriveAt) - Date.now()) / 1000));
+              {tab === 'items' ? (
+                <View style={[styles.itemsPanel, { minHeight: layout.itemsMinH }]}>
+                  {rows.map((row) => {
+                    const qty = Math.max(0, Math.floor(selectedByKey[row.itemKey] ?? 0));
+                    const owned = Math.max(0, Math.floor(Number(row.quantity ?? 0)));
                     return (
-                      <View key={run.transferRunId} style={styles.rowCard}>
+                      <View key={row.itemKey} style={styles.rowCard}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.rowTitle}>${Math.floor(run.totalTransferValue).toLocaleString()} transfer</Text>
-                          <Text style={styles.rowMeta}>Fee: ${Math.floor(run.feeAmount).toLocaleString()} | ETA: {eta}s</Text>
+                          <Text style={styles.rowTitle}>{row.label}</Text>
+                          <Text style={styles.rowMeta}>Owned: {owned}</Text>
                         </View>
-                        <TouchableOpacity
-                          style={[
-                            styles.cancelBtn,
-                            {
-                              opacity:
-                                run.state !== 'outbound'
-                                  ? 0.6
-                                  : cancelBusyTransferRunId === run.transferRunId
-                                    ? 0.75
-                                    : 1,
-                            },
-                          ]}
-                          onPress={() => onCancelRun(run.transferRunId)}
-                          disabled={run.state !== 'outbound' || cancelBusyTransferRunId === run.transferRunId}
-                        >
-                          <Text style={styles.cancelText}>Cancel</Text>
-                        </TouchableOpacity>
+                        <View style={styles.stepper}>
+                          <TouchableOpacity style={styles.stepBtn} onPress={() => onChangeItemQty(row.itemKey, qty - 1, owned)}><Text style={styles.stepText}>-</Text></TouchableOpacity>
+                          <Text style={styles.qtyText}>{qty}</Text>
+                          <TouchableOpacity style={styles.stepBtn} onPress={() => onChangeItemQty(row.itemKey, qty + 1, owned)}><Text style={styles.stepText}>+</Text></TouchableOpacity>
+                        </View>
                       </View>
                     );
-                  })
-                ))}
-              </ScrollView>
-            </View>
+                  })}
+                </View>
+              ) : null}
 
-            {tab !== 'active' ? (
-              <View style={styles.summary}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Cash send</Text>
-                  <Text style={styles.summaryValue}>${Math.floor(quote?.walletAmount ?? 0).toLocaleString()}</Text>
+              {tab === 'cash' ? (
+                <View style={styles.cashCard}>
+                  <Text style={styles.inputLabel}>Cash Amount To Send</Text>
+                  <TextInput value={cashInput} onChangeText={(v) => setCashInput(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="10000" placeholderTextColor={colors.text.secondary} style={styles.input} />
+                  <View style={styles.cashQuickActions}>
+                    <TouchableOpacity style={styles.cashQuickBtn} onPress={() => applyCashDelta(10_000)}>
+                      <Text style={styles.cashQuickText}>+10k</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.cashQuickBtn} onPress={() => applyCashDelta(100_000)}>
+                      <Text style={styles.cashQuickText}>+100k</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.cashQuickBtn} onPress={() => applyCashDelta(1_000_000)}>
+                      <Text style={styles.cashQuickText}>+1m</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.cashQuickBtn} onPress={() => setCashInput('')}>
+                      <Text style={styles.cashQuickText}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.helper}>Minimum send amount is $10,000. Fee is charged on top.</Text>
                 </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Items value</Text>
-                  <Text style={styles.summaryValue}>${Math.floor(quote?.itemValueTotal ?? 0).toLocaleString()}</Text>
+              ) : null}
+
+              {tab === 'active'
+                ? (myRunsData?.runs?.length ?? 0) === 0
+                  ? (
+                      <View style={styles.empty}><Text style={styles.helper}>{runsLoading ? 'Loading active runs...' : 'No active transfer runs.'}</Text></View>
+                    )
+                  : (
+                      <View style={styles.activeRunsList}>
+                        {myRunsData?.runs?.map((run) => {
+                          const eta = Math.max(0, Math.ceil((Date.parse(run.arriveAt) - Date.now()) / 1000));
+                          return (
+                            <View key={run.transferRunId} style={styles.rowCard}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.rowTitle}>${Math.floor(run.totalTransferValue).toLocaleString()} transfer</Text>
+                                <Text style={styles.rowMeta}>Fee: ${Math.floor(run.feeAmount).toLocaleString()} | ETA: {eta}s</Text>
+                              </View>
+                              <TouchableOpacity
+                                style={[
+                                  styles.cancelBtn,
+                                  {
+                                    opacity:
+                                      run.state !== 'outbound'
+                                        ? 0.6
+                                        : cancelBusyTransferRunId === run.transferRunId
+                                          ? 0.75
+                                          : 1,
+                                  },
+                                ]}
+                                onPress={() => onCancelRun(run.transferRunId)}
+                                disabled={run.state !== 'outbound' || cancelBusyTransferRunId === run.transferRunId}
+                              >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )
+                : null}
+
+              {tab !== 'active' ? (
+                <View style={styles.summary}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Cash send</Text>
+                    <Text style={styles.summaryValue}>${Math.floor(quote?.walletAmount ?? 0).toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Items value</Text>
+                    <Text style={styles.summaryValue}>${Math.floor(quote?.itemValueTotal ?? 0).toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>You send (combined)</Text>
+                    <Text style={styles.summaryValue}>${Math.floor(quote?.totalTransferValue ?? 0).toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Fee ({quote ? Math.round(quote.feeRate * 100) : 0}%)</Text>
+                    <Text style={styles.summaryFee}>${Math.floor(quote?.feeAmount ?? 0).toLocaleString()}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryTotalLabel}>Total cash debit</Text>
+                    <Text style={styles.summaryTotalValue}>${Math.floor(quote?.totalSenderCashDebit ?? 0).toLocaleString()}</Text>
+                  </View>
+                  <Text style={styles.warning}>Transfer fee is non-refundable once launched.</Text>
+                  {quoteState.isLoading ? <Text style={styles.helper}>Updating quote...</Text> : null}
+                  {quoteError ? <Text style={styles.error}>{quoteError}</Text> : null}
                 </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>You send (combined)</Text>
-                  <Text style={styles.summaryValue}>${Math.floor(quote?.totalTransferValue ?? 0).toLocaleString()}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Fee ({quote ? Math.round(quote.feeRate * 100) : 0}%)</Text>
-                  <Text style={styles.summaryFee}>${Math.floor(quote?.feeAmount ?? 0).toLocaleString()}</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryTotalLabel}>Total cash debit</Text>
-                  <Text style={styles.summaryTotalValue}>${Math.floor(quote?.totalSenderCashDebit ?? 0).toLocaleString()}</Text>
-                </View>
-                <Text style={styles.warning}>Transfer fee is non-refundable once launched.</Text>
-                {quoteState.isLoading ? <Text style={styles.helper}>Updating quote...</Text> : null}
-                {quoteError ? <Text style={styles.error}>{quoteError}</Text> : null}
+              ) : null}
+
+              <View style={[styles.footer, tab === 'active' ? styles.footerActiveTab : null]}>
+                <TouchableOpacity
+                  style={[styles.ghostBtn, tab === 'active' ? styles.ghostBtnSingle : null]}
+                  onPress={onClose}
+                >
+                  <Text style={styles.ghostText}>Close</Text>
+                </TouchableOpacity>
+                {tab !== 'active' ? (
+                  <TouchableOpacity style={[styles.primaryBtn, { opacity: canSend ? 1 : 0.55 }]} onPress={onSend} disabled={!canSend}>
+                    {launchState.isLoading ? <ActivityIndicator color={colors.background} /> : <Text style={styles.primaryText}>Launch Transfer</Text>}
+                  </TouchableOpacity>
+                ) : null}
               </View>
-            ) : null}
-
-            <View style={styles.footer}>
-              <TouchableOpacity style={styles.ghostBtn} onPress={onClose}><Text style={styles.ghostText}>Close</Text></TouchableOpacity>
-              <TouchableOpacity style={[styles.primaryBtn, { opacity: canSend ? 1 : 0.55 }]} onPress={onSend} disabled={!canSend}>
-                {launchState.isLoading ? <ActivityIndicator color={colors.background} /> : <Text style={styles.primaryText}>Launch Transfer</Text>}
-              </TouchableOpacity>
-            </View>
+            </ScrollView>
           </SafeAreaView>
         </View>
       </View>
@@ -315,12 +368,8 @@ export const TransferRunModalV2: React.FC<Props> = ({ visible, onClose, recipien
 
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: SIZING.spacing.md },
+    overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
     sheet: {
-      width: '92%',
-      height: '86%',
-      maxWidth: 920,
-      minHeight: 420,
       borderWidth: 1,
       borderColor: colors.matrix,
       borderRadius: 14,
@@ -409,7 +458,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       backgroundColor: `${colors.surface}82`,
       borderColor: `${colors.matrix}24`,
     },
-    safe: { flex: 1, padding: SIZING.spacing.md, gap: SIZING.spacing.sm },
+    safe: { flex: 1, minHeight: 0 },
+    scroll: { flex: 1 },
+    scrollContent: {
+      flexGrow: 1,
+      padding: SIZING.spacing.md,
+      gap: SIZING.spacing.sm,
+      paddingBottom: SIZING.spacing.lg,
+    },
     head: { flexDirection: 'row', alignItems: 'center', gap: SIZING.spacing.sm },
     title: { color: colors.matrix, fontSize: FONT.lg, fontWeight: '700' },
     subTitle: { color: colors.text.secondary, marginTop: 2, fontSize: FONT.sm },
@@ -419,16 +475,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     tabActive: { borderColor: colors.matrix, backgroundColor: `${colors.matrix}2A` },
     tabText: { color: colors.text.secondary, fontSize: FONT.sm, fontWeight: '600' },
     tabTextActive: { color: colors.matrix, fontWeight: '700' },
-    bodyWrap: {
-      flex: 1,
-      minHeight: 0,
+    itemsPanel: {
       borderWidth: 1,
       borderColor: `${colors.matrix}44`,
       borderRadius: 10,
-      overflow: 'hidden',
+      padding: SIZING.spacing.sm,
+      gap: SIZING.spacing.xs,
+      backgroundColor: `${colors.surface}55`,
     },
-    body: { flex: 1, minHeight: 0 },
-    bodyContent: { padding: SIZING.spacing.sm, gap: SIZING.spacing.xs },
     rowCard: {
       borderWidth: 1,
       borderColor: `${colors.matrix}36`,
@@ -459,6 +513,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     cashQuickText: { color: colors.matrix, fontSize: FONT.xs, fontWeight: '700' },
     helper: { color: colors.text.secondary, fontSize: FONT.xs },
     empty: { paddingVertical: SIZING.spacing.lg, alignItems: 'center' },
+    activeRunsList: { gap: SIZING.spacing.xs },
     cancelBtn: { borderWidth: 1, borderColor: colors.error ?? '#ff6b6b', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
     cancelText: { color: colors.error ?? '#ff6b6b', fontSize: FONT.xs, fontWeight: '700' },
     summary: { borderWidth: 1, borderColor: `${colors.matrix}4A`, borderRadius: 10, padding: SIZING.spacing.sm, gap: 4, backgroundColor: `${colors.surface}C8` },
@@ -470,7 +525,9 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     summaryTotalValue: { color: colors.matrix, fontSize: FONT.md, fontWeight: '700' },
     warning: { color: colors.text.secondary, fontSize: FONT.xs, marginTop: 4 },
     error: { color: colors.error ?? '#ff6b6b', fontSize: FONT.xs, marginTop: 2 },
-    footer: { flexDirection: 'row', gap: SIZING.spacing.sm },
+    footer: { flexDirection: 'row', gap: SIZING.spacing.sm, marginTop: SIZING.spacing.xs },
+    footerActiveTab: { marginTop: SIZING.spacing.md },
+    ghostBtnSingle: { flex: 1 },
     ghostBtn: { flex: 1, borderWidth: 1, borderColor: `${colors.matrix}7A`, borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
     ghostText: { color: colors.matrix, fontSize: FONT.md, fontWeight: '600' },
     primaryBtn: { flex: 2, backgroundColor: colors.matrix, borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
