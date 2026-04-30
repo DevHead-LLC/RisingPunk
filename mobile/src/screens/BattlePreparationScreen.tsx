@@ -162,6 +162,7 @@ export const BattlePreparationScreen = React.memo(
   /** Re-entry guard for {@link executeDeploy}(true): top of that path clears {@link isStartingBattleRef}, so the usual double-tap guard does not apply until {@link deployInFlightRef} (Bugbot). */
   const shieldContinueDeployRef = useRef(false);
   const token = useAppSelector((state) => state.auth.token);
+  const currentUserHandle = useAppSelector((state) => state.auth.user?.handle);
   const userId = useAppSelector((state) => state.auth.user?._id);
   const botCounts = useAppSelector((state) => state.bots.botCounts);
   const botCountsM2 = useAppSelector((state) => state.bots.botCountsM2);
@@ -207,8 +208,8 @@ export const BattlePreparationScreen = React.memo(
     hackMapCell != null &&
     Number.isFinite(hackMapCell.x) &&
     Number.isFinite(hackMapCell.y);
-  const { data: myMapPos } = useGetMyMapPositionQuery(undefined, {
-    skip: !token || !wantsMarchLaunch,
+  const { data: myMapPos } = useGetMyMapPositionQuery(currentUserHandle ?? '', {
+    skip: !token || !wantsMarchLaunch || !currentUserHandle,
   });
   const { data: shieldData } = useGetShieldStatusQuery(undefined, {
     pollingInterval: 1000,

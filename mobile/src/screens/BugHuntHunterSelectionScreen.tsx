@@ -11,6 +11,7 @@ import {
 } from '../constants/hackMapBugHuntVisuals';
 import { useFetchBugHuntTokenStateQuery, useFetchMyHuntersQuery } from '../store/api/bugHuntApi';
 import { useGetMyMapPositionQuery } from '../store/api/mapApi';
+import { useAppSelector } from '../store/hooks';
 import { useLaunchAttackMarchMutation } from '../store/api/attackApi';
 import { formatBalance } from '../components/common/Balance';
 import { createBugHuntHunterSelectionStyles } from './BugHuntHunterSelectionScreenStyles';
@@ -43,9 +44,10 @@ export const BugHuntHunterSelectionScreen: React.FC<Props> = ({
 }) => {
   const styles = React.useMemo(() => createBugHuntHunterSelectionStyles(), []);
   const colors = useThemeColors();
+  const currentUserHandle = useAppSelector((s) => s.auth.user?.handle);
   const { data } = useFetchMyHuntersQuery();
   const { data: tokenStateData } = useFetchBugHuntTokenStateQuery();
-  const { data: myMapPos } = useGetMyMapPositionQuery();
+  const { data: myMapPos } = useGetMyMapPositionQuery(currentUserHandle ?? '', { skip: !currentUserHandle });
   const [launchAttackMarch, { isLoading: isLaunching }] = useLaunchAttackMarchMutation();
   const [selectedHunterRosterIds, setSelectedHunterRosterIds] = React.useState<string[]>([]);
   const hasKaito = (data?.hunters ?? []).some((h) => h.hunterRosterId === BUG_HUNT_ROSTER_ID_KAITO);
