@@ -4735,6 +4735,7 @@ export const HackMapScreen: React.FC<Props> = ({
     selectedCell,
     effectiveMyPosition,
     currentBalanceDisplay,
+    currentUserHandle,
     movePropertyMutation,
     dispatch,
     refetch,
