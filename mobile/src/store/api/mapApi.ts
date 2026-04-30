@@ -81,7 +81,8 @@ export const mapApi = createApi({
       }),
       providesTags: ['Map'],
     }),
-    getMyMapPosition: builder.query<{ x: number; y: number }, void>({
+    /** Arg is cache key only (API is always current user); changing handle invalidates stale centering data. */
+    getMyMapPosition: builder.query<{ x: number; y: number }, string>({
       query: () => ({ url: '/api/map/my-position' }),
       providesTags: ['Map'],
     }),

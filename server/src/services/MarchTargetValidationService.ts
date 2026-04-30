@@ -70,6 +70,40 @@ export async function resolveMarchLaunchTarget(params: {
 
   let actualDefenderNpcSlug = defenderNpcSlug;
   let npc = actualDefenderNpcSlug ? await NPCService.getNPCBySlug(actualDefenderNpcSlug) : null;
+  let effectiveDefenderNpcInstanceId = defenderNpcInstanceId;
+  let verifiedByCoords = false;
+  let coordResolvedNpcInstanceId: string | undefined;
+  let cachedMapDoc: Awaited<ReturnType<typeof MapModel.findOne>> | null = null;
+  const canValidateByCoords = Number.isFinite(hackMapCellX) && Number.isFinite(hackMapCellY);
+
+  // Authoritative map-targeting path: for Hack Map NPC launches, derive slug/instance from the
+  // target cell coordinates so stale client payload ids/slugs cannot block valid attacks.
+  if (internalDefender === 'computer-opponent' && canValidateByCoords) {
+    cachedMapDoc = await MapModel.findOne({ name: 'main' });
+    if (!cachedMapDoc) {
+      throw new MarchTargetValidationError(404, 'Map not found');
+    }
+    const cell = await getCell(cachedMapDoc, hackMapCellX, hackMapCellY);
+    if (!cell || cell.occupiedBy !== 'npc') {
+      throw new MarchTargetValidationError(404, 'No NPC found at selected tile');
+    }
+    const cellSlug = String((cell as { npcSlug?: unknown }).npcSlug || '').trim();
+    if (cellSlug === '') {
+      throw new MarchTargetValidationError(404, 'NPC target is missing slug metadata');
+    }
+    actualDefenderNpcSlug = cellSlug;
+    npc = await NPCService.getNPCBySlug(actualDefenderNpcSlug);
+    if (!npc) {
+      throw new MarchTargetValidationError(404, `NPC configuration not found for slug ${actualDefenderNpcSlug}`);
+    }
+    const rawId = (cell as { npcInstanceId?: unknown }).npcInstanceId;
+    coordResolvedNpcInstanceId =
+      rawId != null && String(rawId).trim() !== ''
+        ? String(rawId)
+        : `${actualDefenderNpcSlug}-${hackMapCellX}-${hackMapCellY}`;
+    effectiveDefenderNpcInstanceId = coordResolvedNpcInstanceId;
+    verifiedByCoords = true;
+  }
 
   if (internalDefender === 'computer-opponent' && !npc) {
     const level1NPCs = await NPCService.getNPCsByLevel(1);
@@ -85,14 +119,7 @@ export async function resolveMarchLaunchTarget(params: {
     throw new MarchTargetValidationError(400, 'Computer-opponent march requires an NPC configuration');
   }
 
-  let effectiveDefenderNpcInstanceId = defenderNpcInstanceId;
-  let verifiedByCoords = false;
-  let cachedMapDoc: Awaited<ReturnType<typeof MapModel.findOne>> | null = null;
-  const canValidateByCoords =
-    actualDefenderNpcSlug &&
-    Number.isFinite(hackMapCellX) &&
-    Number.isFinite(hackMapCellY);
-  if (canValidateByCoords) {
+  if (actualDefenderNpcSlug && canValidateByCoords && !verifiedByCoords) {
     cachedMapDoc = await MapModel.findOne({ name: 'main' });
     if (cachedMapDoc) {
       const cell = await getCell(cachedMapDoc, hackMapCellX, hackMapCellY);
@@ -102,11 +129,14 @@ export async function resolveMarchLaunchTarget(params: {
         String((cell as { npcSlug?: string }).npcSlug || '') === actualDefenderNpcSlug
       ) {
         const rawId = (cell as { npcInstanceId?: unknown }).npcInstanceId;
-        effectiveDefenderNpcInstanceId =
+        coordResolvedNpcInstanceId =
           rawId != null && String(rawId).trim() !== ''
             ? String(rawId)
             : `${actualDefenderNpcSlug}-${hackMapCellX}-${hackMapCellY}`;
-        verifiedByCoords = true;
+        if (!effectiveDefenderNpcInstanceId || String(effectiveDefenderNpcInstanceId).trim() === '') {
+          effectiveDefenderNpcInstanceId = coordResolvedNpcInstanceId;
+          verifiedByCoords = true;
+        }
       }
     }
   }
@@ -122,7 +152,12 @@ export async function resolveMarchLaunchTarget(params: {
       actualDefenderNpcSlug
     );
     if (!npcCell) {
-      throw new MarchTargetValidationError(404, `NPC instance ${effectiveDefenderNpcInstanceId} not found on map`);
+      if (coordResolvedNpcInstanceId) {
+        effectiveDefenderNpcInstanceId = coordResolvedNpcInstanceId;
+        verifiedByCoords = true;
+      } else {
+        throw new MarchTargetValidationError(404, `NPC instance ${effectiveDefenderNpcInstanceId} not found on map`);
+      }
     }
   }
 

@@ -181,6 +181,7 @@ async function completeProbeEntry(entry: ActiveProbe): Promise<CompleteProbeResu
       n: targetName,
       t: targetOwner,
       l: targetLevel,
+      mapName: 'main',
       x,
       y,
       b: bots,
@@ -366,6 +367,7 @@ export interface ProbeReportPayload {
   n: string;   // target name (handle or NPC name)
   t: 'player' | 'npc';
   l: number;   // level (user level or NPC userLevelAssociation)
+  mapName?: string;
   x: number;
   y: number;
   b: { breacher: number; guardian: number; phreak: number };

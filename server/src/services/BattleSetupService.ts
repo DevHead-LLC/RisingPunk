@@ -242,6 +242,7 @@ export class BattleSetupService {
     /** Client should send this for map NPCs; if missing/stale but hack map coords + slug match a cell, resolve from DB. */
     let effectiveDefenderNpcInstanceId = defenderNpcInstanceId;
     let defenderNpcInstanceIdVerifiedByCoords = false;
+    let coordResolvedNpcInstanceId: string | undefined;
     let cachedMapDoc: Awaited<ReturnType<typeof MapModel.findOne>> | null = null;
     const canValidateByCoords =
       !isUserDefender &&
@@ -260,11 +261,14 @@ export class BattleSetupService {
           String((cell as any).npcSlug || '') === actualDefenderNpcSlug
         ) {
           const raw = (cell as any).npcInstanceId;
-          effectiveDefenderNpcInstanceId =
+          coordResolvedNpcInstanceId =
             raw != null && String(raw).trim() !== ''
               ? String(raw)
               : `${actualDefenderNpcSlug}-${hackMapCellX}-${hackMapCellY}`;
-          defenderNpcInstanceIdVerifiedByCoords = true;
+          if (!effectiveDefenderNpcInstanceId || String(effectiveDefenderNpcInstanceId).trim() === '') {
+            effectiveDefenderNpcInstanceId = coordResolvedNpcInstanceId;
+            defenderNpcInstanceIdVerifiedByCoords = true;
+          }
         }
       }
     }
@@ -277,7 +281,12 @@ export class BattleSetupService {
       }
       const npcCell = await findCellByNpcInstanceId(mapDoc, effectiveDefenderNpcInstanceId, actualDefenderNpcSlug);
       if (!npcCell) {
-        throw new Error(`NPC instance ${effectiveDefenderNpcInstanceId} not found on map`);
+        if (coordResolvedNpcInstanceId) {
+          effectiveDefenderNpcInstanceId = coordResolvedNpcInstanceId;
+          defenderNpcInstanceIdVerifiedByCoords = true;
+        } else {
+          throw new Error(`NPC instance ${effectiveDefenderNpcInstanceId} not found on map`);
+        }
       }
     }
     

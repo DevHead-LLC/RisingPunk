@@ -25,6 +25,7 @@ import { JWT_SECRET } from '../config/env';
 import {
   resolveRegeneratedTokenSnapshotFromPersistedState,
   resolveEffectiveBugHuntTokenConfig,
+  getOrCreateUserBugHuntStateDocument as getOrCreateUserBugHuntState,
   readBugHuntTokens,
 } from '../services/BugHuntTokenService';
 import { getBugHuntTelemetrySummary, recordBugHuntStorageItemConsumed } from '../services/BugHuntTelemetryService';
@@ -88,41 +89,6 @@ function requireStorageDefinition(itemKey: string) {
     throw new Error(`Unknown bug-hunt storage item '${itemKey}'`);
   }
   return def;
-}
-
-async function getOrCreateUserBugHuntState(params: {
-  userId: string;
-  session: mongoose.ClientSession;
-}) {
-  const existing = await UserBugHuntState.findOne({ userId: params.userId }).session(params.session);
-  if (existing) {
-    if (!Array.isArray(existing.storageItems)) {
-      existing.storageItems = [];
-    }
-    return existing;
-  }
-  const effectiveTokenConfig = await resolveEffectiveBugHuntTokenConfig({
-    userId: params.userId,
-    session: params.session,
-  });
-  const created = await UserBugHuntState.create(
-    [
-      {
-        userId: params.userId,
-        currentTokens: effectiveTokenConfig.maxTokens,
-        maxTokens: effectiveTokenConfig.maxTokens,
-        regenPerMinute: effectiveTokenConfig.regenPerMinute,
-        lastRegenAt: new Date(),
-        storageItems: [],
-      },
-    ],
-    { session: params.session }
-  );
-  const state = created[0];
-  if (!state) {
-    throw new Error('Failed to initialize user bug-hunt state');
-  }
-  return state;
 }
 
 function applySpeedupDate(originalDate: Date, durationSeconds: number): Date {
