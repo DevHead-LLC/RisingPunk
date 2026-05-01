@@ -3850,26 +3850,28 @@ export const HackMapScreen: React.FC<Props> = ({
       // Update last fetched viewport (without minimal flag for comparison)
       lastFetchedViewportRef.current = { x1: viewport.x1, y1: viewport.y1, x2: viewport.x2, y2: viewport.y2 };
 
+      const completedPanningWasMinimal = isMinimalRequest;
+
       // Clear viewport params and reset minimal flag to allow next fetch
       panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
-    }
 
-    // Handle pending requests after processing current data (success only; on error don't retry to avoid infinite loop — Bugbot).
-    // Skip if pending is the same as the viewport we just merged (avoid redundant re-fetch)
-    if (panningViewportData && pendingViewportParamsRef.current) {
-      const pending = pendingViewportParamsRef.current;
-      const justMerged = panningViewportData.viewport;
-      const sameViewport = justMerged &&
-        pending.x1 === justMerged.x1 && pending.y1 === justMerged.y1 &&
-        pending.x2 === justMerged.x2 && pending.y2 === justMerged.y2;
-      pendingViewportParamsRef.current = null;
-      if (!sameViewport) {
-        viewportRequestInFlightRef.current = true;
-        panningViewportMinimalRef.current = pending.minimal ?? true;
-        setPanningViewportParams(pending);
+      if (pendingViewportParamsRef.current) {
+        const pending = pendingViewportParamsRef.current;
+        const sameCoords =
+          pending.x1 === viewport.x1 && pending.y1 === viewport.y1 &&
+          pending.x2 === viewport.x2 && pending.y2 === viewport.y2;
+        const sameMinimal = (pending.minimal ?? true) === completedPanningWasMinimal;
+        pendingViewportParamsRef.current = null;
+        if (!(sameCoords && sameMinimal)) {
+          viewportRequestInFlightRef.current = true;
+          panningViewportMinimalRef.current = pending.minimal ?? true;
+          setPanningViewportParams(pending);
+        }
       }
     }
+
+    // Pending after success is handled inside the merge block (uses completed minimal vs pending — Bugbot).
     // On error: only clear pending if it was the same viewport that failed (avoid retry loop).
     // If user panned to B while A was loading and A failed, keep pending and fetch B (Bugbot).
     if (panningViewportError && pendingViewportParamsRef.current) {
