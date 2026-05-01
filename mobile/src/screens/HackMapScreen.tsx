@@ -151,6 +151,7 @@ const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped de
 const ACTIVE_PAN_RECOVERY_FETCH_COOLDOWN_MS = 150; // Faster recovery requests for newly visible terrain while panning
 const RECOVERY_VIEWPORT_REPEAT_COOLDOWN_MS = 1200; // Prevent re-request storms for the same viewport window
 const RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS = 200; // Long pans must not grow per-viewport cooldown map without bound (Bugbot)
+const MAP_DIAG_REQUEST_START_MAP_MAX_KEYS = 200; // __DEV__ diag only; avoid leaking keys across long sessions (Bugbot)
 const STOPPED_DETAILS_FETCH_COOLDOWN_MS = 15000; // Keep expensive non-minimal detail hydration infrequent during travel
 const STOPPED_DETAILS_IDLE_REQUIREMENT_MS = 3000; // Require sustained idle before non-minimal viewport hydration
 const ENABLE_STOPPED_DETAILS_FETCH = false; // Keep panning optimized for terrain/image speed; non-minimal hydration deferred
@@ -3910,6 +3911,9 @@ export const HackMapScreen: React.FC<Props> = ({
     { skip: !ENABLE_STOPPED_DETAILS_FETCH || !stoppedViewportParams || !terrainDataLoaded || !panningStopped }
   );
   const lastStoppedDetailsFetchMsRef = useRef<number>(0);
+  const lastActivePanRecoveryFetchMsRef = useRef<number>(0);
+  const lastActivePanRecoveryViewportRef = useRef<string | null>(null);
+  const lastRecoveryViewportRequestMsRef = useRef<Record<string, number>>({});
   const lastMapDiagLogRef = useRef<{ at: number; signature: string }>({ at: 0, signature: '' });
   const initialViewportRequestStartRef = useRef<Record<string, number>>({});
   const panningViewportRequestStartRef = useRef<Record<string, number>>({});
@@ -3933,24 +3937,40 @@ export const HackMapScreen: React.FC<Props> = ({
     []
   );
 
+  const trimTsMap = useCallback((map: Record<string, number>, maxKeys: number) => {
+    const keys = Object.keys(map);
+    if (keys.length <= maxKeys) return;
+    keys
+      .map((key) => [key, map[key]!] as const)
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, keys.length - maxKeys)
+      .forEach(([key]) => {
+        delete map[key];
+      });
+  }, []);
+
   useEffect(() => {
     if (!MAP_LOAD_DIAG || shouldSkipInitialQuery) return;
     const viewportKey = viewportKeyFromBounds(initialViewport);
     if (!initialViewportRequestStartRef.current[viewportKey]) {
-      initialViewportRequestStartRef.current[viewportKey] = Date.now();
+      const m = initialViewportRequestStartRef.current;
+      m[viewportKey] = Date.now();
+      trimTsMap(m, MAP_DIAG_REQUEST_START_MAP_MAX_KEYS);
       const center = viewportCenterTile(initialViewport);
       logMapDiag('initial-viewport-request-start', {
         viewport: viewportKey,
         centerTile: `${center.x},${center.y}`,
       });
     }
-  }, [shouldSkipInitialQuery, initialViewport, logMapDiag]);
+  }, [shouldSkipInitialQuery, initialViewport, logMapDiag, trimTsMap]);
 
   useEffect(() => {
     if (!MAP_LOAD_DIAG || !panningViewportParams) return;
     const viewportKey = viewportKeyFromBounds(panningViewportParams);
     if (!panningViewportRequestStartRef.current[viewportKey]) {
-      panningViewportRequestStartRef.current[viewportKey] = Date.now();
+      const m = panningViewportRequestStartRef.current;
+      m[viewportKey] = Date.now();
+      trimTsMap(m, MAP_DIAG_REQUEST_START_MAP_MAX_KEYS);
       const center = viewportCenterTile(panningViewportParams);
       logMapDiag('pan-viewport-request-start', {
         viewport: viewportKey,
@@ -3958,11 +3978,7 @@ export const HackMapScreen: React.FC<Props> = ({
         centerTile: `${center.x},${center.y}`,
       });
     }
-  }, [panningViewportParams, logMapDiag]);
-
-  const lastActivePanRecoveryFetchMsRef = useRef<number>(0);
-  const lastActivePanRecoveryViewportRef = useRef<string | null>(null);
-  const lastRecoveryViewportRequestMsRef = useRef<Record<string, number>>({});
+  }, [panningViewportParams, logMapDiag, trimTsMap]);
 
   // Keep terrain loading responsive while panning (not only on pan-stop).
   // If visible tiles include missing terrain, request the current buffered viewport immediately.
@@ -4008,16 +4024,7 @@ export const HackMapScreen: React.FC<Props> = ({
     lastActivePanRecoveryViewportRef.current = viewportKey;
     const recoveryCooldown = lastRecoveryViewportRequestMsRef.current;
     recoveryCooldown[viewportKey] = now;
-    const k = Object.keys(recoveryCooldown);
-    if (k.length > RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS) {
-      k
-        .map((key) => [key, recoveryCooldown[key]!] as const)
-        .sort((a, b) => a[1] - b[1])
-        .slice(0, k.length - RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS)
-        .forEach(([key]) => {
-          delete recoveryCooldown[key];
-        });
-    }
+    trimTsMap(recoveryCooldown, RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS);
 
     triggerViewportFetch(
       recoveryViewport,
@@ -4026,7 +4033,7 @@ export const HackMapScreen: React.FC<Props> = ({
       viewportRequestInFlightRef,
       pendingViewportParamsRef
     );
-  }, [terrainDataLoaded, isMapReady, isPanningJS, panningStopped, virtualViewport.visibleTiles, staticTerrainData, gridSize]);
+  }, [terrainDataLoaded, isMapReady, isPanningJS, panningStopped, virtualViewport.visibleTiles, staticTerrainData, gridSize, trimTsMap]);
   
   // Phase 7: Trigger entity details fetch when panning stops
   // Also fill missing terrain when panning stops (fixes black areas that never loaded during pan)
