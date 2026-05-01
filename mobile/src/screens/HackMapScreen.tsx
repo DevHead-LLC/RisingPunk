@@ -150,6 +150,7 @@ const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
 const ACTIVE_PAN_RECOVERY_FETCH_COOLDOWN_MS = 150; // Faster recovery requests for newly visible terrain while panning
 const RECOVERY_VIEWPORT_REPEAT_COOLDOWN_MS = 1200; // Prevent re-request storms for the same viewport window
+const RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS = 200; // Long pans must not grow per-viewport cooldown map without bound (Bugbot)
 const STOPPED_DETAILS_FETCH_COOLDOWN_MS = 15000; // Keep expensive non-minimal detail hydration infrequent during travel
 const STOPPED_DETAILS_IDLE_REQUIREMENT_MS = 3000; // Require sustained idle before non-minimal viewport hydration
 const ENABLE_STOPPED_DETAILS_FETCH = false; // Keep panning optimized for terrain/image speed; non-minimal hydration deferred
@@ -4005,7 +4006,18 @@ export const HackMapScreen: React.FC<Props> = ({
 
     lastActivePanRecoveryFetchMsRef.current = now;
     lastActivePanRecoveryViewportRef.current = viewportKey;
-    lastRecoveryViewportRequestMsRef.current[viewportKey] = now;
+    const recoveryCooldown = lastRecoveryViewportRequestMsRef.current;
+    recoveryCooldown[viewportKey] = now;
+    const k = Object.keys(recoveryCooldown);
+    if (k.length > RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS) {
+      k
+        .map((key) => [key, recoveryCooldown[key]!] as const)
+        .sort((a, b) => a[1] - b[1])
+        .slice(0, k.length - RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS)
+        .forEach(([key]) => {
+          delete recoveryCooldown[key];
+        });
+    }
 
     triggerViewportFetch(
       recoveryViewport,
