@@ -137,12 +137,27 @@ type TravelSpeedupInventoryRow = {
 };
 
 // Constants for viewport fetching and panning
-const VIEWPORT_FETCH_THRESHOLD = 1; // Cells to move before triggering viewport fetch (1 = request as soon as we leave last fetch)
-const PAN_BUFFER = 12; // Buffer in cells for window range (larger = prefetch more so next pan is often cached)
+const VIEWPORT_FETCH_THRESHOLD = 1; // Slightly coarser trigger reduces request churn so each fetch can complete sooner
+const PAN_BUFFER = 6; // Slightly larger lookahead to reduce near-edge pop-in while panning
+const INITIAL_VIEWPORT_BUFFER = 2; // Keep startup viewport tight when my-position is known (avoids oversized first load)
+/** When my-position is unavailable, first fetch at pan origin must cover enough grid for house discovery + grid-scan fallback (Bugbot). */
+const INITIAL_VIEWPORT_BUFFER_FALLBACK_NO_POSITION = 15;
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
+const DIRECTIONAL_LEAD_CELLS = 3; // Bias viewport farther into travel direction to improve ahead-of-pan fill
+const MINIMAL_VIEWPORT_SNAP_CELLS = 4; // Snap minimal viewport requests to small chunk boundaries for better cache reuse
 
 const MAX_CACHE_SIZE = 1000; // Maximum number of cached cell objects
 const PANNING_STOPPED_DEBOUNCE_MS = 200; // Debounce time for panning stopped detection
+const ACTIVE_PAN_RECOVERY_FETCH_COOLDOWN_MS = 150; // Faster recovery requests for newly visible terrain while panning
+const RECOVERY_VIEWPORT_REPEAT_COOLDOWN_MS = 1200; // Prevent re-request storms for the same viewport window
+const RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS = 200; // Long pans must not grow per-viewport cooldown map without bound (Bugbot)
+const MAP_DIAG_REQUEST_START_MAP_MAX_KEYS = 200; // __DEV__ diag only; avoid leaking keys across long sessions (Bugbot)
+const STOPPED_DETAILS_FETCH_COOLDOWN_MS = 15000; // Keep expensive non-minimal detail hydration infrequent during travel
+const STOPPED_DETAILS_IDLE_REQUIREMENT_MS = 3000; // Require sustained idle before non-minimal viewport hydration
+const ENABLE_STOPPED_DETAILS_FETCH = false; // Keep panning optimized for terrain/image speed; non-minimal hydration deferred
+const MAP_LOAD_DIAG = __DEV__; // Temporary targeted diagnostics for map load boundary issue
+const MAP_LOAD_DIAG_MIN_INTERVAL_MS = 1200; // Keep logs readable (not per-pan spam)
+const MAP_LOAD_DIAG_SLOW_REQUEST_MS = 250;
 /** Max press duration (ms) to count as a tap; longer presses are ignored. See tile-tap-reliability.md. */
 const TILE_TAP_MAX_DURATION_MS = 500;
 /**
@@ -437,42 +452,85 @@ const shouldFetchViewport = (
   );
 };
 
-/**
- * Union two viewports and clamp to grid (so one request can cover multiple queued areas)
- */
-const unionViewports = (
-  a: { x1: number; y1: number; x2: number; y2: number },
-  b: { x1: number; y1: number; x2: number; y2: number },
+const viewportKeyFromBounds = (viewport: { x1: number; y1: number; x2: number; y2: number }): string =>
+  `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+
+const viewportCenterTile = (viewport: { x1: number; y1: number; x2: number; y2: number }): { x: number; y: number } => ({
+  x: Math.floor((viewport.x1 + viewport.x2) / 2),
+  y: Math.floor((viewport.y1 + viewport.y2) / 2),
+});
+
+const snapMinimalViewportToChunk = (
+  viewport: { x1: number; y1: number; x2: number; y2: number; minimal?: boolean },
   gridSize: number
-): { x1: number; y1: number; x2: number; y2: number } => {
+): { x1: number; y1: number; x2: number; y2: number; minimal?: boolean } => {
+  if (!viewport.minimal) return viewport;
+  const snap = Math.max(1, MINIMAL_VIEWPORT_SNAP_CELLS);
+  const snappedX1 = Math.floor(viewport.x1 / snap) * snap;
+  const snappedY1 = Math.floor(viewport.y1 / snap) * snap;
+  const snappedX2 = Math.ceil((viewport.x2 + 1) / snap) * snap - 1;
+  const snappedY2 = Math.ceil((viewport.y2 + 1) / snap) * snap - 1;
   return {
-    x1: Math.max(0, Math.min(a.x1, b.x1)),
-    y1: Math.max(0, Math.min(a.y1, b.y1)),
-    x2: Math.min(gridSize - 1, Math.max(a.x2, b.x2)),
-    y2: Math.min(gridSize - 1, Math.max(a.y2, b.y2)),
+    ...viewport,
+    x1: Math.max(0, Math.min(gridSize - 1, snappedX1)),
+    y1: Math.max(0, Math.min(gridSize - 1, snappedY1)),
+    x2: Math.max(0, Math.min(gridSize - 1, snappedX2)),
+    y2: Math.max(0, Math.min(gridSize - 1, snappedY2)),
   };
 };
 
 /**
+ * Expands fetch bounds toward pan direction using raw viewport deltas (same basis as {@link calculateViewportFromPan}).
+ * Bugbot: row/col convention matches that helper (increasing row index = down on screen). First-frame bogus deltas vs
+ * the UI seed window are suppressed via `panLeadBiasPrimedRef` at the call site in `computeWindow`.
+ *
+ * @param previousRaw — prior unbiased viewport (same basis as `viewport`); must not be a directionally expanded window from a prior frame (Bugbot).
+ */
+const expandViewportWithPanLead = (
+  viewport: { startCol: number; endCol: number; startRow: number; endRow: number },
+  previousRaw: { rowStart: number; rowEnd: number; colStart: number; colEnd: number },
+  gridSize: number
+): { startCol: number; endCol: number; startRow: number; endRow: number } => {
+  let { startCol, endCol, startRow, endRow } = viewport;
+  if (previousRaw.colStart < startCol) {
+    endCol = Math.min(gridSize - 1, endCol + DIRECTIONAL_LEAD_CELLS);
+  } else if (previousRaw.colStart > startCol) {
+    startCol = Math.max(0, startCol - DIRECTIONAL_LEAD_CELLS);
+  }
+  if (previousRaw.rowStart < startRow) {
+    endRow = Math.min(gridSize - 1, endRow + DIRECTIONAL_LEAD_CELLS);
+  } else if (previousRaw.rowStart > startRow) {
+    startRow = Math.max(0, startRow - DIRECTIONAL_LEAD_CELLS);
+  }
+  return { startCol, endCol, startRow, endRow };
+};
+
+/**
  * Trigger viewport fetch with minimal flag
- * Prevents new requests while one is in flight; when queueing, unions with existing pending to cover more area in one request
- * @param gridSize - Grid size for clamping union
+ * Prevents new requests while one is in flight; queue keeps latest viewport to avoid oversized catch-up requests
  */
 const triggerViewportFetch = (
   newViewport: { x1: number; y1: number; x2: number; y2: number; minimal?: boolean },
   panningViewportMinimalRef: React.MutableRefObject<boolean>,
   setPanningViewportParams: React.Dispatch<React.SetStateAction<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>>,
   viewportRequestInFlightRef: React.MutableRefObject<boolean>,
-  pendingViewportParamsRef: React.MutableRefObject<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>,
-  gridSize: number
+  pendingViewportParamsRef: React.MutableRefObject<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>
 ): void => {
   if (viewportRequestInFlightRef.current) {
-    // Request in flight: union with existing pending so one request covers more area (reduces black regions)
+    // Request in flight: prioritize the latest viewport (where user is now) instead of unioning old+new.
+    // Unioning can balloon requests during fast pan and create long hard-edge waits before render catches up.
     const prev = pendingViewportParamsRef.current;
-    const merged = prev
-      ? { ...unionViewports(prev, newViewport, gridSize), minimal: (newViewport.minimal ?? true) && (prev.minimal ?? true) }
+    const nextPending = prev
+      ? { ...newViewport, minimal: (newViewport.minimal ?? true) && (prev.minimal ?? true) }
       : newViewport;
-    pendingViewportParamsRef.current = merged;
+    // Avoid repeatedly enqueueing the exact same pending viewport.
+    const sameAsPrev = !!prev &&
+      prev.x1 === nextPending.x1 && prev.y1 === nextPending.y1 &&
+      prev.x2 === nextPending.x2 && prev.y2 === nextPending.y2 &&
+      (prev.minimal ?? true) === (nextPending.minimal ?? true);
+    if (!sameAsPrev) {
+      pendingViewportParamsRef.current = nextPending;
+    }
     return;
   }
 
@@ -1417,6 +1475,7 @@ export const HackMapScreen: React.FC<Props> = ({
       userId?: string;
       npcSlug?: string;
       npcLevel?: number;
+      name?: string;
     };
     xStyle: any;
     terrainStyleMap: Record<TerrainType, any>;
@@ -1488,6 +1547,7 @@ export const HackMapScreen: React.FC<Props> = ({
       userId?: string;
       npcSlug?: string;
       npcLevel?: number;
+      name?: string;
     };
     xStyle: any;
     yStyle: any;
@@ -1980,6 +2040,10 @@ export const HackMapScreen: React.FC<Props> = ({
   
   // Phase 5: Use ref for windowRange during panning to reduce re-renders
   const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
+  /** Last raw viewport from {@link calculateViewportFromPan} — used only as `previousRaw` for {@link expandViewportWithPanLead}. Must not store biased ranges (Bugbot). */
+  const rawWindowRangeForBiasRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
+  /** False until first computeWindow applies pan-lead; avoids bogus delta vs initial UI window seed (Bugbot). Reset on teleport paths. */
+  const panLeadBiasPrimedRef = useRef(false);
   
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
   const [initialCenterResolved, setInitialCenterResolved] = useState<boolean>(false);
@@ -1994,6 +2058,7 @@ export const HackMapScreen: React.FC<Props> = ({
     userId?: string;
     npcSlug?: string;
     npcLevel?: number;
+    name?: string;
   }>>({});
   const [terrainDataLoaded, setTerrainDataLoaded] = useState<boolean>(false);
 
@@ -2010,6 +2075,7 @@ export const HackMapScreen: React.FC<Props> = ({
   // Phase 1: Panning state management
   const [isPanningJS, setIsPanningJS] = useState<boolean>(false);
   const [panningStopped, setPanningStopped] = useState<boolean>(true);
+  const lastPanActivityMsRef = useRef<number>(Date.now());
   
   // Phase 5: Sync ref to state when panning stops (deferred to next frame to smooth view correction)
   useEffect(() => {
@@ -2028,6 +2094,7 @@ export const HackMapScreen: React.FC<Props> = ({
         return () => cancelAnimationFrame(raf);
       } else {
         windowRangeRef.current = stateRange;
+        // Bugbot: do not assign state/ref window (biased after pan) into rawWindowRangeForBiasRef — keep last raw from computeWindow/teleport.
       }
     }
   }, [panningStopped, isPanningJS, windowRange]);
@@ -2261,9 +2328,10 @@ export const HackMapScreen: React.FC<Props> = ({
     if (!isPanningJS) {
       const timer = setTimeout(() => {
         setPanningStopped(true);
-      }, 200);
+      }, PANNING_STOPPED_DEBOUNCE_MS);
       return () => clearTimeout(timer);
     } else {
+      lastPanActivityMsRef.current = Date.now();
       setPanningStopped(false);
     }
   }, [isPanningJS]);
@@ -2376,7 +2444,7 @@ export const HackMapScreen: React.FC<Props> = ({
     }
     if (containerSize.width === 0 || containerSize.height === 0) {
       // Fallback to center if container not ready (shouldn't happen due to skip condition)
-      const buffer = 15;
+      const buffer = INITIAL_VIEWPORT_BUFFER_FALLBACK_NO_POSITION;
       const centerX = Math.floor(gridSize / 2);
       const centerY = Math.floor(gridSize / 2);
       return {
@@ -2395,7 +2463,7 @@ export const HackMapScreen: React.FC<Props> = ({
         containerSize.width,
         containerSize.height
       );
-      const buffer = 15;
+      const buffer = INITIAL_VIEWPORT_BUFFER;
       const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
         userPanX,
         userPanY,
@@ -2412,8 +2480,8 @@ export const HackMapScreen: React.FC<Props> = ({
       };
     }
 
-    // Calculate viewport from initial pan position (0,0) to match what's actually visible
-    const buffer = 15; // Larger buffer to increase chance of finding user
+    // Calculate viewport from initial pan position (0,0); widen buffer when my-position missing so fallback scan can find home
+    const buffer = INITIAL_VIEWPORT_BUFFER_FALLBACK_NO_POSITION;
     const initialPanX = 0;
     const initialPanY = 0;
     const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
@@ -2434,8 +2502,12 @@ export const HackMapScreen: React.FC<Props> = ({
   }, [gridSize, containerSize.width, containerSize.height, myPositionData]);
 
   const shouldSkipInitialQuery = containerSize.width === 0 || containerSize.height === 0;
+  const initialViewportQueryArgs = useMemo(
+    () => ({ ...initialViewport, minimal: true }),
+    [initialViewport]
+  );
   const { data: initialViewportData, isLoading: isLoadingInitialViewport, refetch: refetchInitialViewport } = useFetchMapViewportQuery(
-    initialViewport,
+    initialViewportQueryArgs,
     { skip: shouldSkipInitialQuery }
   );
 
@@ -3353,6 +3425,7 @@ export const HackMapScreen: React.FC<Props> = ({
       const currentNpcInstanceId = entity?.npcInstanceId || entityImage?.npcInstanceId;
       // Fallback to entityImage.npcLevel so minimal (panning) requests show correct NPC level image (Bugbot).
       const currentNpcLevel = entity?.npcLevel ?? entityImage?.npcLevel;
+      const currentName = entity?.name ?? entityImage?.name;
       const cacheKey = `${x},${y}-${terrain}-${currentEntity}-${currentOwner || ''}-${currentUserId || ''}-${currentNpcSlug || ''}-${currentNpcInstanceId || ''}-${currentNpcLevel ?? ''}`;
       
       let cell = cache.get(cacheKey);
@@ -3369,7 +3442,7 @@ export const HackMapScreen: React.FC<Props> = ({
           terrain,
           entity: currentEntity,
           owner: currentOwner,
-          name: entity?.name,
+          name: currentName,
           userId: currentUserId,
           npcSlug: currentNpcSlug,
           npcInstanceId: currentNpcInstanceId,
@@ -3384,7 +3457,7 @@ export const HackMapScreen: React.FC<Props> = ({
         cell = newCell;
       } else {
         // Phase 1c: Update name and isShielded in place when full details arrive (same ref → less image blink)
-        const name = entity?.name;
+        const name = currentName;
         const isShielded = entity?.isShielded;
         if ((cell as any).name !== name || (cell as any).isShielded !== isShielded) {
           (cell as any).name = name;
@@ -3400,13 +3473,12 @@ export const HackMapScreen: React.FC<Props> = ({
       virtualViewport.visibleTiles.forEach(tileKey => {
         const [x, y] = tileKey.split(',').map(Number);
         // Read directly from state to avoid ref timing issues after cache clears
-        const terrain = staticTerrainData[tileKey];
-        const entity = dynamicEntityData[tileKey];
+        const hasTerrainData = staticTerrainData[tileKey] != null;
+        const terrain = staticTerrainData[tileKey] ?? 'plain';
+        const entity = hasTerrainData ? dynamicEntityData[tileKey] : undefined;
         // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
         // This prevents entities from disappearing when panning stops before full details are loaded
-        const entityImage = entityImageData[tileKey];
-        
-        if (!terrain) return;
+        const entityImage = hasTerrainData ? entityImageData[tileKey] : undefined;
         
         const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
         cells.push({ x, y, cell });
@@ -3417,13 +3489,12 @@ export const HackMapScreen: React.FC<Props> = ({
         for (let x = currentWindowRange.colStart; x <= currentWindowRange.colEnd; x++) {
           const key = `${x},${y}`;
           // Read directly from state to avoid ref timing issues after cache clears
-          const terrain = staticTerrainData[key];
-          const entity = dynamicEntityData[key];
+          const hasTerrainData = staticTerrainData[key] != null;
+          const terrain = staticTerrainData[key] ?? 'plain';
+          const entity = hasTerrainData ? dynamicEntityData[key] : undefined;
           // Bug Fix: Use entityImageData as fallback when dynamicEntityData is missing
           // This prevents entities from disappearing when panning stops before full details are loaded
-          const entityImage = entityImageData[key];
-          
-          if (!terrain) continue;
+          const entityImage = hasTerrainData ? entityImageData[key] : undefined;
           
           const cell = getOrCreateCell(x, y, terrain, entity, entityImage);
           cells.push({ x, y, cell });
@@ -3455,6 +3526,7 @@ export const HackMapScreen: React.FC<Props> = ({
       owner?: string;
       userId?: string;
       npcSlug?: string;
+      name?: string;
       /** Same as entityDetails — needed so "Hack Entity" sends defenderNpcInstanceId before full details load. */
       npcInstanceId?: string;
       npcLevel?: number;
@@ -3481,6 +3553,7 @@ export const HackMapScreen: React.FC<Props> = ({
             npcSlug: cell.npcSlug,
             npcInstanceId: cell.npcInstanceId,
             npcLevel: cell.npcLevel,
+            name: cell.name,
           };
           entityDetails[key] = {
             entity: cell.entity,
@@ -3501,6 +3574,30 @@ export const HackMapScreen: React.FC<Props> = ({
   useEffect(() => {
     dispatch(setLoading(isLoading));
     if (mapData && mapData.grid) {
+      if (MAP_LOAD_DIAG) {
+        const viewportForLog = mapData.viewport ?? initialViewport;
+        const viewportKey = viewportForLog ? viewportKeyFromBounds(viewportForLog) : 'full-map';
+        const requestStartedAt = initialViewportRequestStartRef.current[viewportKey];
+        const durationMs = requestStartedAt ? Date.now() - requestStartedAt : undefined;
+        if (requestStartedAt) {
+          delete initialViewportRequestStartRef.current[viewportKey];
+        }
+        const center = viewportForLog ? viewportCenterTile(viewportForLog) : null;
+        const firstRow = mapData.grid.find((row): row is any[] => Array.isArray(row) && row.length > 0);
+        logMapDiag(
+          'initial-viewport-response',
+          {
+            viewport: viewportKey,
+            durationMs,
+            centerTile: center ? `${center.x},${center.y}` : undefined,
+            responseRows: mapData.grid.length,
+            responseCols: firstRow?.length ?? 0,
+            gridSize: mapData.gridSize ?? null,
+          },
+          { force: (durationMs ?? 0) >= MAP_LOAD_DIAG_SLOW_REQUEST_MS }
+        );
+      }
+
       // Phase 4B: Merge new data with existing cache instead of replacing
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(mapData.grid, mapData.viewport);
       // Phase 1: Batch state updates to reduce re-renders
@@ -3615,10 +3712,72 @@ export const HackMapScreen: React.FC<Props> = ({
     // This ensures non-minimal restorePan data isn't discarded when a panning request is pending
     if (panningViewportData && panningViewportData.grid && panningViewportData.viewport) {
       const viewport = panningViewportData.viewport;
-      const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
+      const viewportKey = viewportKeyFromBounds(viewport);
+      const requestStartedAt = panningViewportRequestStartRef.current[viewportKey];
+      const durationMs = requestStartedAt ? Date.now() - requestStartedAt : undefined;
+      if (requestStartedAt) {
+        delete panningViewportRequestStartRef.current[viewportKey];
+      }
+      if (MAP_LOAD_DIAG) {
+        const center = viewportCenterTile(viewport);
+        let missingVisibleTerrainBeforeMerge = 0;
+        if (virtualViewport.visibleTiles.size > 0) {
+          for (const tileKey of Array.from(virtualViewport.visibleTiles)) {
+            if (!staticTerrainData[tileKey]) {
+              missingVisibleTerrainBeforeMerge += 1;
+            }
+          }
+        }
+        const firstRow = panningViewportData.grid.find((row): row is any[] => Array.isArray(row) && row.length > 0);
+        let npcCellsInPayload = 0;
+        let npcNamedInPayload = 0;
+        let npcGenericInPayload = 0;
+        let npcLevelPresentInPayload = 0;
+        let npcLevelMissingInPayload = 0;
+        for (const row of panningViewportData.grid) {
+          if (!Array.isArray(row)) continue;
+          for (const cell of row) {
+            if (!cell) continue;
+            if (cell.entity === 'house' && cell.owner === 'enemy') {
+              npcCellsInPayload += 1;
+              const npcName = typeof cell.name === 'string' ? cell.name.trim() : '';
+              if (npcName && npcName !== 'NPC') {
+                npcNamedInPayload += 1;
+              } else {
+                npcGenericInPayload += 1;
+              }
+              if (typeof cell.npcLevel === 'number' && Number.isFinite(cell.npcLevel)) {
+                npcLevelPresentInPayload += 1;
+              } else {
+                npcLevelMissingInPayload += 1;
+              }
+            }
+          }
+        }
+        logMapDiag(
+          'pan-viewport-response',
+          {
+            viewport: viewportKey,
+            durationMs,
+            centerTile: `${center.x},${center.y}`,
+            minimal: panningViewportMinimalRef.current,
+            responseRows: panningViewportData.grid.length,
+            responseCols: firstRow?.length ?? 0,
+            missingVisibleTerrainBeforeMerge,
+            npcCellsInPayload,
+            npcNamedInPayload,
+            npcGenericInPayload,
+            npcLevelPresentInPayload,
+            npcLevelMissingInPayload,
+          },
+          { force: (durationMs ?? 0) >= MAP_LOAD_DIAG_SLOW_REQUEST_MS || missingVisibleTerrainBeforeMerge > 0 }
+        );
+      }
 
-      // Phase 6: Prevent processing the same viewport twice
-      if (processedViewportRef.current === viewportKey) {
+      // Phase 6: Prevent processing the same viewport twice. Bugbot: `viewportKey` names tile bounds only; `processedDedupeKey`
+      // adds minimal|full so minimal and non-minimal responses for the same bounds are both processed.
+      const processedDedupeKey = `${viewportKey}|${panningViewportMinimalRef.current ? 'min' : 'full'}`;
+      if (processedViewportRef.current === processedDedupeKey) {
         // Still handle pending requests even if this viewport was already processed
         if (pendingViewportParamsRef.current) {
           const pending = pendingViewportParamsRef.current;
@@ -3629,7 +3788,7 @@ export const HackMapScreen: React.FC<Props> = ({
         }
         return;
       }
-      processedViewportRef.current = viewportKey;
+      processedViewportRef.current = processedDedupeKey;
 
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
 
@@ -3700,26 +3859,28 @@ export const HackMapScreen: React.FC<Props> = ({
       // Update last fetched viewport (without minimal flag for comparison)
       lastFetchedViewportRef.current = { x1: viewport.x1, y1: viewport.y1, x2: viewport.x2, y2: viewport.y2 };
 
+      const completedPanningWasMinimal = isMinimalRequest;
+
       // Clear viewport params and reset minimal flag to allow next fetch
       panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
-    }
 
-    // Handle pending requests after processing current data (success only; on error don't retry to avoid infinite loop — Bugbot).
-    // Skip if pending is the same as the viewport we just merged (avoid redundant re-fetch)
-    if (panningViewportData && pendingViewportParamsRef.current) {
-      const pending = pendingViewportParamsRef.current;
-      const justMerged = panningViewportData.viewport;
-      const sameViewport = justMerged &&
-        pending.x1 === justMerged.x1 && pending.y1 === justMerged.y1 &&
-        pending.x2 === justMerged.x2 && pending.y2 === justMerged.y2;
-      pendingViewportParamsRef.current = null;
-      if (!sameViewport) {
-        viewportRequestInFlightRef.current = true;
-        panningViewportMinimalRef.current = pending.minimal ?? true;
-        setPanningViewportParams(pending);
+      if (pendingViewportParamsRef.current) {
+        const pending = pendingViewportParamsRef.current;
+        const sameCoords =
+          pending.x1 === viewport.x1 && pending.y1 === viewport.y1 &&
+          pending.x2 === viewport.x2 && pending.y2 === viewport.y2;
+        const sameMinimal = (pending.minimal ?? true) === completedPanningWasMinimal;
+        pendingViewportParamsRef.current = null;
+        if (!(sameCoords && sameMinimal)) {
+          viewportRequestInFlightRef.current = true;
+          panningViewportMinimalRef.current = pending.minimal ?? true;
+          setPanningViewportParams(pending);
+        }
       }
     }
+
+    // Pending after success is handled inside the merge block (uses completed minimal vs pending — Bugbot).
     // On error: only clear pending if it was the same viewport that failed (avoid retry loop).
     // If user panned to B while A was loading and A failed, keep pending and fetch B (Bugbot).
     if (panningViewportError && pendingViewportParamsRef.current) {
@@ -3734,14 +3895,158 @@ export const HackMapScreen: React.FC<Props> = ({
         setPanningViewportParams(pending);
       }
     }
+    if (panningViewportError) {
+      const viewportKey = panningViewportParams ? viewportKeyFromBounds(panningViewportParams) : 'unknown';
+      const requestStartedAt = panningViewportRequestStartRef.current[viewportKey];
+      const durationMs = requestStartedAt ? Date.now() - requestStartedAt : undefined;
+      if (requestStartedAt) {
+        delete panningViewportRequestStartRef.current[viewportKey];
+      }
+      const errorStatus = typeof (panningViewportError as any)?.status === 'number' ? (panningViewportError as any).status : undefined;
+      const errorMessage = (panningViewportError as any)?.error || (panningViewportError as any)?.data?.error || 'viewport-request-failed';
+      logMapDiag(
+        'pan-viewport-error',
+        {
+          viewport: viewportKey,
+          durationMs,
+          status: errorStatus,
+          message: String(errorMessage),
+        },
+        { force: true }
+      );
+    }
   }, [panningViewportData, panningViewportError, panningViewportParams, separateStaticAndDynamicData, dispatch]);
 
   // Phase 7: Load entity details when panning stops
   const [stoppedViewportParams, setStoppedViewportParams] = useState<{ x1: number; y1: number; x2: number; y2: number; minimal?: boolean } | null>(null);
   const { data: stoppedViewportData, isLoading: isLoadingStoppedViewport } = useFetchMapViewportQuery(
     stoppedViewportParams!,
-    { skip: !stoppedViewportParams || !terrainDataLoaded || !panningStopped }
+    { skip: !ENABLE_STOPPED_DETAILS_FETCH || !stoppedViewportParams || !terrainDataLoaded || !panningStopped }
   );
+  const lastStoppedDetailsFetchMsRef = useRef<number>(0);
+  const lastActivePanRecoveryFetchMsRef = useRef<number>(0);
+  const lastActivePanRecoveryViewportRef = useRef<string | null>(null);
+  const lastRecoveryViewportRequestMsRef = useRef<Record<string, number>>({});
+  const lastMapDiagLogRef = useRef<{ at: number; signature: string }>({ at: 0, signature: '' });
+  const initialViewportRequestStartRef = useRef<Record<string, number>>({});
+  const panningViewportRequestStartRef = useRef<Record<string, number>>({});
+  const logMapDiag = useCallback(
+    (event: string, payload: Record<string, unknown>, options?: { force?: boolean }) => {
+      if (!MAP_LOAD_DIAG) return;
+      const force = options?.force === true;
+      const now = Date.now();
+      const signature = `${event}|${String(payload.viewport ?? '')}|${String(payload.minimal ?? '')}`;
+      if (!force) {
+        if (lastMapDiagLogRef.current.signature === signature && now - lastMapDiagLogRef.current.at < MAP_LOAD_DIAG_MIN_INTERVAL_MS) {
+          return;
+        }
+        if (now - lastMapDiagLogRef.current.at < MAP_LOAD_DIAG_MIN_INTERVAL_MS) {
+          return;
+        }
+      }
+      lastMapDiagLogRef.current = { at: now, signature };
+      console.log(`[MapLoadDiag] ${event}`, payload);
+    },
+    []
+  );
+
+  const trimTsMap = useCallback((map: Record<string, number>, maxKeys: number) => {
+    const keys = Object.keys(map);
+    if (keys.length <= maxKeys) return;
+    keys
+      .map((key) => [key, map[key]!] as const)
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, keys.length - maxKeys)
+      .forEach(([key]) => {
+        delete map[key];
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!MAP_LOAD_DIAG || shouldSkipInitialQuery) return;
+    const viewportKey = viewportKeyFromBounds(initialViewport);
+    if (!initialViewportRequestStartRef.current[viewportKey]) {
+      const m = initialViewportRequestStartRef.current;
+      m[viewportKey] = Date.now();
+      trimTsMap(m, MAP_DIAG_REQUEST_START_MAP_MAX_KEYS);
+      const center = viewportCenterTile(initialViewport);
+      logMapDiag('initial-viewport-request-start', {
+        viewport: viewportKey,
+        centerTile: `${center.x},${center.y}`,
+      });
+    }
+  }, [shouldSkipInitialQuery, initialViewport, logMapDiag, trimTsMap]);
+
+  useEffect(() => {
+    if (!MAP_LOAD_DIAG || !panningViewportParams) return;
+    const viewportKey = viewportKeyFromBounds(panningViewportParams);
+    if (!panningViewportRequestStartRef.current[viewportKey]) {
+      const m = panningViewportRequestStartRef.current;
+      m[viewportKey] = Date.now();
+      trimTsMap(m, MAP_DIAG_REQUEST_START_MAP_MAX_KEYS);
+      const center = viewportCenterTile(panningViewportParams);
+      logMapDiag('pan-viewport-request-start', {
+        viewport: viewportKey,
+        minimal: panningViewportParams.minimal ?? true,
+        centerTile: `${center.x},${center.y}`,
+      });
+    }
+  }, [panningViewportParams, logMapDiag, trimTsMap]);
+
+  // Keep terrain loading responsive while panning (not only on pan-stop).
+  // If visible tiles include missing terrain, request the current buffered viewport immediately.
+  useEffect(() => {
+    if (!terrainDataLoaded || !isMapReady) return;
+    if (!isPanningJS || panningStopped) return;
+    if (virtualViewport.visibleTiles.size === 0) return;
+
+    let hasMissingVisibleTerrain = false;
+    for (const tileKey of Array.from(virtualViewport.visibleTiles)) {
+      if (!staticTerrainData[tileKey]) {
+        hasMissingVisibleTerrain = true;
+        break;
+      }
+    }
+    if (!hasMissingVisibleTerrain) return;
+
+    const now = Date.now();
+    if (now - lastActivePanRecoveryFetchMsRef.current < ACTIVE_PAN_RECOVERY_FETCH_COOLDOWN_MS) {
+      return;
+    }
+
+    const range = windowRangeRef.current;
+    const baseRecoveryViewport = {
+      x1: range.colStart,
+      y1: range.rowStart,
+      x2: range.colEnd,
+      y2: range.rowEnd,
+      minimal: true,
+    };
+    const recoveryViewport = snapMinimalViewportToChunk(baseRecoveryViewport, gridSize);
+    const viewportKey = `${recoveryViewport.x1},${recoveryViewport.y1},${recoveryViewport.x2},${recoveryViewport.y2}`;
+
+    if (lastActivePanRecoveryViewportRef.current === viewportKey && viewportRequestInFlightRef.current) {
+      return;
+    }
+    const lastForViewport = lastRecoveryViewportRequestMsRef.current[viewportKey] ?? 0;
+    if (now - lastForViewport < RECOVERY_VIEWPORT_REPEAT_COOLDOWN_MS) {
+      return;
+    }
+
+    lastActivePanRecoveryFetchMsRef.current = now;
+    lastActivePanRecoveryViewportRef.current = viewportKey;
+    const recoveryCooldown = lastRecoveryViewportRequestMsRef.current;
+    recoveryCooldown[viewportKey] = now;
+    trimTsMap(recoveryCooldown, RECOVERY_VIEWPORT_COOLDOWN_MAP_MAX_KEYS);
+
+    triggerViewportFetch(
+      recoveryViewport,
+      panningViewportMinimalRef,
+      setPanningViewportParams,
+      viewportRequestInFlightRef,
+      pendingViewportParamsRef
+    );
+  }, [terrainDataLoaded, isMapReady, isPanningJS, panningStopped, virtualViewport.visibleTiles, staticTerrainData, gridSize, trimTsMap]);
   
   // Phase 7: Trigger entity details fetch when panning stops
   // Also fill missing terrain when panning stops (fixes black areas that never loaded during pan)
@@ -3771,15 +4076,29 @@ export const HackMapScreen: React.FC<Props> = ({
         if (hasMissingTerrain) break;
       }
       if (hasMissingTerrain) {
-        const params = { ...currentViewport, minimal: false };
+        // Keep gap-filling requests on the minimal path for speed.
+        // Full-details requests are handled after terrain is present.
+        const params = { ...currentViewport, minimal: true };
         if (viewportRequestInFlightRef.current) {
           pendingViewportParamsRef.current = params;
         } else {
           viewportRequestInFlightRef.current = true;
-          panningViewportMinimalRef.current = false;
+          panningViewportMinimalRef.current = true;
           setPanningViewportParams(params);
         }
-        // Full fetch (minimal: false) includes details; skip separate stoppedViewportParams for this viewport
+        // Terrain-first recovery; details fetch can run once terrain exists.
+        return;
+      }
+
+      if (!ENABLE_STOPPED_DETAILS_FETCH) return;
+
+      // If terrain is still catching up with panning fetches, avoid expensive details query.
+      if (viewportRequestInFlightRef.current || pendingViewportParamsRef.current) {
+        return;
+      }
+
+      // Prioritize terrain fill while user is actively navigating; only hydrate full details after sustained idle.
+      if (Date.now() - lastPanActivityMsRef.current < STOPPED_DETAILS_IDLE_REQUIREMENT_MS) {
         return;
       }
       
@@ -3806,6 +4125,11 @@ export const HackMapScreen: React.FC<Props> = ({
       }
       
       if (needsDetails) {
+        const now = Date.now();
+        if (now - lastStoppedDetailsFetchMsRef.current < STOPPED_DETAILS_FETCH_COOLDOWN_MS) {
+          return;
+        }
+        lastStoppedDetailsFetchMsRef.current = now;
         lastStoppedViewportRef.current = viewportKey;
         // Fetch full details (minimal: false)
         setStoppedViewportParams({ ...currentViewport, minimal: false });
@@ -3817,6 +4141,7 @@ export const HackMapScreen: React.FC<Props> = ({
   // Track processed viewport to prevent infinite loops
   const processedStoppedViewportRef = useRef<string | null>(null);
   useEffect(() => {
+    if (!ENABLE_STOPPED_DETAILS_FETCH) return;
     if (stoppedViewportData && stoppedViewportData.grid && stoppedViewportData.viewport) {
       const viewport = stoppedViewportData.viewport;
       const viewportKey = `${viewport.x1},${viewport.y1},${viewport.x2},${viewport.y2}`;
@@ -3873,7 +4198,7 @@ export const HackMapScreen: React.FC<Props> = ({
       processedRestorePanViewportRef.current = restoreKey;
       
       // Calculate viewport around restorePan location instead of clearing everything
-      const buffer = 15;
+      const buffer = PAN_BUFFER;
       const gridSize = mapGridSize ?? getGridSize(grid);
       
       // Convert restorePan grid coordinates to pan coordinates to calculate correct viewport
@@ -3955,7 +4280,29 @@ export const HackMapScreen: React.FC<Props> = ({
 
     // Simplified buffer calculation - removed complex velocity math
     const baseBuffer = PAN_BUFFER;
-    const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
+    const rawViewport = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
+    // Bugbot: pan direction must compare raw vs raw (previousRawForBias); windowRangeRef holds biased ranges and breaks left/up detection.
+    let previousRawForBias = rawWindowRangeForBiasRef.current;
+    if (!panLeadBiasPrimedRef.current) {
+      previousRawForBias = {
+        rowStart: rawViewport.startRow,
+        rowEnd: rawViewport.endRow,
+        colStart: rawViewport.startCol,
+        colEnd: rawViewport.endCol,
+      };
+      panLeadBiasPrimedRef.current = true;
+    }
+    const { startCol, endCol, startRow, endRow } = expandViewportWithPanLead(
+      rawViewport,
+      previousRawForBias,
+      gridSize
+    );
+    rawWindowRangeForBiasRef.current = {
+      rowStart: rawViewport.startRow,
+      rowEnd: rawViewport.endRow,
+      colStart: rawViewport.startCol,
+      colEnd: rawViewport.endCol,
+    };
 
     // Phase 5: Use ref for windowRange during panning, state when not panning
     const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -3975,10 +4322,13 @@ export const HackMapScreen: React.FC<Props> = ({
           windowRangeRef.current = newWindowRange;
 
           // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
-          const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
+          const newViewport = snapMinimalViewportToChunk(
+            { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true },
+            gridSize
+          );
           const shouldFetch = shouldFetchViewport(newViewport, lastFetchedViewportRef.current);
           if (shouldFetch) {
-            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef, gridSize);
+            triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
           }
         }
       }
@@ -3999,10 +4349,13 @@ export const HackMapScreen: React.FC<Props> = ({
         windowRangeRef.current = newWindowRange;
         
         // Phase 6: Trigger viewport fetch with minimal flag if we've moved significantly outside the last fetched viewport
-        const newViewport = { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true };
+        const newViewport = snapMinimalViewportToChunk(
+          { x1: startCol, y1: startRow, x2: endCol, y2: endRow, minimal: true },
+          gridSize
+        );
         const shouldFetch = shouldFetchViewport(newViewport, lastFetchedViewportRef.current);
         if (shouldFetch) {
-          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef, gridSize);
+          triggerViewportFetch(newViewport, panningViewportMinimalRef, setPanningViewportParams, viewportRequestInFlightRef, pendingViewportParamsRef);
         }
         return newWindowRange;
       });
@@ -4076,6 +4429,8 @@ export const HackMapScreen: React.FC<Props> = ({
       // Force window range update immediately (bypass computeWindow throttling)
       const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newWindowRange;
+      rawWindowRangeForBiasRef.current = newWindowRange;
+      panLeadBiasPrimedRef.current = false;
       setWindowRange(newWindowRange);
       
       // Update lastComputedPan after setting window range to ensure computeWindow can run if needed
@@ -4207,11 +4562,13 @@ export const HackMapScreen: React.FC<Props> = ({
     calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     windowRangeRef.current = newRange;
+    rawWindowRangeForBiasRef.current = newRange;
+    panLeadBiasPrimedRef.current = false;
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
     setInitialCenterResolved(true);
-    const buffer = 15;
+    const buffer = PAN_BUFFER;
     const restoreViewport = calculateViewportFromPan(cx, cy, containerSize.width, containerSize.height, gridSize, buffer);
     if (viewportRequestInFlightRef.current) {
       pendingViewportParamsRef.current = {
@@ -4277,6 +4634,8 @@ export const HackMapScreen: React.FC<Props> = ({
     calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     windowRangeRef.current = newRange;
+    rawWindowRangeForBiasRef.current = newRange;
+    panLeadBiasPrimedRef.current = false;
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
@@ -4484,6 +4843,8 @@ export const HackMapScreen: React.FC<Props> = ({
       calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
       const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newRange;
+      rawWindowRangeForBiasRef.current = newRange;
+      panLeadBiasPrimedRef.current = false;
       setWindowRange(newRange);
       lastComputedPan.value = { x: cx, y: cy };
       const vp = { startCol, endCol, startRow, endRow };
@@ -4531,6 +4892,8 @@ export const HackMapScreen: React.FC<Props> = ({
       calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
       const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newRange;
+      rawWindowRangeForBiasRef.current = newRange;
+      panLeadBiasPrimedRef.current = false;
       setWindowRange(newRange);
       lastComputedPan.value = { x: cx, y: cy };
       const vp = { startCol, endCol, startRow, endRow };
