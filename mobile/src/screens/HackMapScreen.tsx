@@ -477,20 +477,21 @@ const snapMinimalViewportToChunk = (
   };
 };
 
+/** @param previousRaw — prior unbiased viewport (same basis as `viewport`); must not be a directionally expanded window from a prior frame (Bugbot). */
 const applyDirectionalViewportBias = (
   viewport: { startCol: number; endCol: number; startRow: number; endRow: number },
-  previous: { rowStart: number; rowEnd: number; colStart: number; colEnd: number },
+  previousRaw: { rowStart: number; rowEnd: number; colStart: number; colEnd: number },
   gridSize: number
 ): { startCol: number; endCol: number; startRow: number; endRow: number } => {
   let { startCol, endCol, startRow, endRow } = viewport;
-  if (previous.colStart < startCol) {
+  if (previousRaw.colStart < startCol) {
     endCol = Math.min(gridSize - 1, endCol + DIRECTIONAL_LEAD_CELLS);
-  } else if (previous.colStart > startCol) {
+  } else if (previousRaw.colStart > startCol) {
     startCol = Math.max(0, startCol - DIRECTIONAL_LEAD_CELLS);
   }
-  if (previous.rowStart < startRow) {
+  if (previousRaw.rowStart < startRow) {
     endRow = Math.min(gridSize - 1, endRow + DIRECTIONAL_LEAD_CELLS);
-  } else if (previous.rowStart > startRow) {
+  } else if (previousRaw.rowStart > startRow) {
     startRow = Math.max(0, startRow - DIRECTIONAL_LEAD_CELLS);
   }
   return { startCol, endCol, startRow, endRow };
@@ -3706,59 +3707,61 @@ export const HackMapScreen: React.FC<Props> = ({
       if (requestStartedAt) {
         delete panningViewportRequestStartRef.current[viewportKey];
       }
-      const center = viewportCenterTile(viewport);
-      let missingVisibleTerrainBeforeMerge = 0;
-      if (virtualViewport.visibleTiles.size > 0) {
-        for (const tileKey of Array.from(virtualViewport.visibleTiles)) {
-          if (!staticTerrainData[tileKey]) {
-            missingVisibleTerrainBeforeMerge += 1;
-          }
-        }
-      }
-      const firstRow = panningViewportData.grid.find((row): row is any[] => Array.isArray(row) && row.length > 0);
-      let npcCellsInPayload = 0;
-      let npcNamedInPayload = 0;
-      let npcGenericInPayload = 0;
-      let npcLevelPresentInPayload = 0;
-      let npcLevelMissingInPayload = 0;
-      for (const row of panningViewportData.grid) {
-        if (!Array.isArray(row)) continue;
-        for (const cell of row) {
-          if (!cell) continue;
-          if (cell.entity === 'house' && cell.owner === 'enemy') {
-            npcCellsInPayload += 1;
-            const npcName = typeof cell.name === 'string' ? cell.name.trim() : '';
-            if (npcName && npcName !== 'NPC') {
-              npcNamedInPayload += 1;
-            } else {
-              npcGenericInPayload += 1;
-            }
-            if (typeof cell.npcLevel === 'number' && Number.isFinite(cell.npcLevel)) {
-              npcLevelPresentInPayload += 1;
-            } else {
-              npcLevelMissingInPayload += 1;
+      if (MAP_LOAD_DIAG) {
+        const center = viewportCenterTile(viewport);
+        let missingVisibleTerrainBeforeMerge = 0;
+        if (virtualViewport.visibleTiles.size > 0) {
+          for (const tileKey of Array.from(virtualViewport.visibleTiles)) {
+            if (!staticTerrainData[tileKey]) {
+              missingVisibleTerrainBeforeMerge += 1;
             }
           }
         }
+        const firstRow = panningViewportData.grid.find((row): row is any[] => Array.isArray(row) && row.length > 0);
+        let npcCellsInPayload = 0;
+        let npcNamedInPayload = 0;
+        let npcGenericInPayload = 0;
+        let npcLevelPresentInPayload = 0;
+        let npcLevelMissingInPayload = 0;
+        for (const row of panningViewportData.grid) {
+          if (!Array.isArray(row)) continue;
+          for (const cell of row) {
+            if (!cell) continue;
+            if (cell.entity === 'house' && cell.owner === 'enemy') {
+              npcCellsInPayload += 1;
+              const npcName = typeof cell.name === 'string' ? cell.name.trim() : '';
+              if (npcName && npcName !== 'NPC') {
+                npcNamedInPayload += 1;
+              } else {
+                npcGenericInPayload += 1;
+              }
+              if (typeof cell.npcLevel === 'number' && Number.isFinite(cell.npcLevel)) {
+                npcLevelPresentInPayload += 1;
+              } else {
+                npcLevelMissingInPayload += 1;
+              }
+            }
+          }
+        }
+        logMapDiag(
+          'pan-viewport-response',
+          {
+            viewport: viewportKey,
+            durationMs,
+            centerTile: `${center.x},${center.y}`,
+            minimal: panningViewportMinimalRef.current,
+            responseRows: panningViewportData.grid.length,
+            responseCols: firstRow?.length ?? 0,
+            missingVisibleTerrainBeforeMerge,
+            npcCellsInPayload,
+            npcNamedInPayload,
+            npcGenericInPayload,
+            npcLevelPresentInPayload,
+            npcLevelMissingInPayload,
+          },
+          { force: (durationMs ?? 0) >= MAP_LOAD_DIAG_SLOW_REQUEST_MS || missingVisibleTerrainBeforeMerge > 0 }
+        );
       }
-      logMapDiag(
-        'pan-viewport-response',
-        {
-          viewport: viewportKey,
-          durationMs,
-          centerTile: `${center.x},${center.y}`,
-          minimal: panningViewportMinimalRef.current,
-          responseRows: panningViewportData.grid.length,
-          responseCols: firstRow?.length ?? 0,
-          missingVisibleTerrainBeforeMerge,
-          npcCellsInPayload,
-          npcNamedInPayload,
-          npcGenericInPayload,
-          npcLevelPresentInPayload,
-          npcLevelMissingInPayload,
-        },
-        { force: (durationMs ?? 0) >= MAP_LOAD_DIAG_SLOW_REQUEST_MS || missingVisibleTerrainBeforeMerge > 0 }
-      );
 
       // Phase 6: Prevent processing the same viewport twice
       if (processedViewportRef.current === viewportKey) {

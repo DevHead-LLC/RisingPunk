@@ -1007,6 +1007,7 @@ router.get('/:name', async (req: Request, res: Response) => {
         synthesizedNpcInstanceIds.push({ x, y, npcInstanceId: synthesized });
         mutated = true;
       }
+      // Bugbot: minimal path mirrors non-minimal default (`|| 1`) when meta/cache misses slug or omits npcLevel.
       const npcLevel = isMinimalViewportRequest
         ? (npcSlug ? (npcMetaBySlug?.get(npcSlug)?.npcLevel ?? 1) : undefined)
         : (c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined);
