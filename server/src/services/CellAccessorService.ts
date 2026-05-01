@@ -37,8 +37,8 @@ export async function getCellsForMap(
     }
     const query = MapCell.find(filter);
     if (minimal) {
-      // Minimal viewport path: return only fields required for fast terrain/entity-image rendering.
-      query.select('x y terrain isOccupied occupiedBy userId npcSlug npcInstanceId');
+      // Minimal viewport path: fast terrain/entity-image fields; include entityName so map.ts NPC display names match per-cell overrides (Bugbot).
+      query.select('x y terrain isOccupied occupiedBy userId npcSlug npcInstanceId entityName');
     }
     const docs = await query.lean();
     return docs.map((d: any) => ({
