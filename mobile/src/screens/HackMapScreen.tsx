@@ -478,7 +478,7 @@ const snapMinimalViewportToChunk = (
 };
 
 /** @param previousRaw — prior unbiased viewport (same basis as `viewport`); must not be a directionally expanded window from a prior frame (Bugbot). */
-const applyDirectionalViewportBias = (
+const expandViewportWithPanLead = (
   viewport: { startCol: number; endCol: number; startRow: number; endRow: number },
   previousRaw: { rowStart: number; rowEnd: number; colStart: number; colEnd: number },
   gridSize: number
@@ -2032,7 +2032,7 @@ export const HackMapScreen: React.FC<Props> = ({
   
   // Phase 5: Use ref for windowRange during panning to reduce re-renders
   const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
-  /** Last raw viewport from {@link calculateViewportFromPan} — used only for pan-direction in {@link applyDirectionalViewportBias}. Must not store biased ranges or left/up pan compares against shifted colStart/rowStart (Bugbot). */
+  /** Last raw viewport from {@link calculateViewportFromPan} — used only as `previousRaw` for {@link expandViewportWithPanLead}. Must not store biased ranges (Bugbot). */
   const rawWindowRangeForBiasRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
   
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
@@ -4020,7 +4020,6 @@ export const HackMapScreen: React.FC<Props> = ({
   // Also fill missing terrain when panning stops (fixes black areas that never loaded during pan)
   const lastStoppedViewportRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!ENABLE_STOPPED_DETAILS_FETCH) return;
     if (panningStopped && terrainDataLoaded && !isPanningJS) {
       // Use ref so we have the viewport that was active during pan (sync effect may not have run yet)
       const range = windowRangeRef.current;
@@ -4058,6 +4057,8 @@ export const HackMapScreen: React.FC<Props> = ({
         // Terrain-first recovery; details fetch can run once terrain exists.
         return;
       }
+
+      if (!ENABLE_STOPPED_DETAILS_FETCH) return;
 
       // If terrain is still catching up with panning fetches, avoid expensive details query.
       if (viewportRequestInFlightRef.current || pendingViewportParamsRef.current) {
@@ -4250,7 +4251,7 @@ export const HackMapScreen: React.FC<Props> = ({
     const rawViewport = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
     // Bugbot: pan direction must compare raw vs raw (previousRawForBias); windowRangeRef holds biased ranges and breaks left/up detection.
     const previousRawForBias = rawWindowRangeForBiasRef.current;
-    const { startCol, endCol, startRow, endRow } = applyDirectionalViewportBias(
+    const { startCol, endCol, startRow, endRow } = expandViewportWithPanLead(
       rawViewport,
       previousRawForBias,
       gridSize
