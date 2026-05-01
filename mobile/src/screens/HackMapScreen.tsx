@@ -3766,8 +3766,9 @@ export const HackMapScreen: React.FC<Props> = ({
         );
       }
 
-      // Phase 6: Prevent processing the same viewport twice
-      if (processedViewportRef.current === viewportKey) {
+      // Phase 6: Prevent processing the same viewport twice (minimal vs full must not collapse — Bugbot)
+      const processedDedupeKey = `${viewportKey}|${panningViewportMinimalRef.current ? 'min' : 'full'}`;
+      if (processedViewportRef.current === processedDedupeKey) {
         // Still handle pending requests even if this viewport was already processed
         if (pendingViewportParamsRef.current) {
           const pending = pendingViewportParamsRef.current;
@@ -3778,7 +3779,7 @@ export const HackMapScreen: React.FC<Props> = ({
         }
         return;
       }
-      processedViewportRef.current = viewportKey;
+      processedViewportRef.current = processedDedupeKey;
 
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
 
@@ -4553,17 +4554,17 @@ export const HackMapScreen: React.FC<Props> = ({
         y1: restoreViewport.startRow,
         x2: restoreViewport.endCol,
         y2: restoreViewport.endRow,
-        minimal: true,
+        minimal: false,
       };
     } else {
-      panningViewportMinimalRef.current = true;
+      panningViewportMinimalRef.current = false;
       viewportRequestInFlightRef.current = true;
       setPanningViewportParams({
         x1: restoreViewport.startCol,
         y1: restoreViewport.startRow,
         x2: restoreViewport.endCol,
         y2: restoreViewport.endRow,
-        minimal: true,
+        minimal: false,
       });
     }
   }, [myPositionData, currentUserHandle, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
