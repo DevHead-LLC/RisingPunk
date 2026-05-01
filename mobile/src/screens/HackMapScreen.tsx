@@ -2036,6 +2036,8 @@ export const HackMapScreen: React.FC<Props> = ({
   const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
   /** Last raw viewport from {@link calculateViewportFromPan} — used only as `previousRaw` for {@link expandViewportWithPanLead}. Must not store biased ranges (Bugbot). */
   const rawWindowRangeForBiasRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
+  /** False until first computeWindow applies pan-lead; avoids bogus delta vs initial UI window seed (Bugbot). Reset on teleport paths. */
+  const panLeadBiasPrimedRef = useRef(false);
   
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
   const [initialCenterResolved, setInitialCenterResolved] = useState<boolean>(false);
@@ -2436,7 +2438,7 @@ export const HackMapScreen: React.FC<Props> = ({
     }
     if (containerSize.width === 0 || containerSize.height === 0) {
       // Fallback to center if container not ready (shouldn't happen due to skip condition)
-      const buffer = INITIAL_VIEWPORT_BUFFER;
+      const buffer = INITIAL_VIEWPORT_BUFFER_FALLBACK_NO_POSITION;
       const centerX = Math.floor(gridSize / 2);
       const centerY = Math.floor(gridSize / 2);
       return {
@@ -4273,7 +4275,16 @@ export const HackMapScreen: React.FC<Props> = ({
     const baseBuffer = PAN_BUFFER;
     const rawViewport = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
     // Bugbot: pan direction must compare raw vs raw (previousRawForBias); windowRangeRef holds biased ranges and breaks left/up detection.
-    const previousRawForBias = rawWindowRangeForBiasRef.current;
+    let previousRawForBias = rawWindowRangeForBiasRef.current;
+    if (!panLeadBiasPrimedRef.current) {
+      previousRawForBias = {
+        rowStart: rawViewport.startRow,
+        rowEnd: rawViewport.endRow,
+        colStart: rawViewport.startCol,
+        colEnd: rawViewport.endCol,
+      };
+      panLeadBiasPrimedRef.current = true;
+    }
     const { startCol, endCol, startRow, endRow } = expandViewportWithPanLead(
       rawViewport,
       previousRawForBias,
@@ -4412,6 +4423,7 @@ export const HackMapScreen: React.FC<Props> = ({
       const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newWindowRange;
       rawWindowRangeForBiasRef.current = newWindowRange;
+      panLeadBiasPrimedRef.current = false;
       setWindowRange(newWindowRange);
       
       // Update lastComputedPan after setting window range to ensure computeWindow can run if needed
@@ -4544,6 +4556,7 @@ export const HackMapScreen: React.FC<Props> = ({
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     windowRangeRef.current = newRange;
     rawWindowRangeForBiasRef.current = newRange;
+    panLeadBiasPrimedRef.current = false;
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
@@ -4615,6 +4628,7 @@ export const HackMapScreen: React.FC<Props> = ({
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     windowRangeRef.current = newRange;
     rawWindowRangeForBiasRef.current = newRange;
+    panLeadBiasPrimedRef.current = false;
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
@@ -4823,6 +4837,7 @@ export const HackMapScreen: React.FC<Props> = ({
       const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newRange;
       rawWindowRangeForBiasRef.current = newRange;
+      panLeadBiasPrimedRef.current = false;
       setWindowRange(newRange);
       lastComputedPan.value = { x: cx, y: cy };
       const vp = { startCol, endCol, startRow, endRow };
@@ -4871,6 +4886,7 @@ export const HackMapScreen: React.FC<Props> = ({
       const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newRange;
       rawWindowRangeForBiasRef.current = newRange;
+      panLeadBiasPrimedRef.current = false;
       setWindowRange(newRange);
       lastComputedPan.value = { x: cx, y: cy };
       const vp = { startCol, endCol, startRow, endRow };
