@@ -139,7 +139,9 @@ type TravelSpeedupInventoryRow = {
 // Constants for viewport fetching and panning
 const VIEWPORT_FETCH_THRESHOLD = 1; // Slightly coarser trigger reduces request churn so each fetch can complete sooner
 const PAN_BUFFER = 6; // Slightly larger lookahead to reduce near-edge pop-in while panning
-const INITIAL_VIEWPORT_BUFFER = 2; // Keep startup viewport tight to visible area to avoid oversized first load region
+const INITIAL_VIEWPORT_BUFFER = 2; // Keep startup viewport tight when my-position is known (avoids oversized first load)
+/** When my-position is unavailable, first fetch at pan origin must cover enough grid for house discovery + grid-scan fallback (Bugbot). */
+const INITIAL_VIEWPORT_BUFFER_FALLBACK_NO_POSITION = 15;
 const PAN_CHANGE_THRESHOLD = 4; // Minimum pan change in pixels to trigger update
 const DIRECTIONAL_LEAD_CELLS = 3; // Bias viewport farther into travel direction to improve ahead-of-pan fill
 const MINIMAL_VIEWPORT_SNAP_CELLS = 4; // Snap minimal viewport requests to small chunk boundaries for better cache reuse
@@ -2467,8 +2469,8 @@ export const HackMapScreen: React.FC<Props> = ({
       };
     }
 
-    // Calculate viewport from initial pan position (0,0) to match what's actually visible
-    const buffer = INITIAL_VIEWPORT_BUFFER;
+    // Calculate viewport from initial pan position (0,0); widen buffer when my-position missing so fallback scan can find home
+    const buffer = INITIAL_VIEWPORT_BUFFER_FALLBACK_NO_POSITION;
     const initialPanX = 0;
     const initialPanY = 0;
     const { startCol, endCol, startRow, endRow } = calculateViewportFromPan(
@@ -4243,6 +4245,7 @@ export const HackMapScreen: React.FC<Props> = ({
     // Simplified buffer calculation - removed complex velocity math
     const baseBuffer = PAN_BUFFER;
     const rawViewport = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
+    // Bugbot: pan direction must compare raw vs raw (previousRawForBias); windowRangeRef holds biased ranges and breaks left/up detection.
     const previousRawForBias = rawWindowRangeForBiasRef.current;
     const { startCol, endCol, startRow, endRow } = applyDirectionalViewportBias(
       rawViewport,
