@@ -18,10 +18,12 @@ export type Viewport = { x1: number; y1: number; x2: number; y2: number };
 /** Get cells for a map, optionally restricted to viewport. For mapcells + no viewport, returns all (avoid for 500×500 in one request). */
 export async function getCellsForMap(
   mapDoc: any,
-  viewport?: Viewport
+  viewport?: Viewport,
+  options?: { minimal?: boolean }
 ): Promise<any[]> {
   const mapId = mapDoc._id;
   if (!mapId) throw new Error('Map doc has no _id');
+  const minimal = options?.minimal === true;
 
   if (usesMapCells(mapDoc)) {
     const filter: any = { mapId };
@@ -33,7 +35,12 @@ export async function getCellsForMap(
       filter.x = { $gte: minX, $lte: maxX };
       filter.y = { $gte: minY, $lte: maxY };
     }
-    const docs = await MapCell.find(filter).lean();
+    const query = MapCell.find(filter);
+    if (minimal) {
+      // Minimal viewport path: fast terrain/entity-image fields; include entityName so map.ts NPC display names match per-cell overrides (Bugbot).
+      query.select('x y terrain isOccupied occupiedBy userId npcSlug npcInstanceId entityName');
+    }
+    const docs = await query.lean();
     return docs.map((d: any) => ({
       x: d.x,
       y: d.y,
