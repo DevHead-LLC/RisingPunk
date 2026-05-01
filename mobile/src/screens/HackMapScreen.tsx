@@ -2084,7 +2084,7 @@ export const HackMapScreen: React.FC<Props> = ({
         return () => cancelAnimationFrame(raf);
       } else {
         windowRangeRef.current = stateRange;
-        rawWindowRangeForBiasRef.current = stateRange;
+        // Bugbot: do not assign state/ref window (biased after pan) into rawWindowRangeForBiasRef — keep last raw from computeWindow/teleport.
       }
     }
   }, [panningStopped, isPanningJS, windowRange]);
