@@ -44,7 +44,8 @@ let npcMetaBySlugCache: { expiresAt: number; bySlug: Map<string, CachedNpcMeta> 
 
 async function getNpcMetaBySlugCached(): Promise<Map<string, CachedNpcMeta>> {
   const now = Date.now();
-  if (npcMetaBySlugCache.expiresAt > now && npcMetaBySlugCache.bySlug.size > 0) {
+  // Bugbot: cache hit must not require size>0 — empty NPC table still yields a valid empty Map to reuse until TTL.
+  if (npcMetaBySlugCache.expiresAt > now) {
     return npcMetaBySlugCache.bySlug;
   }
   const npcRows = await NPCService.getAllNPCs();

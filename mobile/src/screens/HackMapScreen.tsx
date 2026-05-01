@@ -479,7 +479,13 @@ const snapMinimalViewportToChunk = (
   };
 };
 
-/** @param previousRaw — prior unbiased viewport (same basis as `viewport`); must not be a directionally expanded window from a prior frame (Bugbot). */
+/**
+ * Expands fetch bounds toward pan direction using raw viewport deltas (same basis as {@link calculateViewportFromPan}).
+ * Bugbot: row/col convention matches that helper (increasing row index = down on screen). First-frame bogus deltas vs
+ * the UI seed window are suppressed via `panLeadBiasPrimedRef` at the call site in `computeWindow`.
+ *
+ * @param previousRaw — prior unbiased viewport (same basis as `viewport`); must not be a directionally expanded window from a prior frame (Bugbot).
+ */
 const expandViewportWithPanLead = (
   viewport: { startCol: number; endCol: number; startRow: number; endRow: number },
   previousRaw: { rowStart: number; rowEnd: number; colStart: number; colEnd: number },
@@ -3768,7 +3774,8 @@ export const HackMapScreen: React.FC<Props> = ({
         );
       }
 
-      // Phase 6: Prevent processing the same viewport twice (minimal vs full must not collapse — Bugbot)
+      // Phase 6: Prevent processing the same viewport twice. Bugbot: `viewportKey` names tile bounds only; `processedDedupeKey`
+      // adds minimal|full so minimal and non-minimal responses for the same bounds are both processed.
       const processedDedupeKey = `${viewportKey}|${panningViewportMinimalRef.current ? 'min' : 'full'}`;
       if (processedViewportRef.current === processedDedupeKey) {
         // Still handle pending requests even if this viewport was already processed
