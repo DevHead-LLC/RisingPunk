@@ -33,7 +33,39 @@ const mapService = new MapService();
 // Evict expired entries on each POST so the Map stays bounded (Bugbot: keys for users who stop posting are never revisited otherwise).
 const MAP_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const MAP_CHAT_RATE_LIMIT_MAX = 10;
+const MAP_LOAD_DIAG_SERVER_SLOW_MS = 250;
+const NPC_META_CACHE_TTL_MS = 5 * 60 * 1000;
 const mapChatRateLimit = new Map<string, { count: number; windowStartMs: number }>();
+type CachedNpcMeta = { name: string; npcLevel: number };
+let npcMetaBySlugCache: { expiresAt: number; bySlug: Map<string, CachedNpcMeta> } = {
+  expiresAt: 0,
+  bySlug: new Map<string, CachedNpcMeta>(),
+};
+
+async function getNpcMetaBySlugCached(): Promise<Map<string, CachedNpcMeta>> {
+  const now = Date.now();
+  // Bugbot: cache hit must not require size>0 — empty NPC table still yields a valid empty Map to reuse until TTL.
+  if (npcMetaBySlugCache.expiresAt > now) {
+    return npcMetaBySlugCache.bySlug;
+  }
+  const npcRows = await NPCService.getAllNPCs();
+  const bySlug = new Map<string, CachedNpcMeta>();
+  for (const row of npcRows) {
+    const slug = typeof row.slug === 'string' ? row.slug.trim() : '';
+    if (!slug) continue;
+    const displayName = (row.name || row.title || 'NPC').trim() || 'NPC';
+    const associatedLevel =
+      typeof row.userLevelAssociation === 'number' && !Number.isNaN(row.userLevelAssociation)
+        ? getDisplayLevel(row.userLevelAssociation)
+        : 1;
+    bySlug.set(slug, { name: displayName, npcLevel: associatedLevel });
+  }
+  npcMetaBySlugCache = {
+    expiresAt: now + NPC_META_CACHE_TTL_MS,
+    bySlug,
+  };
+  return bySlug;
+}
 
 function evictExpiredMapChatRateLimitEntries(nowMs: number): void {
   for (const [key, val] of mapChatRateLimit.entries()) {
@@ -300,18 +332,23 @@ router.post('/:mapName/chat-messages', auth, async (req: SendMapChatMessageReque
 });
 
 // Parse viewport params once (used to skip expensive placement for viewport-only requests)
-function parseViewportFromRequest(req: Request): { hasViewport: boolean; x1: number; y1: number; x2: number; y2: number } {
+function parseViewportFromRequest(req: Request): { hasViewport: boolean; x1: number; y1: number; x2: number; y2: number; minimal: boolean } {
   const parse = (param: any): number | undefined => {
     if (param === undefined || param === null) return undefined;
     const parsed = parseInt(param as string, 10);
     return isNaN(parsed) ? undefined : parsed;
   };
+  const parseBool = (param: any): boolean => {
+    if (typeof param !== 'string') return false;
+    return param.toLowerCase() === 'true' || param === '1';
+  };
   const x1 = parse(req.query.x1);
   const y1 = parse(req.query.y1);
   const x2 = parse(req.query.x2);
   const y2 = parse(req.query.y2);
+  const minimal = parseBool(req.query.minimal);
   const hasViewport = x1 !== undefined && y1 !== undefined && x2 !== undefined && y2 !== undefined;
-  return { hasViewport, x1: x1 ?? 0, y1: y1 ?? 0, x2: x2 ?? 0, y2: y2 ?? 0 };
+  return { hasViewport, x1: x1 ?? 0, y1: y1 ?? 0, x2: x2 ?? 0, y2: y2 ?? 0, minimal };
 }
 
 // GET my-position and POST player-position MUST be before /:name so /api/map/my-position is not matched as name='my-position' (user-position-and-locator.md)
@@ -634,9 +671,11 @@ router.post('/move-property', auth, async (req: Request, res: Response) => {
 });
 
 router.get('/:name', async (req: Request, res: Response) => {
+  const requestStartMs = Date.now();
   try {
     const name = req.params.name;
     const viewportEarly = parseViewportFromRequest(req);
+    const isMinimalViewportRequest = viewportEarly.hasViewport && viewportEarly.minimal;
     let mapDoc = await MapModel.findOne({ name });
     if (!mapDoc) {
       // Drop legacy unique index so insert can succeed (E11000); per-doc uniqueness enforced in app (user-position-and-locator.md)
@@ -846,7 +885,7 @@ router.get('/:name', async (req: Request, res: Response) => {
       ? { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
       : undefined;
     const cells: any[] = usesMapCells(mapDoc)
-      ? await getCellsForMap(mapDoc, viewportForFetch)
+      ? await getCellsForMap(mapDoc, viewportForFetch, { minimal: isMinimalViewportRequest })
       : (Array.isArray((mapDoc as any).cells) ? Array.from((mapDoc as any).cells) : []);
 
     const userIdsInMap = new Set<string>();
@@ -865,18 +904,21 @@ router.get('/:name', async (req: Request, res: Response) => {
       : cells;
     
     // Phase 3B: Use optimized user query - only query users with houses
-    // For viewport: filter to users in viewport, for full map: use all users with houses
+    // For viewport: filter to users in viewport, for full map: use all users with houses.
+    // Minimal viewport requests skip user docs entirely (names/shields are not needed in panning image path).
     const userIdsInViewport = new Set<string>();
     viewportCells.forEach((c: any) => {
       if (c.occupiedBy === 'player' && c.userId) {
         userIdsInViewport.add(String(c.userId));
       }
     });
-    
-    // Only query users who have houses (optimized from querying all users)
-    const usersToQuery = hasViewport
-      ? await User.find({ _id: { $in: Array.from(userIdsInViewport) } }, { _id: 1, handle: 1, antivirusShield: 1 })
-      : await User.find({ _id: { $in: Array.from(userIdsInMap) } }, { _id: 1, handle: 1, antivirusShield: 1 });
+
+    // Only query users who have houses (optimized from querying all users).
+    const usersToQuery = isMinimalViewportRequest
+      ? []
+      : (hasViewport
+        ? await User.find({ _id: { $in: Array.from(userIdsInViewport) } }, { _id: 1, handle: 1, antivirusShield: 1 })
+        : await User.find({ _id: { $in: Array.from(userIdsInMap) } }, { _id: 1, handle: 1, antivirusShield: 1 }));
     
     // Viewport requests: build only viewport-sized grid (fast, small payload). Full-map: build gridSize×gridSize.
     const viewportRows = hasViewport ? viewportY2 - viewportY1 + 1 : gridSize;
@@ -888,13 +930,16 @@ router.get('/:name', async (req: Request, res: Response) => {
     /** Only cells we synthesized npcInstanceId for (Bugbot: persist only these, not every NPC in viewport). */
     const synthesizedNpcInstanceIds: { x: number; y: number; npcInstanceId: string }[] = [];
 
-    const shieldStatusMap = await ShieldService.checkAndUpdateMultipleShieldStatuses(usersToQuery);
+    const shieldStatusMap = isMinimalViewportRequest
+      ? new Map<string, boolean>()
+      : await ShieldService.checkAndUpdateMultipleShieldStatuses(usersToQuery);
 
     const userMap = new Map();
     usersToQuery.forEach((user: any) => {
       userMap.set(String(user._id), user);
     });
-    const allNPCs = await NPCService.getAllNPCs();
+    const allNPCs = isMinimalViewportRequest ? [] : await NPCService.getAllNPCs();
+    const npcMetaBySlug = isMinimalViewportRequest ? await getNpcMetaBySlugCached() : null;
     const npcLevelMap = new Map<string, number>();
     for (const npc of allNPCs) {
       // Bugbot: Only call getDisplayLevel when userLevelAssociation is a valid number; undefined/null/NaN would yield wrong display level (e.g. 21).
@@ -904,6 +949,11 @@ router.get('/:name', async (req: Request, res: Response) => {
       }
     }
     const mapId = (mapDoc as any)._id;
+    let npcCellsInViewport = 0;
+    let npcNamedInViewport = 0;
+    let npcGenericInViewport = 0;
+    let npcLevelPresentInViewport = 0;
+    let npcLevelMissingInViewport = 0;
     for (const c of viewportCells) {
       const y = c.y;
       const x = c.x;
@@ -911,22 +961,51 @@ router.get('/:name', async (req: Request, res: Response) => {
       const colIdx = hasViewport ? x - viewportX1 : x;
       const entity = c.isOccupied ? 'house' : 'empty';
       const owner = c.isOccupied ? (c.occupiedBy === 'player' ? 'player' : 'enemy') : undefined;
-      // Send actual handle for player cells so clients see "Splatrat" etc.; client shows "YOU" only when name === current user's handle.
-      const name = c.occupiedBy === 'player' && c.userId && userMap.get(String(c.userId))
-        ? (userMap.get(String(c.userId)) as any).handle
-        : (c.entityName || undefined);
       const npcSlug = c.occupiedBy === 'npc' ? (c.npcSlug || undefined) : undefined;
+      // Send actual handle for player cells so clients see "Splatrat" etc.; client shows "YOU" only when name === current user's handle.
+      const name = isMinimalViewportRequest
+        ? (
+            c.occupiedBy === 'npc'
+              ? (
+                  c.entityName && c.entityName !== 'NPC'
+                    ? c.entityName
+                    : (npcSlug ? npcMetaBySlug?.get(npcSlug)?.name : undefined) || c.entityName || undefined
+                )
+              : (c.occupiedBy === 'player' ? (c.entityName || undefined) : undefined)
+          )
+        : (c.occupiedBy === 'player' && c.userId && userMap.get(String(c.userId))
+          ? (userMap.get(String(c.userId)) as any).handle
+          : (c.entityName || undefined));
       const npcInstanceId = c.occupiedBy === 'npc' && npcSlug ? (c.npcInstanceId || `${npcSlug}-${x}-${y}`) : undefined;
+      if (c.occupiedBy === 'npc') {
+        npcCellsInViewport += 1;
+        const normalizedName = (name || '').trim();
+        if (normalizedName && normalizedName !== 'NPC') {
+          npcNamedInViewport += 1;
+        } else {
+          npcGenericInViewport += 1;
+        }
+      }
       // Bugbot: Set mutated when we synthesize npcInstanceId so MapCells path can persist it (was only when !hasViewport, making updateCell loop dead).
-      if (c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
+      if (!isMinimalViewportRequest && c.occupiedBy === 'npc' && npcSlug && !c.npcInstanceId) {
         const synthesized = `${npcSlug}-${x}-${y}`;
         c.npcInstanceId = synthesized;
         synthesizedNpcInstanceIds.push({ x, y, npcInstanceId: synthesized });
         mutated = true;
       }
-      const npcLevel = c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) || 1) : undefined;
+      // Bugbot: minimal vs non-minimal both use nullish fallback to 1 for NPC level when slug/meta misses (parity with ?? over ||).
+      const npcLevel = isMinimalViewportRequest
+        ? (c.occupiedBy === 'npc' && npcSlug ? (npcMetaBySlug?.get(npcSlug)?.npcLevel ?? 1) : undefined)
+        : (c.occupiedBy === 'npc' && npcSlug ? (npcLevelMap.get(npcSlug) ?? 1) : undefined);
+      if (c.occupiedBy === 'npc') {
+        if (typeof npcLevel === 'number' && Number.isFinite(npcLevel)) {
+          npcLevelPresentInViewport += 1;
+        } else {
+          npcLevelMissingInViewport += 1;
+        }
+      }
       let isShielded = false;
-      if (c.occupiedBy === 'player' && c.userId) {
+      if (!isMinimalViewportRequest && c.occupiedBy === 'player' && c.userId) {
         isShielded = shieldStatusMap.get(String(c.userId)) || false;
       }
       emptyGrid[rowIdx][colIdx] = {
@@ -952,13 +1031,34 @@ router.get('/:name', async (req: Request, res: Response) => {
         await (mapDoc as any).save();
       }
     }
+    const durationMs = Date.now() - requestStartMs;
+    if (hasViewport && durationMs >= MAP_LOAD_DIAG_SERVER_SLOW_MS) {
+      const centerX = Math.floor((viewportX1 + viewportX2) / 2);
+      const centerY = Math.floor((viewportY1 + viewportY2) / 2);
+      console.log('[MapLoadDiagServer] slow-viewport-response', {
+        durationMs,
+        minimal: viewportEarly.minimal,
+        gridSize,
+        viewport: `${viewportX1},${viewportY1},${viewportX2},${viewportY2}`,
+        centerTile: `${centerX},${centerY}`,
+        viewportRows,
+        viewportCols,
+        npcCellsInViewport,
+        npcNamedInViewport,
+        npcGenericInViewport,
+        npcLevelPresentInViewport,
+        npcLevelMissingInViewport,
+      });
+    }
     // Bugbot: Always include gridSize so client never falls back to grid.length (viewport-sized grid would yield wrong pan bounds).
+    // Do not cache minimal (or any) viewport JSON here: cells are mutable; a cache would serve stale NPC/player state to other clients.
     if (hasViewport) {
-      res.json({
+      const payload = {
         grid: emptyGrid,
         gridSize,
         viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
-      });
+      };
+      res.json(payload);
     } else {
       res.json({ grid: emptyGrid, gridSize });
     }
