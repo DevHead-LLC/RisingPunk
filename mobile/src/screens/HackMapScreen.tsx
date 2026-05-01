@@ -3766,8 +3766,9 @@ export const HackMapScreen: React.FC<Props> = ({
         );
       }
 
-      // Phase 6: Prevent processing the same viewport twice
-      if (processedViewportRef.current === viewportKey) {
+      // Phase 6: Prevent processing the same viewport twice (minimal vs full must not collapse — Bugbot)
+      const processedDedupeKey = `${viewportKey}|${panningViewportMinimalRef.current ? 'min' : 'full'}`;
+      if (processedViewportRef.current === processedDedupeKey) {
         // Still handle pending requests even if this viewport was already processed
         if (pendingViewportParamsRef.current) {
           const pending = pendingViewportParamsRef.current;
@@ -3778,7 +3779,7 @@ export const HackMapScreen: React.FC<Props> = ({
         }
         return;
       }
-      processedViewportRef.current = viewportKey;
+      processedViewportRef.current = processedDedupeKey;
 
       const { terrain, entityImages, entityDetails } = separateStaticAndDynamicData(panningViewportData.grid, panningViewportData.viewport);
 
@@ -3849,26 +3850,28 @@ export const HackMapScreen: React.FC<Props> = ({
       // Update last fetched viewport (without minimal flag for comparison)
       lastFetchedViewportRef.current = { x1: viewport.x1, y1: viewport.y1, x2: viewport.x2, y2: viewport.y2 };
 
+      const completedPanningWasMinimal = isMinimalRequest;
+
       // Clear viewport params and reset minimal flag to allow next fetch
       panningViewportMinimalRef.current = false;
       setPanningViewportParams(null);
-    }
 
-    // Handle pending requests after processing current data (success only; on error don't retry to avoid infinite loop — Bugbot).
-    // Skip if pending is the same as the viewport we just merged (avoid redundant re-fetch)
-    if (panningViewportData && pendingViewportParamsRef.current) {
-      const pending = pendingViewportParamsRef.current;
-      const justMerged = panningViewportData.viewport;
-      const sameViewport = justMerged &&
-        pending.x1 === justMerged.x1 && pending.y1 === justMerged.y1 &&
-        pending.x2 === justMerged.x2 && pending.y2 === justMerged.y2;
-      pendingViewportParamsRef.current = null;
-      if (!sameViewport) {
-        viewportRequestInFlightRef.current = true;
-        panningViewportMinimalRef.current = pending.minimal ?? true;
-        setPanningViewportParams(pending);
+      if (pendingViewportParamsRef.current) {
+        const pending = pendingViewportParamsRef.current;
+        const sameCoords =
+          pending.x1 === viewport.x1 && pending.y1 === viewport.y1 &&
+          pending.x2 === viewport.x2 && pending.y2 === viewport.y2;
+        const sameMinimal = (pending.minimal ?? true) === completedPanningWasMinimal;
+        pendingViewportParamsRef.current = null;
+        if (!(sameCoords && sameMinimal)) {
+          viewportRequestInFlightRef.current = true;
+          panningViewportMinimalRef.current = pending.minimal ?? true;
+          setPanningViewportParams(pending);
+        }
       }
     }
+
+    // Pending after success is handled inside the merge block (uses completed minimal vs pending — Bugbot).
     // On error: only clear pending if it was the same viewport that failed (avoid retry loop).
     // If user panned to B while A was loading and A failed, keep pending and fetch B (Bugbot).
     if (panningViewportError && pendingViewportParamsRef.current) {
@@ -4553,17 +4556,17 @@ export const HackMapScreen: React.FC<Props> = ({
         y1: restoreViewport.startRow,
         x2: restoreViewport.endCol,
         y2: restoreViewport.endRow,
-        minimal: true,
+        minimal: false,
       };
     } else {
-      panningViewportMinimalRef.current = true;
+      panningViewportMinimalRef.current = false;
       viewportRequestInFlightRef.current = true;
       setPanningViewportParams({
         x1: restoreViewport.startCol,
         y1: restoreViewport.startRow,
         x2: restoreViewport.endCol,
         y2: restoreViewport.endRow,
-        minimal: true,
+        minimal: false,
       });
     }
   }, [myPositionData, currentUserHandle, restorePan, boundsReadyJS, containerSize.width, containerSize.height, grid, mapGridSize, minX, maxX, minY, maxY, offsetX, offsetY, calculateVirtualViewport]);
