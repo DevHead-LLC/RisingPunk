@@ -2029,6 +2029,8 @@ export const HackMapScreen: React.FC<Props> = ({
   
   // Phase 5: Use ref for windowRange during panning to reduce re-renders
   const windowRangeRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
+  /** Last raw viewport from {@link calculateViewportFromPan} — used only for pan-direction in {@link applyDirectionalViewportBias}. Must not store biased ranges or left/up pan compares against shifted colStart/rowStart (Bugbot). */
+  const rawWindowRangeForBiasRef = useRef<{ rowStart: number; rowEnd: number; colStart: number; colEnd: number }>(windowRange);
   
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
   const [initialCenterResolved, setInitialCenterResolved] = useState<boolean>(false);
@@ -2079,6 +2081,7 @@ export const HackMapScreen: React.FC<Props> = ({
         return () => cancelAnimationFrame(raf);
       } else {
         windowRangeRef.current = stateRange;
+        rawWindowRangeForBiasRef.current = stateRange;
       }
     }
   }, [panningStopped, isPanningJS, windowRange]);
@@ -4240,12 +4243,18 @@ export const HackMapScreen: React.FC<Props> = ({
     // Simplified buffer calculation - removed complex velocity math
     const baseBuffer = PAN_BUFFER;
     const rawViewport = calculateViewportFromPan(panX, panY, width, height, gridSize, baseBuffer);
-    const previousRangeForBias = windowRangeRef.current;
+    const previousRawForBias = rawWindowRangeForBiasRef.current;
     const { startCol, endCol, startRow, endRow } = applyDirectionalViewportBias(
       rawViewport,
-      previousRangeForBias,
+      previousRawForBias,
       gridSize
     );
+    rawWindowRangeForBiasRef.current = {
+      rowStart: rawViewport.startRow,
+      rowEnd: rawViewport.endRow,
+      colStart: rawViewport.startCol,
+      colEnd: rawViewport.endCol,
+    };
 
     // Phase 5: Use ref for windowRange during panning, state when not panning
     const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
@@ -4372,6 +4381,7 @@ export const HackMapScreen: React.FC<Props> = ({
       // Force window range update immediately (bypass computeWindow throttling)
       const newWindowRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newWindowRange;
+      rawWindowRangeForBiasRef.current = newWindowRange;
       setWindowRange(newWindowRange);
       
       // Update lastComputedPan after setting window range to ensure computeWindow can run if needed
@@ -4503,6 +4513,7 @@ export const HackMapScreen: React.FC<Props> = ({
     calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     windowRangeRef.current = newRange;
+    rawWindowRangeForBiasRef.current = newRange;
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
@@ -4573,6 +4584,7 @@ export const HackMapScreen: React.FC<Props> = ({
     calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
     const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
     windowRangeRef.current = newRange;
+    rawWindowRangeForBiasRef.current = newRange;
     setWindowRange(newRange);
     lastComputedPan.value = { x: cx, y: cy };
     hasCenteredOnHome.value = true;
@@ -4780,6 +4792,7 @@ export const HackMapScreen: React.FC<Props> = ({
       calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
       const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newRange;
+      rawWindowRangeForBiasRef.current = newRange;
       setWindowRange(newRange);
       lastComputedPan.value = { x: cx, y: cy };
       const vp = { startCol, endCol, startRow, endRow };
@@ -4827,6 +4840,7 @@ export const HackMapScreen: React.FC<Props> = ({
       calculateVirtualViewport(cx, cy, containerSize.width, containerSize.height);
       const newRange = { rowStart: startRow, rowEnd: endRow, colStart: startCol, colEnd: endCol };
       windowRangeRef.current = newRange;
+      rawWindowRangeForBiasRef.current = newRange;
       setWindowRange(newRange);
       lastComputedPan.value = { x: cx, y: cy };
       const vp = { startCol, endCol, startRow, endRow };
