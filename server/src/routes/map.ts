@@ -34,13 +34,8 @@ const mapService = new MapService();
 const MAP_CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const MAP_CHAT_RATE_LIMIT_MAX = 10;
 const MAP_LOAD_DIAG_SERVER_SLOW_MS = 250;
-const MINIMAL_VIEWPORT_CACHE_TTL_MS = 3000;
-const MINIMAL_VIEWPORT_CACHE_MAX_ENTRIES = 400;
-/** Disabled: cached minimal payloads include mutable NPC/player cells; TTL hits served stale entities across concurrent map mutations (Bugbot). */
-const MINIMAL_VIEWPORT_RESPONSE_CACHE_ENABLED = false;
 const NPC_META_CACHE_TTL_MS = 5 * 60 * 1000;
 const mapChatRateLimit = new Map<string, { count: number; windowStartMs: number }>();
-const minimalViewportResponseCache = new Map<string, { expiresAt: number; payload: any }>();
 type CachedNpcMeta = { name: string; npcLevel: number };
 let npcMetaBySlugCache: { expiresAt: number; bySlug: Map<string, CachedNpcMeta> } = {
   expiresAt: 0,
@@ -885,18 +880,6 @@ router.get('/:name', async (req: Request, res: Response) => {
       viewportY2 = Math.min(gridSize - 1, Math.max(maxY, 0));
     }
 
-    if (MINIMAL_VIEWPORT_RESPONSE_CACHE_ENABLED && isMinimalViewportRequest && hasViewport) {
-      const cacheKey = `${String((mapDoc as any)._id)}|${viewportX1},${viewportY1},${viewportX2},${viewportY2}`;
-      const cached = minimalViewportResponseCache.get(cacheKey);
-      if (cached && cached.expiresAt > Date.now()) {
-        res.json(cached.payload);
-        return;
-      }
-      if (cached) {
-        minimalViewportResponseCache.delete(cacheKey);
-      }
-    }
-
     const viewportForFetch = hasViewport
       ? { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
       : undefined;
@@ -1067,23 +1050,13 @@ router.get('/:name', async (req: Request, res: Response) => {
       });
     }
     // Bugbot: Always include gridSize so client never falls back to grid.length (viewport-sized grid would yield wrong pan bounds).
+    // Do not cache minimal (or any) viewport JSON here: cells are mutable; a cache would serve stale NPC/player state to other clients.
     if (hasViewport) {
       const payload = {
         grid: emptyGrid,
         gridSize,
         viewport: { x1: viewportX1, y1: viewportY1, x2: viewportX2, y2: viewportY2 }
       };
-      if (MINIMAL_VIEWPORT_RESPONSE_CACHE_ENABLED && isMinimalViewportRequest) {
-        const cacheKey = `${String((mapDoc as any)._id)}|${viewportX1},${viewportY1},${viewportX2},${viewportY2}`;
-        minimalViewportResponseCache.set(cacheKey, {
-          expiresAt: Date.now() + MINIMAL_VIEWPORT_CACHE_TTL_MS,
-          payload,
-        });
-        if (minimalViewportResponseCache.size > MINIMAL_VIEWPORT_CACHE_MAX_ENTRIES) {
-          const firstKey = minimalViewportResponseCache.keys().next().value as string | undefined;
-          if (firstKey) minimalViewportResponseCache.delete(firstKey);
-        }
-      }
       res.json(payload);
     } else {
       res.json({ grid: emptyGrid, gridSize });

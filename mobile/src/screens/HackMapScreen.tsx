@@ -3518,6 +3518,7 @@ export const HackMapScreen: React.FC<Props> = ({
       owner?: string;
       userId?: string;
       npcSlug?: string;
+      name?: string;
       /** Same as entityDetails — needed so "Hack Entity" sends defenderNpcInstanceId before full details load. */
       npcInstanceId?: string;
       npcLevel?: number;
