@@ -297,12 +297,6 @@ export async function listDeveloperSupportLedgerWithSupporter(userId: string): P
   };
 }
 
-/** @deprecated Prefer listDeveloperSupportLedgerWithSupporter for read paths (one query). */
-export async function listDeveloperSupportLedgerForUser(userId: string): Promise<IapLedgerRowWire[]> {
-  const { rows } = await listDeveloperSupportLedgerWithSupporter(userId);
-  return rows;
-}
-
 export async function applyAppleRefundForTransactionIdIfPresent(transactionId: string): Promise<boolean> {
   const res = await IapDeveloperSupportLedger.findOneAndUpdate(
     { platform: 'apple', transactionId },

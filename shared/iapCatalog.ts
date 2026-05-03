@@ -3,6 +3,8 @@
  * @see taskItems/featuresAndBugs/iap-integration-plan.md (v1 Developer Support table)
  */
 
+import { IAP_APP_SURFACES } from './iapAppSurfaces';
+
 export type IapProductKind = 'consumable';
 
 /** Per-plan audit keys (spreadsheet “Suggested per-SKU record key”). */
@@ -54,10 +56,6 @@ export const IAP_CATALOG_V1: readonly IapCatalogEntry[] = [
   },
 ] as const;
 
-const catalogByKey = new Map<IapCatalogKey, IapCatalogEntry>(
-  IAP_CATALOG_V1.map((row) => [row.key, row]),
-);
-
 const catalogByStoreProductId = new Map<string, IapCatalogEntry>();
 for (const row of IAP_CATALOG_V1) {
   if (row.appleProductId !== row.googleProductId) {
@@ -71,29 +69,21 @@ for (const row of IAP_CATALOG_V1) {
   catalogByStoreProductId.set(row.appleProductId, row);
 }
 
+const requiredIapSurfaceIds = ['black_hat_patch_screen', 'server_verify', 'server_purchase_history'] as const;
+const iapSurfaceIds = new Set(IAP_APP_SURFACES.map((row) => row.id));
+for (const surfaceId of requiredIapSurfaceIds) {
+  if (!iapSurfaceIds.has(surfaceId)) {
+    throw new Error(`IAP surfaces invariant: missing required surface ${surfaceId}`);
+  }
+}
+
 /** Every distinct store product id (Apple and Google use the same string for v1). */
 export function listIapV1StoreProductIds(): string[] {
   return IAP_CATALOG_V1.map((row) => row.appleProductId);
-}
-
-export function getIapCatalogEntryByKey(key: IapCatalogKey): IapCatalogEntry {
-  const row = catalogByKey.get(key);
-  if (!row) {
-    throw new Error(`Unknown IAP catalog key: ${String(key)}`);
-  }
-  return row;
 }
 
 export function findIapCatalogEntryByStoreProductId(
   storeProductId: string,
 ): IapCatalogEntry | undefined {
   return catalogByStoreProductId.get(storeProductId);
-}
-
-export function requireIapCatalogEntryByStoreProductId(storeProductId: string): IapCatalogEntry {
-  const row = findIapCatalogEntryByStoreProductId(storeProductId);
-  if (!row) {
-    throw new Error(`Unknown IAP store product id: ${storeProductId}`);
-  }
-  return row;
 }
