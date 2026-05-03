@@ -24,6 +24,7 @@
 		B948132A2E870CC50020DD49 /* AntDesign.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B94813272E870CC50020DD49 /* AntDesign.ttf */; };
 		B948132B2E870CC50020DD49 /* FontAwesome.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B94813282E870CC50020DD49 /* FontAwesome.ttf */; };
 		B948132C2E870CC50020DD49 /* Ionicons.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B94813292E870CC50020DD49 /* Ionicons.ttf */; };
+		B9E6E3FE2FA7F1770051CF70 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B9E6E3FD2FA7F1770051CF70 /* StoreKit.framework */; };
 		C0A1B2C42E91000100B7C4FE /* AppTrackingTransparency.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C0A1B2C32E91000100B7C4FE /* AppTrackingTransparency.framework */; };
 /* End PBXBuildFile section */
 
@@ -67,6 +68,7 @@
 		B94813272E870CC50020DD49 /* AntDesign.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = AntDesign.ttf; sourceTree = "<group>"; };
 		B94813282E870CC50020DD49 /* FontAwesome.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = FontAwesome.ttf; sourceTree = "<group>"; };
 		B94813292E870CC50020DD49 /* Ionicons.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Ionicons.ttf; sourceTree = "<group>"; };
+		B9E6E3FD2FA7F1770051CF70 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		C0A1B2C32E91000100B7C4FE /* AppTrackingTransparency.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppTrackingTransparency.framework; path = System/Library/Frameworks/AppTrackingTransparency.framework; sourceTree = SDKROOT; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		FE486BCC9CA1C85C49E25284 /* Pods-mobile.staging.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-mobile.staging.xcconfig"; path = "Target Support Files/Pods-mobile/Pods-mobile.staging.xcconfig"; sourceTree = "<group>"; };
@@ -85,6 +87,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B9E6E3FE2FA7F1770051CF70 /* StoreKit.framework in Frameworks */,
 				C0A1B2C42E91000100B7C4FE /* AppTrackingTransparency.framework in Frameworks */,
 				81DD277CF28D3833A2EE1E61 /* Pods_mobile.framework in Frameworks */,
 			);
@@ -131,6 +134,7 @@
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				B9E6E3FD2FA7F1770051CF70 /* StoreKit.framework */,
 				C0A1B2C32E91000100B7C4FE /* AppTrackingTransparency.framework */,
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				23CB8ADDF7B6752523DCE9BC /* Pods_mobile.framework */,
@@ -586,7 +590,7 @@
 				ASSETCATALOG_COMPILER_OPTIMIZATION = time;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 131;
+				CURRENT_PROJECT_VERSION = 133;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				ENABLE_BITCODE = NO;
@@ -624,7 +628,7 @@
 				ASSETCATALOG_COMPILER_OPTIMIZATION = time;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 131;
+				CURRENT_PROJECT_VERSION = 133;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				INFOPLIST_FILE = mobile/Info.plist;
@@ -660,7 +664,7 @@
 				ASSETCATALOG_COMPILER_OPTIMIZATION = time;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = mobile/mobile.entitlements;
-				CURRENT_PROJECT_VERSION = 131;
+				CURRENT_PROJECT_VERSION = 133;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 26522YLRG2;
 				INFOPLIST_FILE = mobile/Info.plist;

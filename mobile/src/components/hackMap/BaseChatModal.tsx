@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   Pressable,
   ScrollView,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
@@ -19,6 +18,7 @@ import {
   NativeScrollEvent,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { SIZING } from '../../styles/theme';
 import { FilteredTextInput } from '../common/FilteredTextInput';
