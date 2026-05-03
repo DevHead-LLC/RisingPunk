@@ -23,7 +23,7 @@ router.post('/apple', express.json({ limit: '256kb' }), async (req: Request, res
       return;
     }
     console.error('Apple ASSN handler error:', e);
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
