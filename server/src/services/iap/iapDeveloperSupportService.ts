@@ -30,14 +30,31 @@ function requireProductId(productId: string | undefined): string {
 }
 
 /** Apple JWS `price` is in milliunits of the major currency unit; convert to ISO 4217 minor units (e.g. USD cents). */
-function appleMilliunitsToMinorUnits(priceMilliunits: number): number {
+function currencyMinorUnitScale(currency: string): number {
+  let fractionDigits: number;
+  try {
+    fractionDigits = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }).resolvedOptions().maximumFractionDigits;
+  } catch {
+    throw new Error(`IAP verify: unsupported currency for minor-unit conversion (${currency})`);
+  }
+  if (!Number.isInteger(fractionDigits) || fractionDigits < 0) {
+    throw new Error(`IAP verify: invalid currency fraction digits (${currency})`);
+  }
+  return 10 ** fractionDigits;
+}
+
+function appleMilliunitsToMinorUnits(priceMilliunits: number, currency: string): number {
   if (!Number.isFinite(priceMilliunits)) {
     throw new Error('IAP verify: Apple price is not a finite number');
   }
-  return Math.round(priceMilliunits / 10);
+  const minorPerMajor = currencyMinorUnitScale(currency);
+  return Math.round((priceMilliunits * minorPerMajor) / 1000);
 }
 
-function googleMicrosToMinorUnits(microsStr: string | undefined): number {
+function googleMicrosToMinorUnits(microsStr: string | undefined, currency: string): number {
   if (!microsStr) {
     throw new Error('IAP verify: Google priceAmountMicros missing from Play API response');
   }
@@ -45,7 +62,8 @@ function googleMicrosToMinorUnits(microsStr: string | undefined): number {
   if (!Number.isFinite(micros)) {
     throw new Error('IAP verify: Google priceAmountMicros is not numeric');
   }
-  return Math.round(micros / 10000);
+  const minorPerMajor = currencyMinorUnitScale(currency);
+  return Math.round((micros * minorPerMajor) / 1_000_000);
 }
 
 async function sendThankYouDm(userId: string): Promise<void> {
@@ -139,12 +157,12 @@ function assertAppleConsumable(decoded: JWSTransactionDecodedPayload) {
   }
 }
 
-function readAppleLineMinorUnits(decoded: JWSTransactionDecodedPayload): number {
+function readAppleLineMinorUnits(decoded: JWSTransactionDecodedPayload, currency: string): number {
   const price = decoded.price;
   if (price == null) {
     throw new Error('IAP verify: Apple price missing from JWS');
   }
-  const unitMinor = appleMilliunitsToMinorUnits(price);
+  const unitMinor = appleMilliunitsToMinorUnits(price, currency);
   const qtyRaw = decoded.quantity;
   const qty = qtyRaw != null && Number.isFinite(Number(qtyRaw)) ? Math.max(1, Math.floor(Number(qtyRaw))) : 1;
   const line = unitMinor * qty;
@@ -170,7 +188,7 @@ export async function verifyAppleDeveloperSupport(params: {
     throw new Error('IAP verify: Apple transactionId missing from JWS');
   }
   const currency = normalizeCurrencyCode(decoded.currency);
-  const amountMinorUnits = readAppleLineMinorUnits(decoded);
+  const amountMinorUnits = readAppleLineMinorUnits(decoded, currency);
   const userOid = new mongoose.Types.ObjectId(params.userId);
   const { row, inserted } = await insertLedgerOrReturnExisting({
     userId: userOid,
@@ -226,7 +244,7 @@ export async function verifyGoogleDeveloperSupport(params: {
     return { ledgerId: String(existing._id), supporter, duplicate: true };
   }
   const currency = normalizeCurrencyCode(gp.priceCurrencyCode);
-  const unitMinor = googleMicrosToMinorUnits(gp.priceAmountMicros);
+  const unitMinor = googleMicrosToMinorUnits(gp.priceAmountMicros, currency);
   const qtyRaw = gp.quantity;
   const qty = qtyRaw != null && Number.isFinite(Number(qtyRaw)) ? Math.max(1, Math.floor(Number(qtyRaw))) : 1;
   const amountMinorUnits = unitMinor * qty;
