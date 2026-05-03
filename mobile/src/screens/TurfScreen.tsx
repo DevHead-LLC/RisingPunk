@@ -2101,7 +2101,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           edges={['left', 'right']}
           pointerEvents="box-none"
         >
-          <View style={styles.bottomRightIcons}>
+          <View style={[styles.bottomRightIcons, { right: SIZING.spacing.lg + turfSideInset }]}>
             <TouchableOpacity
               style={styles.storageIconButton}
               onPress={() => navigateToScreen('storage')}
@@ -2201,7 +2201,6 @@ const styles = StyleSheet.create({
   bottomRightIcons: {
     position: 'absolute',
     bottom: SIZING.spacing.lg,
-    right: SIZING.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
