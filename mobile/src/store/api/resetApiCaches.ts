@@ -20,4 +20,5 @@ export const resetAllApiCaches = (api: any) => {
   api.dispatch({ type: 'battlePresetsApi/resetApiState' });
   api.dispatch({ type: 'attackApi/resetApiState' });
   api.dispatch({ type: 'bugHuntApi/resetApiState' });
+  api.dispatch({ type: 'iapApi/resetApiState' });
 };

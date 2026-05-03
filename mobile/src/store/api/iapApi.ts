@@ -3,6 +3,7 @@ import { API_URL } from '../../config';
 import type { RootState } from '../index';
 import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
+import { resetAllApiCaches } from './resetApiCaches';
 
 export type IapVerifyDeveloperSupportBody =
   | { platform: 'apple'; signedTransactionInfo: string }
@@ -45,6 +46,16 @@ const iapBaseQuery = async (args: unknown, api: unknown, extraOptions: unknown) 
     },
   })(args, api, extraOptions);
   if (handle426IfNeeded(result as Parameters<typeof handle426IfNeeded>[0], api)) return result;
+  const error = (result as { error?: { status?: number; data?: { error?: string } } }).error;
+  if (error?.status === 401 && error?.data?.error === 'ACCOUNT_SWITCHED') {
+    (api as { dispatch: (action: unknown) => void }).dispatch({ type: 'auth/handleAccountSwitched' });
+    resetAllApiCaches(api);
+    return result;
+  }
+  if (error?.status === 401 && error?.data?.error === 'Token expired') {
+    (api as { dispatch: (action: unknown) => void }).dispatch({ type: 'auth/logout' });
+    return result;
+  }
   return result;
 };
 
