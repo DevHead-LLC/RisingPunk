@@ -103,7 +103,11 @@ function DayCell({
   return content;
 }
 
-export const DailyHaulLocation = memo(function DailyHaulLocation() {
+type DailyHaulLocationProps = {
+  rightInset?: number;
+};
+
+export const DailyHaulLocation = memo(function DailyHaulLocation({ rightInset = 0 }: DailyHaulLocationProps) {
   const colors = useThemeColors();
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const [showModal, setShowModal] = useState(false);
@@ -160,7 +164,7 @@ export const DailyHaulLocation = memo(function DailyHaulLocation() {
 
   return (
     <>
-      <View style={[styles.container, styles.position]}>
+      <View style={[styles.container, styles.position, { right: SIZING.spacing.lg + CENTER_OFFSET + rightInset }]}>
         <TouchableOpacity
           style={styles.button}
           onPress={() => setShowModal(true)}

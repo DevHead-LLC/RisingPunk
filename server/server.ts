@@ -42,6 +42,8 @@ import binaryBankCrackRoutes from './src/routes/binaryBankCrack';
 import battlePresetsRoutes from './src/routes/battlePresets';
 import swarmRoutes from './src/routes/swarm';
 import transferRunsRoutes from './src/routes/transferRuns';
+import iapRoutes from './src/routes/iap';
+import iapWebhooksRoutes from './src/routes/iapWebhooks';
 
 declare global {
   namespace Express {
@@ -62,7 +64,7 @@ app.use(cors({
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'x-device-id', 'X-App-Version'],
 }));
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
 
 // Activity logging middleware for privacy policy compliance
 import { activityLogging } from './src/middleware/activityLogging';
@@ -748,6 +750,8 @@ app.use('/api/attack', attackRoutes);
 app.use('/api/bug-hunt', bugHuntRoutes);
 app.use('/api/swarm', swarmRoutes);
 app.use('/api/transfer-runs', transferRunsRoutes);
+app.use('/api/iap/webhooks', iapWebhooksRoutes);
+app.use('/api/iap', iapRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/daily-haul', dailyHaulRoutes);
 app.use('/api/packet-breach', packetBreachRoutes);

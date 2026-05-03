@@ -8,15 +8,21 @@ import {useTaskGuideHighlight} from '../../contexts/TaskGuideHighlightContext';
 type ProfileLocationProps = {
   onPress: () => void;
   isIntroActive?: boolean;
+  rightInset?: number;
 };
 
-export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroActive = false }: ProfileLocationProps) {
+export const ProfileLocation = memo(function ProfileLocation({
+  onPress,
+  isIntroActive = false,
+  rightInset = 0,
+}: ProfileLocationProps) {
   const colors = useThemeColors();
   const profileGender = useAppSelector((state) => state.preferences.profileGender);
   const { highlightTaskId, highlightStep, advanceHighlightStep } = useTaskGuideHighlight();
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
+  // Keep intro highlight colors in sync with active theme tokens.
   const introColors = [colors.primary, colors.secondary, colors.matrix];
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';
@@ -62,6 +68,7 @@ export const ProfileLocation = memo(function ProfileLocation({ onPress, isIntroA
   return (
     <Animated.View
       style={[styles.location, styles.profilePosition, { 
+        right: SIZING.spacing.lg + rightInset,
         borderColor: isHighlighted ? animatedBorderColorValue : colors.primary,
         borderWidth: isHighlighted ? 3 : 1,
         zIndex: isHighlighted ? 1000 : 3
