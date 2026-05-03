@@ -5,13 +5,13 @@ import {
   Image,
   Linking,
   Platform,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   deepLinkToSubscriptions,
   finishTransaction,
