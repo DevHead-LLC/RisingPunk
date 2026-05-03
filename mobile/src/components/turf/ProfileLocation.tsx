@@ -22,6 +22,7 @@ export const ProfileLocation = memo(function ProfileLocation({
   const [currentColorIndex, setCurrentColorIndex] = useState(0);
   const animatedBorderColor = useState(new Animated.Value(0))[0];
   
+  // Keep intro highlight colors in sync with active theme tokens.
   const introColors = [colors.primary, colors.secondary, colors.matrix];
   const isThemeTask = highlightTaskId === 'use-hacker-mode' || highlightTaskId === 'use-business-mode';
   const isAvatarTask = highlightTaskId === 'change-avatar';
