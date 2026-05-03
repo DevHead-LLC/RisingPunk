@@ -31,7 +31,7 @@ function requireProductId(productId: string | undefined): string {
 
 /** Apple JWS `price` is in milliunits of the major currency unit; convert to ISO 4217 minor units (e.g. USD cents). */
 function currencyMinorUnitScale(currency: string): number {
-  let fractionDigits: number;
+  let fractionDigits: number | undefined;
   try {
     fractionDigits = new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -40,7 +40,7 @@ function currencyMinorUnitScale(currency: string): number {
   } catch {
     throw new Error(`IAP verify: unsupported currency for minor-unit conversion (${currency})`);
   }
-  if (!Number.isInteger(fractionDigits) || fractionDigits < 0) {
+  if (fractionDigits === undefined || !Number.isInteger(fractionDigits) || fractionDigits < 0) {
     throw new Error(`IAP verify: invalid currency fraction digits (${currency})`);
   }
   return 10 ** fractionDigits;
@@ -116,7 +116,11 @@ async function insertLedgerOrReturnExisting(doc: {
 }): Promise<{ row: IIapDeveloperSupportLedger; inserted: boolean }> {
   try {
     const created = await IapDeveloperSupportLedger.create(doc);
-    await sendThankYouDm(String(doc.userId));
+    try {
+      await sendThankYouDm(String(doc.userId));
+    } catch (err) {
+      console.warn('IAP thank-you DM failed:', err);
+    }
     await maybeSendReceiptEmail({
       userId: String(doc.userId),
       platform: doc.platform,

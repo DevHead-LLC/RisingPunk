@@ -1,6 +1,6 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
 import {View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState, Image, useWindowDimensions} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -180,9 +180,10 @@ const HUNTER_FACILITY_IMAGE = require('../assets/images/turfScreen/hunterFacilit
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const isLandscape = windowWidth > windowHeight;
   const turfSideInset =
-    Platform.OS === 'ios' && !Platform.isPad && isLandscape ? 22 : 0;
+    Platform.OS === 'ios' && !Platform.isPad && isLandscape ? Math.max(insets.left, insets.right) : 0;
   const { highlightTaskId, highlightStep, clearHighlight } = useTaskGuideHighlight();
   const isVisitHome = highlightTaskId === 'visit-home';
   const isVisitHackmap = highlightTaskId === 'visit-hackmap';
