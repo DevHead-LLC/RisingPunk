@@ -208,9 +208,6 @@ export async function verifyGoogleDeveloperSupport(params: {
   if (gp.purchaseState !== 0) {
     throw new Error(`IAP verify: Google purchase not in purchased state (purchaseState=${String(gp.purchaseState)})`);
   }
-  if (gp.consumptionState === 1) {
-    throw new Error('IAP verify: Google purchase is already consumed; cannot grant again');
-  }
   const currency = normalizeCurrencyCode(gp.priceCurrencyCode);
   const unitMinor = googleMicrosToMinorUnits(gp.priceAmountMicros);
   const qtyRaw = gp.quantity;
@@ -220,6 +217,22 @@ export async function verifyGoogleDeveloperSupport(params: {
     throw new Error('IAP verify: Google amount computation invalid');
   }
   const transactionId = gp.orderId && gp.orderId.length > 0 ? gp.orderId : params.purchaseToken;
+  if (gp.consumptionState === 1) {
+    const existing = await IapDeveloperSupportLedger.findOne({
+      platform: 'google',
+      transactionId,
+    });
+    if (!existing) {
+      throw new Error('IAP verify: Google purchase is already consumed; cannot grant again');
+    }
+    if (String(existing.userId) !== params.userId) {
+      throw new Error(
+        'IAP verify: this store transaction is already recorded for a different RisingPunk account',
+      );
+    }
+    const supporter = await computeDeveloperSupportSupporter(params.userId);
+    return { ledgerId: String(existing._id), supporter, duplicate: true };
+  }
   const userOid = new mongoose.Types.ObjectId(params.userId);
   const { row, inserted } = await insertLedgerOrReturnExisting({
     userId: userOid,
