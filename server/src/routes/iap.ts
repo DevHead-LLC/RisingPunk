@@ -54,8 +54,12 @@ router.post('/developer-support/verify', auth, async (req: Request, res: Respons
       res.status(409).json({ error: msg });
       return;
     }
+    if (msg.startsWith('IAP verify:')) {
+      res.status(400).json({ error: msg });
+      return;
+    }
     console.error('IAP verify error:', e);
-    res.status(400).json({ error: msg });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
