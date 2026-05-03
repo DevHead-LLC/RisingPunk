@@ -92,5 +92,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(0, 255, 120, 0.55)',
     top: -4,
+    left: -4,
   },
 });
