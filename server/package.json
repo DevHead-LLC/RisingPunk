@@ -23,6 +23,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@apple/app-store-server-library": "^1.4.0",
     "@types/crypto-js": "^4.2.2",
     "@types/jsonwebtoken": "^9.0.7",
     "bcryptjs": "^2.4.3",
