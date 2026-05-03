@@ -64,7 +64,7 @@ app.use(cors({
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'x-device-id', 'X-App-Version'],
 }));
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
 
 // Activity logging middleware for privacy policy compliance
 import { activityLogging } from './src/middleware/activityLogging';
