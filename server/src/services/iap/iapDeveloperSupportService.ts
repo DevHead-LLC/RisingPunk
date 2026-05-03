@@ -305,12 +305,3 @@ export async function applyAppleRefundForTransactionIdIfPresent(transactionId: s
   );
   return Boolean(res);
 }
-
-export async function applyGoogleRefundForOrderOrToken(idKey: string): Promise<boolean> {
-  const res = await IapDeveloperSupportLedger.findOneAndUpdate(
-    { platform: 'google', transactionId: idKey },
-    { $set: { remainingMinorUnits: 0 } },
-    { new: true },
-  );
-  return Boolean(res);
-}

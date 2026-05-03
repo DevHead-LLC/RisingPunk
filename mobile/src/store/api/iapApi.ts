@@ -5,6 +5,9 @@ import { setAppVersionHeader } from './appVersionHeader';
 import { handle426IfNeeded } from './handle426';
 import { resetAllApiCaches } from './resetApiCaches';
 
+let iapAccountSwitchedDispatched = false;
+let iapAccountSwitchedTimeout: number | null = null;
+
 export type IapVerifyDeveloperSupportBody =
   | { platform: 'apple'; signedTransactionInfo: string }
   | { platform: 'google'; productId: string; purchaseToken: string };
@@ -48,8 +51,17 @@ const iapBaseQuery = async (args: unknown, api: unknown, extraOptions: unknown) 
   if (handle426IfNeeded(result as Parameters<typeof handle426IfNeeded>[0], api)) return result;
   const error = (result as { error?: { status?: number; data?: { error?: string } } }).error;
   if (error?.status === 401 && error?.data?.error === 'ACCOUNT_SWITCHED') {
-    (api as { dispatch: (action: unknown) => void }).dispatch({ type: 'auth/handleAccountSwitched' });
-    resetAllApiCaches(api);
+    if (!iapAccountSwitchedDispatched) {
+      iapAccountSwitchedDispatched = true;
+      (api as { dispatch: (action: unknown) => void }).dispatch({ type: 'auth/handleAccountSwitched' });
+      resetAllApiCaches(api);
+      if (iapAccountSwitchedTimeout) {
+        clearTimeout(iapAccountSwitchedTimeout);
+      }
+      iapAccountSwitchedTimeout = setTimeout(() => {
+        iapAccountSwitchedDispatched = false;
+      }, 2000);
+    }
     return result;
   }
   if (error?.status === 401 && error?.data?.error === 'Token expired') {
