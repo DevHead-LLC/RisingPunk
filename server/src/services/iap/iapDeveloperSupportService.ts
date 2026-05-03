@@ -208,14 +208,6 @@ export async function verifyGoogleDeveloperSupport(params: {
   if (gp.purchaseState !== 0) {
     throw new Error(`IAP verify: Google purchase not in purchased state (purchaseState=${String(gp.purchaseState)})`);
   }
-  const currency = normalizeCurrencyCode(gp.priceCurrencyCode);
-  const unitMinor = googleMicrosToMinorUnits(gp.priceAmountMicros);
-  const qtyRaw = gp.quantity;
-  const qty = qtyRaw != null && Number.isFinite(Number(qtyRaw)) ? Math.max(1, Math.floor(Number(qtyRaw))) : 1;
-  const amountMinorUnits = unitMinor * qty;
-  if (!Number.isFinite(amountMinorUnits) || amountMinorUnits < 0) {
-    throw new Error('IAP verify: Google amount computation invalid');
-  }
   const transactionId = gp.orderId && gp.orderId.length > 0 ? gp.orderId : params.purchaseToken;
   if (gp.consumptionState === 1) {
     const existing = await IapDeveloperSupportLedger.findOne({
@@ -232,6 +224,14 @@ export async function verifyGoogleDeveloperSupport(params: {
     }
     const supporter = await computeDeveloperSupportSupporter(params.userId);
     return { ledgerId: String(existing._id), supporter, duplicate: true };
+  }
+  const currency = normalizeCurrencyCode(gp.priceCurrencyCode);
+  const unitMinor = googleMicrosToMinorUnits(gp.priceAmountMicros);
+  const qtyRaw = gp.quantity;
+  const qty = qtyRaw != null && Number.isFinite(Number(qtyRaw)) ? Math.max(1, Math.floor(Number(qtyRaw))) : 1;
+  const amountMinorUnits = unitMinor * qty;
+  if (!Number.isFinite(amountMinorUnits) || amountMinorUnits < 0) {
+    throw new Error('IAP verify: Google amount computation invalid');
   }
   const userOid = new mongoose.Types.ObjectId(params.userId);
   const { row, inserted } = await insertLedgerOrReturnExisting({
