@@ -72,6 +72,20 @@ for (const row of IAP_CATALOG_V1) {
   seenCatalogKeys.add(row.key);
 }
 
+if (process.env.NODE_ENV !== 'production') {
+  const requiredIapSurfaceIds = ['black_hat_patch_screen', 'server_verify', 'server_purchase_history'] as const;
+  // Keep this as a non-production integrity check so docs drift is caught in dev/test
+  // without coupling production boot to documentation metadata modules.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { IAP_APP_SURFACES } = require('./iapAppSurfaces') as typeof import('./iapAppSurfaces');
+  const iapSurfaceIds = new Set(IAP_APP_SURFACES.map((row) => row.id));
+  for (const surfaceId of requiredIapSurfaceIds) {
+    if (!iapSurfaceIds.has(surfaceId)) {
+      throw new Error(`IAP surfaces invariant: missing required surface ${surfaceId}`);
+    }
+  }
+}
+
 /** Every distinct store product id (Apple and Google use the same string for v1). */
 export function listIapV1StoreProductIds(): string[] {
   return IAP_CATALOG_V1.map((row) => row.appleProductId);
