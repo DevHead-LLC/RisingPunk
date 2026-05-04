@@ -31,7 +31,7 @@ function requireProductId(productId: string | undefined): string {
 
 /** Apple JWS `price` is in milliunits of the major currency unit; convert to ISO 4217 minor units (e.g. USD cents). */
 function currencyMinorUnitScale(currency: string): number {
-  let fractionDigits: number;
+  let fractionDigits: number | undefined;
   try {
     fractionDigits = new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -40,7 +40,7 @@ function currencyMinorUnitScale(currency: string): number {
   } catch {
     throw new Error(`IAP verify: unsupported currency for minor-unit conversion (${currency})`);
   }
-  if (!Number.isInteger(fractionDigits) || fractionDigits < 0) {
+  if (fractionDigits === undefined || !Number.isInteger(fractionDigits) || fractionDigits < 0) {
     throw new Error(`IAP verify: invalid currency fraction digits (${currency})`);
   }
   return 10 ** fractionDigits;
@@ -78,26 +78,26 @@ async function maybeSendReceiptEmail(params: {
   currency: string;
   amountMinorUnits: number;
 }): Promise<void> {
-  const user = await User.findById(params.userId).select('email emailVerified handle').lean();
-  if (!user?.email || !user.emailVerified) {
-    return;
-  }
-  const subject = 'RisingPunk — Developer Support purchase receipt';
-  const text = [
-    `Hi ${user.handle || 'player'},`,
-    '',
-    'This email confirms a Developer Support purchase recorded on your RisingPunk account.',
-    `Platform: ${params.platform}`,
-    `Product: ${params.storeProductId}`,
-    `Transaction id: ${params.transactionId}`,
-    `Amount: ${params.amountMinorUnits} minor units ${params.currency} (see in-game history for display formatting).`,
-    '',
-    'Official tax/receipt records may also be available from Apple App Store purchase history or Google Play order history.',
-    '',
-    '— RisingPunk',
-  ].join('\n');
-  const template: EmailTemplate = { subject, text, html: `<pre>${text.replace(/</g, '&lt;')}</pre>` };
   try {
+    const user = await User.findById(params.userId).select('email emailVerified handle').lean();
+    if (!user?.email || !user.emailVerified) {
+      return;
+    }
+    const subject = 'RisingPunk — Developer Support purchase receipt';
+    const text = [
+      `Hi ${user.handle || 'player'},`,
+      '',
+      'This email confirms a Developer Support purchase recorded on your RisingPunk account.',
+      `Platform: ${params.platform}`,
+      `Product: ${params.storeProductId}`,
+      `Transaction id: ${params.transactionId}`,
+      `Amount: ${params.amountMinorUnits} minor units ${params.currency} (see in-game history for display formatting).`,
+      '',
+      'Official tax/receipt records may also be available from Apple App Store purchase history or Google Play order history.',
+      '',
+      '— RisingPunk',
+    ].join('\n');
+    const template: EmailTemplate = { subject, text, html: `<pre>${text.replace(/</g, '&lt;')}</pre>` };
     await EmailService.sendEmail(user.email, template);
   } catch (err) {
     console.warn('IAP receipt email failed:', err);
@@ -116,7 +116,12 @@ async function insertLedgerOrReturnExisting(doc: {
 }): Promise<{ row: IIapDeveloperSupportLedger; inserted: boolean }> {
   try {
     const created = await IapDeveloperSupportLedger.create(doc);
-    await sendThankYouDm(String(doc.userId));
+    // Bugbot: DM/receipt side-effects must not fail verify after successful ledger insert.
+    try {
+      await sendThankYouDm(String(doc.userId));
+    } catch (err) {
+      console.warn('IAP thank-you DM failed:', err);
+    }
     await maybeSendReceiptEmail({
       userId: String(doc.userId),
       platform: doc.platform,
