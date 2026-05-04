@@ -1955,7 +1955,9 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               pointerEvents="box-none"
             >
               <ErrorBoundary>
-                <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
+                <View style={styles.walletGuideBalanceLayer} pointerEvents="box-none">
+                  <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
+                </View>
               </ErrorBoundary>
               {isHomeHighlight && (
                 <>
@@ -2177,6 +2179,9 @@ const styles = StyleSheet.create({
   turfOverlaySafe: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 10002,
+  },
+  walletGuideBalanceLayer: {
+    zIndex: 10004,
   },
   bottomRightSafeWrap: {
     position: 'absolute',
