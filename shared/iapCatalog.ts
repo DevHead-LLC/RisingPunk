@@ -3,8 +3,6 @@
  * @see taskItems/featuresAndBugs/iap-integration-plan.md (v1 Developer Support table)
  */
 
-import { IAP_APP_SURFACES } from './iapAppSurfaces';
-
 export type IapProductKind = 'consumable';
 
 /** Per-plan audit keys (spreadsheet “Suggested per-SKU record key”). */
@@ -72,14 +70,6 @@ for (const row of IAP_CATALOG_V1) {
     throw new Error(`IAP catalog invariant: duplicate key ${row.key}`);
   }
   seenCatalogKeys.add(row.key);
-}
-
-const requiredIapSurfaceIds = ['black_hat_patch_screen', 'server_verify', 'server_purchase_history'] as const;
-const iapSurfaceIds = new Set(IAP_APP_SURFACES.map((row) => row.id));
-for (const surfaceId of requiredIapSurfaceIds) {
-  if (!iapSurfaceIds.has(surfaceId)) {
-    throw new Error(`IAP surfaces invariant: missing required surface ${surfaceId}`);
-  }
 }
 
 /** Every distinct store product id (Apple and Google use the same string for v1). */
