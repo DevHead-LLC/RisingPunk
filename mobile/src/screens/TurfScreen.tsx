@@ -1,5 +1,6 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
 import {View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState, Image} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -11,6 +12,7 @@ import {ResearchScreen} from './ResearchScreen';
 import {useThemeColors} from '../hooks/useThemeColors';
 import {ProfileLocation} from '../components/turf/ProfileLocation';
 import {DailyHaulLocation} from '../components/turf/DailyHaulLocation';
+import {BlackHatPatchLocation} from '../components/turf/BlackHatPatchLocation';
 import {ProgrammingFacilityLocation} from '../components/turf/ProgrammingFacilityLocation';
 import {ProgrammingFacilityCurtain} from '../components/turf/ProgrammingFacilityCurtain';
 import {HomeLocation} from '../components/turf/HomeLocation';
@@ -23,6 +25,7 @@ import {InvestmentPropertyScreen} from './InvestmentPropertyScreen';
 import {HunterFacilityScreen} from './HunterFacilityScreen';
 import {StorageScreen} from './StorageScreen';
 import {UndergroundExchangeScreen} from './UndergroundExchangeScreen';
+import {BlackHatPatchScreen} from './BlackHatPatchScreen';
 import {BugHuntHunterSelectionScreen} from './BugHuntHunterSelectionScreen';
 import {PacketBreachLevelScreen} from './PacketBreachLevelScreen';
 import {PacketBreachGameScreen} from './PacketBreachGameScreen';
@@ -62,6 +65,7 @@ import { CrewModal } from '../components/hackMap/CrewModal';
 import { ActiveJobsModal } from '../components/turf/ActiveJobsModal';
 import { useGetCrewStatusQuery } from '../store/api/authApi';
 import { useGetMySwarmQuery } from '../store/api/swarmApi';
+import { useBlackHatPatchUnread } from '../hooks/useBlackHatPatchUnread';
 
 // Platform-specific imports - available on both platforms but only used on Android
 let Gesture: any, GestureDetector: any, Animated: any, useSharedValue: any, useAnimatedStyle: any, withDecay: any, withTiming: any, computePanBounds: any, runOnJS: any, useAnimatedReaction: any;
@@ -175,6 +179,8 @@ const HUNTER_FACILITY_IMAGE = require('../assets/images/turfScreen/hunterFacilit
 
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
+  // Bugbot: side insets are already applied by SafeAreaView(edges=['left','right']); extra offset causes double-inset in landscape.
+  const turfSideInset = 0;
   const { highlightTaskId, highlightStep, clearHighlight } = useTaskGuideHighlight();
   const isVisitHome = highlightTaskId === 'visit-home';
   const isVisitHackmap = highlightTaskId === 'visit-hackmap';
@@ -263,6 +269,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
   // Restore persisted nav state on mount (Phase 2: refresh — stay on current screen and position).
   // State is per-user so a new guest does not see the previous account's screen (e.g. HackMap/onboarding).
   const userId = useAppSelector((state) => state.auth.user?._id);
+  const { hasUnread: blackHatPatchUnread, refresh: refreshBlackHatPatchUnread } = useBlackHatPatchUnread(userId);
   const dispatch = useAppDispatch();
   const restorePendingForUserIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -303,6 +310,12 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       if (persistNavStateTimeoutRef.current) clearTimeout(persistNavStateTimeoutRef.current);
     };
   }, [navRestoreAttempted, userId, currentScreen, turfViewPosition]);
+
+  useEffect(() => {
+    if (currentScreen === 'turf' && userId) {
+      refreshBlackHatPatchUnread().catch(() => {});
+    }
+  }, [currentScreen, userId, refreshBlackHatPatchUnread]);
 
   const token = useAppSelector((state) => state.auth.token);
 
@@ -1335,6 +1348,15 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             onClose={() => navigateToScreen('turf')}
           />
         );
+      case 'blackHatPatch':
+        return (
+          <BlackHatPatchScreen
+            onClose={() => {
+              refreshBlackHatPatchUnread().catch(() => {});
+              navigateToScreen('turf');
+            }}
+          />
+        );
       case 'storage':
         return (
           <StorageScreen
@@ -1575,20 +1597,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       default:
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {isViewWallet && (
-              <View
-                style={[StyleSheet.absoluteFill, { zIndex: 999 }]}
-                onStartShouldSetResponder={() => true}
-                onMoveShouldSetResponder={() => false}
-                onResponderTerminationRequest={() => true}
-                onResponderRelease={() => {
-                  clearHighlight();
-                }}
-              />
-            )}
-<ErrorBoundary>
-              <Balance isIntroActive={currentIntroStep === 'wallet'} />
-            </ErrorBoundary>
             <View
               ref={scrollWrapperRef}
               style={styles.scrollWrapper}
@@ -1929,49 +1937,75 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                 </View>
               )}
             </View>
-            {isHomeHighlight && (
-              <>
-                <View style={styles.homeLocationElevatedWrapper}>
-                  <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
-                </View>
-                <TaskGuideHighlightOverlay forHome={true} />
-              </>
-            )}
-            <ProfileLocation onPress={() => navigateToScreen('profile')} isIntroActive={currentIntroStep === 'profile'} />
-            <DailyHaulLocation />
-            {!isOnboardingOrIntroActive && (
-              <>
-                <View style={styles.exchangeIconDock}>
-                  <TouchableOpacity
-                    style={styles.exchangeIconButton}
-                    onPress={() => navigateToScreen('undergroundExchange')}
-                    activeOpacity={0.8}
-                  >
-                    <Image
-                      source={require('../assets/images/ui/undergroundExchange.png')}
-                      style={{ width: 56, height: 56 }}
-                      resizeMode="contain"
+            <SafeAreaView
+              style={styles.turfOverlaySafe}
+              edges={['left', 'right']}
+              pointerEvents="box-none"
+            >
+              <ErrorBoundary>
+                {isViewWallet ? (
+                  <>
+                    <View
+                      style={styles.walletGuideDismissLayer}
+                      onStartShouldSetResponder={() => true}
+                      onMoveShouldSetResponder={() => false}
+                      onResponderTerminationRequest={() => true}
+                      onResponderRelease={() => {
+                        clearHighlight();
+                      }}
                     />
-                  </TouchableOpacity>
-                </View>
-                <TaskGuide 
-                  currentScreen={currentScreen} 
-                  onNavigateToProfile={() => navigateToScreen('profile')}
-                />
-                <TaskGuideHighlightOverlay forProfile={true} />
-              </>
-            )}
-            {isVisitHackmap && (
-              <TouchableOpacity
-                style={styles.turfClickHandler}
-                activeOpacity={1}
-                onPress={() => {
-                  clearHighlight();
-                }}
+                    <View style={styles.walletGuideBalanceLayer} pointerEvents="box-none">
+                      <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
+                    </View>
+                  </>
+                ) : (
+                  <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
+                )}
+              </ErrorBoundary>
+              {isHomeHighlight && (
+                <>
+                  <View style={styles.homeLocationElevatedWrapper}>
+                    <HomeLocation onPress={() => navigateToScreen('hackRig')} isIntroActive={currentIntroStep === 'home'} />
+                  </View>
+                  <TaskGuideHighlightOverlay forHome={true} />
+                </>
+              )}
+              <ProfileLocation
+                onPress={() => navigateToScreen('profile')}
+                isIntroActive={currentIntroStep === 'profile'}
+                rightInset={turfSideInset}
               />
-            )}
-            {isVisitDigitalBarracks && (
-              <>
+              <DailyHaulLocation rightInset={turfSideInset} />
+              {!isOnboardingOrIntroActive && (
+                <BlackHatPatchLocation
+                  hasUnread={blackHatPatchUnread}
+                  onPress={() => navigateToScreen('blackHatPatch')}
+                  rightInset={turfSideInset}
+                />
+              )}
+              {!isOnboardingOrIntroActive && (
+                <>
+                  <View style={styles.exchangeIconDock}>
+                    <TouchableOpacity
+                      style={styles.exchangeIconButton}
+                      onPress={() => navigateToScreen('undergroundExchange')}
+                      activeOpacity={0.8}
+                    >
+                      <Image
+                        source={require('../assets/images/ui/undergroundExchange.png')}
+                        style={{ width: 56, height: 56 }}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <TaskGuide
+                    currentScreen={currentScreen}
+                    onNavigateToProfile={() => navigateToScreen('profile')}
+                  />
+                  <TaskGuideHighlightOverlay forProfile={true} />
+                </>
+              )}
+              {isVisitHackmap && (
                 <TouchableOpacity
                   style={styles.turfClickHandler}
                   activeOpacity={1}
@@ -1979,24 +2013,35 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
                     clearHighlight();
                   }}
                 />
-                <View style={styles.digitalBarracksElevatedWrapper}>
-                  <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
+              )}
+              {isVisitDigitalBarracks && (
+                <>
+                  <TouchableOpacity
+                    style={styles.turfClickHandler}
+                    activeOpacity={1}
+                    onPress={() => {
+                      clearHighlight();
+                    }}
+                  />
+                  <View style={styles.digitalBarracksElevatedWrapper}>
+                    <DigitalBarracksLocation onPress={() => navigateToScreen('barracks')} isIntroActive={currentIntroStep === 'barracks'} />
+                  </View>
+                </>
+              )}
+              {!isOnboardingOrIntroActive && (
+                <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
+                  {hackRigUnlocked && (
+                    <WorldChatIconButton inline onPress={() => setShowWorldChatModal(true)} />
+                  )}
+                  <MessagesIconButton
+                    inline
+                    onPress={() => setShowMessagesModal(true)}
+                    unreadCount={messagesUnreadCount}
+                  />
+                  <SearchUserIconButton inline onPress={() => setShowSearchUserModal(true)} />
                 </View>
-              </>
-            )}
-            {!isOnboardingOrIntroActive && (
-              <View style={styles.topCenterIconsWrapper} pointerEvents="box-none">
-                {hackRigUnlocked && (
-                  <WorldChatIconButton inline onPress={() => setShowWorldChatModal(true)} />
-                )}
-                <MessagesIconButton
-                  inline
-                  onPress={() => setShowMessagesModal(true)}
-                  unreadCount={messagesUnreadCount}
-                />
-                <SearchUserIconButton inline onPress={() => setShowSearchUserModal(true)} />
-              </View>
-            )}
+              )}
+            </SafeAreaView>
             <WorldChatModal
               visible={showWorldChatModal}
               onClose={() => setShowWorldChatModal(false)}
@@ -2034,7 +2079,7 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           </View>
         );
     }
-  }, [currentScreen, navigateToScreen, battleId, battleScreenMode, openMessagesAfterReplayClose, mapOpenMessagesAfterReplayToken, handleWatchBattleFromMessages, handleBattleEnd, handleBattlePrepDeployComplete, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive, dispatch, returnContext, pendingBugSelection]);
+  }, [currentScreen, navigateToScreen, battleId, battleScreenMode, openMessagesAfterReplayClose, mapOpenMessagesAfterReplayToken, handleWatchBattleFromMessages, handleBattleEnd, handleBattlePrepDeployComplete, colors, currentPropertyId, navigateToFloorPlan, previousScreen, turfViewPosition, property1Unlocked, property2Unlocked, property3Unlocked, handleTurfScroll, property4Status, buildingProperties, showOnboarding, handleOnboardingComplete, handleOnboardingSkip, showTurfIntro, handleTurfIntroComplete, handleTurfIntroSkip, currentIntroStep, isHomeHighlight, isVisitHackmap, isVisitDigitalBarracks, isDigitalBarracksHighlight, isResearchCenterHighlight, highlightTaskId, clearHighlight, hackRigUnlocked, showWorldChatModal, showMessagesModal, messagesUnreadCount, showSearchUserModal, visitingProfileUserId, showVisitingProfileModal, messagesOpenToUser, handleCloseMessagesModal, handleVisitingProfileClose, handleVisitingProfileUserNotFound, handleOpenMessagesFromProfile, handleBlockUser, user, mapPendingNavigateCell, handleChatNavigateToMapCell, handleMapPendingNavigateConsumed, isOnboardingOrIntroActive, dispatch, returnContext, pendingBugSelection, blackHatPatchUnread, refreshBlackHatPatchUnread, turfSideInset]);
 
   // Avoid flashing turf (centered) on refresh: show placeholder until persisted nav state is restored
   if (!navRestoreAttempted) {
@@ -2055,34 +2100,40 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       )}
       {renderScreen()}
       {currentScreen === 'turf' && !isOnboardingOrIntroActive && (
-        <View style={styles.bottomRightIcons}>
-          <TouchableOpacity
-            style={styles.storageIconButton}
-            onPress={() => navigateToScreen('storage')}
-            activeOpacity={0.8}
-          >
-            <Image source={require('../assets/images/ui/storage.png')} style={{ width: 34, height: 34 }} resizeMode="contain" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.activeJobsIconButton}
-            onPress={() => setShowActiveJobsModal(true)}
-            activeOpacity={0.8}
-          >
-            <Image source={require('../assets/images/ui/activeJobs.png')} style={{ width: 33, height: 33 }} resizeMode="contain" />
-          </TouchableOpacity>
-          {crewStatus?.isInCrew && (
+        <SafeAreaView
+          style={[styles.bottomRightSafeWrap, { paddingHorizontal: turfSideInset }]}
+          edges={['left', 'right']}
+          pointerEvents="box-none"
+        >
+          <View style={[styles.bottomRightIcons, { right: SIZING.spacing.lg + turfSideInset }]}>
             <TouchableOpacity
-              style={styles.crewIconButton}
-              onPress={() => {
-                setCrewModalInitialCategory(null);
-                setShowCrewModal(true);
-              }}
+              style={styles.storageIconButton}
+              onPress={() => navigateToScreen('storage')}
               activeOpacity={0.8}
             >
-              <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
+              <Image source={require('../assets/images/ui/storage.png')} style={{ width: 34, height: 34 }} resizeMode="contain" />
             </TouchableOpacity>
-          )}
-        </View>
+            <TouchableOpacity
+              style={styles.activeJobsIconButton}
+              onPress={() => setShowActiveJobsModal(true)}
+              activeOpacity={0.8}
+            >
+              <Image source={require('../assets/images/ui/activeJobs.png')} style={{ width: 33, height: 33 }} resizeMode="contain" />
+            </TouchableOpacity>
+            {crewStatus?.isInCrew && (
+              <TouchableOpacity
+                style={styles.crewIconButton}
+                onPress={() => {
+                  setCrewModalInitialCategory(null);
+                  setShowCrewModal(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Image source={require('../assets/images/hackMap/hackCrewActive.png')} style={{ width: 28, height: 28 }} resizeMode="contain" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </SafeAreaView>
       )}
       <ActiveJobsModal
         visible={showActiveJobsModal}
@@ -2127,6 +2178,28 @@ const styles = StyleSheet.create({
     flex: 1,
     zIndex: 1,
   },
+  /** HUD only — map/grid stays full-bleed; safe-area-context applies side insets. */
+  turfOverlaySafe: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10002,
+  },
+  /** Above turfOverlaySafe (10002) so tap-to-dismiss catches the full screen. Bugbot: keep above SafeAreaView stacking. */
+  walletGuideDismissLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10003,
+  },
+  walletGuideBalanceLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10004,
+  },
+  bottomRightSafeWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    zIndex: 10002,
+  },
   topCenterIconsWrapper: {
     position: 'absolute',
     top: SIZING.spacing.lg,
@@ -2141,7 +2214,6 @@ const styles = StyleSheet.create({
   bottomRightIcons: {
     position: 'absolute',
     bottom: SIZING.spacing.lg,
-    right: SIZING.spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

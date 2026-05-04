@@ -28,6 +28,7 @@ export type TurfScreenName =
   | 'profile'
   | 'research'
   | 'undergroundExchange'
+  | 'blackHatPatch'
   | 'storage'
   | 'hunterFacility'
   | 'bugHuntHunterSelection'
@@ -50,6 +51,7 @@ const VALID_SCREENS: TurfScreenName[] = [
   'profile',
   'research',
   'undergroundExchange',
+  'blackHatPatch',
   'storage',
   'hunterFacility',
   'bugHuntHunterSelection',

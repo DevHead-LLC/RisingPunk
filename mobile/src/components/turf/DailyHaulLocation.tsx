@@ -16,13 +16,18 @@ import { useThemeColors } from '../../hooks/useThemeColors';
 import { useGetDailyHaulStatusQuery, useClaimDailyHaulMutation } from '../../store/api/dailyHaulApi';
 import { CloseButton } from '../common/CloseButton';
 
-const PROFILE_HEIGHT = 60;
-const PROFILE_WIDTH = 60;
+export const DAILY_HAUL_PROFILE_HEIGHT = 60;
+export const DAILY_HAUL_PROFILE_WIDTH = 60;
+export const DAILY_HAUL_GAP_BELOW_PROFILE = 16;
+export const DAILY_HAUL_BUTTON_SIZE = 48;
+
+const PROFILE_HEIGHT = DAILY_HAUL_PROFILE_HEIGHT;
+const PROFILE_WIDTH = DAILY_HAUL_PROFILE_WIDTH;
 /** Extra space below the profile so it has margin above the Daily Haul icon. */
-const GAP_BELOW_PROFILE = 16;
+const GAP_BELOW_PROFILE = DAILY_HAUL_GAP_BELOW_PROFILE;
 
 /** Slightly larger than top-center icons so the Daily Haul is easy to see and tap. */
-const BUTTON_SIZE = 48;
+const BUTTON_SIZE = DAILY_HAUL_BUTTON_SIZE;
 /** Offset so the icon is centered under the profile (profile is PROFILE_WIDTH wide). */
 const CENTER_OFFSET = (PROFILE_WIDTH - BUTTON_SIZE) / 2;
 
@@ -103,7 +108,11 @@ function DayCell({
   return content;
 }
 
-export const DailyHaulLocation = memo(function DailyHaulLocation() {
+type DailyHaulLocationProps = {
+  rightInset?: number;
+};
+
+export const DailyHaulLocation = memo(function DailyHaulLocation({ rightInset = 0 }: DailyHaulLocationProps) {
   const colors = useThemeColors();
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const [showModal, setShowModal] = useState(false);
@@ -160,7 +169,7 @@ export const DailyHaulLocation = memo(function DailyHaulLocation() {
 
   return (
     <>
-      <View style={[styles.container, styles.position]}>
+      <View style={[styles.container, styles.position, { right: SIZING.spacing.lg + CENTER_OFFSET + rightInset }]}>
         <TouchableOpacity
           style={styles.button}
           onPress={() => setShowModal(true)}

@@ -19,9 +19,10 @@ export function formatBalance(amount: number): string {
 
 type BalanceProps = {
   isIntroActive?: boolean;
+  leftInset?: number;
 };
 
-export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
+export const Balance = memo(({ isIntroActive = false, leftInset = 0 }: BalanceProps) => {
   const colors = useThemeColors();
   const balance = useAppSelector(getCurrentBalance);
   const dispatch = useAppDispatch();
@@ -74,6 +75,7 @@ export const Balance = memo(({ isIntroActive = false }: BalanceProps) => {
     <Animated.View style={[
       styles.balanceContainer, 
       { 
+        left: SIZING.spacing.lg + leftInset,
         backgroundColor: colors.accent, 
         borderColor: isHighlighted ? animatedBorderColorValue : colors.primary,
         borderWidth: isHighlighted ? 3 : 1,
