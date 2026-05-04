@@ -57,7 +57,7 @@ export const IAP_CATALOG_V1: readonly IapCatalogEntry[] = [
 ] as const;
 
 const catalogByStoreProductId = new Map<string, IapCatalogEntry>();
-const catalogByKey = new Map<IapCatalogKey, IapCatalogEntry>();
+const seenCatalogKeys = new Set<IapCatalogKey>();
 for (const row of IAP_CATALOG_V1) {
   if (row.appleProductId !== row.googleProductId) {
     throw new Error(
@@ -68,10 +68,10 @@ for (const row of IAP_CATALOG_V1) {
     throw new Error(`IAP catalog invariant: duplicate store product id ${row.appleProductId}`);
   }
   catalogByStoreProductId.set(row.appleProductId, row);
-  if (catalogByKey.has(row.key)) {
+  if (seenCatalogKeys.has(row.key)) {
     throw new Error(`IAP catalog invariant: duplicate key ${row.key}`);
   }
-  catalogByKey.set(row.key, row);
+  seenCatalogKeys.add(row.key);
 }
 
 const requiredIapSurfaceIds = ['black_hat_patch_screen', 'server_verify', 'server_purchase_history'] as const;
