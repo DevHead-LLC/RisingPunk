@@ -1599,7 +1599,8 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
           <View style={[styles.container, { backgroundColor: colors.background }]}>
             {isViewWallet && (
               <View
-                style={[StyleSheet.absoluteFill, { zIndex: 999 }]}
+                // Bugbot: wallet guide blocker must sit above turf overlay SafeAreaView (zIndex 10002) to prevent click-through.
+                style={[StyleSheet.absoluteFill, { zIndex: 10003 }]}
                 onStartShouldSetResponder={() => true}
                 onMoveShouldSetResponder={() => false}
                 onResponderTerminationRequest={() => true}
