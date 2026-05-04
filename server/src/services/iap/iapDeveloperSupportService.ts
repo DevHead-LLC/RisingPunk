@@ -122,18 +122,14 @@ async function insertLedgerOrReturnExisting(doc: {
     } catch (err) {
       console.warn('IAP thank-you DM failed:', err);
     }
-    try {
-      await maybeSendReceiptEmail({
-        userId: String(doc.userId),
-        platform: doc.platform,
-        storeProductId: doc.storeProductId,
-        transactionId: doc.transactionId,
-        currency: doc.currency,
-        amountMinorUnits: doc.amountMinorUnits,
-      });
-    } catch (err) {
-      console.warn('IAP receipt pipeline failed after ledger write:', err);
-    }
+    await maybeSendReceiptEmail({
+      userId: String(doc.userId),
+      platform: doc.platform,
+      storeProductId: doc.storeProductId,
+      transactionId: doc.transactionId,
+      currency: doc.currency,
+      amountMinorUnits: doc.amountMinorUnits,
+    });
     return { row: created, inserted: true };
   } catch (err: unknown) {
     const code = (err as { code?: number })?.code;
