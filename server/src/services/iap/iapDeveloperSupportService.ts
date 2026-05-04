@@ -116,19 +116,24 @@ async function insertLedgerOrReturnExisting(doc: {
 }): Promise<{ row: IIapDeveloperSupportLedger; inserted: boolean }> {
   try {
     const created = await IapDeveloperSupportLedger.create(doc);
+    // Bugbot: DM/receipt side-effects must not fail verify after successful ledger insert.
     try {
       await sendThankYouDm(String(doc.userId));
     } catch (err) {
       console.warn('IAP thank-you DM failed:', err);
     }
-    await maybeSendReceiptEmail({
-      userId: String(doc.userId),
-      platform: doc.platform,
-      storeProductId: doc.storeProductId,
-      transactionId: doc.transactionId,
-      currency: doc.currency,
-      amountMinorUnits: doc.amountMinorUnits,
-    });
+    try {
+      await maybeSendReceiptEmail({
+        userId: String(doc.userId),
+        platform: doc.platform,
+        storeProductId: doc.storeProductId,
+        transactionId: doc.transactionId,
+        currency: doc.currency,
+        amountMinorUnits: doc.amountMinorUnits,
+      });
+    } catch (err) {
+      console.warn('IAP receipt pipeline failed after ledger write:', err);
+    }
     return { row: created, inserted: true };
   } catch (err: unknown) {
     const code = (err as { code?: number })?.code;
