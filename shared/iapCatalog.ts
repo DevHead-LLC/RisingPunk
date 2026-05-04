@@ -72,8 +72,8 @@ for (const row of IAP_CATALOG_V1) {
   seenCatalogKeys.add(row.key);
 }
 
-const requiredIapSurfaceIds = ['black_hat_patch_screen', 'server_verify', 'server_purchase_history'] as const;
 if (process.env.NODE_ENV !== 'production') {
+  const requiredIapSurfaceIds = ['black_hat_patch_screen', 'server_verify', 'server_purchase_history'] as const;
   // Keep this as a non-production integrity check so docs drift is caught in dev/test
   // without coupling production boot to documentation metadata modules.
   // eslint-disable-next-line @typescript-eslint/no-var-requires
