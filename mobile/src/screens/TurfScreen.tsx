@@ -1955,9 +1955,13 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
               pointerEvents="box-none"
             >
               <ErrorBoundary>
-                <View style={styles.walletGuideBalanceLayer} pointerEvents="box-none">
+                {isViewWallet ? (
+                  <View style={styles.walletGuideBalanceLayer} pointerEvents="box-none">
+                    <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
+                  </View>
+                ) : (
                   <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
-                </View>
+                )}
               </ErrorBoundary>
               {isHomeHighlight && (
                 <>

@@ -17,11 +17,12 @@ import { useGetDailyHaulStatusQuery, useClaimDailyHaulMutation } from '../../sto
 import { CloseButton } from '../common/CloseButton';
 
 export const DAILY_HAUL_PROFILE_HEIGHT = 60;
+export const DAILY_HAUL_PROFILE_WIDTH = 60;
 export const DAILY_HAUL_GAP_BELOW_PROFILE = 16;
 export const DAILY_HAUL_BUTTON_SIZE = 48;
 
 const PROFILE_HEIGHT = DAILY_HAUL_PROFILE_HEIGHT;
-const PROFILE_WIDTH = 60;
+const PROFILE_WIDTH = DAILY_HAUL_PROFILE_WIDTH;
 /** Extra space below the profile so it has margin above the Daily Haul icon. */
 const GAP_BELOW_PROFILE = DAILY_HAUL_GAP_BELOW_PROFILE;
 

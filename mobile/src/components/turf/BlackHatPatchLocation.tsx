@@ -5,10 +5,11 @@ import {
   DAILY_HAUL_BUTTON_SIZE,
   DAILY_HAUL_GAP_BELOW_PROFILE,
   DAILY_HAUL_PROFILE_HEIGHT,
+  DAILY_HAUL_PROFILE_WIDTH,
 } from './DailyHaulLocation';
 
 /** Match `DailyHaulLocation` vertical stack under profile (right-hand column). */
-const CENTER_OFFSET = (DAILY_HAUL_PROFILE_HEIGHT - DAILY_HAUL_BUTTON_SIZE) / 2;
+const CENTER_OFFSET = (DAILY_HAUL_PROFILE_WIDTH - DAILY_HAUL_BUTTON_SIZE) / 2;
 const BLACK_HAT_SIZE = 48;
 const GAP_BELOW_DAILY_HAUL = 8;
 
