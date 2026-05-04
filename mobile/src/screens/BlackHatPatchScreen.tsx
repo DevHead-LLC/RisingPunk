@@ -137,9 +137,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
     [userId, token, refetchLedger],
   );
   const handleVerifiedPurchaseRef = useRef(handleVerifiedPurchase);
-  useEffect(() => {
-    handleVerifiedPurchaseRef.current = handleVerifiedPurchase;
-  }, [handleVerifiedPurchase]);
+  handleVerifiedPurchaseRef.current = handleVerifiedPurchase;
 
   const { connected, products, fetchProducts, requestPurchase, restorePurchases } = useIAP({
     onPurchaseSuccess: (purchase) => {
