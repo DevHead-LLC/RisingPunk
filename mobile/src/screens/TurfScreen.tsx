@@ -2185,11 +2185,11 @@ const styles = StyleSheet.create({
   },
   walletGuideDismissLayer: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 10002,
+    zIndex: 10003,
   },
   walletGuideBalanceLayer: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 10003,
+    zIndex: 10004,
   },
   bottomRightSafeWrap: {
     position: 'absolute',
