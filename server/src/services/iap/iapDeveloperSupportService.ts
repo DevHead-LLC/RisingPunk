@@ -78,26 +78,26 @@ async function maybeSendReceiptEmail(params: {
   currency: string;
   amountMinorUnits: number;
 }): Promise<void> {
-  const user = await User.findById(params.userId).select('email emailVerified handle').lean();
-  if (!user?.email || !user.emailVerified) {
-    return;
-  }
-  const subject = 'RisingPunk — Developer Support purchase receipt';
-  const text = [
-    `Hi ${user.handle || 'player'},`,
-    '',
-    'This email confirms a Developer Support purchase recorded on your RisingPunk account.',
-    `Platform: ${params.platform}`,
-    `Product: ${params.storeProductId}`,
-    `Transaction id: ${params.transactionId}`,
-    `Amount: ${params.amountMinorUnits} minor units ${params.currency} (see in-game history for display formatting).`,
-    '',
-    'Official tax/receipt records may also be available from Apple App Store purchase history or Google Play order history.',
-    '',
-    '— RisingPunk',
-  ].join('\n');
-  const template: EmailTemplate = { subject, text, html: `<pre>${text.replace(/</g, '&lt;')}</pre>` };
   try {
+    const user = await User.findById(params.userId).select('email emailVerified handle').lean();
+    if (!user?.email || !user.emailVerified) {
+      return;
+    }
+    const subject = 'RisingPunk — Developer Support purchase receipt';
+    const text = [
+      `Hi ${user.handle || 'player'},`,
+      '',
+      'This email confirms a Developer Support purchase recorded on your RisingPunk account.',
+      `Platform: ${params.platform}`,
+      `Product: ${params.storeProductId}`,
+      `Transaction id: ${params.transactionId}`,
+      `Amount: ${params.amountMinorUnits} minor units ${params.currency} (see in-game history for display formatting).`,
+      '',
+      'Official tax/receipt records may also be available from Apple App Store purchase history or Google Play order history.',
+      '',
+      '— RisingPunk',
+    ].join('\n');
+    const template: EmailTemplate = { subject, text, html: `<pre>${text.replace(/</g, '&lt;')}</pre>` };
     await EmailService.sendEmail(user.email, template);
   } catch (err) {
     console.warn('IAP receipt email failed:', err);
