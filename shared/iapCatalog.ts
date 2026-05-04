@@ -57,6 +57,7 @@ export const IAP_CATALOG_V1: readonly IapCatalogEntry[] = [
 ] as const;
 
 const catalogByStoreProductId = new Map<string, IapCatalogEntry>();
+const catalogByKey = new Map<IapCatalogKey, IapCatalogEntry>();
 for (const row of IAP_CATALOG_V1) {
   if (row.appleProductId !== row.googleProductId) {
     throw new Error(
@@ -67,6 +68,10 @@ for (const row of IAP_CATALOG_V1) {
     throw new Error(`IAP catalog invariant: duplicate store product id ${row.appleProductId}`);
   }
   catalogByStoreProductId.set(row.appleProductId, row);
+  if (catalogByKey.has(row.key)) {
+    throw new Error(`IAP catalog invariant: duplicate key ${row.key}`);
+  }
+  catalogByKey.set(row.key, row);
 }
 
 const requiredIapSurfaceIds = ['black_hat_patch_screen', 'server_verify', 'server_purchase_history'] as const;
@@ -86,4 +91,20 @@ export function findIapCatalogEntryByStoreProductId(
   storeProductId: string,
 ): IapCatalogEntry | undefined {
   return catalogByStoreProductId.get(storeProductId);
+}
+
+export function requireIapCatalogEntryByStoreProductId(storeProductId: string): IapCatalogEntry {
+  const row = findIapCatalogEntryByStoreProductId(storeProductId);
+  if (!row) {
+    throw new Error(`Unknown IAP store product id: ${storeProductId}`);
+  }
+  return row;
+}
+
+export function getIapCatalogEntryByKey(key: IapCatalogKey): IapCatalogEntry {
+  const row = catalogByKey.get(key);
+  if (!row) {
+    throw new Error(`Unknown IAP catalog key: ${key}`);
+  }
+  return row;
 }
