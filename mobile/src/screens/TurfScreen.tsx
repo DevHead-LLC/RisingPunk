@@ -1597,18 +1597,6 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
       default:
         return (
           <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {isViewWallet && (
-              <View
-                // Bugbot: wallet guide blocker must sit above turf overlay SafeAreaView (zIndex 10002) to prevent click-through.
-                style={[StyleSheet.absoluteFill, { zIndex: 10003 }]}
-                onStartShouldSetResponder={() => true}
-                onMoveShouldSetResponder={() => false}
-                onResponderTerminationRequest={() => true}
-                onResponderRelease={() => {
-                  clearHighlight();
-                }}
-              />
-            )}
             <View
               ref={scrollWrapperRef}
               style={styles.scrollWrapper}
@@ -1956,9 +1944,20 @@ export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element =>
             >
               <ErrorBoundary>
                 {isViewWallet ? (
-                  <View style={styles.walletGuideBalanceLayer} pointerEvents="box-none">
-                    <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
-                  </View>
+                  <>
+                    <View
+                      style={styles.walletGuideDismissLayer}
+                      onStartShouldSetResponder={() => true}
+                      onMoveShouldSetResponder={() => false}
+                      onResponderTerminationRequest={() => true}
+                      onResponderRelease={() => {
+                        clearHighlight();
+                      }}
+                    />
+                    <View style={styles.walletGuideBalanceLayer} pointerEvents="box-none">
+                      <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
+                    </View>
+                  </>
                 ) : (
                   <Balance isIntroActive={currentIntroStep === 'wallet'} leftInset={turfSideInset} />
                 )}
@@ -2184,9 +2183,13 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 10002,
   },
+  walletGuideDismissLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10002,
+  },
   walletGuideBalanceLayer: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 10004,
+    zIndex: 10003,
   },
   bottomRightSafeWrap: {
     position: 'absolute',
