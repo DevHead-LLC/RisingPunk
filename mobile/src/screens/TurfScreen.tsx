@@ -2183,6 +2183,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 10002,
   },
+  /** Above turfOverlaySafe (10002) so tap-to-dismiss catches the full screen. Bugbot: keep above SafeAreaView stacking. */
   walletGuideDismissLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 10003,

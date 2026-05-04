@@ -65,6 +65,10 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
   });
   const userId = useAppSelector((s) => s.auth.user?._id);
   const token = useAppSelector((s) => s.auth.token);
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [verifyDeveloperSupport] = useVerifyDeveloperSupportMutation();
@@ -83,10 +87,12 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
 
   const handleVerifiedPurchase = useCallback(
     async (purchase: Purchase) => {
-      if (!userId) {
+      const uid = userIdRef.current;
+      const tok = tokenRef.current;
+      if (!uid) {
         throw new Error('Not signed in');
       }
-      if (!token) {
+      if (!tok) {
         throw new Error('Not authenticated — sign in again to complete verification');
       }
       const dedupeKey = purchaseDedupeKey(purchase);
@@ -134,7 +140,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
         verifyInFlightKeysRef.current.delete(dedupeKey);
       }
     },
-    [userId, token, refetchLedger],
+    [refetchLedger],
   );
   const handleVerifiedPurchaseRef = useRef(handleVerifiedPurchase);
   handleVerifiedPurchaseRef.current = handleVerifiedPurchase;

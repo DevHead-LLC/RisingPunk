@@ -13,6 +13,7 @@ export function loadAppleRootCertificateBuffers(): Buffer[] {
       'APPLE_ROOT_CA_PATHS is not set. Download Apple Root CA G3 (and related) .cer files and list paths separated by your OS path delimiter.',
     );
   }
+  // Bugbot: split on path.delimiter (; on Windows, : on POSIX)—not a naive ':' split, so drive letters in one path are safe.
   const paths = raw
     .split(path.delimiter)
     .map((s) => s.trim())
