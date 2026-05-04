@@ -1,6 +1,6 @@
 import React, {useState, useRef, useEffect, useCallback, memo, forwardRef, useImperativeHandle, useMemo} from 'react';
-import {View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState, Image, useWindowDimensions} from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {View, Text, StyleSheet, ScrollView, Dimensions, Platform, TouchableOpacity, Pressable, AppState, Image} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {Balance} from '../components/common/Balance';
 import {HomeScreen} from './HomeScreen';
 import {DigitalBarracksScreen} from './DigitalBarracksScreen';
@@ -179,11 +179,8 @@ const HUNTER_FACILITY_IMAGE = require('../assets/images/turfScreen/hunterFacilit
 
 export const TurfScreen = forwardRef<any, {}>((props, ref): React.JSX.Element => {
   const colors = useThemeColors();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const isLandscape = windowWidth > windowHeight;
-  const turfSideInset =
-    Platform.OS === 'ios' && !Platform.isPad && isLandscape ? Math.max(insets.left, insets.right) : 0;
+  // Bugbot: side insets are already applied by SafeAreaView(edges=['left','right']); extra offset causes double-inset in landscape.
+  const turfSideInset = 0;
   const { highlightTaskId, highlightStep, clearHighlight } = useTaskGuideHighlight();
   const isVisitHome = highlightTaskId === 'visit-home';
   const isVisitHackmap = highlightTaskId === 'visit-hackmap';
