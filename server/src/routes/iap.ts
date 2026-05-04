@@ -47,7 +47,7 @@ router.post('/developer-support/verify', auth, async (req: Request, res: Respons
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('not set') || msg.includes('APPLE_ROOT_CA_PATHS') || msg.includes('GOOGLE_PLAY')) {
-      res.status(503).json({ error: 'IAP verification is not configured on this server', detail: msg });
+      res.status(503).json({ error: 'IAP verification is not configured on this server' });
       return;
     }
     if (msg.includes('already recorded for a different RisingPunk account')) {
