@@ -1,12 +1,15 @@
 import React, { memo, useEffect, useRef } from 'react';
 import { TouchableOpacity, View, Image, StyleSheet, Animated } from 'react-native';
 import { SIZING } from '../../styles/theme';
+import {
+  DAILY_HAUL_BUTTON_SIZE,
+  DAILY_HAUL_GAP_BELOW_PROFILE,
+  DAILY_HAUL_PROFILE_HEIGHT,
+  DAILY_HAUL_PROFILE_WIDTH,
+} from './DailyHaulLocation';
 
 /** Match `DailyHaulLocation` vertical stack under profile (right-hand column). */
-const PROFILE_HEIGHT = 60;
-const GAP_BELOW_PROFILE = 16;
-const DAILY_BUTTON_SIZE = 48;
-const CENTER_OFFSET = (PROFILE_HEIGHT - DAILY_BUTTON_SIZE) / 2;
+const CENTER_OFFSET = (DAILY_HAUL_PROFILE_WIDTH - DAILY_HAUL_BUTTON_SIZE) / 2;
 const BLACK_HAT_SIZE = 48;
 const GAP_BELOW_DAILY_HAUL = 8;
 
@@ -42,8 +45,8 @@ export const BlackHatPatchLocation = memo(function BlackHatPatchLocation({
 
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
 
-  const dailyHaulTop = SIZING.spacing.lg + PROFILE_HEIGHT + GAP_BELOW_PROFILE;
-  const blackHatTop = dailyHaulTop + DAILY_BUTTON_SIZE + GAP_BELOW_DAILY_HAUL;
+  const dailyHaulTop = SIZING.spacing.lg + DAILY_HAUL_PROFILE_HEIGHT + DAILY_HAUL_GAP_BELOW_PROFILE;
+  const blackHatTop = dailyHaulTop + DAILY_HAUL_BUTTON_SIZE + GAP_BELOW_DAILY_HAUL;
 
   return (
     <View
