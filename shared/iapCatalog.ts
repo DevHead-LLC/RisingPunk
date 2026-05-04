@@ -92,19 +92,3 @@ export function findIapCatalogEntryByStoreProductId(
 ): IapCatalogEntry | undefined {
   return catalogByStoreProductId.get(storeProductId);
 }
-
-export function requireIapCatalogEntryByStoreProductId(storeProductId: string): IapCatalogEntry {
-  const row = findIapCatalogEntryByStoreProductId(storeProductId);
-  if (!row) {
-    throw new Error(`Unknown IAP store product id: ${storeProductId}`);
-  }
-  return row;
-}
-
-export function getIapCatalogEntryByKey(key: IapCatalogKey): IapCatalogEntry {
-  const row = catalogByKey.get(key);
-  if (!row) {
-    throw new Error(`Unknown IAP catalog key: ${key}`);
-  }
-  return row;
-}

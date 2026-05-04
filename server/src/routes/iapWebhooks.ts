@@ -19,7 +19,8 @@ router.post('/apple', express.json({ limit: '256kb' }), async (req: Request, res
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('not set') || msg.includes('APPLE_ROOT_CA_PATHS')) {
-      res.status(503).json({ error: 'Apple ASSN verification not configured', detail: msg });
+      // Bugbot: webhook is unauthenticated; avoid leaking server configuration internals to callers.
+      res.status(503).json({ error: 'Apple ASSN verification not configured' });
       return;
     }
     console.error('Apple ASSN handler error:', e);

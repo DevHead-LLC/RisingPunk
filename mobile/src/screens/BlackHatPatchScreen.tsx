@@ -136,12 +136,16 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
     },
     [userId, token, refetchLedger],
   );
+  const handleVerifiedPurchaseRef = useRef(handleVerifiedPurchase);
+  useEffect(() => {
+    handleVerifiedPurchaseRef.current = handleVerifiedPurchase;
+  }, [handleVerifiedPurchase]);
 
   const { connected, products, fetchProducts, requestPurchase, restorePurchases } = useIAP({
     onPurchaseSuccess: (purchase) => {
       (async () => {
         try {
-          await handleVerifiedPurchase(purchase);
+          await handleVerifiedPurchaseRef.current(purchase);
           Alert.alert('Thank you', 'Your purchase was verified. Thank you for supporting RisingPunk.');
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
