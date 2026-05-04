@@ -8,6 +8,7 @@ import {
   DAILY_HAUL_PROFILE_WIDTH,
 } from './DailyHaulLocation';
 
+// Bugbot: CENTER_OFFSET is derived from DailyHaulLocation exports; BLACK_HAT_SIZE / GAP_BELOW_DAILY_HAUL are icon-only.
 /** Match `DailyHaulLocation` vertical stack under profile (right-hand column). */
 const CENTER_OFFSET = (DAILY_HAUL_PROFILE_WIDTH - DAILY_HAUL_BUTTON_SIZE) / 2;
 const BLACK_HAT_SIZE = 48;
