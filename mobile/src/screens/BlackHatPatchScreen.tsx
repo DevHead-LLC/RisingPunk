@@ -14,11 +14,13 @@ import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   deepLinkToSubscriptions,
+  ErrorCode,
   finishTransaction,
   getTransactionJwsIOS,
   useIAP,
   type Product,
   type Purchase,
+  type PurchaseError,
 } from 'react-native-iap';
 import { IAP_CATALOG_V1, listIapV1StoreProductIds } from '../../../shared/iapCatalog';
 import { CloseButton } from '../components/common/CloseButton';
@@ -43,6 +45,41 @@ import { setBlackHatPatchAcknowledgedToToday } from '../utils/blackHatPatchAckSt
 function looksLikeCompactJws(token: string): boolean {
   const parts = token.split('.');
   return parts.length >= 3 && parts.every((p) => p.length > 0);
+}
+
+/** RTK Query `.unwrap()` rejects with `{ status, data }`, not `Error` — avoid `[object Object]` in alerts. */
+function formatUserFacingError(e: unknown): string {
+  if (e instanceof Error) {
+    return e.message;
+  }
+  if (typeof e === 'object' && e !== null) {
+    const rec = e as Record<string, unknown>;
+    if (typeof rec.message === 'string' && rec.message.length > 0) {
+      return rec.message;
+    }
+    const data = rec.data;
+    if (typeof data === 'string') {
+      return data;
+    }
+    if (typeof data === 'object' && data !== null && 'error' in data) {
+      const inner = (data as { error: unknown }).error;
+      if (typeof inner === 'string') {
+        return inner;
+      }
+    }
+    if (typeof rec.status === 'number') {
+      const fromData =
+        typeof data === 'object' && data !== null && 'error' in data
+          ? String((data as { error: unknown }).error)
+          : '';
+      return fromData.length > 0 ? fromData : `Request failed (${rec.status})`;
+    }
+  }
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
 }
 
 function purchaseDedupeKey(purchase: Purchase): string {
@@ -78,6 +115,13 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
   const { data: ledger, refetch: refetchLedger } = useFetchDeveloperSupportLedgerQuery(undefined, {
     skip: !token,
   });
+
+  const refetchLedgerSafe = useCallback(() => {
+    if (!token) {
+      return Promise.resolve();
+    }
+    return refetchLedger();
+  }, [token, refetchLedger]);
 
   useEffect(() => {
     if (userId) {
@@ -135,12 +179,12 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
           .unwrap();
       }
       await finishTransaction({ purchase, isConsumable: true });
-      refetchLedger().catch(() => {});
+      refetchLedgerSafe().catch(() => {});
       } finally {
         verifyInFlightKeysRef.current.delete(dedupeKey);
       }
     },
-    [refetchLedger],
+    [refetchLedgerSafe],
   );
   const handleVerifiedPurchaseRef = useRef(handleVerifiedPurchase);
   handleVerifiedPurchaseRef.current = handleVerifiedPurchase;
@@ -152,13 +196,17 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
           await handleVerifiedPurchaseRef.current(purchase);
           Alert.alert('Thank you', 'Your purchase was verified. Thank you for supporting RisingPunk.');
         } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          Alert.alert('Purchase', msg);
+          Alert.alert('Purchase', formatUserFacingError(e));
         }
       })().catch(() => {});
     },
-    onPurchaseError: (err) => {
-      Alert.alert('Purchase', err.message ?? String(err.code ?? 'unknown error'));
+    onPurchaseError: (err: PurchaseError) => {
+      const base = err.message ?? String(err.code ?? 'unknown error');
+      const hint =
+        err.code === ErrorCode.DuplicatePurchase
+          ? '\n\nIf you already paid, server verification may have failed earlier (check the prior alert). Try Restore after signing in, or wait a moment and try again. Unfinished store transactions can look like “duplicate” until they are finished.'
+          : '';
+      Alert.alert('Purchase', `${base}${hint}`);
     },
     onError: (err) => {
       Alert.alert('Store', err.message);
@@ -197,8 +245,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
           },
         });
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        Alert.alert('Purchase', msg);
+        Alert.alert('Purchase', formatUserFacingError(e));
       }
     },
     [connected, requestPurchase, userId],
@@ -211,12 +258,11 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
         'Restore',
         'If you had pending purchases, sync is complete. Developer Support consumables are finalized after server verification at purchase time.',
       );
-      refetchLedger().catch(() => {});
+      await refetchLedgerSafe();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      Alert.alert('Restore', msg);
+      Alert.alert('Restore', formatUserFacingError(e));
     }
-  }, [restorePurchases, refetchLedger]);
+  }, [restorePurchases, refetchLedgerSafe]);
 
   const onManageStore = useCallback(async () => {
     try {
@@ -365,6 +411,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
               onPress={() => {
                 onRestore().catch(() => {});
               }}
+              disabled={!token}
             >
               <Text style={[styles.secondaryBtnText, { color: colors.primary }]}>Restore purchases</Text>
             </TouchableOpacity>
