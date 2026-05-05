@@ -8,7 +8,10 @@ import {
 import { IapDeveloperSupportLedger, type IIapDeveloperSupportLedger } from '../../models/IapDeveloperSupportLedger';
 import { User } from '../../models/User';
 import { createAppleSignedDataVerifier } from './IapAppleSignedTransactionVerifier';
-import { getGooglePlayProductPurchase } from './googlePlayProductPurchase';
+import {
+  consumeGooglePlayProductPurchase,
+  getGooglePlayProductPurchase,
+} from './googlePlayProductPurchase';
 import { sendSystemNotificationDm } from '../CrewSystemNotificationService';
 import { EmailService, type EmailTemplate } from '../EmailService';
 import { normalizeCurrencyCode } from './iapCurrency';
@@ -268,6 +271,16 @@ export async function verifyGoogleDeveloperSupport(params: {
     entitlementKey: IAP_ENTITLEMENT_DEVELOPER_SUPPORT_SUPPORTER,
   });
   const supporter = await computeDeveloperSupportSupporter(params.userId);
+  try {
+    await consumeGooglePlayProductPurchase({
+      packageName,
+      productId: params.productId,
+      purchaseToken: params.purchaseToken,
+    });
+  } catch (err: unknown) {
+    // Bugbot: never fail a granted verify on consume side-effect; log and recover via restore/retry.
+    console.warn('IAP verify: Google consume failed after successful verify:', err);
+  }
   return { ledgerId: String(row._id), supporter, duplicate: !inserted };
 }
 
