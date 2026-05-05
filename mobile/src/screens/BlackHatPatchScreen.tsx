@@ -109,8 +109,14 @@ function isAndroidAlreadyConsumedFinishError(err: unknown): boolean {
     return false;
   }
   if (err instanceof Error) {
+    const errWithCode = err as Error & { code?: unknown };
+    const code = typeof errWithCode.code === 'string' ? errWithCode.code.toUpperCase() : '';
     const msg = err.message.toUpperCase();
-    return msg.includes('ITEM_NOT_OWNED') || msg.includes('ALREADY CONSUMED');
+    return (
+      code.includes('ITEM_NOT_OWNED') ||
+      msg.includes('ITEM_NOT_OWNED') ||
+      msg.includes('ALREADY CONSUMED')
+    );
   }
   const rec = err as { code?: unknown; message?: unknown };
   const code = typeof rec?.code === 'string' ? rec.code.toUpperCase() : '';
