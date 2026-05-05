@@ -8,7 +8,10 @@ import {
 import { IapDeveloperSupportLedger, type IIapDeveloperSupportLedger } from '../../models/IapDeveloperSupportLedger';
 import { User } from '../../models/User';
 import { createAppleSignedDataVerifier } from './IapAppleSignedTransactionVerifier';
-import { getGooglePlayProductPurchase } from './googlePlayProductPurchase';
+import {
+  consumeGooglePlayProductPurchase,
+  getGooglePlayProductPurchase,
+} from './googlePlayProductPurchase';
 import { sendSystemNotificationDm } from '../CrewSystemNotificationService';
 import { EmailService, type EmailTemplate } from '../EmailService';
 import { normalizeCurrencyCode } from './iapCurrency';
@@ -185,7 +188,13 @@ export async function verifyAppleDeveloperSupport(params: {
     throw new Error('IAP verify: invalid user id');
   }
   const verifier = createAppleSignedDataVerifier();
-  const decoded = await verifier.verifyAndDecodeTransaction(params.signedTransactionInfo);
+  let decoded: JWSTransactionDecodedPayload;
+  try {
+    decoded = await verifier.verifyAndDecodeTransaction(params.signedTransactionInfo);
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`IAP verify: Apple transaction verification failed (${detail})`);
+  }
   assertAppleConsumable(decoded);
   const storeProductId = requireProductId(decoded.productId);
   const transactionId = decoded.transactionId;
@@ -223,11 +232,17 @@ export async function verifyGoogleDeveloperSupport(params: {
   if (!packageName) {
     throw new Error('GOOGLE_PLAY_PACKAGE_NAME is not set');
   }
-  const gp = await getGooglePlayProductPurchase({
-    packageName,
-    productId: params.productId,
-    purchaseToken: params.purchaseToken,
-  });
+  let gp: Awaited<ReturnType<typeof getGooglePlayProductPurchase>>;
+  try {
+    gp = await getGooglePlayProductPurchase({
+      packageName,
+      productId: params.productId,
+      purchaseToken: params.purchaseToken,
+    });
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(`IAP verify: Google purchase lookup failed (${detail})`);
+  }
   if (gp.purchaseState !== 0) {
     throw new Error(`IAP verify: Google purchase not in purchased state (purchaseState=${String(gp.purchaseState)})`);
   }
@@ -268,6 +283,16 @@ export async function verifyGoogleDeveloperSupport(params: {
     entitlementKey: IAP_ENTITLEMENT_DEVELOPER_SUPPORT_SUPPORTER,
   });
   const supporter = await computeDeveloperSupportSupporter(params.userId);
+  try {
+    await consumeGooglePlayProductPurchase({
+      packageName,
+      productId: params.productId,
+      purchaseToken: params.purchaseToken,
+    });
+  } catch (err: unknown) {
+    // Bugbot: never fail a granted verify on consume side-effect; log and recover via restore/retry.
+    console.warn('IAP verify: Google consume failed after successful verify:', err);
+  }
   return { ledgerId: String(row._id), supporter, duplicate: !inserted };
 }
 

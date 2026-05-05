@@ -269,11 +269,41 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
 
   const onRestore = useCallback(async () => {
     try {
-      await restorePurchases();
-      Alert.alert(
-        'Restore',
-        'If you had pending purchases, sync is complete. Developer Support consumables are finalized after server verification at purchase time.',
-      );
+      const restored = (await restorePurchases()) as unknown;
+      const pending = Array.isArray(restored) ? (restored as Purchase[]) : [];
+      if (pending.length === 0) {
+        Alert.alert(
+          'Restore',
+          'Sync complete. No pending purchases were found for this signed-in store account.',
+        );
+        refetchLedgerSafe().catch(() => {});
+        return;
+      }
+      let verifiedCount = 0;
+      let firstError: unknown = null;
+      for (const purchase of pending) {
+        try {
+          await handleVerifiedPurchaseRef.current(purchase);
+          verifiedCount += 1;
+        } catch (err) {
+          if (firstError == null) {
+            firstError = err;
+          }
+        }
+      }
+      if (verifiedCount > 0) {
+        Alert.alert(
+          'Restore',
+          `Recovered ${verifiedCount} pending purchase${verifiedCount === 1 ? '' : 's'}.`,
+        );
+      } else if (firstError) {
+        throw firstError;
+      } else {
+        Alert.alert(
+          'Restore',
+          'Sync complete. Pending purchases were checked, but none were eligible for recovery on this account.',
+        );
+      }
       refetchLedgerSafe().catch(() => {});
     } catch (e: unknown) {
       Alert.alert('Restore', formatUserFacingError(e));
