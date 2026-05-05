@@ -257,10 +257,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
     onPurchaseError: (err: PurchaseError) => {
       if (isUserCancelledPurchaseError(err)) {
         if (Platform.OS === 'ios') {
-          Alert.alert(
-            'Purchase',
-            'Purchase was canceled before completion. If this is the iOS Simulator, test App Store sandbox purchases on a physical device/TestFlight build.',
-          );
+          Alert.alert('Purchase', 'Purchase canceled.');
         }
         return;
       }
