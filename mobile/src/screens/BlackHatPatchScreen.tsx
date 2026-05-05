@@ -68,11 +68,20 @@ function formatUserFacingError(e: unknown): string {
       }
     }
     if (typeof rec.status === 'number') {
-      const fromData =
-        typeof data === 'object' && data !== null && 'error' in data
-          ? String((data as { error: unknown }).error)
-          : '';
-      return fromData.length > 0 ? fromData : `Request failed (${rec.status})`;
+      if (typeof data === 'object' && data !== null && 'error' in data) {
+        const inner = (data as { error: unknown }).error;
+        if (typeof inner === 'string' && inner.length > 0) {
+          return inner;
+        }
+        if (inner !== null && typeof inner === 'object') {
+          try {
+            return JSON.stringify(inner);
+          } catch {
+            return `Request failed (${rec.status})`;
+          }
+        }
+      }
+      return `Request failed (${rec.status})`;
     }
   }
   try {
@@ -258,7 +267,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
         'Restore',
         'If you had pending purchases, sync is complete. Developer Support consumables are finalized after server verification at purchase time.',
       );
-      await refetchLedgerSafe();
+      refetchLedgerSafe().catch(() => {});
     } catch (e: unknown) {
       Alert.alert('Restore', formatUserFacingError(e));
     }
