@@ -104,6 +104,20 @@ function purchaseDedupeKey(purchase: Purchase): string {
   return `${Platform.OS}:${purchase.productId ?? ''}:${base}`;
 }
 
+function isAndroidAlreadyConsumedFinishError(err: unknown): boolean {
+  if (Platform.OS !== 'android') {
+    return false;
+  }
+  if (err instanceof Error) {
+    const msg = err.message.toUpperCase();
+    return msg.includes('ITEM_NOT_OWNED') || msg.includes('ALREADY CONSUMED');
+  }
+  const rec = err as { code?: unknown; message?: unknown };
+  const code = typeof rec?.code === 'string' ? rec.code.toUpperCase() : '';
+  const message = typeof rec?.message === 'string' ? rec.message.toUpperCase() : '';
+  return code.includes('ITEM_NOT_OWNED') || message.includes('ITEM_NOT_OWNED') || message.includes('ALREADY CONSUMED');
+}
+
 type Props = {
   onClose: () => void;
 };
@@ -194,7 +208,14 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
           .current({ platform: 'google', productId, purchaseToken })
           .unwrap();
       }
-      await finishTransaction({ purchase, isConsumable: true });
+      try {
+        await finishTransaction({ purchase, isConsumable: true });
+      } catch (finishErr: unknown) {
+        // Server-side Google consume can race client consume; treat already-consumed Android finish as non-fatal.
+        if (!isAndroidAlreadyConsumedFinishError(finishErr)) {
+          throw finishErr;
+        }
+      }
       refetchLedgerSafe().catch(() => {});
       } finally {
         verifyInFlightKeysRef.current.delete(dedupeKey);
