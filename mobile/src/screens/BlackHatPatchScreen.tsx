@@ -52,6 +52,9 @@ function formatUserFacingError(e: unknown): string {
   if (e instanceof Error) {
     return e.message;
   }
+  if (typeof e === 'string') {
+    return e;
+  }
   if (typeof e === 'object' && e !== null) {
     const rec = e as Record<string, unknown>;
     if (typeof rec.message === 'string' && rec.message.length > 0) {
@@ -61,28 +64,32 @@ function formatUserFacingError(e: unknown): string {
     if (typeof data === 'string') {
       return data;
     }
+    const status = typeof rec.status === 'number' ? rec.status : null;
     if (typeof data === 'object' && data !== null && 'error' in data) {
       const inner = (data as { error: unknown }).error;
       if (typeof inner === 'string') {
-        return inner;
-      }
-    }
-    if (typeof rec.status === 'number') {
-      if (typeof data === 'object' && data !== null && 'error' in data) {
-        const inner = (data as { error: unknown }).error;
-        if (typeof inner === 'string' && inner.length > 0) {
+        if (inner.length > 0) {
           return inner;
         }
-        if (inner !== null && typeof inner === 'object') {
-          try {
-            return JSON.stringify(inner);
-          } catch {
-            return `Request failed (${rec.status})`;
-          }
+      } else if (inner !== null && typeof inner === 'object') {
+        try {
+          return JSON.stringify(inner);
+        } catch {
+          /* fall through to status or generic */
         }
+      } else if (typeof inner === 'number' || typeof inner === 'boolean') {
+        return String(inner);
       }
-      return `Request failed (${rec.status})`;
     }
+    if (status !== null) {
+      return `Request failed (${status})`;
+    }
+  }
+  if (typeof e === 'number' || typeof e === 'boolean' || typeof e === 'bigint') {
+    return String(e);
+  }
+  if (e === undefined) {
+    return String(e);
   }
   try {
     return JSON.stringify(e);
