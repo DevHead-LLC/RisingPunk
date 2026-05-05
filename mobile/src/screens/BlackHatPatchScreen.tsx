@@ -127,12 +127,7 @@ function isAndroidAlreadyConsumedFinishError(err: unknown): boolean {
 
 function isUserCancelledPurchaseError(err: PurchaseError): boolean {
   const code = String(err.code ?? '').toLowerCase();
-  const msg = String(err.message ?? '').toLowerCase();
-  return (
-    err.code === ErrorCode.UserCancelled ||
-    code.includes('cancel') ||
-    msg.includes('cancel')
-  );
+  return err.code === ErrorCode.UserCancelled || code === 'user-cancelled' || code === 'user_cancelled';
 }
 
 type Props = {
@@ -242,6 +237,16 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
   );
   const handleVerifiedPurchaseRef = useRef(handleVerifiedPurchase);
   handleVerifiedPurchaseRef.current = handleVerifiedPurchase;
+  type PendingRecoveryResult = {
+    recoveredCount: number;
+    hadPending: boolean;
+    firstError: unknown | null;
+  };
+  const recoverPendingPurchasesRef = useRef<() => Promise<PendingRecoveryResult>>(async () => ({
+    recoveredCount: 0,
+    hadPending: false,
+    firstError: null,
+  }));
 
   const { connected, products, fetchProducts, requestPurchase, restorePurchases } = useIAP({
     onPurchaseSuccess: (purchase) => {
@@ -268,7 +273,8 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
           : '';
       Alert.alert('Purchase', `${base}${hint}`);
       if (err.code === ErrorCode.DuplicatePurchase) {
-        recoverPendingPurchases()
+        recoverPendingPurchasesRef
+          .current()
           .then((result) => {
             if (result.recoveredCount > 0) {
               Alert.alert('Purchase', `Recovered ${result.recoveredCount} pending purchase(s). You can try buying again.`);
@@ -283,11 +289,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
     },
   });
 
-  const recoverPendingPurchases = useCallback(async (): Promise<{
-    recoveredCount: number;
-    hadPending: boolean;
-    firstError: unknown | null;
-  }> => {
+  const recoverPendingPurchases = useCallback(async (): Promise<PendingRecoveryResult> => {
     const pendingRaw =
       Platform.OS === 'ios'
         ? ((await getPendingTransactionsIOS()) as unknown)
@@ -310,6 +312,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
     }
     return { recoveredCount, hadPending: true, firstError };
   }, [restorePurchases]);
+  recoverPendingPurchasesRef.current = recoverPendingPurchases;
 
   useEffect(() => {
     if (!connected) return;
