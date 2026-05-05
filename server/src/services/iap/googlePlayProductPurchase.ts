@@ -66,6 +66,5 @@ export async function consumeGooglePlayProductPurchase(params: {
   await client.request({
     url,
     method: 'POST',
-    data: {},
   });
 }
