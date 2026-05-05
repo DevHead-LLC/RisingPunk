@@ -188,13 +188,7 @@ export async function verifyAppleDeveloperSupport(params: {
     throw new Error('IAP verify: invalid user id');
   }
   const verifier = createAppleSignedDataVerifier();
-  let decoded: JWSTransactionDecodedPayload;
-  try {
-    decoded = await verifier.verifyAndDecodeTransaction(params.signedTransactionInfo);
-  } catch (err: unknown) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`IAP verify: Apple transaction verification failed (${detail})`);
-  }
+  const decoded = await verifier.verifyAndDecodeTransaction(params.signedTransactionInfo);
   assertAppleConsumable(decoded);
   const storeProductId = requireProductId(decoded.productId);
   const transactionId = decoded.transactionId;
@@ -232,17 +226,11 @@ export async function verifyGoogleDeveloperSupport(params: {
   if (!packageName) {
     throw new Error('GOOGLE_PLAY_PACKAGE_NAME is not set');
   }
-  let gp: Awaited<ReturnType<typeof getGooglePlayProductPurchase>>;
-  try {
-    gp = await getGooglePlayProductPurchase({
-      packageName,
-      productId: params.productId,
-      purchaseToken: params.purchaseToken,
-    });
-  } catch (err: unknown) {
-    const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`IAP verify: Google purchase lookup failed (${detail})`);
-  }
+  const gp = await getGooglePlayProductPurchase({
+    packageName,
+    productId: params.productId,
+    purchaseToken: params.purchaseToken,
+  });
   if (gp.purchaseState !== 0) {
     throw new Error(`IAP verify: Google purchase not in purchased state (purchaseState=${String(gp.purchaseState)})`);
   }
