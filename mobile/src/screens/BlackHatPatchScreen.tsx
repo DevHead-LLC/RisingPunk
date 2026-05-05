@@ -13,6 +13,7 @@ import {
 import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  getPendingTransactionsIOS,
   deepLinkToSubscriptions,
   ErrorCode,
   finishTransaction,
@@ -124,6 +125,11 @@ function isAndroidAlreadyConsumedFinishError(err: unknown): boolean {
   return code.includes('ITEM_NOT_OWNED') || message.includes('ITEM_NOT_OWNED') || message.includes('ALREADY CONSUMED');
 }
 
+function isUserCancelledPurchaseError(err: PurchaseError): boolean {
+  const code = String(err.code ?? '').toLowerCase();
+  return err.code === ErrorCode.UserCancelled || code === 'user-cancelled' || code === 'user_cancelled';
+}
+
 type Props = {
   onClose: () => void;
 };
@@ -231,6 +237,16 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
   );
   const handleVerifiedPurchaseRef = useRef(handleVerifiedPurchase);
   handleVerifiedPurchaseRef.current = handleVerifiedPurchase;
+  type PendingRecoveryResult = {
+    recoveredCount: number;
+    hadPending: boolean;
+    firstError: unknown | null;
+  };
+  const recoverPendingPurchasesRef = useRef<() => Promise<PendingRecoveryResult>>(async () => ({
+    recoveredCount: 0,
+    hadPending: false,
+    firstError: null,
+  }));
 
   const { connected, products, fetchProducts, requestPurchase, restorePurchases } = useIAP({
     onPurchaseSuccess: (purchase) => {
@@ -244,17 +260,59 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
       })().catch(() => {});
     },
     onPurchaseError: (err: PurchaseError) => {
+      if (isUserCancelledPurchaseError(err)) {
+        if (Platform.OS === 'ios') {
+          Alert.alert('Purchase', 'Purchase canceled.');
+        }
+        return;
+      }
       const base = err.message ?? String(err.code ?? 'unknown error');
       const hint =
         err.code === ErrorCode.DuplicatePurchase
-          ? '\n\nIf you already paid, server verification may have failed earlier (check the prior alert). Try Restore after signing in, or wait a moment and try again. Unfinished store transactions can look like “duplicate” until they are finished.'
+          ? '\n\nA prior transaction is likely still pending verification/finalization. Use Restore purchases to recover and clear pending transactions, then try again.'
           : '';
       Alert.alert('Purchase', `${base}${hint}`);
+      if (err.code === ErrorCode.DuplicatePurchase) {
+        recoverPendingPurchasesRef
+          .current()
+          .then((result) => {
+            if (result.recoveredCount > 0) {
+              Alert.alert('Purchase', `Recovered ${result.recoveredCount} pending purchase(s). You can try buying again.`);
+              refetchLedgerSafe().catch(() => {});
+            }
+          })
+          .catch(() => {});
+      }
     },
     onError: (err) => {
       Alert.alert('Store', err.message);
     },
   });
+
+  const recoverPendingPurchases = useCallback(async (): Promise<PendingRecoveryResult> => {
+    const pendingRaw =
+      Platform.OS === 'ios'
+        ? ((await getPendingTransactionsIOS()) as unknown)
+        : ((await restorePurchases()) as unknown);
+    const pending = Array.isArray(pendingRaw) ? (pendingRaw as Purchase[]) : [];
+    if (pending.length === 0) {
+      return { recoveredCount: 0, hadPending: false, firstError: null };
+    }
+    let recoveredCount = 0;
+    let firstError: unknown = null;
+    for (const purchase of pending) {
+      try {
+        await handleVerifiedPurchaseRef.current(purchase);
+        recoveredCount += 1;
+      } catch (err) {
+        if (firstError == null) {
+          firstError = err;
+        }
+      }
+    }
+    return { recoveredCount, hadPending: true, firstError };
+  }, [restorePurchases]);
+  recoverPendingPurchasesRef.current = recoverPendingPurchases;
 
   useEffect(() => {
     if (!connected) return;
@@ -296,35 +354,28 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
 
   const onRestore = useCallback(async () => {
     try {
-      const restored = (await restorePurchases()) as unknown;
-      const pending = Array.isArray(restored) ? (restored as Purchase[]) : [];
-      if (pending.length === 0) {
+      if (Platform.OS === 'ios') {
+        // iOS restore should force a full App Store sync before pending-transaction recovery.
+        await restorePurchases();
+      }
+      const result = await recoverPendingPurchases();
+      if (!result.hadPending) {
         Alert.alert(
           'Restore',
-          'Sync complete. No pending purchases were found for this signed-in store account.',
+          Platform.OS === 'ios'
+            ? 'Sync complete. No pending iOS purchases were found to recover.'
+            : 'Sync complete. No pending purchases were found for this signed-in store account.',
         );
         refetchLedgerSafe().catch(() => {});
         return;
       }
-      let verifiedCount = 0;
-      let firstError: unknown = null;
-      for (const purchase of pending) {
-        try {
-          await handleVerifiedPurchaseRef.current(purchase);
-          verifiedCount += 1;
-        } catch (err) {
-          if (firstError == null) {
-            firstError = err;
-          }
-        }
-      }
-      if (verifiedCount > 0) {
+      if (result.recoveredCount > 0) {
         Alert.alert(
           'Restore',
-          `Recovered ${verifiedCount} pending purchase${verifiedCount === 1 ? '' : 's'}.`,
+          `Recovered ${result.recoveredCount} pending purchase${result.recoveredCount === 1 ? '' : 's'}.`,
         );
-      } else if (firstError) {
-        throw firstError;
+      } else if (result.firstError) {
+        throw result.firstError;
       } else {
         Alert.alert(
           'Restore',
@@ -335,7 +386,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
     } catch (e: unknown) {
       Alert.alert('Restore', formatUserFacingError(e));
     }
-  }, [restorePurchases, refetchLedgerSafe]);
+  }, [recoverPendingPurchases, refetchLedgerSafe, restorePurchases]);
 
   const onManageStore = useCallback(async () => {
     try {
