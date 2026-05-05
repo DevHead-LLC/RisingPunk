@@ -354,6 +354,10 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
 
   const onRestore = useCallback(async () => {
     try {
+      if (Platform.OS === 'ios') {
+        // iOS restore should force a full App Store sync before pending-transaction recovery.
+        await restorePurchases();
+      }
       const result = await recoverPendingPurchases();
       if (!result.hadPending) {
         Alert.alert(
@@ -382,7 +386,7 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
     } catch (e: unknown) {
       Alert.alert('Restore', formatUserFacingError(e));
     }
-  }, [recoverPendingPurchases, refetchLedgerSafe]);
+  }, [recoverPendingPurchases, refetchLedgerSafe, restorePurchases]);
 
   const onManageStore = useCallback(async () => {
     try {
