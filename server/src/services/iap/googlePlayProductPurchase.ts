@@ -12,15 +12,7 @@ export type GoogleProductPurchaseResource = {
   priceCurrencyCode?: string;
 };
 
-/**
- * Calls Play Developer API `purchases.products.get` using a service account JSON in
- * `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (raw JSON string).
- */
-export async function getGooglePlayProductPurchase(params: {
-  packageName: string;
-  productId: string;
-  purchaseToken: string;
-}): Promise<GoogleProductPurchaseResource> {
+async function createAndroidPublisherClient() {
   const json = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
   if (!json || !json.trim()) {
     throw new Error('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not set');
@@ -35,7 +27,19 @@ export async function getGooglePlayProductPurchase(params: {
     credentials,
     scopes: ['https://www.googleapis.com/auth/androidpublisher'],
   });
-  const client = await auth.getClient();
+  return auth.getClient();
+}
+
+/**
+ * Calls Play Developer API `purchases.products.get` using a service account JSON in
+ * `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (raw JSON string).
+ */
+export async function getGooglePlayProductPurchase(params: {
+  packageName: string;
+  productId: string;
+  purchaseToken: string;
+}): Promise<GoogleProductPurchaseResource> {
+  const client = await createAndroidPublisherClient();
   const url =
     `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/` +
     `${encodeURIComponent(params.packageName)}/purchases/products/` +
@@ -46,4 +50,21 @@ export async function getGooglePlayProductPurchase(params: {
     throw new Error('Google Play API returned an empty product purchase payload');
   }
   return data;
+}
+
+/** Consumes a verified one-time product purchase so consumables can be repurchased. */
+export async function consumeGooglePlayProductPurchase(params: {
+  packageName: string;
+  productId: string;
+  purchaseToken: string;
+}): Promise<void> {
+  const client = await createAndroidPublisherClient();
+  const url =
+    `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/` +
+    `${encodeURIComponent(params.packageName)}/purchases/products/` +
+    `${encodeURIComponent(params.productId)}/tokens/${encodeURIComponent(params.purchaseToken)}:consume`;
+  await client.request({
+    url,
+    method: 'POST',
+  });
 }
