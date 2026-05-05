@@ -256,7 +256,9 @@ export const BlackHatPatchScreen: React.FC<Props> = ({ onClose }) => {
     },
     onPurchaseError: (err: PurchaseError) => {
       if (isUserCancelledPurchaseError(err)) {
-        Alert.alert('Purchase', 'Purchase canceled.');
+        if (Platform.OS === 'ios') {
+          Alert.alert('Purchase', 'Purchase canceled.');
+        }
         return;
       }
       const base = err.message ?? String(err.code ?? 'unknown error');
