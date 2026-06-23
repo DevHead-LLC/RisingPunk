@@ -1,0 +1,196 @@
+================================================================================
+  RISINGPUNK — SYSTEM ARCHITECTURE (Plain-Text Version)
+================================================================================
+
+RisingPunk is a cross-platform mobile strategy game (iOS & Android) built with
+React Native. Players manage a hacker-themed empire: turf/base building, world-
+map PvP/NPC combat, crew coordination, bug hunts, mini-games, and in-app
+purchases. The backend is a Node.js/Express API backed by MongoDB, deployed to
+AWS Elastic Beanstalk.
+
+--------------------------------------------------------------------------------
+HIGH-LEVEL OVERVIEW
+--------------------------------------------------------------------------------
+
+  +------------------+     +------------------+     +------------------+
+  |   iOS App        |     |  Android App     |     |  shared/         |
+  | (React Native)   |     | (React Native)   |     |  TypeScript      |
+  +--------+---------+     +--------+---------+     +--------+---------+
+           |                        |                        |
+           +------------------------+------------------------+
+                                    |
+                                    v
+                         +----------------------+
+                         |  Express API         |
+                         |  REST /api/*         |
+                         +----------+-----------+
+                                    |
+              +---------------------+---------------------+
+              |                     |                     |
+              v                     v                     v
+   +------------------+  +------------------+  +------------------+
+   | Domain Services  |  | Background       |  | External APIs    |
+   | battles, marches |  | Schedulers       |  | Apple/Google IAP |
+   | crew, bug hunt   |  | march arrival,   |  | Firebase, Email  |
+   +--------+---------+  | NPC respawn      |  +------------------+
+            |             +--------+---------+
+            |                      |
+            v                      v
+         +-----------------------------------+
+         |         MongoDB                   |
+         |  RisingPunk / RisingPunkProd      |
+         +-----------------------------------+
+
+  Deployment: GitHub Actions --> AWS Elastic Beanstalk --> Express API
+
+--------------------------------------------------------------------------------
+REPOSITORY STRUCTURE
+--------------------------------------------------------------------------------
+
+  mobile/              React Native app (iOS + Android), Redux, RTK Query
+  server/              Express API, Mongoose models, domain services
+  shared/              Cross-platform TypeScript (IAP, battle replay, map copy)
+  .github/workflows/   Deploy, branch promotion, Bugbot babysit automation
+
+--------------------------------------------------------------------------------
+MOBILE CLIENT
+--------------------------------------------------------------------------------
+
+  Screens & UI                    State                         Native
+  -------------                   -----                         ------
+  Turf / Base                     Redux slices                  Apple Sign-In
+  Hack Map                        (auth, balance, bots, map)    Google Sign-In
+  Battle Grid                     RTK Query (20+ API modules)     react-native-iap
+  Crew & Chat                     --> HTTPS + JWT --> Backend     Keychain storage
+  Mini-Games (Daily Haul, etc.)
+
+  Patterns:
+  - Environment-aware API URL via react-native-config (dev / staging / prod)
+  - RTK Query for server state with tag-based cache invalidation
+  - Polling for async systems (marches, transfer runs, swarm sessions)
+  - Turf <-> Hack Map handoff for battle prep, swarm, and bug hunt flows
+
+--------------------------------------------------------------------------------
+BACKEND API
+--------------------------------------------------------------------------------
+
+  HTTP Layer
+  ----------
+  Express routes under /api/*
+  JWT auth middleware
+  Minimum app version gate
+
+  Representative API Routes
+  -------------------------
+  /api/auth              Login, guest, Apple/Google OAuth, JWT sessions
+  /api/map               World grid, occupancy, probes, shields
+  /api/attack            Async marches (solo, swarm, bug hunt)
+  /api/battle            Live and headless PvP/NPC battles
+  /api/crew              Crew roster, chat, swarm prep
+  /api/bug-hunt          Ant world, hunters, storage, tokens
+  /api/transfer-runs     Player-to-player item/cash transfers
+  /api/iap               Store receipt verify + developer-support ledger
+  /api/private-messages  DMs, battle reports (BTL|), system messages
+
+  Domain Services (examples)
+  --------------------------
+  BattleService, HeadlessBattleRunner
+  MarchArrivalSchedulerService, AttackMarchLaunchService
+  SwarmService, CrewDisbandService
+  BugHuntWorldService, BugHuntTokenService
+  RentalHousingSyncService, TransferRunService
+  IAP verify + IapDeveloperSupportLedger
+
+  Mongoose Models (examples)
+  --------------------------
+  User, Bot, Finance, Map, MapCell, AttackMarch
+  Crew, PrivateMessage, SwarmSession
+  Battle, BattleReplay, BugInstance
+
+  Background Schedulers (multi-instance safe)
+  -------------------------------------------
+  March arrival and stale-state recovery
+  NPC respawn timers
+  Crew understaff / disband watchdogs
+  Battle data retention and privacy cleanup
+  Ant world reseed scheduler
+
+--------------------------------------------------------------------------------
+ASYNC MAP ATTACK FLOW (Simplified)
+--------------------------------------------------------------------------------
+
+  1. Mobile app  -->  POST /api/attack/launch
+  2. Server      -->  Create AttackMarch in MongoDB (outbound state)
+  3. Mobile app  -->  Poll GET /api/attack/mine for ETA and position
+  4. Scheduler   -->  Sweep due marches, resolve arrival
+  5. Server      -->  Run battle (headless if offline), save results
+  6. Mobile app  -->  Receive battle report via DM or replay API
+
+  Battles can run headlessly while the player is offline. Replay format is
+  shared between client and server via shared/battleReplay.ts.
+
+--------------------------------------------------------------------------------
+AUTHENTICATION & PAYMENTS
+--------------------------------------------------------------------------------
+
+  Sign-In:  Guest | Apple Sign-In | Google Sign-In
+  Session:  JWT in Authorization header, stored in device keychain
+
+  IAP Flow:
+    App Store / Play Store  -->  POST /api/iap/verify  -->  Ledger
+    Apple ASSN webhook      -->  Refund / revoke handling
+
+--------------------------------------------------------------------------------
+ENVIRONMENTS
+--------------------------------------------------------------------------------
+
+  Environment   Mobile Config      API Host                  Database
+  -----------   -------------      --------                  --------
+  Development   .env.dev           localhost / emulator      RisingPunk
+  Staging       .env.staging       api.risingpunk.dev        RisingPunk
+  Production    .env.prod          api.risingpunk.com        RisingPunkProd
+
+--------------------------------------------------------------------------------
+DEPLOYMENT PIPELINE
+--------------------------------------------------------------------------------
+
+  feature/*  --PR+Bugbot-->  dev  -->  main  -->  staging  -->  prod
+                                                                  |
+                                                                  v
+                                                    AWS Elastic Beanstalk
+                                                    (server/** push triggers deploy)
+
+  GitHub Actions workflows:
+  - deploy-staging.yml / deploy-production.yml  (API build + EB deploy)
+  - auto-promote-branches.yml                   (Cursor Bugbot gate)
+  - babysit-manual.yml                          (PR fix loop automation)
+
+  Mobile: Xcode / Gradle builds with ENVFILE per environment (store release)
+
+--------------------------------------------------------------------------------
+TECHNOLOGY STACK
+--------------------------------------------------------------------------------
+
+  Mobile:     React Native 0.83, React 19, TypeScript, Redux Toolkit,
+              RTK Query, Reanimated, Gesture Handler
+  Backend:    Node.js, Express, TypeScript, Mongoose, Jest
+  Database:   MongoDB
+  Auth:       JWT, Apple Sign-In, Google Sign-In
+  IAP:        react-native-iap, Apple App Store Server Library, Google Play
+  Analytics:  Firebase Analytics
+  Hosting:    AWS Elastic Beanstalk
+  CI:         GitHub Actions, Cursor Bugbot
+
+--------------------------------------------------------------------------------
+DESIGN PRINCIPLES
+--------------------------------------------------------------------------------
+
+  1. Server authority — economy, combat, march timing, IAP grants on server
+  2. Shared contracts — IAP catalog, battle replay in shared/ TypeScript
+  3. Async-first map gameplay — scheduled resolution, no persistent socket
+  4. Fail-fast configuration — missing env vars throw at startup
+  5. Multi-instance safety — MongoDB leases/indexes for EB horizontal scale
+
+================================================================================
+  End of document — suitable for portfolio and technical onboarding
+================================================================================
