@@ -1,0 +1,43 @@
+flowchart TB
+    subgraph Clients["Clients"]
+        iOS["iOS App\nReact Native"]
+        Android["Android App\nReact Native"]
+        Web["Web App\nAWS Amplify\nrisingpunk.com"]
+    end
+
+    subgraph DNS["Cloudflare DNS / SSL"]
+        CFProd["risingpunk.com"]
+        CFStaging["risingpunk.dev"]
+    end
+
+    subgraph API["AWS Elastic Beanstalk"]
+        EBProd["rp-api-prod\napi.risingpunk.com"]
+        EBStaging["rp-api-staging\napi.risingpunk.dev"]
+    end
+
+    subgraph Data["MongoDB Atlas"]
+        DBStaging["RisingPunkDB cluster\nRisingPunk database"]
+        DBProd["RisingPunkProd cluster"]
+    end
+
+    subgraph CI["GitHub"]
+        Repo["DevHead-LLC/RisingPunk"]
+        Actions["Actions deploy workflows"]
+    end
+
+    iOS --> CFProd
+    Android --> CFProd
+    Web --> CFProd
+    iOS --> CFStaging
+    Android --> CFStaging
+
+    CFProd --> EBProd
+    CFStaging --> EBStaging
+
+    EBProd --> DBProd
+    EBStaging --> DBStaging
+
+    Repo --> Actions
+    Actions --> EBProd
+    Actions --> EBStaging
+    Actions --> Web

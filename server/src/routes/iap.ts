@@ -9,6 +9,34 @@ import {
 
 const router = express.Router();
 
+function isIapConfigurationError(msg: string): boolean {
+  const s = msg.toLowerCase();
+  const hasEnvKey =
+    s.includes('apple_') ||
+    s.includes('google_play_') ||
+    s.includes('app_apple_id') ||
+    s.includes('bundle_id') ||
+    s.includes('bundle id');
+  const hasConfigSignal =
+    s.includes('not set') ||
+    s.includes('required') ||
+    s.includes('must be') ||
+    s.includes('contained no usable paths') ||
+    s.includes('valid json');
+  return hasEnvKey && hasConfigSignal;
+}
+
+function isStoreVerificationInputError(msg: string): boolean {
+  const s = msg.toLowerCase();
+  return (
+    s.includes('verification failed') ||
+    s.includes('failed to decode') ||
+    s.includes('invalid compact jws') ||
+    s.includes('transactionid missing') ||
+    s.includes('product id not in v1 catalog')
+  );
+}
+
 router.post('/developer-support/verify', auth, async (req: Request, res: Response) => {
   try {
     const userId = req.user?._id;
@@ -46,7 +74,7 @@ router.post('/developer-support/verify', auth, async (req: Request, res: Respons
     res.status(400).json({ error: 'platform must be apple or google' });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('not set') || msg.includes('APPLE_ROOT_CA_PATHS') || msg.includes('GOOGLE_PLAY')) {
+    if (isIapConfigurationError(msg)) {
       res.status(503).json({ error: 'IAP verification is not configured on this server' });
       return;
     }
@@ -56,6 +84,10 @@ router.post('/developer-support/verify', auth, async (req: Request, res: Respons
     }
     if (msg.startsWith('IAP verify:')) {
       res.status(400).json({ error: msg });
+      return;
+    }
+    if (isStoreVerificationInputError(msg)) {
+      res.status(400).json({ error: `IAP verify: ${msg}` });
       return;
     }
     console.error('IAP verify error:', e);

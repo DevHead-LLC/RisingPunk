@@ -23,10 +23,12 @@ jest.setup.js
 **/*.test.d.ts
 **/*.spec.d.ts
 
+# Markdown: ignore by default; allow root README + portfolio package only
 *.md
 **/*.md
-mobile/current-task.md
-current-task.md
+!README.md
+!portfolio/
+!portfolio/**/*.md
 
 # IDE configuration files
 .idea/
