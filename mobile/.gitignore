@@ -22,6 +22,11 @@ DerivedData
 *.xcuserstate
 **/.xcode.env.local
 
+# Environment files (secrets / per-machine config — never commit)
+.env
+.env.*
+!.env.example
+
 # Android/IntelliJ
 #
 build/
